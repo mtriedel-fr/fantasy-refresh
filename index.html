@@ -159,11 +159,11 @@ tr:hover td{background:var(--or4);}
 .myteam-stat-val.bad{color:var(--red);}
 .myteam-lineup{padding:16px 20px;}
 .myteam-lineup-title{font-family:var(--fd);font-size:11px;font-weight:700;color:var(--ink2);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;}
-.lineup-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;}
-.lineup-slot{background:var(--bg3);border-radius:8px;padding:10px 12px;border:1px solid var(--bdr);display:flex;align-items:center;gap:10px;}
-.lineup-pos{font-family:var(--fd);font-size:11px;font-weight:800;color:var(--or);text-transform:uppercase;letter-spacing:.5px;min-width:34px;}
-.lineup-player{font-family:var(--fd);font-size:13px;font-weight:600;color:var(--ink);flex:1;}
-.lineup-pct{font-family:var(--fd);font-size:11px;color:var(--ink3);}
+.lineup-grid{display:flex;flex-direction:column;gap:6px;}
+.lineup-slot{background:var(--bg4);border-radius:8px;padding:11px 14px;border:1px solid var(--bdr);display:flex;align-items:center;gap:12px;}
+.lineup-pos{font-family:var(--fd);font-size:12px;font-weight:800;color:var(--or);text-transform:uppercase;letter-spacing:.5px;min-width:40px;}
+.lineup-player{font-family:var(--fd);font-size:15px;font-weight:700;color:var(--ink);flex:1;}
+.lineup-pct{font-family:var(--fd);font-size:11px;color:var(--ink3);white-space:nowrap;}
 .myteam-empty{padding:48px 24px;text-align:center;}
 .myteam-empty-icon{font-size:40px;margin-bottom:12px;opacity:.4;}
 .myteam-empty-title{font-family:var(--fd);font-size:18px;font-weight:700;color:var(--ink2);text-transform:uppercase;margin-bottom:6px;}
@@ -995,17 +995,30 @@ function renderMyTeam(sorted, curEntries, prevRank, curMap){
   // League start percentages for this week
   var startPcts = getLeagueStartPcts(curEntries);
 
-  // Parse this team's lineup
-  var players = parseLineup(entry.lineup || '');
-  var posOrder = ['QB','RB','WR','TE','FLEX','DST','K'];
-  players.sort(function(a,b){ return (posOrder.indexOf(a.pos)||9) - (posOrder.indexOf(b.pos)||9); });
+  // Build standard fantasy lineup slots in fixed order
+  var slotDefs = [
+    {pos:'QB',  label:'QB'},
+    {pos:'RB',  label:'RB'},
+    {pos:'RB',  label:'RB'},
+    {pos:'WR',  label:'WR'},
+    {pos:'WR',  label:'WR'},
+    {pos:'WR',  label:'WR'},
+    {pos:'TE',  label:'TE'},
+    {pos:'FLEX',label:'FLEX'},
+    {pos:'DST', label:'DEF'}
+  ];
 
-  var lineupSlots = players.map(function(p){
-    var pct = startPcts[p.player] ? Math.round(startPcts[p.player] / curEntries.length * 100) : 0;
+  // Match parsed players to slots greedily
+  var remaining = players.slice();
+  var lineupSlots = slotDefs.map(function(slot){
+    var idx = remaining.findIndex(function(p){ return p.pos === slot.pos; });
+    var player = idx >= 0 ? remaining.splice(idx, 1)[0] : null;
+    var count = player && startPcts[player.player] ? startPcts[player.player] : 0;
+    var pct = count ? Math.round(count / curEntries.length * 100) : 0;
     return '<div class="lineup-slot">'
-      + '<span class="lineup-pos">' + p.pos + '</span>'
-      + '<span class="lineup-player">' + p.player + '</span>'
-      + '<span class="lineup-pct">' + pct + '%</span>'
+      + '<span class="lineup-pos">' + slot.label + '</span>'
+      + '<span class="lineup-player">' + (player ? player.player : '—') + '</span>'
+      + (player ? '<span class="lineup-pct">' + count + ' of ' + curEntries.length + ' (' + pct + '%)</span>' : '')
       + '</div>';
   }).join('');
 
@@ -1139,10 +1152,7 @@ function renderNumbers(curEntries){
     + '<div class="num-body"><div class="num-stat-grid">'
     + '<div class="num-stat"><div class="num-stat-lbl">High</div><div class="num-stat-val">' + high.score.toFixed(1) + '</div></div>'
     + '<div class="num-stat"><div class="num-stat-lbl">Average</div><div class="num-stat-val">' + avg.toFixed(1) + '</div></div>'
-    + '<div class="num-stat"><div class="num-stat-lbl">Median</div><div class="num-stat-val">' + median.toFixed(1) + '</div></div>'
     + '<div class="num-stat"><div class="num-stat-lbl">Low</div><div class="num-stat-val">' + low.score.toFixed(1) + '</div></div>'
-    + '<div class="num-stat"><div class="num-stat-lbl">Std Dev</div><div class="num-stat-val">' + stddev.toFixed(1) + '</div></div>'
-    + '<div class="num-stat"><div class="num-stat-lbl">Above avg</div><div class="num-stat-val">' + above + '</div></div>'
     + '</div></div></div>'
 
     // Score distribution
