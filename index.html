@@ -364,8 +364,6 @@ tr.my-team:hover td{background:rgba(255,123,58,.14) !important;}
   </div>
 </div>
 
-<div class="recap-banner" id="recap-banner"></div>
-
 <!-- YOUR WEEK — main landing with 3 sub-tabs -->
 <div id="tab-myteam" class="content">
   <div class="sub-tabs">
@@ -613,7 +611,6 @@ function renderAll(){
   renderMyTeam(sorted, curEntries, prevRank, curMap);
   renderFinish(sorted, curEntries, prevRank);
   renderNumbers(curEntries);
-  renderRecap(sorted, curEntries, prevRank);
   initMyTeamInput();
   if(!document.getElementById('comm-panel').classList.contains('hidden')) renderHistory();
 }
