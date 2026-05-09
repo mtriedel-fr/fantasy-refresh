@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fantasy Refresh — Player Profile</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --hdr:#150D02;--hdr2:#1E1206;
+  --bg:#D4B896;--bg2:#C8A878;--bg3:#E8D4B8;--bg4:#F0E4CC;
+  --or:#FF7B3A;--or2:#FF9A62;--or4:#FFE0C0;
+  --ink:#1E1206;--ink2:#6A4E2E;--ink3:#A07848;
+  --bdr:#B8986A;--bdr2:#A08050;--red:#B83020;--grn:#2A6838;
+  --fd:'Barlow Condensed',sans-serif;--fb:'Barlow',sans-serif;
+}
+body{background:#1E1206;min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:24px 16px;font-family:var(--fb);}
+.wrap{width:100%;max-width:960px;border-radius:16px;overflow:hidden;border:1px solid #3A2810;box-shadow:0 24px 80px rgba(0,0,0,.6);}
+
+/* HEADER */
+.hdr{background:var(--hdr);padding:22px 28px;display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid var(--or);}
+.logo{display:flex;align-items:center;gap:12px;}
+.logo-box{width:40px;height:40px;background:var(--or);border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.logo-box svg{width:22px;height:22px;stroke:#150D02;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;}
+.logo-txt{font-family:var(--fd);font-size:28px;font-weight:800;color:#F5EAD8;text-transform:uppercase;letter-spacing:.5px;line-height:1;}
+.logo-txt span{color:var(--or);}
+.hdr-r{display:flex;flex-direction:column;align-items:flex-end;gap:6px;}
+.back-btn{background:transparent;border:1px solid #3A2810;color:#6A5038;font-family:var(--fd);font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;padding:4px 12px;border-radius:6px;cursor:pointer;transition:all .15s;text-decoration:none;display:inline-block;}
+.back-btn:hover{border-color:var(--or);color:var(--or);}
+
+/* HERO */
+.hero{background:linear-gradient(135deg,var(--hdr) 0%,var(--hdr2) 100%);padding:28px;border-bottom:2px solid var(--bg2);}
+.hero-name{font-family:var(--fd);font-size:36px;font-weight:800;color:#F5EAD8;text-transform:uppercase;letter-spacing:.5px;line-height:1;}
+.hero-sub{font-family:var(--fd);font-size:13px;font-weight:600;color:#6A5038;letter-spacing:1px;text-transform:uppercase;margin-top:4px;}
+.hero-stats{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;margin-top:20px;background:var(--bdr2);border-radius:10px;overflow:hidden;border:1px solid var(--bdr2);}
+.hero-stat{background:#1E1206;padding:14px 12px;text-align:center;}
+.hero-stat-lbl{font-family:var(--fd);font-size:10px;font-weight:700;color:#6A5038;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;}
+.hero-stat-val{font-family:var(--fd);font-size:24px;font-weight:800;color:var(--or);letter-spacing:-.5px;line-height:1;}
+.hero-stat-sub{font-family:var(--fd);font-size:10px;color:#4A3020;margin-top:3px;letter-spacing:.3px;}
+
+/* CONTENT */
+.body{background:var(--bg);padding:20px 24px;display:flex;flex-direction:column;gap:20px;}
+
+/* SECTION */
+.section{background:var(--bg3);border-radius:12px;overflow:hidden;border:1px solid var(--bdr);}
+.section-hdr{background:var(--bg2);padding:12px 18px;font-family:var(--fd);font-size:12px;font-weight:700;color:var(--ink2);text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--bdr);}
+
+/* CHARTS */
+.chart-wrap{padding:16px 18px 8px;}
+.chart-canvas{width:100%;height:180px;position:relative;}
+svg.chart{width:100%;height:100%;overflow:visible;}
+.chart-label{font-family:var(--fd);font-size:10px;fill:var(--ink3);}
+.chart-line{fill:none;stroke:var(--or);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;}
+.chart-line-avg{fill:none;stroke:var(--bdr2);stroke-width:1.5;stroke-dasharray:4,3;stroke-linecap:round;}
+.chart-line-rank{fill:none;stroke:#6050A8;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;}
+.chart-dot{fill:var(--or);stroke:#1E1206;stroke-width:2;}
+.chart-dot-rank{fill:#6050A8;stroke:#1E1206;stroke-width:2;}
+.chart-area{opacity:.12;}
+.chart-legend{display:flex;gap:16px;padding:4px 18px 12px;flex-wrap:wrap;}
+.legend-item{display:flex;align-items:center;gap:5px;font-family:var(--fd);font-size:11px;font-weight:600;color:var(--ink2);text-transform:uppercase;letter-spacing:.5px;}
+.legend-dot{width:10px;height:3px;border-radius:2px;}
+
+/* WEEKLY TABLE */
+table{width:100%;border-collapse:collapse;}
+th{padding:9px 16px;text-align:left;font-family:var(--fd);font-size:10px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--ink2);border-bottom:1px solid var(--bdr);background:var(--bg2);}
+td{padding:11px 16px;border-bottom:1px solid var(--bdr);font-size:14px;color:var(--ink);}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:var(--or4);}
+.wk-num{font-family:var(--fd);font-weight:700;font-size:15px;color:var(--ink2);}
+.wk-score{font-family:var(--fd);font-weight:800;font-size:16px;color:var(--or);}
+.wk-rank{font-family:var(--fd);font-weight:600;font-size:14px;}
+.wk-rank.top{color:var(--grn);}
+.wk-rank.bot{color:var(--red);}
+.wk-vs-avg{font-size:13px;}
+.wk-vs-avg.pos{color:var(--grn);}
+.wk-vs-avg.neg{color:var(--red);}
+.bar-cell{width:120px;}
+.mini-bar-bg{height:6px;background:var(--bdr);border-radius:3px;}
+.mini-bar-fill{height:6px;background:var(--or);border-radius:3px;}
+
+/* VS LEAGUE */
+.vs-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--bdr);}
+.vs-item{background:var(--bg3);padding:14px 16px;text-align:center;}
+.vs-lbl{font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink2);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;}
+.vs-val{font-family:var(--fd);font-size:22px;font-weight:800;color:var(--ink);letter-spacing:-.3px;}
+.vs-league{font-family:var(--fd);font-size:11px;color:var(--ink3);margin-top:2px;}
+.vs-val.better{color:var(--grn);}
+.vs-val.worse{color:var(--red);}
+
+/* EMPTY */
+.empty{padding:60px 24px;text-align:center;background:var(--bg);}
+.empty-icon{font-size:48px;margin-bottom:16px;opacity:.4;}
+.empty-title{font-family:var(--fd);font-size:20px;font-weight:700;color:var(--ink2);text-transform:uppercase;margin-bottom:8px;}
+.empty-sub{font-size:14px;color:var(--ink3);line-height:1.6;}
+/* TOP PLAYERS */
+.top-players{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--bdr);}
+.top-player{background:var(--bg3);padding:16px;text-align:center;}
+.tp-medal{font-size:22px;margin-bottom:6px;}
+.tp-name{font-family:var(--fd);font-size:15px;font-weight:700;color:var(--ink);margin-bottom:3px;line-height:1.2;}
+.tp-pos{font-family:var(--fd);font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--or);margin-bottom:6px;}
+.tp-count{font-family:var(--fd);font-size:12px;font-weight:600;color:var(--ink2);text-transform:uppercase;letter-spacing:.5px;}
+.tp-bar-bg{height:4px;background:var(--bdr);border-radius:2px;margin-top:8px;}
+.tp-bar-fill{height:4px;background:var(--or);border-radius:2px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="hdr">
+  <div class="logo">
+    <div class="logo-box">
+      <svg viewBox="0 0 24 24"><path d="M1 4v6h6"/><path d="M23 20v-6h-6"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
+    </div>
+    <div>
+      <div class="logo-txt">Fantasy <span>Refresh</span></div>
+    </div>
+  </div>
+  <div class="hdr-r">
+    <a href="index.html" class="back-btn">← Back to Standings</a>
+  </div>
+</div>
+
+<div id="main"></div>
+
+</div>
+
+<script>
+var FB_API_KEY  = 'AIzaSyA-2hcf2hzThk7MuEm9DAvRICK95koE9gM';
+var FB_DB_URL   = 'https://fantasy-refresh-default-rtdb.firebaseio.com';
+var TOTAL_WEEKS = 17;
+var FB_TOKEN    = null;
+var seasonData  = {};
+var teamName    = decodeURIComponent((new URLSearchParams(window.location.search)).get('team') || '');
+
+// ── LOAD ───────────────────────────────────────────────────────
+function fbSignIn(cb){
+  if(FB_TOKEN){ cb(); return; }
+  fetch('https://identitytoolkit.googleapis.com/v1/accounts:signInAnonymously?key=' + FB_API_KEY, {
+    method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({returnSecureToken:true})
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){ FB_TOKEN = d.idToken; cb(); })
+  .catch(function(){ cb(); });
+}
+
+fbSignIn(function(){
+  fetch(FB_DB_URL + '/season2025.json' + (FB_TOKEN ? '?auth=' + FB_TOKEN : ''))
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if(d && typeof d === 'object' && !d.error) seasonData = d;
+      render();
+    })
+    .catch(function(){
+      try{ var d = localStorage.getItem('fr_2025_backup'); if(d) seasonData = JSON.parse(d); }catch(e){}
+      render();
+    });
+});
+
+// ── HELPERS ────────────────────────────────────────────────────
+function getWeeks(){
+  return Object.keys(seasonData).filter(function(k){ return !isNaN(Number(k)) && seasonData[k] && seasonData[k].length; }).map(Number).sort(function(a,b){ return a-b; });
+}
+
+function getTeamEntry(week, name){
+  return (seasonData[String(week)] || []).find(function(e){ return e.name === name; });
+}
+
+function getWeekRank(week, name){
+  var entries = (seasonData[String(week)] || []).slice().sort(function(a,b){ return b.score - a.score; });
+  var idx = entries.findIndex(function(e){ return e.name === name; });
+  return idx >= 0 ? idx + 1 : null;
+}
+
+function getWeekAvg(week){
+  var entries = seasonData[String(week)] || [];
+  if(!entries.length) return 0;
+  return entries.reduce(function(s, e){ return s + e.score; }, 0) / entries.length;
+}
+
+function getLeagueAvgOverall(){
+  var weeks = getWeeks();
+  var all = [];
+  weeks.forEach(function(w){ (seasonData[String(w)]||[]).forEach(function(e){ all.push(e.score); }); });
+  return all.length ? all.reduce(function(a,b){ return a+b; },0) / all.length : 0;
+}
+
+function getAllTeamTotals(){
+  var totals = {};
+  getWeeks().forEach(function(w){
+    (seasonData[String(w)]||[]).forEach(function(e){ totals[e.name] = (totals[e.name]||0) + e.score; });
+  });
+  return Object.keys(totals).sort(function(a,b){ return totals[b]-totals[a]; }).map(function(name, i){ return {name:name, total:totals[name], rank:i+1}; });
+}
+
+function getCumulativeStanding(upToWeek, name){
+  // Build cumulative totals for all teams through upToWeek
+  var totals = {};
+  getWeeks().filter(function(w){ return w <= upToWeek; }).forEach(function(w){
+    (seasonData[String(w)]||[]).forEach(function(e){
+      totals[e.name] = (totals[e.name]||0) + e.score;
+    });
+  });
+  var sorted = Object.keys(totals).sort(function(a,b){ return totals[b]-totals[a]; });
+  var idx = sorted.indexOf(name);
+  return idx >= 0 ? idx + 1 : null;
+}
+
+// ── RENDER ─────────────────────────────────────────────────────
+function render(){
+  if(!teamName){
+    document.getElementById('main').innerHTML = '<div class="empty"><div class="empty-icon">🔍</div><div class="empty-title">No team selected</div><div class="empty-sub"><a href="index.html" style="color:var(--or)">← Back to standings</a></div></div>';
+    return;
+  }
+
+  var weeks = getWeeks();
+  var teamWeeks = weeks.filter(function(w){ return !!getTeamEntry(w, teamName); });
+
+  if(!teamWeeks.length){
+    document.getElementById('main').innerHTML = '<div class="empty"><div class="empty-icon">🏈</div><div class="empty-title">No data for ' + teamName + '</div><div class="empty-sub"><a href="index.html" style="color:var(--or)">← Back to standings</a></div></div>';
+    return;
+  }
+
+  // Build per-week data including cumulative standing after each week
+  var weekData = teamWeeks.map(function(w){
+    var entry = getTeamEntry(w, teamName);
+    var rank = getWeekRank(w, teamName);
+    var avg = getWeekAvg(w);
+    var total = seasonData[String(w)] ? seasonData[String(w)].length : 0;
+    var cumStanding = getCumulativeStanding(w, teamName);
+    return { week: w, score: entry.score, rank: rank, avg: avg, total: total, vsAvg: entry.score - avg, cumStanding: cumStanding };
+  });
+
+  var scores = weekData.map(function(d){ return d.score; });
+  var total = scores.reduce(function(a,b){ return a+b; }, 0);
+  var avg = total / scores.length;
+  var best = Math.max.apply(null, scores);
+  var worst = Math.min.apply(null, scores);
+  var bestWeek = weekData.find(function(d){ return d.score === best; });
+  var ranks = weekData.map(function(d){ return d.rank; }).filter(function(r){ return r !== null; });
+  var avgRank = ranks.length ? Math.round(ranks.reduce(function(a,b){ return a+b; },0) / ranks.length) : null;
+
+  // Overall standing
+  var allTotals = getAllTeamTotals();
+  var myStanding = allTotals.find(function(t){ return t.name === teamName; });
+  var leagueAvg = getLeagueAvgOverall();
+
+  document.title = teamName + ' — Fantasy Refresh';
+
+  var html = '';
+
+  // HERO
+  html += '<div class="hero">'
+    + '<div class="hero-name">' + teamName + '</div>'
+    + '<div class="hero-sub">2025 Season · ' + teamWeeks.length + ' weeks played</div>'
+    + '<div class="hero-stats">'
+    + heroStat('Season Total', total.toFixed(1), myStanding ? '#' + myStanding.rank + ' overall' : '')
+    + heroStat('Weekly Avg', avg.toFixed(1), leagueAvg > 0 ? (avg >= leagueAvg ? '+' : '') + (avg - leagueAvg).toFixed(1) + ' vs league' : '')
+    + heroStat('Best Week', best.toFixed(1), 'Week ' + (bestWeek ? bestWeek.week : '—'))
+    + heroStat('Worst Week', worst.toFixed(1), '')
+    + heroStat('Avg Rank', avgRank ? '#' + avgRank : '—', 'per week')
+    + '</div></div>';
+
+  // CHARTS
+  html += '<div class="body">';
+
+  // Score chart
+  html += '<div class="section"><div class="section-hdr">Weekly Score — vs League Average</div>'
+    + '<div class="chart-wrap"><div class="chart-canvas">' + buildScoreChart(weekData) + '</div></div>'
+    + '<div class="chart-legend">'
+    + '<div class="legend-item"><div class="legend-dot" style="background:var(--or)"></div>' + teamName + '</div>'
+    + '<div class="legend-item"><div class="legend-dot" style="background:var(--bdr2)"></div>League avg</div>'
+    + '</div></div>';
+
+  // Rank chart
+  html += '<div class="section"><div class="section-hdr">Weekly Finish & Season Standing</div>'
+    + '<div class="chart-wrap"><div class="chart-canvas">' + buildRankChart(weekData) + '</div></div>'
+    + '<div class="chart-legend">'
+    + '<div class="legend-item"><div class="legend-dot" style="background:#6050A8"></div>Weekly finish</div>'
+    + '<div class="legend-item"><div class="legend-dot" style="background:var(--or);opacity:.7"></div>Season standing</div>'
+    + '</div></div>';
+
+  // VS LEAGUE
+  html += '<div class="section"><div class="section-hdr">vs League Averages</div><div class="vs-grid">'
+    + vsItem('Your Avg', avg.toFixed(1), 'League: ' + leagueAvg.toFixed(1), avg >= leagueAvg)
+    + vsItem('Your Best', best.toFixed(1), 'League best: ' + getLeagueBest().toFixed(1), best >= getLeagueBest() * 0.9)
+    + vsItem('Overall Rank', myStanding ? '#' + myStanding.rank : '—', 'of ' + allTotals.length + ' teams', myStanding && myStanding.rank <= Math.ceil(allTotals.length / 3))
+    + '</div></div>';
+
+  // TOP 3 MOST USED PLAYERS
+  var topPlayers = getTopPlayers(teamName, 3);
+  if(topPlayers.length){
+    var medals = ['🥇','🥈','🥉'];
+    var maxCount = topPlayers[0].count;
+    html += '<div class="section"><div class="section-hdr">Most Used Players This Season</div>'
+      + '<div class="top-players">';
+    topPlayers.forEach(function(p, i){
+      var pct = Math.round(p.count / teamWeeks.length * 100);
+      var barPct = Math.round(p.count / maxCount * 100);
+      html += '<div class="top-player">'
+        + '<div class="tp-medal">' + medals[i] + '</div>'
+        + '<div class="tp-name">' + p.player + '</div>'
+        + '<div class="tp-pos">' + p.pos + '</div>'
+        + '<div class="tp-count">' + p.count + ' of ' + teamWeeks.length + ' weeks (' + pct + '%)</div>'
+        + '<div class="tp-bar-bg"><div class="tp-bar-fill" style="width:' + barPct + '%"></div></div>'
+        + '</div>';
+    });
+    html += '</div></div>';
+  }
+
+  // WEEKLY TABLE
+  html += '<div class="section"><div class="section-hdr">Week by Week</div><table><thead><tr>'
+    + '<th>Week</th><th style="text-align:right">Score</th><th style="text-align:center">Rank</th>'
+    + '<th style="text-align:right">vs Avg</th><th class="bar-cell"></th>'
+    + '</tr></thead><tbody>';
+
+  var maxScore = Math.max.apply(null, weekData.map(function(d){ return d.score; }));
+  weekData.slice().reverse().forEach(function(d){
+    var vsClass = d.vsAvg >= 0 ? 'pos' : 'neg';
+    var vsStr = (d.vsAvg >= 0 ? '+' : '') + d.vsAvg.toFixed(1);
+    var rankClass = d.rank <= Math.ceil(d.total * 0.3) ? 'top' : d.rank >= Math.ceil(d.total * 0.7) ? 'bot' : '';
+    var pct = Math.round(d.score / maxScore * 100);
+    html += '<tr>'
+      + '<td class="wk-num">Week ' + d.week + '</td>'
+      + '<td class="wk-score" style="text-align:right">' + d.score.toFixed(1) + '</td>'
+      + '<td class="wk-rank ' + rankClass + '" style="text-align:center">#' + d.rank + ' / ' + d.total + '</td>'
+      + '<td class="wk-vs-avg ' + vsClass + '" style="text-align:right">' + vsStr + '</td>'
+      + '<td class="bar-cell"><div class="mini-bar-bg"><div class="mini-bar-fill" style="width:' + pct + '%"></div></div></td>'
+      + '</tr>';
+  });
+
+  html += '</tbody></table></div>';
+  html += '</div>'; // body
+
+  document.getElementById('main').innerHTML = html;
+}
+
+function heroStat(lbl, val, sub){
+  return '<div class="hero-stat"><div class="hero-stat-lbl">' + lbl + '</div><div class="hero-stat-val">' + val + '</div>' + (sub ? '<div class="hero-stat-sub">' + sub + '</div>' : '') + '</div>';
+}
+
+function vsItem(lbl, val, sub, isBetter){
+  return '<div class="vs-item"><div class="vs-lbl">' + lbl + '</div><div class="vs-val ' + (isBetter ? 'better' : 'worse') + '">' + val + '</div><div class="vs-league">' + sub + '</div></div>';
+}
+
+function getLeagueBest(){
+  var all = [];
+  getWeeks().forEach(function(w){ (seasonData[String(w)]||[]).forEach(function(e){ all.push(e.score); }); });
+  return all.length ? Math.max.apply(null, all) : 0;
+}
+
+// ── TOP PLAYERS ────────────────────────────────────────────────
+function getTopPlayers(teamName, limit){
+  var counts = {};
+  getWeeks().forEach(function(w){
+    var entry = (seasonData[String(w)]||[]).find(function(e){ return e.name === teamName; });
+    if(!entry || !entry.lineup) return;
+    var players = parseLineup(entry.lineup);
+    players.forEach(function(p){
+      var key = p.player + '|' + p.pos;
+      if(!counts[key]) counts[key] = { player: p.player, pos: p.pos, count: 0 };
+      counts[key].count++;
+    });
+  });
+  return Object.values(counts).sort(function(a,b){ return b.count - a.count; }).slice(0, limit || 3);
+}
+
+function parseLineup(str){
+  if(!str) return [];
+  var positions = ['QB','RB','WR','TE','FLEX','DST','K'];
+  var regex = new RegExp('(' + positions.join('|') + ')\\s+(.+?)(?=\\s+(?:' + positions.join('|') + ')(?:\\s|$)|$)', 'g');
+  var result = [], m;
+  while((m = regex.exec(str)) !== null) result.push({ pos: m[1], player: m[2].trim() });
+  return result;
+}
+
+// ── SVG CHARTS ─────────────────────────────────────────────────
+function buildScoreChart(weekData){
+  if(!weekData.length) return '';
+  var W = 800, H = 160, PAD = { t:10, r:10, b:30, l:40 };
+  var iW = W - PAD.l - PAD.r, iH = H - PAD.t - PAD.b;
+
+  var scores = weekData.map(function(d){ return d.score; });
+  var avgs   = weekData.map(function(d){ return d.avg; });
+  var allVals = scores.concat(avgs);
+  var minV = Math.min.apply(null, allVals) * 0.92;
+  var maxV = Math.max.apply(null, allVals) * 1.05;
+
+  function xp(i){ return PAD.l + (i / (weekData.length - 1 || 1)) * iW; }
+  function yp(v){ return PAD.t + iH - ((v - minV) / (maxV - minV)) * iH; }
+
+  var scorePath = weekData.map(function(d,i){ return (i?'L':'M') + xp(i).toFixed(1) + ' ' + yp(d.score).toFixed(1); }).join(' ');
+  var avgPath   = weekData.map(function(d,i){ return (i?'L':'M') + xp(i).toFixed(1) + ' ' + yp(d.avg).toFixed(1); }).join(' ');
+  var areaPath  = scorePath + ' L' + xp(weekData.length-1).toFixed(1) + ' ' + (PAD.t+iH) + ' L' + PAD.l.toFixed(1) + ' ' + (PAD.t+iH) + ' Z';
+
+  var dots = weekData.map(function(d,i){
+    return '<circle class="chart-dot" cx="' + xp(i).toFixed(1) + '" cy="' + yp(d.score).toFixed(1) + '" r="4"><title>Wk ' + d.week + ': ' + d.score.toFixed(1) + '</title></circle>';
+  }).join('');
+
+  var xLabels = weekData.map(function(d,i){
+    return '<text class="chart-label" x="' + xp(i).toFixed(1) + '" y="' + (H - 6) + '" text-anchor="middle">Wk' + d.week + '</text>';
+  }).join('');
+
+  // Y axis labels
+  var yLabels = '';
+  var steps = 4;
+  for(var s = 0; s <= steps; s++){
+    var v = minV + (maxV - minV) * (s / steps);
+    var y = yp(v);
+    yLabels += '<text class="chart-label" x="' + (PAD.l - 4) + '" y="' + y.toFixed(1) + '" text-anchor="end" dominant-baseline="middle">' + Math.round(v) + '</text>';
+    yLabels += '<line x1="' + PAD.l + '" y1="' + y.toFixed(1) + '" x2="' + (W - PAD.r) + '" y2="' + y.toFixed(1) + '" stroke="rgba(184,152,106,0.2)" stroke-width="1"/>';
+  }
+
+  return '<svg class="chart" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none">'
+    + '<defs><linearGradient id="sg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#FF7B3A" stop-opacity=".3"/><stop offset="100%" stop-color="#FF7B3A" stop-opacity="0"/></linearGradient></defs>'
+    + yLabels + xLabels
+    + '<path d="' + areaPath + '" fill="url(#sg)"/>'
+    + '<path class="chart-line-avg" d="' + avgPath + '"/>'
+    + '<path class="chart-line" d="' + scorePath + '"/>'
+    + dots + '</svg>';
+}
+
+function buildRankChart(weekData){
+  if(!weekData.length) return '';
+  var W = 800, H = 160, PAD = { t:10, r:10, b:30, l:40 };
+  var iW = W - PAD.l - PAD.r, iH = H - PAD.t - PAD.b;
+
+  var ranked = weekData.filter(function(d){ return d.rank !== null; });
+  if(!ranked.length) return '';
+
+  // Use both weekly rank and cumulative standing to set scale
+  var allRanks = ranked.map(function(d){ return d.rank; });
+  var allStandings = ranked.map(function(d){ return d.cumStanding || d.rank; });
+  var maxR = Math.max.apply(null, allRanks.concat(allStandings).concat([ranked[0].total || 68]));
+  var minR = 1;
+
+  function xp(i){ return PAD.l + (i / (ranked.length - 1 || 1)) * iW; }
+  // Invert: rank 1 at top
+  function yp(r){ return PAD.t + iH - ((maxR - r) / (maxR - minR || 1)) * iH; }
+
+  // Weekly finish line (purple)
+  var rankPath = ranked.map(function(d,i){ return (i?'L':'M') + xp(i).toFixed(1) + ' ' + yp(d.rank).toFixed(1); }).join(' ');
+
+  // Cumulative standing line (orange dashed)
+  var standingPath = ranked.filter(function(d){ return d.cumStanding !== null; }).map(function(d,i){
+    return (i?'L':'M') + xp(ranked.indexOf(d)).toFixed(1) + ' ' + yp(d.cumStanding).toFixed(1);
+  }).join(' ');
+
+  // Dots for weekly finish
+  var rankDots = ranked.map(function(d,i){
+    return '<circle class="chart-dot-rank" cx="' + xp(i).toFixed(1) + '" cy="' + yp(d.rank).toFixed(1) + '" r="4"><title>Wk ' + d.week + ': Finished #' + d.rank + '</title></circle>';
+  }).join('');
+
+  // Dots for cumulative standing
+  var standingDots = ranked.filter(function(d){ return d.cumStanding !== null; }).map(function(d,i){
+    return '<circle cx="' + xp(ranked.indexOf(d)).toFixed(1) + '" cy="' + yp(d.cumStanding).toFixed(1) + '" r="3.5" fill="var(--or)" stroke="#1E1206" stroke-width="2" opacity=".85"><title>After Wk ' + d.week + ': Standing #' + d.cumStanding + '</title></circle>';
+  }).join('');
+
+  var xLabels = ranked.map(function(d,i){
+    return '<text class="chart-label" x="' + xp(i).toFixed(1) + '" y="' + (H-6) + '" text-anchor="middle">Wk' + d.week + '</text>';
+  }).join('');
+
+  var yLabels = '';
+  var steps = 4;
+  for(var s = 0; s <= steps; s++){
+    var r = Math.round(minR + (maxR - minR) * (s / steps));
+    var y = yp(r);
+    yLabels += '<text class="chart-label" x="' + (PAD.l-4) + '" y="' + y.toFixed(1) + '" text-anchor="end" dominant-baseline="middle">#' + r + '</text>';
+    yLabels += '<line x1="' + PAD.l + '" y1="' + y.toFixed(1) + '" x2="' + (W-PAD.r) + '" y2="' + y.toFixed(1) + '" stroke="rgba(184,152,106,0.2)" stroke-width="1"/>';
+  }
+
+  return '<svg class="chart" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none">'
+    + yLabels + xLabels
+    + '<path class="chart-line-rank" d="' + rankPath + '"/>'
+    + (standingPath ? '<path d="' + standingPath + '" fill="none" stroke="var(--or)" stroke-width="2" stroke-dasharray="5,3" stroke-linecap="round" opacity=".7"/>' : '')
+    + rankDots
+    + standingDots
+    + '</svg>';
+}
+</script>
+</body>
+</html>

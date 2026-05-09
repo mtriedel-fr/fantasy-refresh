@@ -1,0 +1,1084 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fantasy Refresh — 2025 Season</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --hdr:#150D02;--hdr2:#1E1206;
+  --bg:#D4B896;--bg2:#C8A878;--bg3:#E8D4B8;--bg4:#F0E4CC;
+  --or:#FF7B3A;--or2:#FF9A62;--or4:#FFE0C0;
+  --ink:#1E1206;--ink2:#6A4E2E;--ink3:#A07848;
+  --bdr:#B8986A;--bdr2:#A08050;--red:#B83020;--grn:#2A6838;
+  --fd:'Barlow Condensed',sans-serif;--fb:'Barlow',sans-serif;
+}
+body{background:#1E1206;min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:24px 16px;font-family:var(--fb);}
+.wrap{width:100%;max-width:960px;border-radius:16px;overflow:hidden;border:1px solid #3A2810;box-shadow:0 24px 80px rgba(0,0,0,.6);}
+
+/* HEADER */
+.hdr{background:var(--hdr);padding:22px 28px;display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid var(--or);}
+.logo{display:flex;align-items:center;gap:12px;}
+.logo-box{width:40px;height:40px;background:var(--or);border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.logo-box svg{width:22px;height:22px;stroke:#150D02;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;}
+.logo-txt{font-family:var(--fd);font-size:28px;font-weight:800;color:#F5EAD8;text-transform:uppercase;letter-spacing:.5px;line-height:1;}
+.logo-txt span{color:var(--or);}
+.logo-sub{font-family:var(--fd);font-size:11px;font-weight:600;color:#6A5038;letter-spacing:2px;text-transform:uppercase;margin-top:2px;}
+.hdr-r{text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:6px;}
+.s-badge{background:rgba(255,123,58,.12);color:var(--or);font-family:var(--fd);font-size:11px;font-weight:700;padding:4px 13px;border-radius:20px;letter-spacing:1.2px;text-transform:uppercase;border:1px solid rgba(255,123,58,.35);}
+.hdr-sub{color:#6A5038;font-size:11px;font-family:var(--fd);letter-spacing:.8px;text-transform:uppercase;}
+.comm-btn{background:transparent;border:1px solid #3A2810;color:#6A5038;font-family:var(--fd);font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;padding:4px 12px;border-radius:6px;cursor:pointer;transition:all .15s;}
+.comm-btn:hover{border-color:var(--or);color:var(--or);}
+
+/* WEEK BAR */
+.wk-bar{background:var(--hdr2);padding:10px 28px;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid var(--bg2);gap:12px;}
+.wk-bar-label{font-family:var(--fd);font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#6A5038;display:flex;align-items:center;gap:8px;}
+.wk-bar-label .dot-live{width:7px;height:7px;background:var(--grn);border-radius:50%;display:inline-block;}
+.wk-select{background:#2A1A08;border:1px solid #4A3018;color:#F5EAD8;font-family:var(--fd);font-size:13px;font-weight:700;letter-spacing:.5px;padding:6px 14px;border-radius:8px;cursor:pointer;outline:none;transition:border-color .15s;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23FF7B3A' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:30px;}
+.wk-select:focus{border-color:var(--or);}
+.wk-select option{background:#1E1206;color:#F5EAD8;}
+
+/* STATS */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--bdr2);border-bottom:1px solid var(--bdr);}
+.stat{background:var(--bg3);padding:16px 14px;text-align:center;}
+.stat-lbl{font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink2);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:4px;}
+.stat-val{font-family:var(--fd);font-size:30px;font-weight:800;color:var(--or);letter-spacing:-.5px;line-height:1;}
+
+/* TABS */
+.tabs{display:flex;background:var(--bg4);border-bottom:1px solid var(--bdr);}
+.tab{padding:12px 22px;font-family:var(--fd);font-size:13px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;cursor:pointer;color:var(--ink2);border-bottom:2px solid transparent;display:flex;align-items:center;gap:6px;transition:color .15s;}
+.tab.active{color:var(--or);border-bottom:2px solid var(--or);}
+.tab:hover:not(.active){color:var(--ink);}
+.tab svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+.content{background:var(--bg);}
+.hidden{display:none;}
+
+/* TABLE */
+table{width:100%;border-collapse:collapse;}
+th{padding:10px 16px;text-align:left;font-family:var(--fd);font-size:10px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--ink2);border-bottom:1px solid var(--bdr);background:var(--bg2);}
+td{padding:13px 16px;border-bottom:1px solid var(--bdr);font-size:14px;color:var(--ink);}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:var(--or4);}
+.rk{font-family:var(--fd);font-weight:800;font-size:17px;color:var(--ink2);}
+.rk.g{color:var(--or);}
+.tp{font-family:var(--fd);font-weight:800;font-size:16px;color:var(--ink);}
+.ws{font-family:var(--fd);font-weight:700;font-size:15px;color:var(--or);}
+.av{font-size:13px;color:var(--ink2);}
+.up{color:var(--grn);font-family:var(--fd);font-size:13px;font-weight:700;display:flex;align-items:center;gap:2px;justify-content:center;}
+.dn{color:var(--red);font-family:var(--fd);font-size:13px;font-weight:700;display:flex;align-items:center;gap:2px;justify-content:center;}
+.fl{color:var(--ink3);}
+.bdg{font-family:var(--fd);font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:2px 8px;border-radius:10px;margin-left:8px;background:rgba(255,123,58,.12);color:var(--or);border:1px solid rgba(255,123,58,.35);}
+
+/* TEAM NAME + TOOLTIP */
+.tn-wrap{position:relative;display:inline-block;cursor:default;}
+.tn-name{font-family:var(--fd);font-weight:700;font-size:15px;color:var(--ink);}
+.roster-tip{display:none;position:absolute;left:0;top:calc(100% + 4px);background:#1C1208;border:1px solid var(--or);border-radius:10px;padding:10px 14px;z-index:999;min-width:210px;box-shadow:0 8px 32px rgba(0,0,0,.55);pointer-events:none;}
+.tn-wrap:hover .roster-tip{display:block;}
+.tip-title{font-family:var(--fd);font-size:10px;font-weight:700;color:var(--or);text-transform:uppercase;letter-spacing:1px;margin-bottom:7px;padding-bottom:5px;border-bottom:1px solid #3A2810;}
+.tip-row{display:flex;gap:8px;padding:2px 0;}
+.tip-pos{font-family:var(--fd);font-weight:700;font-size:11px;color:var(--or);width:36px;flex-shrink:0;text-transform:uppercase;}
+.tip-player{font-size:12px;color:#F0E4CC;white-space:nowrap;}
+
+/* SCORES */
+.sg{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:10px;padding:16px;}
+.sc{background:var(--bg3);border-radius:10px;padding:14px;border:1px solid var(--bdr);transition:border-color .15s;}
+.sc:hover{border-color:var(--or2);}
+.sc.t1{border-color:var(--or);background:var(--or4);}
+.sc-n{font-family:var(--fd);font-size:12px;font-weight:700;color:var(--ink2);margin-bottom:6px;text-transform:uppercase;}
+.sc-p{font-family:var(--fd);font-size:32px;font-weight:800;color:var(--or);letter-spacing:-1px;line-height:1;}
+.sc-r{font-family:var(--fd);font-size:11px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--ink2);margin-top:4px;}
+.sc-time{font-family:var(--fd);font-size:11px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--or2);margin-top:4px;}
+.bb{height:3px;background:var(--bdr);border-radius:2px;margin-top:10px;}
+.bf{height:3px;background:var(--or);border-radius:2px;}
+
+/* PODIUM */
+.pod{display:flex;justify-content:center;align-items:flex-end;gap:14px;padding:24px 28px 0;}
+.ps{text-align:center;flex:1;max-width:165px;}
+.pn{font-family:var(--fd);font-size:13px;font-weight:700;text-transform:uppercase;color:var(--ink);margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.pp{font-family:var(--fd);font-size:13px;color:var(--or);margin-bottom:8px;font-weight:600;}
+.pb{border-radius:6px 6px 0 0;display:flex;align-items:center;justify-content:center;font-family:var(--fd);font-size:26px;font-weight:800;}
+.p1{background:var(--or);color:#1C1208;height:92px;}
+.p2{background:var(--bg2);color:var(--ink);height:65px;border:1px solid var(--bdr2);}
+.p3{background:var(--bg3);color:var(--ink2);height:48px;border:1px solid var(--bdr);}
+.mu{color:var(--grn);font-family:var(--fd);font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;gap:2px;}
+.md{color:var(--red);font-family:var(--fd);font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;gap:2px;}
+.mf{color:var(--ink3);}
+
+/* YOUR TEAM BAR */
+.my-team-bar{background:var(--bg3);padding:9px 28px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--bdr);}
+.my-team-lbl{font-family:var(--fd);font-size:11px;font-weight:700;color:var(--ink2);text-transform:uppercase;letter-spacing:.8px;white-space:nowrap;}
+.my-team-bar input{flex:1;max-width:320px;padding:5px 10px;font-family:var(--fb);font-size:13px;background:var(--bg4);border:1px solid var(--bdr2);border-radius:6px;color:var(--ink);outline:none;}
+.my-team-bar input:focus{border-color:var(--or);}
+.my-team-bar input::placeholder{color:var(--ink3);}
+.my-team-badge{font-family:var(--fd);font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:2px 7px;border-radius:8px;margin-left:6px;background:rgba(255,123,58,.15);color:var(--or);border:1px solid rgba(255,123,58,.4);}
+
+/* ACTION BAR — search left, nav dropdown right */
+.action-bar{background:var(--bg4);padding:10px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid var(--bdr);}
+.search-wrap{position:relative;flex:1;max-width:340px;}
+.search-icon{width:15px;height:15px;stroke:var(--ink3);fill:none;stroke-width:2;stroke-linecap:round;position:absolute;left:10px;top:50%;transform:translateY(-50%);pointer-events:none;}
+#player-search{width:100%;padding:7px 12px 7px 32px;font-family:var(--fb);font-size:13px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:8px;color:var(--ink);outline:none;transition:border-color .15s;}
+#player-search:focus{border-color:var(--or);}
+#player-search::placeholder{color:var(--ink3);}
+.search-dropdown{position:absolute;top:calc(100% + 4px);left:0;right:0;background:#1C1208;border:1px solid var(--or);border-radius:8px;z-index:999;max-height:220px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.5);}
+.search-item{padding:9px 14px;font-family:var(--fd);font-size:14px;font-weight:600;color:#F0E4CC;cursor:pointer;border-bottom:1px solid #2A1A08;display:flex;justify-content:space-between;align-items:center;}
+.search-item:last-child{border-bottom:none;}
+.search-item:hover{background:rgba(255,123,58,.1);color:var(--or);}
+.search-item-rank{font-size:11px;color:#6A5038;}
+.nav-select-wrap{flex-shrink:0;}
+.nav-select{background:#1C1208;border:1px solid #4A3018;color:#F5EAD8;font-family:var(--fd);font-size:13px;font-weight:700;letter-spacing:.3px;padding:7px 32px 7px 14px;border-radius:8px;cursor:pointer;outline:none;transition:border-color .15s;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23FF7B3A' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;}
+.nav-select:focus{border-color:var(--or);}
+.nav-select option{background:#1E1206;color:#F5EAD8;}
+/* CLICKABLE TEAM NAME */
+.tn-link{color:var(--ink);text-decoration:none;font-family:var(--fd);font-weight:700;font-size:15px;cursor:pointer;}
+.tn-link:hover{color:var(--or);text-decoration:underline;}
+/* prevent badge text wrap */
+.bdg{white-space:nowrap;font-size:9px;}
+/* movement col fixed width */
+.move-col{width:52px;min-width:52px;max-width:52px;text-align:center;overflow:hidden;}
+
+/* ── FEATURE 1: YOUR TEAM HIGHLIGHT ── */
+tr.my-team td{background:rgba(255,123,58,.08) !important;border-left:3px solid var(--or);}
+tr.my-team:hover td{background:rgba(255,123,58,.14) !important;}
+.my-team-input{display:flex;align-items:center;gap:8px;padding:8px 16px;background:var(--bg4);border-bottom:1px solid var(--bdr);}
+.my-team-input input{flex:1;padding:6px 10px;font-family:var(--fb);font-size:13px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:6px;color:var(--ink);outline:none;}
+.my-team-input input:focus{border-color:var(--or);}
+.my-team-input input::placeholder{color:var(--ink3);}
+.my-team-lbl{font-family:var(--fd);font-size:11px;font-weight:700;color:var(--ink2);text-transform:uppercase;letter-spacing:.8px;white-space:nowrap;}
+.my-team-badge{font-family:var(--fd);font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:2px 7px;border-radius:8px;margin-left:6px;background:rgba(255,123,58,.15);color:var(--or);border:1px solid rgba(255,123,58,.4);}
+
+/* ── FEATURE 2: STREAK BADGES ── */
+.streak-hot{font-size:12px;margin-left:5px;cursor:default;}
+.streak-cold{font-size:12px;margin-left:5px;cursor:default;}
+
+/* ── FEATURE 3: WEEKLY RECAP BANNER ── */
+.recap-banner{background:linear-gradient(135deg,var(--hdr) 0%,var(--hdr2) 100%);border-bottom:2px solid var(--or);padding:14px 20px;display:none;}
+.recap-banner.show{display:block;}
+.recap-title{font-family:var(--fd);font-size:11px;font-weight:700;color:var(--or);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;}
+.recap-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;}
+.recap-item{background:rgba(255,255,255,.04);border-radius:8px;padding:10px 12px;border:1px solid #2A1A08;}
+.recap-item-lbl{font-family:var(--fd);font-size:10px;font-weight:700;color:#6A5038;text-transform:uppercase;letter-spacing:.8px;margin-bottom:3px;}
+.recap-item-val{font-family:var(--fd);font-size:14px;font-weight:700;color:#F5EAD8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.recap-item-sub{font-family:var(--fd);font-size:11px;color:var(--or);margin-top:1px;}
+
+/* ── FEATURE 4: SCORE DISTRIBUTION BAR ── */
+.dist-wrap{padding:16px 20px 8px;background:var(--bg);}
+.dist-title{font-family:var(--fd);font-size:11px;font-weight:700;color:var(--ink2);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;}
+.dist-chart{position:relative;height:56px;display:flex;align-items:flex-end;gap:2px;}
+.dist-bar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:default;}
+.dist-bar{width:100%;background:var(--or);border-radius:2px 2px 0 0;opacity:.7;transition:opacity .15s;min-height:4px;}
+.dist-bar.is-me{background:var(--or);opacity:1;outline:2px solid var(--ink);outline-offset:1px;}
+.dist-bar:hover{opacity:1;}
+.dist-axis{display:flex;justify-content:space-between;padding:4px 0 0;font-family:var(--fd);font-size:10px;color:var(--ink3);}
+.dist-avg-line{position:absolute;bottom:0;width:2px;background:var(--ink);opacity:.4;border-radius:1px;}
+.dist-avg-lbl{position:absolute;bottom:0;font-family:var(--fd);font-size:9px;color:var(--ink2);transform:translateX(-50%);white-space:nowrap;}
+
+/* ── FEATURE 5: MOBILE ── */
+@media(max-width:600px){
+  body{padding:0;}
+  .wrap{border-radius:0;border:none;box-shadow:none;}
+  .hdr{padding:14px 16px;}
+  .logo-txt{font-size:22px;}
+  .logo-sub{display:none;}
+  .s-badge{display:none;}
+  .hdr-sub{font-size:10px;}
+  .stats{grid-template-columns:repeat(2,1fr);}
+  .stat-val{font-size:22px;}
+  .comm-cols{grid-template-columns:1fr;}
+  th:nth-child(5),td:nth-child(5){display:none;}
+  .action-bar{padding:8px 12px;}
+  .my-team-bar{padding:8px 12px;}
+  td{padding:10px 10px;}
+  th{padding:8px 10px;}
+  .sg{grid-template-columns:repeat(2,1fr);padding:10px;}
+  .pod{padding:16px 12px 0;gap:8px;}
+  .recap-grid{grid-template-columns:1fr 1fr;}
+  .wk-bar{padding:10px 16px;}
+}
+
+/* COMMISSIONER */
+.comm-panel{background:var(--hdr);border-top:2px solid var(--or);}
+.comm-inner{padding:24px 28px;}
+.comm-title{font-family:var(--fd);font-size:14px;font-weight:700;color:var(--or);text-transform:uppercase;letter-spacing:1px;margin-bottom:20px;}
+.comm-cols{display:grid;grid-template-columns:1fr 1fr;gap:28px;}
+.csect{font-family:var(--fd);font-size:11px;font-weight:700;color:#6A5038;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;}
+.wk-sel-row{display:flex;gap:10px;margin-bottom:14px;align-items:center;}
+.wk-sel-row label{font-family:var(--fd);font-size:12px;font-weight:700;color:#9A7858;text-transform:uppercase;letter-spacing:.8px;white-space:nowrap;}
+.wk-sel-row select{background:#2A1A08;border:1px solid #3A2810;color:#F5EAD8;font-family:var(--fd);font-size:13px;font-weight:600;padding:7px 12px;border-radius:6px;cursor:pointer;flex:1;}
+.wk-sel-row select:focus{outline:none;border-color:var(--or);}
+.drop-zone{border:2px dashed #3A2810;border-radius:10px;padding:28px 20px;text-align:center;cursor:pointer;transition:all .15s;position:relative;}
+.drop-zone:hover,.drop-zone.drag{border-color:var(--or);background:rgba(255,123,58,.04);}
+.drop-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+.dz-icon{width:36px;height:36px;background:rgba(255,123,58,.1);border-radius:8px;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;}
+.dz-icon svg{width:20px;height:20px;stroke:var(--or);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+.dz-title{font-family:var(--fd);font-size:15px;font-weight:700;color:#F5EAD8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;}
+.dz-sub{font-size:12px;color:#6A5038;line-height:1.6;}
+.dz-sub strong{color:var(--or2);}
+.preview-box{background:#0A0700;border:1px solid #2A1A08;border-radius:8px;padding:14px;margin-top:14px;display:none;}
+.preview-title{font-family:var(--fd);font-size:11px;font-weight:700;color:#6A5038;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;}
+.preview-row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #1A1006;font-size:13px;}
+.preview-row:last-child{border-bottom:none;}
+.pv-name{color:#9A8878;}
+.pv-score{color:var(--or);font-family:var(--fd);font-weight:700;}
+.import-btn{width:100%;margin-top:14px;padding:12px;background:var(--or);color:#150D02;font-family:var(--fd);font-size:14px;font-weight:800;text-transform:uppercase;letter-spacing:1px;border:none;border-radius:8px;cursor:pointer;transition:background .15s;display:none;}
+.import-btn:hover{background:var(--or2);}
+.hist-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #2A1A08;}
+.hist-row:last-child{border-bottom:none;}
+.hist-wk{font-family:var(--fd);font-weight:700;color:var(--or);font-size:14px;}
+.hist-info{color:#6A5038;font-size:12px;margin-top:1px;}
+.del-btn{background:transparent;border:1px solid #3A2810;color:#6A5038;font-family:var(--fd);font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:3px 9px;border-radius:4px;cursor:pointer;transition:all .15s;}
+.del-btn:hover{border-color:var(--red);color:var(--red);}
+.toast{position:fixed;bottom:24px;right:24px;background:var(--grn);color:#fff;font-family:var(--fd);font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:12px 20px;border-radius:8px;transform:translateY(80px);opacity:0;transition:all .3s;z-index:9999;pointer-events:none;}
+.toast.show{transform:translateY(0);opacity:1;}
+.toast.err{background:var(--red);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="hdr">
+  <div class="logo">
+    <div class="logo-box">
+      <svg viewBox="0 0 24 24"><path d="M1 4v6h6"/><path d="M23 20v-6h-6"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
+    </div>
+    <div>
+      <div class="logo-txt">Fantasy <span>Refresh</span></div>
+      <div class="logo-sub">Weekly Salary Cap League</div>
+    </div>
+  </div>
+  <div class="hdr-r">
+    <div class="s-badge">2025 Season</div>
+    <div class="hdr-sub" id="hdr-sub">Ready to import</div>
+    <div style="display:flex;gap:6px;align-items:center;justify-content:flex-end;">
+      <button class="comm-btn" onclick="toggleComm()" id="comm-toggle">⚙ Commissioner</button>
+    </div>
+  </div>
+</div>
+
+<div class="wk-bar">
+  <div class="wk-bar-label">
+    <span id="wk-bar-season">2025 Season</span>
+  </div>
+  <select class="wk-select" id="wk-select" onchange="setWeekFromSelect(this.value)">
+  </select>
+</div>
+
+<!-- YOUR TEAM — directly below week bar -->
+<div class="my-team-bar">
+  <span class="my-team-lbl">Your team:</span>
+  <input type="text" id="my-team-input" placeholder="Type your team name to highlight your row..." oninput="setMyTeam(this.value)">
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="stat-lbl">Week high</div><div class="stat-val" id="s-wkhigh">—</div><div class="stat-sub" id="s-wkhigh-name" style="font-family:var(--fd);font-size:11px;color:var(--ink3);letter-spacing:.5px;text-transform:uppercase;margin-top:2px"></div></div>
+  <div class="stat"><div class="stat-lbl">Week avg</div><div class="stat-val" id="s-avg">—</div></div>
+  <div class="stat"><div class="stat-lbl">Week low</div><div class="stat-val" id="s-wklow">—</div><div class="stat-sub" id="s-wklow-name" style="font-family:var(--fd);font-size:11px;color:var(--ink3);letter-spacing:.5px;text-transform:uppercase;margin-top:2px"></div></div>
+  <div class="stat"><div class="stat-lbl">Weeks left</div><div class="stat-val" id="s-left">18</div></div>
+</div>
+
+<!-- COMBINED SEARCH + NAV BAR -->
+<div class="action-bar">
+  <div class="search-wrap">
+    <svg viewBox="0 0 24 24" class="search-icon"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input type="text" id="player-search" placeholder="Search player profiles..." autocomplete="off" oninput="handleSearch(this.value)" onfocus="showDropdown()" onblur="hideDropdown()">
+    <div class="search-dropdown hidden" id="search-dropdown"></div>
+  </div>
+  <div class="nav-select-wrap">
+    <select class="nav-select" id="nav-select" onchange="handleNav(this.value)">
+      <option value="w">📊 This Week</option>
+      <option value="s">🏆 Standings</option>
+      <option value="m">📈 Movement</option>
+      <option value="playoffs">🏈 Playoffs</option>
+    </select>
+  </div>
+</div>
+
+<div class="recap-banner" id="recap-banner"></div>
+
+<div id="tab-w" class="content"><div id="ww"></div></div>
+<div id="tab-s" class="content hidden"><div id="sw"></div></div>
+<div id="tab-m" class="content hidden"><div id="mw"></div></div>
+
+<div class="comm-panel hidden" id="comm-panel">
+  <div class="comm-inner">
+    <div class="comm-title">⚙ Commissioner Tools</div>
+    <div class="comm-cols">
+      <div>
+        <div class="csect">Import week scores</div>
+        <div class="wk-sel-row">
+          <label>Week</label>
+          <select id="imp-wk"><option value="">Select week...</option></select>
+        </div>
+        <div class="drop-zone" id="drop-zone">
+          <input type="file" accept=".csv" id="csv-inp" onchange="handleFile(this.files[0])">
+          <div class="dz-icon"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
+          <div class="dz-title">Drop DraftKings CSV here</div>
+          <div class="dz-sub">My Contests → find contest → <strong>Export Results</strong></div>
+        </div>
+        <div class="preview-box" id="prev-box">
+          <div class="preview-title">Preview — <span id="prev-count">0</span> entries</div>
+          <div id="prev-rows"></div>
+        </div>
+        <button class="import-btn" id="imp-btn" onclick="confirmImport()">↑ Import Week Scores</button>
+      </div>
+      <div>
+        <div class="csect">Season history</div>
+        <div id="hist-list"></div>
+        <div style="margin-top:20px;padding-top:16px;border-top:1px solid #2A1A08;">
+          <div class="csect">Danger zone</div>
+          <button class="del-btn" style="width:100%;padding:9px;" onclick="resetAll()">Clear entire season</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ── CONSTANTS ──────────────────────────────────────────────────
+var WEEKS = 18;
+var MED = ['🥇','🥈','🥉'];
+var AUP = '<svg style="width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round" viewBox="0 0 24 24"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>';
+var ADN = '<svg style="width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>';
+var AUP2 = '<svg style="width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round" viewBox="0 0 24 24"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>';
+var ADN2 = '<svg style="width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>';
+
+// ── STATE ──────────────────────────────────────────────────────
+var seasonData = {};   // {"1": [{name, score, lineup}, ...], ...}
+var currentWeek = 1;
+var parsedCSV = null;
+var myTeam = '';
+try{ myTeam = localStorage.getItem('fr_myteam') || ''; }catch(e){}
+
+// ── FIREBASE CONFIG ────────────────────────────────────────────
+var FB_API_KEY   = 'AIzaSyA-2hcf2hzThk7MuEm9DAvRICK95koE9gM';
+var FB_DB_URL    = 'https://fantasy-refresh-default-rtdb.firebaseio.com';
+var FB_DATA_URL  = FB_DB_URL + '/season2025.json?auth=';
+
+// ── FIREBASE AUTH (anonymous) ──────────────────────────────────
+var FB_TOKEN = null;
+
+function fbSignIn(cb){
+  if(FB_TOKEN){ cb(); return; }
+  fetch('https://identitytoolkit.googleapis.com/v1/accounts:signInAnonymously?key=' + FB_API_KEY, {
+    method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({returnSecureToken:true})
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){ FB_TOKEN = d.idToken; cb(); })
+  .catch(function(){ cb(); }); // proceed without auth if it fails
+}
+
+// ── STORAGE ────────────────────────────────────────────────────
+function save(){
+  try{ localStorage.setItem('fr_2025_backup', JSON.stringify(seasonData)); }catch(e){}
+  fbSignIn(function(){
+    fetch(FB_DB_URL + '/season2025.json' + (FB_TOKEN ? '?auth=' + FB_TOKEN : ''), {
+      method: 'PUT',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(seasonData)
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if(d && d.error){ showToast('Save failed: ' + d.error, true); }
+      else { showToast('Saved ✓'); }
+    })
+    .catch(function(){ showToast('Cloud save failed', true); });
+  });
+}
+
+function loadFromCloud(){
+  setLoading(true);
+  fbSignIn(function(){
+    fetch(FB_DB_URL + '/season2025.json' + (FB_TOKEN ? '?auth=' + FB_TOKEN : ''))
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      if(data && typeof data === 'object' && !data.error){
+        seasonData = data;
+      }
+      setLoading(false);
+      boot();
+    })
+    .catch(function(){
+      try{ var d = localStorage.getItem('fr_2025_backup'); if(d) seasonData = JSON.parse(d); }catch(e){}
+      setLoading(false);
+      showToast('Using local backup — cloud unavailable', true);
+      boot();
+    });
+  });
+}
+
+function setLoading(on){
+  document.getElementById('hdr-sub').textContent = on ? 'Loading season data...' : '';
+}
+
+// ── BOOT ───────────────────────────────────────────────────────
+function boot(){
+  buildWeekBar();
+  buildWeekSelect();
+  var loadedWks = Object.keys(seasonData).filter(function(k){
+    return !isNaN(Number(k)) && seasonData[k] && seasonData[k].length > 0;
+  }).map(Number);
+  // Default to latest imported week
+  if(loadedWks.length) currentWeek = Math.max.apply(null, loadedWks);
+  // Default to This Week view
+  document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); });
+  var tw = document.getElementById('tab-w');
+  if(tw) tw.classList.remove('hidden');
+  var navSel = document.getElementById('nav-select');
+  if(navSel) navSel.value = 'w';
+  initMyTeamInput();
+  renderAll();
+}
+
+loadFromCloud();
+
+// ── WEEK BAR ───────────────────────────────────────────────────
+function buildWeekBar(){
+  var sel = document.getElementById('wk-select');
+  if(!sel) return;
+  sel.innerHTML = '';
+  for(var i = 1; i <= WEEKS; i++){
+    var k = String(i);
+    var hasData = seasonData[k] && seasonData[k].length > 0;
+    var o = document.createElement('option');
+    o.value = i;
+    o.textContent = 'Week ' + i + (hasData ? ' ✓' : '');
+    if(i === currentWeek) o.selected = true;
+    sel.appendChild(o);
+  }
+}
+
+function setWeekFromSelect(val){
+  currentWeek = parseInt(val);
+  renderAll();
+}
+
+function buildWeekSelect(){
+  var sel = document.getElementById('imp-wk');
+  sel.innerHTML = '<option value="">Select week...</option>';
+  for(var i = 1; i <= WEEKS; i++){
+    var k = String(i);
+    var hasData = seasonData[k] && seasonData[k].length > 0;
+    var o = document.createElement('option');
+    o.value = i;
+    o.textContent = 'Week ' + i + (hasData ? ' (update)' : '');
+    sel.appendChild(o);
+  }
+}
+
+// ── RENDER ALL ─────────────────────────────────────────────────
+function renderAll(){
+  // Sync dropdown to currentWeek
+  var sel = document.getElementById('wk-select');
+  if(sel) sel.value = currentWeek;
+
+  var weeks = Object.keys(seasonData).filter(function(k){ return !isNaN(Number(k)) && seasonData[k] && seasonData[k].length > 0; });
+
+  if(!weeks.length){
+    showEmpty();
+    document.getElementById('hdr-sub').textContent = 'Import Week 1 to get started';
+    document.getElementById('s-left').textContent = WEEKS;
+    return;
+  }
+
+  // Cumulative totals
+  var totals = {};
+  weeks.forEach(function(w){
+    seasonData[w].forEach(function(entry){
+      if(!totals[entry.name]) totals[entry.name] = {total:0, cnt:0};
+      totals[entry.name].total += entry.score;
+      totals[entry.name].cnt++;
+    });
+  });
+
+  var sorted = Object.keys(totals).map(function(name){
+    var d = totals[name];
+    return {name: name, total: d.total, cnt: d.cnt, avg: d.total / d.cnt};
+  }).sort(function(a,b){ return b.total - a.total; });
+
+  // Prev rank
+  var curKey = String(currentWeek);
+  var prevWeeks = weeks.filter(function(w){ return Number(w) < currentWeek; });
+  var prevTotals = {};
+  prevWeeks.forEach(function(w){
+    seasonData[w].forEach(function(entry){
+      prevTotals[entry.name] = (prevTotals[entry.name] || 0) + entry.score;
+    });
+  });
+  var prevSorted = Object.keys(prevTotals).sort(function(a,b){ return prevTotals[b] - prevTotals[a]; });
+  var prevRank = {};
+  prevSorted.forEach(function(name, i){ prevRank[name] = i + 1; });
+
+  // Current week
+  var curEntries = seasonData[curKey] || [];
+  var curMap = {};
+  curEntries.forEach(function(e){ curMap[e.name] = e; });
+  var curScores = curEntries.map(function(e){ return e.score; });
+  var maxWk = curScores.length ? Math.max.apply(null, curScores) : 0;
+  var wkHighName = curEntries.length ? curEntries.reduce(function(a,b){ return b.score > a.score ? b : a; }).name : null;
+
+  // Stats
+  var allScores = weeks.reduce(function(acc, w){
+    return acc.concat(seasonData[w].map(function(e){ return e.score; }));
+  }, []);
+  var avg = allScores.length ? allScores.reduce(function(a,b){ return a+b; }, 0) / allScores.length : 0;
+
+  // Current week stats
+  var curScores = curEntries.map(function(e){ return e.score; });
+  var curAvg = curScores.length ? curScores.reduce(function(a,b){ return a+b; }, 0) / curScores.length : 0;
+  var sortedEntries = curEntries.slice().sort(function(a,b){ return b.score - a.score; });
+  var highEntry = sortedEntries.length ? sortedEntries[0] : null;
+  var lowEntry = sortedEntries.length ? sortedEntries[sortedEntries.length - 1] : null;
+
+  document.getElementById('s-wkhigh').textContent = highEntry ? highEntry.score.toFixed(1) : '—';
+  document.getElementById('s-wkhigh-name').textContent = highEntry ? highEntry.name : '';
+  document.getElementById('s-avg').textContent = curAvg > 0 ? curAvg.toFixed(1) : '—';
+  document.getElementById('s-wklow').textContent = lowEntry ? lowEntry.score.toFixed(1) : '—';
+  document.getElementById('s-wklow-name').textContent = lowEntry ? lowEntry.name : '';
+  document.getElementById('s-left').textContent = WEEKS - weeks.length;
+  document.getElementById('hdr-sub').textContent = 'Week ' + currentWeek + ' of ' + WEEKS + ' · ' + sorted.length + ' teams';
+
+  renderStandings(sorted, prevRank, curMap, wkHighName);
+  renderWeek(curEntries, maxWk);
+  renderMovement(sorted, prevRank, curMap);
+  renderRecap(sorted, curEntries, prevRank);
+  initMyTeamInput();
+  if(!document.getElementById('comm-panel').classList.contains('hidden')) renderHistory();
+}
+
+function showEmpty(){
+  var html = '<div class="empty"><div class="empty-icon">🏈</div><div class="empty-title">No data yet</div><div class="empty-sub">Click <strong>Commissioner</strong> above<br>and import your first DraftKings CSV.</div></div>';
+  document.getElementById('sw').innerHTML = html;
+  document.getElementById('ww').innerHTML = html;
+  document.getElementById('mw').innerHTML = html;
+  ['s-leader','s-wkhigh','s-avg'].forEach(function(id){ document.getElementById(id).textContent = '—'; });
+}
+
+// ── LINEUP PARSER ──────────────────────────────────────────────
+function parseLineup(str){
+  if(!str) return [];
+  var positions = ['QB','RB','WR','TE','FLEX','DST','K'];
+  var regex = new RegExp('(' + positions.join('|') + ')\\s+(.+?)(?=\\s+(?:' + positions.join('|') + ')(?:\\s|$)|$)', 'g');
+  var result = [];
+  var m;
+  while((m = regex.exec(str)) !== null){
+    result.push({pos: m[1], player: m[2].trim()});
+  }
+  var order = {QB:0,RB:1,WR:2,TE:3,FLEX:4,DST:5,K:6};
+  result.sort(function(a,b){ return (order[a.pos] !== undefined ? order[a.pos] : 9) - (order[b.pos] !== undefined ? order[b.pos] : 9); });
+  return result;
+}
+
+function buildTip(lineup){
+  if(!lineup) return '';
+  var players = parseLineup(lineup);
+  if(!players.length) return '';
+  var rows = players.map(function(p){
+    return '<div class="tip-row"><span class="tip-pos">' + p.pos + '</span><span class="tip-player">' + p.player + '</span></div>';
+  }).join('');
+  return '<div class="roster-tip"><div class="tip-title">Week ' + currentWeek + ' Roster</div>' + rows + '</div>';
+}
+
+// ── STANDINGS ──────────────────────────────────────────────────
+// ── TIER LOGIC ─────────────────────────────────────────────────
+// 2025: tiers lock after week 15. 2026+: after week 14
+var TIER_LOCK_WEEK = 15;
+
+function getTiers(sorted){
+  var n = sorted.length;
+  var top = Math.ceil(n / 3);
+  var mid = Math.ceil((n - top) / 2);
+  return { eliteEnd: top, midEnd: top + mid };
+}
+
+function getTierForRank(rank, tiers){
+  if(rank <= tiers.eliteEnd) return 'elite';
+  if(rank <= tiers.midEnd) return 'mid';
+  return 'low';
+}
+
+function tiersLocked(){
+  var weeks = Object.keys(seasonData).filter(function(k){ return !isNaN(Number(k)) && seasonData[k] && seasonData[k].length; }).map(Number);
+  return weeks.length > 0 && Math.max.apply(null, weeks) >= TIER_LOCK_WEEK;
+}
+
+function renderStandings(sorted, prevRank, curMap, wkHighName){
+  var locked = tiersLocked();
+  var tiers = getTiers(sorted);
+  var tierLabels = {elite:'🏆 Elite', mid:'🥈 Mid', low:'🥉 Survivor'};
+  var tierColors = {elite:'elite', mid:'mid', low:'low'};
+
+  var rows = sorted.map(function(t, i){
+    var r = i + 1;
+    var tier = locked ? getTierForRank(r, tiers) : null;
+    var prev = prevRank[t.name];
+    var diff = (prev !== undefined) ? prev - r : null;
+    var mv = diff === null ? '<span class="fl">—</span>'
+      : diff > 0 ? '<span class="up">' + AUP + diff + '</span>'
+      : diff < 0 ? '<span class="dn">' + ADN + Math.abs(diff) + '</span>'
+      : '<span class="fl">—</span>';
+    var entry = curMap[t.name];
+    var wk = entry ? entry.score : undefined;
+    var lineup = entry ? (entry.lineup || '') : '';
+    var isHigh = t.name === wkHighName && wk !== undefined;
+    var tip = buildTip(lineup);
+    var tierBadge = (locked && tier) ? '<span class="tier-label ' + tierColors[tier] + '">' + tierLabels[tier] + '</span>' : '';
+
+    // Add divider row at tier boundaries
+    var divider = locked && (r === tiers.eliteEnd + 1 || r === tiers.midEnd + 1) ? ' tier-divider' : '';
+    var tierClass = locked && tier ? ' tier-' + tier : '';
+
+    var isMe = myTeam && t.name.toLowerCase() === myTeam.toLowerCase();
+    var streak = getStreak(t.name);
+    var streakBadge = streak === 'hot' ? '<span class="streak-hot" title="Hot streak — above avg 3+ weeks">🔥</span>'
+      : streak === 'cold' ? '<span class="streak-cold" title="Cold streak — below avg 3+ weeks">❄️</span>' : '';
+
+    return '<tr class="' + tierClass + divider + (isMe ? ' my-team' : '') + '">'
+      + '<td class="rk' + (r <= 3 ? ' g' : '') + '">' + (r <= 3 ? MED[r-1] : r) + '</td>'
+      + '<td><div class="tn-wrap"><a class="tn-link" href="player.html?team=' + encodeURIComponent(t.name) + '">' + t.name + '</a>'
+      + (isMe ? '<span class="my-team-badge">You</span>' : '')
+      + (isHigh ? '<span class="bdg">🔥 Wk High</span>' : '')
+      + streakBadge
+      + tierBadge
+      + tip + '</div></td>'
+      + '<td class="tp" style="text-align:right">' + t.total.toLocaleString() + '</td>'
+      + '<td class="ws" style="text-align:right">' + (wk !== undefined ? wk.toFixed(1) : '—') + '</td>'
+      + '<td class="av" style="text-align:right">' + t.avg.toFixed(1) + '</td>'
+      + '<td class="move-col">' + mv + '</td>'
+      + '</tr>';
+  }).join('');
+
+  var tierNote = locked
+    ? '<div style="padding:10px 16px 6px;font-family:var(--fd);font-size:11px;color:var(--ink3);letter-spacing:.5px;text-transform:uppercase;background:var(--bg2);border-bottom:1px solid var(--bdr)">Playoff tiers locked after Week ' + TIER_LOCK_WEEK + ' · <a href="playoffs.html" style="color:var(--or);text-decoration:none;">View Playoff Bracket →</a></div>'
+    : '<div style="padding:10px 16px 6px;font-family:var(--fd);font-size:11px;color:var(--ink3);letter-spacing:.5px;text-transform:uppercase;background:var(--bg2);border-bottom:1px solid var(--bdr)">Playoff tiers lock after Week ' + TIER_LOCK_WEEK + ' · ' + (TIER_LOCK_WEEK - Object.keys(seasonData).filter(function(k){ return seasonData[k]&&seasonData[k].length; }).length) + ' weeks remaining</div>';
+
+  document.getElementById('sw').innerHTML = tierNote + '<table><thead><tr>'
+    + '<th style="width:40px">#</th><th>Team</th>'
+    + '<th style="text-align:right">Total</th>'
+    + '<th style="text-align:right">Wk ' + currentWeek + '</th>'
+    + '<th style="text-align:right">Avg</th>'
+    + '<th class="move-col">Move</th>'
+    + '</tr></thead><tbody>' + rows + '</tbody></table>';
+}
+
+// ── THIS WEEK ──────────────────────────────────────────────────
+function renderWeek(data, maxScore){
+  if(!data.length){
+    document.getElementById('ww').innerHTML = '<div class="empty"><div class="empty-icon">📊</div><div class="empty-title">No data for week ' + currentWeek + '</div><div class="empty-sub">Import Week ' + currentWeek + ' from the Commissioner panel.</div></div>';
+    return;
+  }
+  var sw = data.slice().sort(function(a,b){ return b.score - a.score; });
+
+  // Check if any entries have live time remaining data
+  var hasLive = sw.some(function(e){ return e.timeRemaining && e.timeRemaining !== '0' && e.timeRemaining !== ''; });
+  var liveNote = hasLive ? '<div style="padding:10px 16px;background:var(--bg2);border-bottom:1px solid var(--bdr);font-family:var(--fd);font-size:11px;font-weight:700;color:var(--or);letter-spacing:.8px;text-transform:uppercase;">🔴 Live — scores updating</div>' : '';
+
+  var t3 = sw.slice(0,3);
+  var pod = '<div class="pod">'
+    + '<div class="ps"><div class="pn">' + (t3[1]?t3[1].name:'') + '</div><div class="pp">' + (t3[1]?t3[1].score.toFixed(1):'') + ' pts</div><div class="pb p2">2</div></div>'
+    + '<div class="ps"><div class="pn">' + (t3[0]?t3[0].name:'') + '</div><div class="pp">' + (t3[0]?t3[0].score.toFixed(1):'') + ' pts</div><div class="pb p1">1</div></div>'
+    + '<div class="ps"><div class="pn">' + (t3[2]?t3[2].name:'') + '</div><div class="pp">' + (t3[2]?t3[2].score.toFixed(1):'') + ' pts</div><div class="pb p3">3</div></div>'
+    + '</div>';
+
+  var cards = sw.map(function(t,i){
+    var timeTag = '';
+    if(t.timeRemaining && t.timeRemaining !== '0' && t.timeRemaining !== ''){
+      timeTag = '<div class="sc-time">⏱ ' + t.timeRemaining + ' remaining</div>';
+    }
+    return '<div class="sc' + (i===0?' t1':'') + '">'
+      + '<div class="sc-n">' + t.name + '</div>'
+      + '<div class="sc-p">' + t.score.toFixed(1) + '</div>'
+      + '<div class="sc-r">Rank ' + (i+1) + ' this week</div>'
+      + timeTag
+      + '<div class="bb"><div class="bf" style="width:' + Math.round(t.score/maxScore*100) + '%"></div></div>'
+      + '</div>';
+  }).join('');
+
+  document.getElementById('ww').innerHTML = liveNote + renderDistribution(sw) + pod + '<div class="sg">' + cards + '</div>';
+}
+
+// ── MOVEMENT ───────────────────────────────────────────────────
+function renderMovement(sorted, prevRank, curMap){
+  var wm = sorted.map(function(t,i){
+    var curr = i + 1;
+    var prev = prevRank[t.name];
+    var diff = (prev !== undefined) ? prev - curr : null;
+    return {name:t.name, curr:curr, prev:prev, diff:diff, score: curMap[t.name] ? curMap[t.name].score : undefined};
+  }).sort(function(a,b){
+    return (b.diff === null ? -999 : b.diff) - (a.diff === null ? -999 : a.diff);
+  });
+
+  var rows = wm.map(function(t){
+    var d = t.diff;
+    var mv = d === null ? '<div class="mf">New</div>'
+      : d > 0 ? '<div class="mu">' + AUP2 + '+' + d + '</div>'
+      : d < 0 ? '<div class="md">' + ADN2 + d + '</div>'
+      : '<div class="mf">—</div>';
+    return '<tr>'
+      + '<td><span class="tn-name">' + t.name + '</span></td>'
+      + '<td style="text-align:center;color:var(--ink2);font-family:var(--fd);font-weight:600">' + (t.prev || '—') + '</td>'
+      + '<td style="text-align:center;font-family:var(--fd);font-weight:800;font-size:17px">' + t.curr + '</td>'
+      + '<td style="text-align:center">' + mv + '</td>'
+      + '<td style="text-align:right;font-family:var(--fd);font-weight:700;font-size:15px;color:var(--or)">' + (t.score !== undefined ? t.score.toFixed(1) : '—') + '</td>'
+      + '</tr>';
+  }).join('');
+
+  document.getElementById('mw').innerHTML = '<table><thead><tr>'
+    + '<th>Team</th><th style="text-align:center">Prev</th>'
+    + '<th style="text-align:center">Now</th><th style="text-align:center">Change</th>'
+    + '<th style="text-align:right">Wk ' + currentWeek + '</th>'
+    + '</tr></thead><tbody>' + rows + '</tbody></table>';
+}
+
+// ── HISTORY ────────────────────────────────────────────────────
+function renderHistory(){
+  var weeks = Object.keys(seasonData).filter(function(k){ return !isNaN(Number(k)) && seasonData[k] && seasonData[k].length > 0; }).map(Number).sort(function(a,b){ return b-a; });
+  var el = document.getElementById('hist-list');
+  if(!weeks.length){ el.innerHTML = '<div style="color:#6A5038;font-size:13px;font-family:var(--fd)">No weeks imported yet.</div>'; return; }
+  el.innerHTML = weeks.map(function(w){
+    var scores = seasonData[String(w)].map(function(e){ return e.score; });
+    var high = Math.max.apply(null, scores).toFixed(1);
+    return '<div class="hist-row"><div><div class="hist-wk">Week ' + w + '</div><div class="hist-info">' + seasonData[String(w)].length + ' entries · High: ' + high + '</div></div>'
+      + '<button class="del-btn" onclick="deleteWeek(' + w + ')">Delete</button></div>';
+  }).join('');
+}
+
+// ── CSV PARSING ────────────────────────────────────────────────
+function handleFile(file){
+  if(!file) return;
+  var r = new FileReader();
+  r.onload = function(e){
+    try{
+      parsedCSV = parseCSV(e.target.result);
+      showPreview(parsedCSV);
+    } catch(err){
+      showToast('Could not read CSV: ' + err.message, true);
+    }
+  };
+  r.readAsText(file);
+}
+
+function parseCSV(text){
+  text = text.replace(/^\ufeff/, '');
+  var lines = text.split(/\r?\n/).filter(function(l){ return l.trim(); });
+  if(lines.length < 2) throw new Error('File is empty');
+
+  var delim = lines[0].indexOf('\t') !== -1 ? '\t' : ',';
+  var headers = lines[0].split(delim).map(function(h){ return h.trim().replace(/^"|"$/g,'').toLowerCase(); });
+
+  var nc = -1, pc = -1, lc = -1, tc = -1;
+  headers.forEach(function(h, i){
+    if(h === 'entryname' || h === 'entry name' || h === 'name') nc = i;
+    if(h === 'points') pc = i;
+    if(h === 'lineup') lc = i;
+    if(h === 'timeremaining' || h === 'time remaining' || h === 'time_remaining') tc = i;
+  });
+  if(nc < 0) nc = 2;
+  if(pc < 0) pc = 4;
+  if(lc < 0) lc = 5;
+  if(tc < 0) tc = 3; // DK default column 3
+
+  var seen = {};
+  for(var i = 1; i < lines.length; i++){
+    var cols = lines[i].split(delim);
+    if(cols.length <= Math.max(nc, pc)) continue;
+    var name = cols[nc].trim().replace(/^"|"$/g, '');
+    var rawScore = cols[pc].trim().replace(/^"|"$/g, '');
+    var score = parseFloat(rawScore);
+    var lineup = lc < cols.length ? cols[lc].trim().replace(/^"|"$/g, '') : '';
+    var timeRemaining = tc < cols.length ? cols[tc].trim().replace(/^"|"$/g, '') : '';
+    if(!name || isNaN(score) || score < 0) continue;
+    if(name.toLowerCase() === 'entryname' || name.toLowerCase() === 'player') continue;
+    if(!seen[name] || score > seen[name].score) seen[name] = {score: score, lineup: lineup, timeRemaining: timeRemaining};
+  }
+
+  var results = Object.keys(seen).map(function(name){ return {name: name, score: seen[name].score, lineup: seen[name].lineup, timeRemaining: seen[name].timeRemaining}; });
+  if(!results.length) throw new Error('No valid entries found');
+  return results.sort(function(a,b){ return b.score - a.score; });
+}
+
+function showPreview(data){
+  document.getElementById('prev-count').textContent = data.length;
+  var top = data.slice(0,5);
+  document.getElementById('prev-rows').innerHTML = top.map(function(d){
+    return '<div class="preview-row"><span class="pv-name">' + d.name + '</span><span class="pv-score">' + d.score.toFixed(1) + '</span></div>';
+  }).join('') + (data.length > 5 ? '<div class="preview-row"><span class="pv-name" style="color:#4A3020">...and ' + (data.length-5) + ' more</span></div>' : '');
+  document.getElementById('prev-box').style.display = 'block';
+  document.getElementById('imp-btn').style.display = 'block';
+}
+
+function confirmImport(){
+  var wk = document.getElementById('imp-wk').value;
+  if(!wk){ showToast('Select a week first', true); return; }
+  if(!parsedCSV){ showToast('No CSV loaded', true); return; }
+  var high = parsedCSV.slice().sort(function(a,b){ return b.score-a.score; })[0];
+  seasonData[String(wk)] = parsedCSV;
+  currentWeek = parseInt(wk);
+  buildWeekBar(); buildWeekSelect(); renderAll();
+  parsedCSV = null;
+  document.getElementById('prev-box').style.display = 'none';
+  document.getElementById('imp-btn').style.display = 'none';
+  document.getElementById('csv-inp').value = '';
+  showToast('Week ' + wk + ' imported · ' + seasonData[String(wk)].length + ' teams · High: ' + high.score.toFixed(1) + ' by ' + high.name);
+  save();
+}
+
+// ── COMMISSIONER ───────────────────────────────────────────────
+function toggleComm(){
+  var p = document.getElementById('comm-panel');
+  var hidden = p.classList.contains('hidden');
+  p.classList.toggle('hidden');
+  document.getElementById('comm-toggle').textContent = hidden ? '✕ Close' : '⚙ Commissioner';
+  if(!hidden) return;
+  renderHistory();
+  var zone = document.getElementById('drop-zone');
+  zone.addEventListener('dragover', function(e){ e.preventDefault(); zone.classList.add('drag'); });
+  zone.addEventListener('dragleave', function(){ zone.classList.remove('drag'); });
+  zone.addEventListener('drop', function(e){ e.preventDefault(); zone.classList.remove('drag'); handleFile(e.dataTransfer.files[0]); });
+}
+
+function deleteWeek(w){
+  if(!confirm('Delete Week ' + w + ' data?')) return;
+  delete seasonData[String(w)];
+  buildWeekBar(); buildWeekSelect(); renderAll(); renderHistory();
+  showToast('Week ' + w + ' deleted — saving...');
+  save();
+}
+
+function resetAll(){
+  if(!confirm('Clear ALL season data? This cannot be undone.')) return;
+  seasonData = {}; currentWeek = 1;
+  buildWeekBar(); buildWeekSelect(); renderAll(); renderHistory();
+  showToast('Season cleared — saving...');
+  save();
+}
+
+// ── SEARCH ─────────────────────────────────────────────────────
+function getAllTeams(){
+  var seen = {};
+  Object.keys(seasonData).forEach(function(w){
+    (seasonData[w]||[]).forEach(function(e){ seen[e.name] = true; });
+  });
+  return Object.keys(seen).sort();
+}
+
+function getTeamRank(name){
+  var totals = {};
+  Object.keys(seasonData).forEach(function(w){
+    (seasonData[w]||[]).forEach(function(e){
+      totals[e.name] = (totals[e.name]||0) + e.score;
+    });
+  });
+  var sorted = Object.keys(totals).sort(function(a,b){ return totals[b]-totals[a]; });
+  var idx = sorted.indexOf(name);
+  return idx >= 0 ? idx + 1 : null;
+}
+
+function handleSearch(val){
+  var dd = document.getElementById('search-dropdown');
+  if(!val.trim()){ dd.classList.add('hidden'); return; }
+  var teams = getAllTeams().filter(function(t){ return t.toLowerCase().indexOf(val.toLowerCase()) !== -1; });
+  if(!teams.length){ dd.classList.add('hidden'); return; }
+  dd.innerHTML = teams.slice(0,8).map(function(t){
+    var rank = getTeamRank(t);
+    return '<div class="search-item" onmousedown="goToProfile(\'' + encodeURIComponent(t) + '\')">'
+      + '<span>' + t + '</span>'
+      + (rank ? '<span class="search-item-rank">Rank #' + rank + '</span>' : '')
+      + '</div>';
+  }).join('');
+  dd.classList.remove('hidden');
+}
+
+function showDropdown(){
+  var val = document.getElementById('player-search').value;
+  if(val.trim()) handleSearch(val);
+}
+
+function hideDropdown(){
+  setTimeout(function(){ document.getElementById('search-dropdown').classList.add('hidden'); }, 150);
+}
+
+function goToProfile(encodedName){
+  window.location.href = 'player.html?team=' + encodedName;
+}
+
+// ── FEATURE 1: YOUR TEAM ──────────────────────────────────────
+function setMyTeam(val){
+  myTeam = val.trim();
+  try{ localStorage.setItem('fr_myteam', myTeam); }catch(e){}
+  renderAll();
+}
+
+function initMyTeamInput(){
+  var inp = document.getElementById('my-team-input');
+  if(inp && myTeam) inp.value = myTeam;
+}
+
+// ── FEATURE 2: STREAKS ────────────────────────────────────────
+function getStreak(name){
+  var weeks = Object.keys(seasonData).filter(function(k){
+    return !isNaN(Number(k)) && seasonData[k] && seasonData[k].length > 0;
+  }).map(Number).sort(function(a,b){ return b-a; });
+  if(weeks.length < 3) return null;
+  var recent = weeks.slice(0,3);
+  var results = recent.map(function(w){
+    var entry = (seasonData[String(w)]||[]).find(function(e){ return e.name === name; });
+    if(!entry) return null;
+    var avg = (seasonData[String(w)]||[]).reduce(function(s,e){ return s+e.score; },0) / (seasonData[String(w)]||[]).length;
+    return entry.score >= avg ? 'hot' : 'cold';
+  });
+  if(results.some(function(r){ return r === null; })) return null;
+  if(results.every(function(r){ return r === 'hot'; })) return 'hot';
+  if(results.every(function(r){ return r === 'cold'; })) return 'cold';
+  return null;
+}
+
+// ── FEATURE 3: WEEKLY RECAP ───────────────────────────────────
+function getMostStartedByPosition(curEntries){
+  var positions = ['QB','RB','WR','TE','DST'];
+  var counts = {};
+  positions.forEach(function(p){ counts[p] = {}; });
+
+  curEntries.forEach(function(entry){
+    if(!entry.lineup) return;
+    var players = parseLineup(entry.lineup);
+    // Track which players appeared at each position (dedupe per team)
+    var seen = {};
+    players.forEach(function(p){
+      var pos = p.pos === 'FLEX' ? null : p.pos; // skip FLEX — count at natural pos
+      if(!pos) return;
+      var key = pos + '|' + p.player;
+      if(seen[key]) return;
+      seen[key] = true;
+      if(counts[pos]) counts[pos][p.player] = (counts[pos][p.player] || 0) + 1;
+    });
+  });
+
+  var result = {};
+  positions.forEach(function(pos){
+    var players = Object.keys(counts[pos]);
+    if(!players.length) return;
+    var top = players.reduce(function(a,b){ return counts[pos][a] >= counts[pos][b] ? a : b; });
+    result[pos] = { player: top, count: counts[pos][top], total: curEntries.length };
+  });
+  return result;
+}
+
+function renderRecap(sorted, curEntries, prevRank){
+  var banner = document.getElementById('recap-banner');
+  if(!curEntries.length){ banner.classList.remove('show'); return; }
+
+  var scores = curEntries.slice().sort(function(a,b){ return b.score-a.score; });
+  var high = scores[0];
+  var avg = scores.reduce(function(s,e){ return s+e.score; },0)/scores.length;
+
+  // Biggest mover up/down
+  var biggestUp = null, biggestUpDiff = 0;
+  var biggestDown = null, biggestDownDiff = 0;
+  sorted.forEach(function(t,i){
+    var curr = i+1, prev = prevRank[t.name];
+    if(prev && (prev-curr) > biggestUpDiff){ biggestUpDiff = prev-curr; biggestUp = t.name; }
+    if(prev && (curr-prev) > biggestDownDiff){ biggestDownDiff = curr-prev; biggestDown = t.name; }
+  });
+
+  // Most started by position
+  var topByPos = getMostStartedByPosition(curEntries);
+  var posEmoji = {QB:'🏈',RB:'🏃',WR:'⚡',TE:'🎯',DST:'🛡️'};
+  var posOrder = ['QB','RB','WR','TE','DST'];
+
+  var posCards = posOrder.map(function(pos){
+    var d = topByPos[pos];
+    if(!d) return '';
+    var pct = Math.round(d.count / d.total * 100);
+    return '<div class="recap-item">'
+      + '<div class="recap-item-lbl">' + posEmoji[pos] + ' Top ' + pos + '</div>'
+      + '<div class="recap-item-val">' + d.player + '</div>'
+      + '<div class="recap-item-sub">Started by ' + d.count + ' of ' + d.total + ' (' + pct + '%)</div>'
+      + '</div>';
+  }).join('');
+
+  var divider = '<div style="grid-column:1/-1;height:1px;background:rgba(255,123,58,.15);margin:4px 0"></div>';
+
+  banner.innerHTML = '<div class="recap-title">⚡ Week ' + currentWeek + ' Recap</div>'
+    + '<div class="recap-grid">'
+    + '<div class="recap-item"><div class="recap-item-lbl">🔥 High score</div><div class="recap-item-val">' + high.name + '</div><div class="recap-item-sub">' + high.score.toFixed(1) + ' pts</div></div>'
+    + '<div class="recap-item"><div class="recap-item-lbl">📊 League avg</div><div class="recap-item-val">' + avg.toFixed(1) + ' pts</div><div class="recap-item-sub">Wk ' + currentWeek + ' average</div></div>'
+    + (biggestUp ? '<div class="recap-item"><div class="recap-item-lbl">📈 Biggest mover ↑</div><div class="recap-item-val">' + biggestUp + '</div><div class="recap-item-sub">+' + biggestUpDiff + ' spots</div></div>' : '')
+    + (biggestDown ? '<div class="recap-item"><div class="recap-item-lbl">📉 Biggest drop ↓</div><div class="recap-item-val">' + biggestDown + '</div><div class="recap-item-sub">-' + biggestDownDiff + ' spots</div></div>' : '')
+    + divider
+    + posCards
+    + '</div>';
+  banner.classList.add('show');
+}
+
+// ── FEATURE 4: SCORE DISTRIBUTION ────────────────────────────
+function renderDistribution(data){
+  if(!data.length) return '';
+  var scores = data.slice().sort(function(a,b){ return a.score-b.score; });
+  var min = scores[0].score, max = scores[scores.length-1].score;
+  var avg = scores.reduce(function(s,e){ return s+e.score; },0)/scores.length;
+  var range = max - min || 1;
+  var maxH = 44;
+
+  // Group into 10 buckets
+  var buckets = 10;
+  var bucketSize = range / buckets;
+  var groups = [];
+  for(var i=0;i<buckets;i++) groups.push([]);
+  scores.forEach(function(e){
+    var idx = Math.min(buckets-1, Math.floor((e.score-min)/bucketSize));
+    groups[idx].push(e);
+  });
+  var maxCount = Math.max.apply(null, groups.map(function(g){ return g.length; })) || 1;
+
+  var bars = groups.map(function(g, i){
+    var h = Math.round((g.length/maxCount)*maxH);
+    var isMe = myTeam && g.some(function(e){ return e.name.toLowerCase() === myTeam.toLowerCase(); });
+    var label = (min + i*bucketSize).toFixed(0);
+    return '<div class="dist-bar-wrap" title="' + g.length + ' teams · ' + label + '+ pts">'
+      + '<div class="dist-bar' + (isMe?' is-me':'') + '" style="height:' + Math.max(4,h) + 'px"></div>'
+      + '</div>';
+  }).join('');
+
+  // avg line position
+  var avgPct = ((avg-min)/range*100).toFixed(1);
+
+  return '<div class="dist-wrap">'
+    + '<div class="dist-title">Score distribution — Week ' + currentWeek + '</div>'
+    + '<div class="dist-chart" style="position:relative">'
+    + bars
+    + '<div class="dist-avg-line" style="left:' + avgPct + '%;height:' + (maxH+4) + 'px;bottom:0"></div>'
+    + '</div>'
+    + '<div class="dist-axis"><span>' + min.toFixed(0) + '</span><span>Avg ' + avg.toFixed(1) + '</span><span>' + max.toFixed(0) + '</span></div>'
+    + '</div>';
+}
+
+function handleNav(val){
+  if(val === 'playoffs'){
+    window.location.href = 'playoffs.html';
+    return;
+  }
+  // Show the right content panel
+  document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); });
+  var panel = document.getElementById('tab-' + val);
+  if(panel) panel.classList.remove('hidden');
+  // Sync select
+  var sel = document.getElementById('nav-select');
+  if(sel) sel.value = val;
+}
+
+// ── UTILS ──────────────────────────────────────────────────────
+function showTab(el, id){ handleNav(id); }
+
+function showToast(msg, isErr){
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast' + (isErr ? ' err' : '') + ' show';
+  setTimeout(function(){ t.className = 'toast' + (isErr ? ' err' : ''); }, 3000);
+}
+</script>
+</body>
+</html>
