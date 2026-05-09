@@ -434,59 +434,40 @@ var myTeam = '';
 try{ myTeam = localStorage.getItem('fr_myteam') || ''; }catch(e){}
 
 // ── FIREBASE CONFIG ────────────────────────────────────────────
-var FB_API_KEY   = 'AIzaSyA-2hcf2hzThk7MuEm9DAvRICK95koE9gM';
-var FB_DB_URL    = 'https://fantasy-refresh-default-rtdb.firebaseio.com';
-var FB_DATA_URL  = FB_DB_URL + '/season2025.json?auth=';
-
-// ── FIREBASE AUTH (anonymous) ──────────────────────────────────
-var FB_TOKEN = null;
-
-function fbSignIn(cb){
-  if(FB_TOKEN){ cb(); return; }
-  fetch('https://identitytoolkit.googleapis.com/v1/accounts:signInAnonymously?key=' + FB_API_KEY, {
-    method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({returnSecureToken:true})
-  })
-  .then(function(r){ return r.json(); })
-  .then(function(d){ FB_TOKEN = d.idToken; cb(); })
-  .catch(function(){ cb(); }); // proceed without auth if it fails
-}
+var FB_DB_URL = 'https://fantasy-refresh-default-rtdb.firebaseio.com';
 
 // ── STORAGE ────────────────────────────────────────────────────
 function save(){
   try{ localStorage.setItem('fr_2025_backup', JSON.stringify(seasonData)); }catch(e){}
-  fbSignIn(function(){
-    fetch(FB_DB_URL + '/season2025.json' + (FB_TOKEN ? '?auth=' + FB_TOKEN : ''), {
-      method: 'PUT',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify(seasonData)
-    })
-    .then(function(r){ return r.json(); })
-    .then(function(d){
-      if(d && d.error){ showToast('Save failed: ' + d.error, true); }
-      else { showToast('Saved ✓'); }
-    })
-    .catch(function(){ showToast('Cloud save failed', true); });
-  });
+  fetch(FB_DB_URL + '/season2025.json', {
+    method: 'PUT',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(seasonData)
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    if(d && d.error){ showToast('Save failed: ' + d.error, true); }
+    else { showToast('Saved ✓'); }
+  })
+  .catch(function(){ showToast('Cloud save failed', true); });
 }
 
 function loadFromCloud(){
   setLoading(true);
-  fbSignIn(function(){
-    fetch(FB_DB_URL + '/season2025.json' + (FB_TOKEN ? '?auth=' + FB_TOKEN : ''))
-    .then(function(r){ return r.json(); })
-    .then(function(data){
-      if(data && typeof data === 'object' && !data.error){
-        seasonData = data;
-      }
-      setLoading(false);
-      boot();
-    })
-    .catch(function(){
-      try{ var d = localStorage.getItem('fr_2025_backup'); if(d) seasonData = JSON.parse(d); }catch(e){}
-      setLoading(false);
-      showToast('Using local backup — cloud unavailable', true);
-      boot();
-    });
+  fetch(FB_DB_URL + '/season2025.json')
+  .then(function(r){ return r.json(); })
+  .then(function(data){
+    if(data && typeof data === 'object' && !data.error){
+      seasonData = data;
+    }
+    setLoading(false);
+    boot();
+  })
+  .catch(function(){
+    try{ var d = localStorage.getItem('fr_2025_backup'); if(d) seasonData = JSON.parse(d); }catch(e){}
+    setLoading(false);
+    showToast('Using local backup — cloud unavailable', true);
+    boot();
   });
 }
 
@@ -628,7 +609,6 @@ function renderAll(){
   document.getElementById('hdr-sub').textContent = 'Week ' + currentWeek + ' of ' + WEEKS + ' · ' + sorted.length + ' teams';
 
   renderStandings(sorted, prevRank, curMap, wkHighName);
-  renderWeek(curEntries, maxWk);
   renderMovement(sorted, prevRank, curMap);
   renderMyTeam(sorted, curEntries, prevRank, curMap);
   renderFinish(sorted, curEntries, prevRank);
