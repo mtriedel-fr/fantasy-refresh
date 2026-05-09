@@ -995,6 +995,9 @@ function renderMyTeam(sorted, curEntries, prevRank, curMap){
   // League start percentages for this week
   var startPcts = getLeagueStartPcts(curEntries);
 
+  // Parse this team's lineup
+  var players = parseLineup(entry.lineup || '');
+
   // Build standard fantasy lineup slots in fixed order
   var slotDefs = [
     {pos:'QB',  label:'QB'},
