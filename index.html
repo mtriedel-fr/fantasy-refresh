@@ -139,7 +139,21 @@ tr:hover td{background:var(--or4);}
 /* movement col fixed width */
 .move-col{width:52px;min-width:52px;max-width:52px;text-align:center;overflow:hidden;}
 
-/* SUB-TABS inside Your Week */
+/* PLAYER CHARTS inside My Lineup */
+.chart-section{background:var(--bg3);border-radius:12px;overflow:hidden;border:1px solid var(--bdr);margin-top:0;}
+.chart-section-hdr{background:var(--bg2);padding:12px 18px;font-family:var(--fd);font-size:11px;font-weight:700;color:var(--ink2);text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--bdr);}
+.chart-wrap{padding:14px 18px 6px;}
+.chart-canvas{width:100%;height:160px;}
+svg.chart{width:100%;height:100%;overflow:visible;}
+.chart-label{font-family:var(--fd);font-size:10px;fill:var(--ink3);}
+.chart-line{fill:none;stroke:var(--or);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;}
+.chart-line-avg{fill:none;stroke:var(--bdr2);stroke-width:1.5;stroke-dasharray:4,3;stroke-linecap:round;}
+.chart-line-rank{fill:none;stroke:#6050A8;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;}
+.chart-dot{fill:var(--or);stroke:var(--bg);stroke-width:2;}
+.chart-dot-rank{fill:#6050A8;stroke:var(--bg);stroke-width:2;}
+.chart-legend{display:flex;gap:16px;padding:4px 18px 12px;flex-wrap:wrap;}
+.legend-item{display:flex;align-items:center;gap:5px;font-family:var(--fd);font-size:11px;font-weight:600;color:var(--ink2);text-transform:uppercase;letter-spacing:.5px;}
+.legend-dot{width:10px;height:3px;border-radius:2px;}
 .sub-tabs{display:flex;background:var(--bg2);border-bottom:2px solid var(--bdr);padding:0 4px;}
 .sub-tab{padding:11px 18px;font-family:var(--fd);font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;color:var(--ink2);border-bottom:3px solid transparent;margin-bottom:-2px;transition:color .15s;white-space:nowrap;}
 .sub-tab.active{color:var(--or);border-bottom:3px solid var(--or);}
@@ -971,6 +985,73 @@ function goToProfile(encodedName){
   window.location.href = 'player.html?team=' + encodedName;
 }
 
+// ── PLAYER CHART HELPERS ──────────────────────────────────────
+function getPlayerWeekData(name){
+  var weeks = Object.keys(seasonData).filter(function(k){
+    return !isNaN(Number(k)) && seasonData[k] && seasonData[k].length > 0;
+  }).map(Number).sort(function(a,b){ return a-b; });
+
+  return weeks.map(function(w){
+    var entry = (seasonData[String(w)]||[]).find(function(e){ return e.name === name; });
+    if(!entry) return null;
+    var wkData = seasonData[String(w)] || [];
+    var avg = wkData.reduce(function(s,e){ return s+e.score; },0) / (wkData.length||1);
+    var sorted = wkData.slice().sort(function(a,b){ return b.score-a.score; });
+    var rank = sorted.findIndex(function(e){ return e.name === name; }) + 1;
+    // Cumulative standing up to this week
+    var cumTotals = {};
+    weeks.filter(function(ww){ return ww <= w; }).forEach(function(ww){
+      (seasonData[String(ww)]||[]).forEach(function(e){ cumTotals[e.name] = (cumTotals[e.name]||0) + e.score; });
+    });
+    var cumSorted = Object.keys(cumTotals).sort(function(a,b){ return cumTotals[b]-cumTotals[a]; });
+    var cumStanding = cumSorted.indexOf(name) + 1;
+    return { week:w, score:entry.score, avg:avg, rank:rank, total:wkData.length, cumStanding:cumStanding };
+  }).filter(Boolean);
+}
+
+function buildScoreChartInline(weekData){
+  if(weekData.length < 2) return '';
+  var W=800,H=140,PAD={t:10,r:10,b:28,l:38};
+  var iW=W-PAD.l-PAD.r, iH=H-PAD.t-PAD.b;
+  var scores=weekData.map(function(d){return d.score;}), avgs=weekData.map(function(d){return d.avg;});
+  var minV=Math.min.apply(null,scores.concat(avgs))*0.92, maxV=Math.max.apply(null,scores.concat(avgs))*1.05;
+  function xp(i){return PAD.l+(i/(weekData.length-1||1))*iW;}
+  function yp(v){return PAD.t+iH-((v-minV)/(maxV-minV))*iH;}
+  var sp=weekData.map(function(d,i){return(i?'L':'M')+xp(i).toFixed(1)+' '+yp(d.score).toFixed(1);}).join(' ');
+  var ap=weekData.map(function(d,i){return(i?'L':'M')+xp(i).toFixed(1)+' '+yp(d.avg).toFixed(1);}).join(' ');
+  var area=sp+' L'+xp(weekData.length-1).toFixed(1)+' '+(PAD.t+iH)+' L'+PAD.l+' '+(PAD.t+iH)+' Z';
+  var dots=weekData.map(function(d,i){return'<circle class="chart-dot" cx="'+xp(i).toFixed(1)+'" cy="'+yp(d.score).toFixed(1)+'" r="4"><title>Wk '+d.week+': '+d.score.toFixed(1)+'</title></circle>';}).join('');
+  var xlbl=weekData.map(function(d,i){return'<text class="chart-label" x="'+xp(i).toFixed(1)+'" y="'+(H-4)+'" text-anchor="middle">Wk'+d.week+'</text>';}).join('');
+  var ylbl='';
+  for(var s=0;s<=3;s++){var v=minV+(maxV-minV)*(s/3),y=yp(v);ylbl+='<text class="chart-label" x="'+(PAD.l-3)+'" y="'+y.toFixed(1)+'" text-anchor="end" dominant-baseline="middle">'+Math.round(v)+'</text><line x1="'+PAD.l+'" y1="'+y.toFixed(1)+'" x2="'+(W-PAD.r)+'" y2="'+y.toFixed(1)+'" stroke="rgba(184,152,106,0.2)" stroke-width="1"/>';}
+  return '<svg class="chart" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none">'
+    +'<defs><linearGradient id="csg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#FF7B3A" stop-opacity=".25"/><stop offset="100%" stop-color="#FF7B3A" stop-opacity="0"/></linearGradient></defs>'
+    +ylbl+xlbl+'<path d="'+area+'" fill="url(#csg)"/><path class="chart-line-avg" d="'+ap+'"/><path class="chart-line" d="'+sp+'"/>'+dots+'</svg>';
+}
+
+function buildRankChartInline(weekData){
+  if(weekData.length < 2) return '';
+  var W=800,H=140,PAD={t:10,r:10,b:28,l:38};
+  var iW=W-PAD.l-PAD.r, iH=H-PAD.t-PAD.b;
+  var ranked=weekData.filter(function(d){return d.rank!==null;});
+  if(!ranked.length) return '';
+  var allR=ranked.map(function(d){return d.rank;}).concat(ranked.map(function(d){return d.cumStanding||d.rank;}));
+  var maxR=Math.max.apply(null,allR.concat([ranked[0].total||68])), minR=1;
+  function xp(i){return PAD.l+(i/(ranked.length-1||1))*iW;}
+  function yp(r){return PAD.t+iH-((maxR-r)/(maxR-minR||1))*iH;}
+  var rp=ranked.map(function(d,i){return(i?'L':'M')+xp(i).toFixed(1)+' '+yp(d.rank).toFixed(1);}).join(' ');
+  var sp2=ranked.filter(function(d){return d.cumStanding;}).map(function(d,i){return(i?'L':'M')+xp(ranked.indexOf(d)).toFixed(1)+' '+yp(d.cumStanding).toFixed(1);}).join(' ');
+  var rdots=ranked.map(function(d,i){return'<circle class="chart-dot-rank" cx="'+xp(i).toFixed(1)+'" cy="'+yp(d.rank).toFixed(1)+'" r="4"><title>Wk '+d.week+': #'+d.rank+'</title></circle>';}).join('');
+  var sdots=ranked.filter(function(d){return d.cumStanding;}).map(function(d,i){return'<circle cx="'+xp(ranked.indexOf(d)).toFixed(1)+'" cy="'+yp(d.cumStanding).toFixed(1)+'" r="3.5" fill="var(--or)" stroke="#1C1208" stroke-width="2" opacity=".8"><title>After Wk '+d.week+': Standing #'+d.cumStanding+'</title></circle>';}).join('');
+  var xlbl=ranked.map(function(d,i){return'<text class="chart-label" x="'+xp(i).toFixed(1)+'" y="'+(H-4)+'" text-anchor="middle">Wk'+d.week+'</text>';}).join('');
+  var ylbl='';
+  for(var s=0;s<=3;s++){var r=Math.round(minR+(maxR-minR)*(s/3)),y=yp(r);ylbl+='<text class="chart-label" x="'+(PAD.l-3)+'" y="'+y.toFixed(1)+'" text-anchor="end" dominant-baseline="middle">#'+r+'</text><line x1="'+PAD.l+'" y1="'+y.toFixed(1)+'" x2="'+(W-PAD.r)+'" y2="'+y.toFixed(1)+'" stroke="rgba(184,152,106,0.2)" stroke-width="1"/>';}
+  return '<svg class="chart" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none">'
+    +ylbl+xlbl+'<path class="chart-line-rank" d="'+rp+'"/>'
+    +(sp2?'<path d="'+sp2+'" fill="none" stroke="var(--or)" stroke-width="2" stroke-dasharray="5,3" stroke-linecap="round" opacity=".7"/>':'')
+    +rdots+sdots+'</svg>';
+}
+
 // ── YOUR TEAM VIEW ────────────────────────────────────────────
 function renderMyTeam(sorted, curEntries, prevRank, curMap){
   var el = document.getElementById('wt');
@@ -1025,10 +1106,30 @@ function renderMyTeam(sorted, curEntries, prevRank, curMap){
       + '</div>';
   }).join('');
 
-  var moveStr = move === null ? '—' : move > 0 ? '+' + move : String(move);
-  var moveClass = move > 0 ? 'good' : move < 0 ? 'bad' : '';
-  var med = ['🥇','🥈','🥉'];
-  var rankDisplay = currRank && currRank <= 3 ? med[currRank-1] : (currRank ? '#' + currRank : '—');
+  // Build charts from season data
+  var playerWeekData = getPlayerWeekData(entry.name);
+  var scoreChart = buildScoreChartInline(playerWeekData);
+  var rankChart = buildRankChartInline(playerWeekData);
+
+  var chartsHTML = '';
+  if(scoreChart){
+    chartsHTML += '<div class="chart-section">'
+      + '<div class="chart-section-hdr">Weekly Score vs League Average</div>'
+      + '<div class="chart-wrap"><div class="chart-canvas">' + scoreChart + '</div></div>'
+      + '<div class="chart-legend">'
+      + '<div class="legend-item"><div class="legend-dot" style="background:var(--or)"></div>Your score</div>'
+      + '<div class="legend-item"><div class="legend-dot" style="background:var(--bdr2)"></div>League avg</div>'
+      + '</div></div>';
+  }
+  if(rankChart){
+    chartsHTML += '<div class="chart-section">'
+      + '<div class="chart-section-hdr">Weekly Finish & Season Standing</div>'
+      + '<div class="chart-wrap"><div class="chart-canvas">' + rankChart + '</div></div>'
+      + '<div class="chart-legend">'
+      + '<div class="legend-item"><div class="legend-dot" style="background:#6050A8"></div>Weekly finish</div>'
+      + '<div class="legend-item"><div class="legend-dot" style="background:var(--or);opacity:.7"></div>Season standing</div>'
+      + '</div></div>';
+  }
 
   el.innerHTML = '<div class="myteam-wrap">'
     + '<div class="myteam-card">'
@@ -1043,7 +1144,9 @@ function renderMyTeam(sorted, curEntries, prevRank, curMap){
     + '<div class="myteam-stat"><div class="myteam-stat-lbl">Movement</div><div class="myteam-stat-val ' + moveClass + '">' + moveStr + '</div></div>'
     + '</div>'
     + (players.length ? '<div class="myteam-lineup"><div class="myteam-lineup-title">Your lineup · League start % shown</div><div class="lineup-grid">' + lineupSlots + '</div></div>' : '')
-    + '</div></div>';
+    + '</div>'
+    + chartsHTML
+    + '</div>';
 }
 
 function getLeagueStartPcts(curEntries){
