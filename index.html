@@ -382,6 +382,7 @@ tr.my-team:hover td{background:rgba(255,123,58,.14) !important;}
 <div id="tab-myteam" class="content">
   <div class="sub-tabs">
     <div class="sub-tab active" onclick="showSubTab(this,'mylineup')">👤 My Lineup</div>
+    <div class="sub-tab" onclick="goToMySeason()">📈 My Season</div>
     <div class="sub-tab" onclick="showSubTab(this,'finish')">📊 Overall Finish</div>
     <div class="sub-tab" onclick="showSubTab(this,'numbers')">🔢 Weekly Numbers</div>
   </div>
@@ -1429,6 +1430,14 @@ function renderDistribution(data){
     + '</div>'
     + '<div class="dist-axis"><span>' + min.toFixed(0) + '</span><span>Avg ' + avg.toFixed(1) + '</span><span>' + max.toFixed(0) + '</span></div>'
     + '</div>';
+}
+
+function goToMySeason(){
+  if(!myTeam){
+    showToast('Set your team name first to view your season', true);
+    return;
+  }
+  window.location.href = 'player.html?team=' + encodeURIComponent(myTeam);
 }
 
 function showSubTab(el, id){
