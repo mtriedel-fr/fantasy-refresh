@@ -9,23 +9,24 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 :root{
-  --hdr:#060E0E;--hdr2:#091414;
-  --bg:#0D1F1F;--bg2:#0A1818;--bg3:#102828;--bg4:#143030;
-  --or:#00D4CC;--or2:#33DEDA;--or4:#004A48;
-  --ink:#E8F8F8;--ink2:#7ABFBF;--ink3:#4A8888;
-  --bdr:#0A3A3A;--bdr2:#0D4A4A;--red:#FF2D78;--grn:#00D4CC;
+  --hdr:#050808;--hdr2:#080E0E;
+  --bg:#0A0F0F;--bg2:#0D1515;--bg3:#101C1C;--bg4:#142020;
+  --or:#00E5D4;--or2:#33EDE0;--or4:#003A38;
+  --pk:#FF1A6E;--pk2:#FF4D8F;--pk4:#3A0018;
+  --ink:#F0FAFA;--ink2:#6ABFBF;--ink3:#3A8888;
+  --bdr:#0D3535;--bdr2:#104040;--red:#FF1A6E;--grn:#00E5D4;
   --fd:'Barlow Condensed',sans-serif;--fb:'Barlow',sans-serif;
 }
 body{background:#091414;min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:24px 16px;font-family:var(--fb);}
 .wrap{width:100%;max-width:960px;border-radius:16px;overflow:hidden;border:1px solid #0A2A2A;box-shadow:0 24px 80px rgba(0,0,0,.6);}
 
 /* HEADER */
-.hdr{background:var(--hdr);padding:22px 28px;display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid var(--or);}
+.hdr{background:var(--hdr);padding:22px 28px;display:flex;justify-content:space-between;align-items:center;border-top:3px solid var(--or);border-bottom:3px solid var(--pk);}
 .logo{display:flex;align-items:center;gap:12px;}
-.logo-box{width:40px;height:40px;background:var(--or);border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.logo-box{width:40px;height:40px;background:linear-gradient(135deg,var(--or),var(--pk));border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .logo-box svg{width:22px;height:22px;stroke:#060E0E;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;}
 .logo-txt{font-family:var(--fd);font-size:28px;font-weight:800;color:#E8F8F8;text-transform:uppercase;letter-spacing:.5px;line-height:1;}
-.logo-txt span{color:var(--or);}
+.logo-txt span{color:var(--pk);}
 .logo-sub{font-family:var(--fd);font-size:11px;font-weight:600;color:#1A5A5A;letter-spacing:2px;text-transform:uppercase;margin-top:2px;}
 .hdr-r{text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:6px;}
 .back-btn{background:transparent;border:1px solid #0A2A2A;color:#1A5A5A;font-family:var(--fd);font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;padding:4px 12px;border-radius:6px;cursor:pointer;transition:all .15s;text-decoration:none;display:inline-block;}
