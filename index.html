@@ -139,7 +139,76 @@ tr:hover td{background:var(--or4);}
 /* movement col fixed width */
 .move-col{width:52px;min-width:52px;max-width:52px;text-align:center;overflow:hidden;}
 
-/* ── FEATURE 1: YOUR TEAM HIGHLIGHT ── */
+/* SUB-TABS inside Your Week */
+.sub-tabs{display:flex;background:var(--bg2);border-bottom:2px solid var(--bdr);padding:0 4px;}
+.sub-tab{padding:11px 18px;font-family:var(--fd);font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;color:var(--ink2);border-bottom:3px solid transparent;margin-bottom:-2px;transition:color .15s;white-space:nowrap;}
+.sub-tab.active{color:var(--or);border-bottom:3px solid var(--or);}
+.sub-tab:hover:not(.active){color:var(--ink);}
+/* ── YOUR TEAM CARD ── */
+.myteam-wrap{padding:20px 24px;display:flex;flex-direction:column;gap:16px;}
+.myteam-card{background:var(--bg3);border-radius:12px;overflow:hidden;border:2px solid var(--or);}
+.myteam-hero{background:linear-gradient(135deg,var(--hdr) 0%,var(--hdr2) 100%);padding:20px 24px;display:flex;justify-content:space-between;align-items:flex-start;}
+.myteam-name{font-family:var(--fd);font-size:28px;font-weight:800;color:#F5EAD8;text-transform:uppercase;letter-spacing:.5px;}
+.myteam-score{font-family:var(--fd);font-size:48px;font-weight:800;color:var(--or);line-height:1;letter-spacing:-1px;}
+.myteam-score-lbl{font-family:var(--fd);font-size:11px;font-weight:600;color:#6A5038;text-transform:uppercase;letter-spacing:1px;text-align:right;margin-top:4px;}
+.myteam-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--bdr);border-bottom:1px solid var(--bdr);}
+.myteam-stat{background:var(--bg4);padding:12px 16px;text-align:center;}
+.myteam-stat-lbl{font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink2);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;}
+.myteam-stat-val{font-family:var(--fd);font-size:20px;font-weight:800;color:var(--ink);}
+.myteam-stat-val.good{color:var(--grn);}
+.myteam-stat-val.bad{color:var(--red);}
+.myteam-lineup{padding:16px 20px;}
+.myteam-lineup-title{font-family:var(--fd);font-size:11px;font-weight:700;color:var(--ink2);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;}
+.lineup-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;}
+.lineup-slot{background:var(--bg3);border-radius:8px;padding:10px 12px;border:1px solid var(--bdr);display:flex;align-items:center;gap:10px;}
+.lineup-pos{font-family:var(--fd);font-size:11px;font-weight:800;color:var(--or);text-transform:uppercase;letter-spacing:.5px;min-width:34px;}
+.lineup-player{font-family:var(--fd);font-size:13px;font-weight:600;color:var(--ink);flex:1;}
+.lineup-pct{font-family:var(--fd);font-size:11px;color:var(--ink3);}
+.myteam-empty{padding:48px 24px;text-align:center;}
+.myteam-empty-icon{font-size:40px;margin-bottom:12px;opacity:.4;}
+.myteam-empty-title{font-family:var(--fd);font-size:18px;font-weight:700;color:var(--ink2);text-transform:uppercase;margin-bottom:6px;}
+.myteam-empty-sub{font-size:13px;color:var(--ink3);line-height:1.6;}
+
+/* ── OVERALL FINISH ── */
+.finish-wrap{padding:0;}
+.finish-table{width:100%;border-collapse:collapse;}
+.finish-table th{padding:10px 16px;text-align:left;font-family:var(--fd);font-size:10px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--ink2);border-bottom:1px solid var(--bdr);background:var(--bg2);}
+.finish-table td{padding:12px 16px;border-bottom:1px solid var(--bdr);font-size:14px;color:var(--ink);}
+.finish-table tr:last-child td{border-bottom:none;}
+.finish-table tr:hover td{background:var(--or4);}
+.finish-table tr.is-me td{background:rgba(255,123,58,.08);border-left:3px solid var(--or);}
+.finish-rank{font-family:var(--fd);font-weight:800;font-size:16px;color:var(--ink2);}
+.finish-rank.top{color:var(--or);}
+.finish-name{font-family:var(--fd);font-weight:700;font-size:15px;color:var(--ink);}
+.finish-score{font-family:var(--fd);font-weight:700;font-size:15px;color:var(--or);}
+.finish-move{font-family:var(--fd);font-size:13px;font-weight:700;}
+.finish-pct-bar{height:4px;background:var(--bdr);border-radius:2px;margin-top:4px;}
+.finish-pct-fill{height:4px;background:var(--or);border-radius:2px;}
+
+/* ── WEEKLY NUMBERS ── */
+.numbers-wrap{padding:20px 24px;display:flex;flex-direction:column;gap:20px;}
+.num-section{background:var(--bg3);border-radius:12px;overflow:hidden;border:1px solid var(--bdr);}
+.num-section-hdr{background:var(--bg2);padding:12px 18px;font-family:var(--fd);font-size:11px;font-weight:700;color:var(--ink2);text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--bdr);}
+.num-body{padding:16px 18px;}
+.score-card-hero{display:flex;align-items:flex-start;gap:16px;margin-bottom:12px;}
+.score-card-hero .score{font-family:var(--fd);font-size:40px;font-weight:800;color:var(--or);line-height:1;letter-spacing:-1px;}
+.score-card-hero .name{font-family:var(--fd);font-size:16px;font-weight:700;color:var(--ink);margin-bottom:4px;}
+.score-card-hero .sub{font-family:var(--fd);font-size:11px;color:var(--ink2);text-transform:uppercase;letter-spacing:.5px;}
+.roster-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:6px;}
+.roster-item{background:var(--bg4);border-radius:6px;padding:7px 10px;display:flex;align-items:center;gap:8px;border:1px solid var(--bdr);}
+.roster-pos{font-family:var(--fd);font-size:10px;font-weight:800;color:var(--or);min-width:30px;}
+.roster-player{font-family:var(--fd);font-size:12px;font-weight:600;color:var(--ink);}
+.pos-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:10px;}
+.pos-card{background:var(--bg4);border-radius:8px;padding:12px 14px;border:1px solid var(--bdr);}
+.pos-card-pos{font-family:var(--fd);font-size:10px;font-weight:800;color:var(--or);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;}
+.pos-card-player{font-family:var(--fd);font-size:15px;font-weight:700;color:var(--ink);margin-bottom:6px;}
+.pos-card-count{font-family:var(--fd);font-size:11px;color:var(--ink2);}
+.pos-bar-bg{height:4px;background:var(--bdr);border-radius:2px;margin-top:6px;}
+.pos-bar-fill{height:4px;background:var(--or);border-radius:2px;}
+.num-stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;}
+.num-stat{background:var(--bg4);border-radius:8px;padding:12px 14px;text-align:center;border:1px solid var(--bdr);}
+.num-stat-lbl{font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink2);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;}
+.num-stat-val{font-family:var(--fd);font-size:22px;font-weight:800;color:var(--or);}
 tr.my-team td{background:rgba(255,123,58,.08) !important;border-left:3px solid var(--or);}
 tr.my-team:hover td{background:rgba(255,123,58,.14) !important;}
 .my-team-input{display:flex;align-items:center;gap:8px;padding:8px 16px;background:var(--bg4);border-bottom:1px solid var(--bdr);}
@@ -287,7 +356,7 @@ tr.my-team:hover td{background:rgba(255,123,58,.14) !important;}
   </div>
   <div class="nav-select-wrap">
     <select class="nav-select" id="nav-select" onchange="handleNav(this.value)">
-      <option value="w">📊 This Week</option>
+      <option value="myteam">👤 Your Week</option>
       <option value="s">🏆 Standings</option>
       <option value="m">📈 Movement</option>
       <option value="playoffs">🏈 Playoffs</option>
@@ -297,7 +366,18 @@ tr.my-team:hover td{background:rgba(255,123,58,.14) !important;}
 
 <div class="recap-banner" id="recap-banner"></div>
 
-<div id="tab-w" class="content"><div id="ww"></div></div>
+<!-- YOUR WEEK — main landing with 3 sub-tabs -->
+<div id="tab-myteam" class="content">
+  <div class="sub-tabs">
+    <div class="sub-tab active" onclick="showSubTab(this,'mylineup')">👤 My Lineup</div>
+    <div class="sub-tab" onclick="showSubTab(this,'finish')">📊 Overall Finish</div>
+    <div class="sub-tab" onclick="showSubTab(this,'numbers')">🔢 Weekly Numbers</div>
+  </div>
+  <div id="sub-mylineup"><div id="wt"></div></div>
+  <div id="sub-finish" class="hidden"><div id="wf"></div></div>
+  <div id="sub-numbers" class="hidden"><div id="wn"></div></div>
+</div>
+
 <div id="tab-s" class="content hidden"><div id="sw"></div></div>
 <div id="tab-m" class="content hidden"><div id="mw"></div></div>
 
@@ -423,12 +503,18 @@ function boot(){
   }).map(Number);
   // Default to latest imported week
   if(loadedWks.length) currentWeek = Math.max.apply(null, loadedWks);
-  // Default to This Week view
+  // Default to Your Week view, My Lineup sub-tab
   document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); });
-  var tw = document.getElementById('tab-w');
-  if(tw) tw.classList.remove('hidden');
+  var defaultTab = document.getElementById('tab-myteam');
+  if(defaultTab) defaultTab.classList.remove('hidden');
+  ['finish','numbers'].forEach(function(n){
+    var el = document.getElementById('sub-' + n);
+    if(el) el.classList.add('hidden');
+  });
+  var mylineup = document.getElementById('sub-mylineup');
+  if(mylineup) mylineup.classList.remove('hidden');
   var navSel = document.getElementById('nav-select');
-  if(navSel) navSel.value = 'w';
+  if(navSel) navSel.value = 'myteam';
   initMyTeamInput();
   renderAll();
 }
@@ -544,6 +630,9 @@ function renderAll(){
   renderStandings(sorted, prevRank, curMap, wkHighName);
   renderWeek(curEntries, maxWk);
   renderMovement(sorted, prevRank, curMap);
+  renderMyTeam(sorted, curEntries, prevRank, curMap);
+  renderFinish(sorted, curEntries, prevRank);
+  renderNumbers(curEntries);
   renderRecap(sorted, curEntries, prevRank);
   initMyTeamInput();
   if(!document.getElementById('comm-panel').classList.contains('hidden')) renderHistory();
@@ -905,7 +994,200 @@ function goToProfile(encodedName){
   window.location.href = 'player.html?team=' + encodedName;
 }
 
-// ── FEATURE 1: YOUR TEAM ──────────────────────────────────────
+// ── YOUR TEAM VIEW ────────────────────────────────────────────
+function renderMyTeam(sorted, curEntries, prevRank, curMap){
+  var el = document.getElementById('wt');
+  if(!el) return;
+
+  if(!myTeam){
+    el.innerHTML = '<div class="myteam-empty"><div class="myteam-empty-icon">👤</div><div class="myteam-empty-title">No team set</div><div class="myteam-empty-sub">Type your team name in the "Your Team" field above to see your personal dashboard.</div></div>';
+    return;
+  }
+
+  var entry = curEntries.find(function(e){ return e.name.toLowerCase() === myTeam.toLowerCase(); });
+  var rank = sorted.findIndex(function(t){ return t.name.toLowerCase() === myTeam.toLowerCase(); });
+  var currRank = rank >= 0 ? rank + 1 : null;
+  var prev = currRank ? (prevRank[sorted[rank].name] || null) : null;
+  var move = (currRank && prev) ? prev - currRank : null;
+
+  if(!entry){
+    el.innerHTML = '<div class="myteam-empty"><div class="myteam-empty-icon">📭</div><div class="myteam-empty-title">No data for "' + myTeam + '" this week</div><div class="myteam-empty-sub">Make sure your team name matches exactly what appears in the standings.</div></div>';
+    return;
+  }
+
+  // League start percentages for this week
+  var startPcts = getLeagueStartPcts(curEntries);
+
+  // Parse this team's lineup
+  var players = parseLineup(entry.lineup || '');
+  var posOrder = ['QB','RB','WR','TE','FLEX','DST','K'];
+  players.sort(function(a,b){ return (posOrder.indexOf(a.pos)||9) - (posOrder.indexOf(b.pos)||9); });
+
+  var lineupSlots = players.map(function(p){
+    var pct = startPcts[p.player] ? Math.round(startPcts[p.player] / curEntries.length * 100) : 0;
+    return '<div class="lineup-slot">'
+      + '<span class="lineup-pos">' + p.pos + '</span>'
+      + '<span class="lineup-player">' + p.player + '</span>'
+      + '<span class="lineup-pct">' + pct + '%</span>'
+      + '</div>';
+  }).join('');
+
+  var moveStr = move === null ? '—' : move > 0 ? '+' + move : String(move);
+  var moveClass = move > 0 ? 'good' : move < 0 ? 'bad' : '';
+  var med = ['🥇','🥈','🥉'];
+  var rankDisplay = currRank && currRank <= 3 ? med[currRank-1] : (currRank ? '#' + currRank : '—');
+
+  el.innerHTML = '<div class="myteam-wrap">'
+    + '<div class="myteam-card">'
+    + '<div class="myteam-hero">'
+    + '<div><div class="myteam-name">' + entry.name + '</div>'
+    + '<div style="font-family:var(--fd);font-size:11px;color:#6A5038;text-transform:uppercase;letter-spacing:1px;margin-top:4px;">Week ' + currentWeek + ' · Your dashboard</div></div>'
+    + '<div style="text-align:right"><div class="myteam-score">' + entry.score.toFixed(1) + '</div><div class="myteam-score-lbl">Points</div></div>'
+    + '</div>'
+    + '<div class="myteam-stats">'
+    + '<div class="myteam-stat"><div class="myteam-stat-lbl">Week rank</div><div class="myteam-stat-val">' + rankDisplay + '</div></div>'
+    + '<div class="myteam-stat"><div class="myteam-stat-lbl">Season rank</div><div class="myteam-stat-val">' + (currRank ? '#' + currRank : '—') + '</div></div>'
+    + '<div class="myteam-stat"><div class="myteam-stat-lbl">Movement</div><div class="myteam-stat-val ' + moveClass + '">' + moveStr + '</div></div>'
+    + '</div>'
+    + (players.length ? '<div class="myteam-lineup"><div class="myteam-lineup-title">Your lineup · League start % shown</div><div class="lineup-grid">' + lineupSlots + '</div></div>' : '')
+    + '</div></div>';
+}
+
+function getLeagueStartPcts(curEntries){
+  var counts = {};
+  curEntries.forEach(function(entry){
+    if(!entry.lineup) return;
+    var players = parseLineup(entry.lineup);
+    var seen = {};
+    players.forEach(function(p){
+      if(seen[p.player]) return;
+      seen[p.player] = true;
+      counts[p.player] = (counts[p.player] || 0) + 1;
+    });
+  });
+  return counts;
+}
+
+// ── OVERALL FINISH VIEW ───────────────────────────────────────
+function renderFinish(sorted, curEntries, prevRank){
+  var el = document.getElementById('wf');
+  if(!el) return;
+
+  if(!curEntries.length){
+    el.innerHTML = '<div class="empty"><div class="empty-icon">📊</div><div class="empty-title">No data for week ' + currentWeek + '</div></div>';
+    return;
+  }
+
+  var byScore = curEntries.slice().sort(function(a,b){ return b.score - a.score; });
+  var maxScore = byScore[0].score;
+  var med = ['🥇','🥈','🥉'];
+
+  var rows = byScore.map(function(e, i){
+    var wkRank = i + 1;
+    // Find season rank
+    var sznRank = sorted.findIndex(function(t){ return t.name === e.name; }) + 1;
+    var prev = prevRank[e.name];
+    var move = (sznRank && prev) ? prev - sznRank : null;
+    var moveStr = move === null ? '—' : move > 0 ? '<span style="color:var(--grn)">+' + move + '</span>' : move < 0 ? '<span style="color:var(--red)">' + move + '</span>' : '—';
+    var isMe = myTeam && e.name.toLowerCase() === myTeam.toLowerCase();
+    var pct = Math.round(e.score / maxScore * 100);
+    return '<tr' + (isMe ? ' class="is-me"' : '') + '>'
+      + '<td class="finish-rank' + (wkRank <= 3 ? ' top' : '') + '">' + (wkRank <= 3 ? med[wkRank-1] : wkRank) + '</td>'
+      + '<td class="finish-name">' + e.name + (isMe ? '<span class="my-team-badge">You</span>' : '') + '</td>'
+      + '<td class="finish-score">' + e.score.toFixed(1) + '<div class="finish-pct-bar"><div class="finish-pct-fill" style="width:' + pct + '%"></div></div></td>'
+      + '<td style="text-align:center;font-family:var(--fd);font-size:14px;color:var(--ink2)">' + (sznRank ? '#' + sznRank : '—') + '</td>'
+      + '<td style="text-align:center">' + moveStr + '</td>'
+      + '</tr>';
+  }).join('');
+
+  el.innerHTML = '<div class="finish-wrap"><table class="finish-table"><thead><tr>'
+    + '<th style="width:44px">Wk #</th><th>Team</th>'
+    + '<th>Score</th>'
+    + '<th style="text-align:center">Season rank</th>'
+    + '<th style="text-align:center">Move</th>'
+    + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+}
+
+// ── WEEKLY NUMBERS VIEW ───────────────────────────────────────
+function renderNumbers(curEntries){
+  var el = document.getElementById('wn');
+  if(!el) return;
+
+  if(!curEntries.length){
+    el.innerHTML = '<div class="empty"><div class="empty-icon">🔢</div><div class="empty-title">No data for week ' + currentWeek + '</div></div>';
+    return;
+  }
+
+  var byScore = curEntries.slice().sort(function(a,b){ return b.score - a.score; });
+  var scores = byScore.map(function(e){ return e.score; });
+  var high = byScore[0];
+  var low = byScore[byScore.length-1];
+  var avg = scores.reduce(function(a,b){ return a+b; }, 0) / scores.length;
+  var median = scores[Math.floor(scores.length/2)];
+  var stddev = Math.sqrt(scores.reduce(function(s,v){ return s + Math.pow(v-avg,2); }, 0) / scores.length);
+  var above = scores.filter(function(s){ return s > avg; }).length;
+
+  // Most started by position
+  var topByPos = getMostStartedByPosition(curEntries);
+  var posOrder = ['QB','RB','WR','TE','DST'];
+  var posEmoji = {QB:'🏈',RB:'🏃',WR:'⚡',TE:'🎯',DST:'🛡️'};
+
+  function rosterHTML(entry){
+    if(!entry || !entry.lineup) return '<div style="color:var(--ink3);font-size:13px">No lineup data</div>';
+    var players = parseLineup(entry.lineup);
+    var posOrd = ['QB','RB','WR','TE','FLEX','DST','K'];
+    players.sort(function(a,b){ return posOrd.indexOf(a.pos) - posOrd.indexOf(b.pos); });
+    return '<div class="roster-list">' + players.map(function(p){
+      return '<div class="roster-item"><span class="roster-pos">' + p.pos + '</span><span class="roster-player">' + p.player + '</span></div>';
+    }).join('') + '</div>';
+  }
+
+  var posCards = posOrder.map(function(pos){
+    var d = topByPos[pos];
+    if(!d) return '';
+    var pct = Math.round(d.count / d.total * 100);
+    var barPct = Math.round(d.count / d.total * 100);
+    return '<div class="pos-card">'
+      + '<div class="pos-card-pos">' + posEmoji[pos] + ' ' + pos + '</div>'
+      + '<div class="pos-card-player">' + d.player + '</div>'
+      + '<div class="pos-card-count">Started by ' + d.count + ' of ' + d.total + ' teams (' + pct + '%)</div>'
+      + '<div class="pos-bar-bg"><div class="pos-bar-fill" style="width:' + barPct + '%"></div></div>'
+      + '</div>';
+  }).join('');
+
+  el.innerHTML = '<div class="numbers-wrap">'
+
+    // Key stats
+    + '<div class="num-section"><div class="num-section-hdr">📐 League Stats — Week ' + currentWeek + '</div>'
+    + '<div class="num-body"><div class="num-stat-grid">'
+    + '<div class="num-stat"><div class="num-stat-lbl">High</div><div class="num-stat-val">' + high.score.toFixed(1) + '</div></div>'
+    + '<div class="num-stat"><div class="num-stat-lbl">Average</div><div class="num-stat-val">' + avg.toFixed(1) + '</div></div>'
+    + '<div class="num-stat"><div class="num-stat-lbl">Median</div><div class="num-stat-val">' + median.toFixed(1) + '</div></div>'
+    + '<div class="num-stat"><div class="num-stat-lbl">Low</div><div class="num-stat-val">' + low.score.toFixed(1) + '</div></div>'
+    + '<div class="num-stat"><div class="num-stat-lbl">Std Dev</div><div class="num-stat-val">' + stddev.toFixed(1) + '</div></div>'
+    + '<div class="num-stat"><div class="num-stat-lbl">Above avg</div><div class="num-stat-val">' + above + '</div></div>'
+    + '</div></div></div>'
+
+    // Score distribution
+    + '<div class="num-section"><div class="num-section-hdr">📊 Score Distribution</div>'
+    + '<div class="num-body">' + renderDistribution(curEntries) + '</div></div>'
+
+    // High score + roster
+    + '<div class="num-section"><div class="num-section-hdr">🔥 Highest Score — ' + high.name + ' · ' + high.score.toFixed(1) + ' pts</div>'
+    + '<div class="num-body">' + rosterHTML(high) + '</div></div>'
+
+    // Low score + roster
+    + '<div class="num-section"><div class="num-section-hdr">📉 Lowest Score — ' + low.name + ' · ' + low.score.toFixed(1) + ' pts</div>'
+    + '<div class="num-body">' + rosterHTML(low) + '</div></div>'
+
+    // Most started by position
+    + '<div class="num-section"><div class="num-section-hdr">👥 Most Started Players by Position</div>'
+    + '<div class="num-body"><div class="pos-grid">' + posCards + '</div></div></div>'
+
+    + '</div>';
+}
+
+
 function setMyTeam(val){
   myTeam = val.trim();
   try{ localStorage.setItem('fr_myteam', myTeam); }catch(e){}
@@ -1056,16 +1338,27 @@ function renderDistribution(data){
     + '</div>';
 }
 
+function showSubTab(el, id){
+  // Toggle sub-tab active state
+  document.querySelectorAll('.sub-tab').forEach(function(t){ t.classList.remove('active'); });
+  el.classList.add('active');
+  // Toggle sub-content
+  ['mylineup','finish','numbers'].forEach(function(name){
+    var el = document.getElementById('sub-' + name);
+    if(el) el.classList.add('hidden');
+  });
+  var panel = document.getElementById('sub-' + id);
+  if(panel) panel.classList.remove('hidden');
+}
+
 function handleNav(val){
   if(val === 'playoffs'){
     window.location.href = 'playoffs.html';
     return;
   }
-  // Show the right content panel
   document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); });
   var panel = document.getElementById('tab-' + val);
   if(panel) panel.classList.remove('hidden');
-  // Sync select
   var sel = document.getElementById('nav-select');
   if(sel) sel.value = val;
 }
