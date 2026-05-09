@@ -36,7 +36,27 @@ body{background:#1E1206;min-height:100vh;display:flex;align-items:flex-start;jus
 .playoff-badge{background:rgba(200,152,0,.12);color:var(--gold);font-family:var(--fd);font-size:11px;font-weight:700;padding:4px 13px;border-radius:20px;letter-spacing:1.2px;text-transform:uppercase;border:1px solid rgba(200,152,0,.35);}
 .hdr-sub{color:#6A5038;font-size:11px;font-family:var(--fd);letter-spacing:.8px;text-transform:uppercase;}
 
-/* STATUS BAR */
+/* MOBILE */
+@media(max-width:600px){
+  body{padding:0;}
+  .wrap{border-radius:0;border:none;}
+  .hdr{padding:14px 16px;}
+  .logo-sub{display:none;}
+  .tiers{padding:12px;}
+  .rounds{grid-template-columns:1fr;overflow-x:auto;}
+  .tier-block{overflow-x:auto;}
+  .rounds{display:flex;flex-direction:column;gap:0;}
+  .round-col{min-width:100%;}
+}
+/* HORIZONTAL SCROLL on rounds for mobile */
+.rounds-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+.rounds-inner{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;background:var(--bdr);min-width:540px;}
+/* MY TEAM highlight in playoffs */
+.t-name.is-me{color:var(--or);font-weight:700;}
+.team-row.is-me .t-name{color:var(--or);}
+/* CLICKABLE team names */
+.t-link{color:inherit;text-decoration:none;transition:color .15s;}
+.t-link:hover{color:var(--or);text-decoration:underline;}
 .status-bar{background:var(--hdr2);padding:10px 28px;border-bottom:2px solid var(--bg2);display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
 .round-pill{padding:5px 16px;border-radius:20px;font-family:var(--fd);font-size:12px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;border:1px solid #3A2810;color:#6A5038;}
 .round-pill.active{background:var(--or);color:#150D02;border-color:var(--or);}
@@ -124,38 +144,31 @@ body{background:#1E1206;min-height:100vh;display:flex;align-items:flex-start;jus
 
 <script>
 // ── FIREBASE CONFIG ────────────────────────────────────────────
-var FB_API_KEY  = 'AIzaSyA-2hcf2hzThk7MuEm9DAvRICK95koE9gM';
 var FB_DB_URL   = 'https://fantasy-refresh-default-rtdb.firebaseio.com';
 var TIER_LOCK_WEEK = 15;
 var PLAYOFF_WEEKS = [16, 17, 18];
-var FB_TOKEN = null;
 var seasonData = {};
+var myTeam = '';
+try{ myTeam = localStorage.getItem('fr_myteam') || ''; }catch(e){}
+
+function teamLink(name){
+  var isMe = myTeam && name.toLowerCase() === myTeam.toLowerCase();
+  return '<a class="t-link' + (isMe ? ' is-me' : '') + '" href="player.html?team=' + encodeURIComponent(name) + '">' + name + '</a>';
+}
 
 // ── LOAD ───────────────────────────────────────────────────────
 function loadFromCloud(){
   document.getElementById('hdr-sub').textContent = 'Loading...';
-  fbSignIn(function(){
-    fetch(FB_DB_URL + '/season2025.json' + (FB_TOKEN ? '?auth=' + FB_TOKEN : ''))
-      .then(function(r){ return r.json(); })
-      .then(function(data){
-        if(data && typeof data === 'object' && !data.error) seasonData = data;
-        render();
-      })
-      .catch(function(){
-        try{ var d = localStorage.getItem('fr_2025_backup'); if(d) seasonData = JSON.parse(d); }catch(e){}
-        render();
-      });
-  });
-}
-
-function fbSignIn(cb){
-  if(FB_TOKEN){ cb(); return; }
-  fetch('https://identitytoolkit.googleapis.com/v1/accounts:signInAnonymously?key=' + FB_API_KEY, {
-    method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({returnSecureToken:true})
-  })
-  .then(function(r){ return r.json(); })
-  .then(function(d){ FB_TOKEN = d.idToken; cb(); })
-  .catch(function(){ cb(); });
+  fetch(FB_DB_URL + '/season2025.json')
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      if(data && typeof data === 'object' && !data.error) seasonData = data;
+      render();
+    })
+    .catch(function(){
+      try{ var d = localStorage.getItem('fr_2025_backup'); if(d) seasonData = JSON.parse(d); }catch(e){}
+      render();
+    });
 }
 
 // ── TIER CALCULATION ───────────────────────────────────────────
@@ -272,8 +285,8 @@ function render(){
       + '<div class="tier-count">' + (hasWk18 ? 'Complete' : hasWk16 ? (r1.advanced.length + ' remaining') : tierTeams.length + ' competing') + '</div>'
       + '</div>';
 
-    // Rounds columns
-    html += '<div class="rounds">';
+    // Rounds columns — wrapped for horizontal scroll on mobile
+    html += '<div class="rounds-scroll"><div class="rounds-inner">';
 
     // Round 1 — Week 16
     html += '<div class="round-col">';
@@ -281,15 +294,16 @@ function render(){
     if(!hasWk16){
       html += '<div class="round-empty">Pending</div>';
       tierTeams.forEach(function(t, i){
-        html += '<div class="team-row"><span class="t-rank">' + (i+1) + '</span><span class="t-name">' + t.name + '</span></div>';
+        html += '<div class="team-row"><span class="t-rank">' + (i+1) + '</span><span class="t-name">' + teamLink(t.name) + '</span></div>';
       });
     } else {
       var allR1 = r1.advanced.concat(r1.eliminated).sort(function(a,b){ return b.score - a.score; });
       allR1.forEach(function(t, i){
         var isElim = r1.eliminated.some(function(e){ return e.name === t.name; });
-        html += '<div class="team-row' + (isElim ? ' eliminated' : ' advanced') + '">'
+        var isMe = myTeam && t.name.toLowerCase() === myTeam.toLowerCase();
+        html += '<div class="team-row' + (isElim ? ' eliminated' : ' advanced') + (isMe ? ' is-me' : '') + '">'
           + '<span class="t-rank">' + (i+1) + '</span>'
-          + '<span class="t-name' + (isElim ? ' elim-line' : '') + '">' + t.name + '</span>'
+          + '<span class="t-name' + (isElim ? ' elim-line' : '') + '">' + teamLink(t.name) + '</span>'
           + '<span class="t-score">' + (t.score > 0 ? t.score.toFixed(1) : '—') + '</span>'
           + '<span class="t-status">' + (isElim ? '❌' : '✅') + '</span>'
           + '</div>';
@@ -304,15 +318,17 @@ function render(){
       html += '<div class="round-empty">After Wk 16</div>';
     } else if(!hasWk17){
       r1.advanced.forEach(function(t, i){
-        html += '<div class="team-row"><span class="t-rank">' + (i+1) + '</span><span class="t-name">' + t.name + '</span></div>';
+        var isMe = myTeam && t.name.toLowerCase() === myTeam.toLowerCase();
+        html += '<div class="team-row' + (isMe ? ' is-me' : '') + '"><span class="t-rank">' + (i+1) + '</span><span class="t-name">' + teamLink(t.name) + '</span></div>';
       });
     } else {
       var allR2 = r2.advanced.concat(r2.eliminated).sort(function(a,b){ return b.score - a.score; });
       allR2.forEach(function(t, i){
         var isElim = r2.eliminated.some(function(e){ return e.name === t.name; });
-        html += '<div class="team-row' + (isElim ? ' eliminated' : ' advanced') + '">'
+        var isMe = myTeam && t.name.toLowerCase() === myTeam.toLowerCase();
+        html += '<div class="team-row' + (isElim ? ' eliminated' : ' advanced') + (isMe ? ' is-me' : '') + '">'
           + '<span class="t-rank">' + (i+1) + '</span>'
-          + '<span class="t-name' + (isElim ? ' elim-line' : '') + '">' + t.name + '</span>'
+          + '<span class="t-name' + (isElim ? ' elim-line' : '') + '">' + teamLink(t.name) + '</span>'
           + '<span class="t-score">' + (t.score > 0 ? t.score.toFixed(1) : '—') + '</span>'
           + '<span class="t-status">' + (isElim ? '❌' : '✅') + '</span>'
           + '</div>';
@@ -327,23 +343,25 @@ function render(){
       html += '<div class="round-empty">After Wk 17</div>';
     } else if(!hasWk18){
       r2.advanced.forEach(function(t, i){
-        html += '<div class="team-row"><span class="t-rank">' + (i+1) + '</span><span class="t-name">' + t.name + '</span></div>';
+        var isMe = myTeam && t.name.toLowerCase() === myTeam.toLowerCase();
+        html += '<div class="team-row' + (isMe ? ' is-me' : '') + '"><span class="t-rank">' + (i+1) + '</span><span class="t-name">' + teamLink(t.name) + '</span></div>';
       });
     } else {
       var finals = r3.advanced.concat(r3.eliminated).sort(function(a,b){ return b.score - a.score; });
       finals.forEach(function(t, i){
         var crown = i === 0 ? '🏆' : i === 1 ? '🥈' : i === 2 ? '🥉' : '';
         var isChamp = i === 0;
-        html += '<div class="team-row' + (isChamp ? ' champion' : '') + '">'
+        var isMe = myTeam && t.name.toLowerCase() === myTeam.toLowerCase();
+        html += '<div class="team-row' + (isChamp ? ' champion' : '') + (isMe ? ' is-me' : '') + '">'
           + '<span class="t-rank">' + crown + '</span>'
-          + '<span class="t-name">' + t.name + '</span>'
+          + '<span class="t-name">' + teamLink(t.name) + '</span>'
           + '<span class="t-score">' + (t.score > 0 ? t.score.toFixed(1) : '—') + '</span>'
           + '</div>';
       });
     }
     html += '</div>';
 
-    html += '</div>'; // rounds
+    html += '</div></div>'; // close rounds-inner + rounds-scroll
 
     // Payout legend
     html += '<div class="payout-legend">'
