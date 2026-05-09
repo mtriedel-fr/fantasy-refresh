@@ -9,34 +9,34 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 :root{
-  --hdr:#150D02;--hdr2:#1E1206;
-  --bg:#D4B896;--bg2:#C8A878;--bg3:#E8D4B8;--bg4:#F0E4CC;
-  --or:#FF7B3A;--or2:#FF9A62;--or4:#FFE0C0;
-  --ink:#1E1206;--ink2:#6A4E2E;--ink3:#A07848;
-  --bdr:#B8986A;--bdr2:#A08050;--red:#B83020;--grn:#2A6838;
+  --hdr:#060E0E;--hdr2:#091414;
+  --bg:#0D1F1F;--bg2:#0A1818;--bg3:#102828;--bg4:#143030;
+  --or:#00D4CC;--or2:#33DEDA;--or4:#004A48;
+  --ink:#E8F8F8;--ink2:#7ABFBF;--ink3:#4A8888;
+  --bdr:#0A3A3A;--bdr2:#0D4A4A;--red:#FF2D78;--grn:#00D4CC;
   --fd:'Barlow Condensed',sans-serif;--fb:'Barlow',sans-serif;
 }
-body{background:#1E1206;min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:24px 16px;font-family:var(--fb);}
-.wrap{width:100%;max-width:960px;border-radius:16px;overflow:hidden;border:1px solid #3A2810;box-shadow:0 24px 80px rgba(0,0,0,.6);}
+body{background:#091414;min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:24px 16px;font-family:var(--fb);}
+.wrap{width:100%;max-width:960px;border-radius:16px;overflow:hidden;border:1px solid #0A2A2A;box-shadow:0 24px 80px rgba(0,0,0,.6);}
 
 /* HEADER */
 .hdr{background:var(--hdr);padding:22px 28px;display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid var(--or);}
 .logo{display:flex;align-items:center;gap:12px;}
 .logo-box{width:40px;height:40px;background:var(--or);border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
-.logo-box svg{width:22px;height:22px;stroke:#150D02;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;}
-.logo-txt{font-family:var(--fd);font-size:28px;font-weight:800;color:#F5EAD8;text-transform:uppercase;letter-spacing:.5px;line-height:1;}
+.logo-box svg{width:22px;height:22px;stroke:#060E0E;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;}
+.logo-txt{font-family:var(--fd);font-size:28px;font-weight:800;color:#E8F8F8;text-transform:uppercase;letter-spacing:.5px;line-height:1;}
 .logo-txt span{color:var(--or);}
 .hdr-r{display:flex;flex-direction:column;align-items:flex-end;gap:6px;}
-.back-btn{background:transparent;border:1px solid #3A2810;color:#6A5038;font-family:var(--fd);font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;padding:4px 12px;border-radius:6px;cursor:pointer;transition:all .15s;text-decoration:none;display:inline-block;}
+.back-btn{background:transparent;border:1px solid #0A2A2A;color:#1A5A5A;font-family:var(--fd);font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;padding:4px 12px;border-radius:6px;cursor:pointer;transition:all .15s;text-decoration:none;display:inline-block;}
 .back-btn:hover{border-color:var(--or);color:var(--or);}
 
 /* HERO */
 .hero{background:linear-gradient(135deg,var(--hdr) 0%,var(--hdr2) 100%);padding:28px;border-bottom:2px solid var(--bg2);}
-.hero-name{font-family:var(--fd);font-size:36px;font-weight:800;color:#F5EAD8;text-transform:uppercase;letter-spacing:.5px;line-height:1;}
-.hero-sub{font-family:var(--fd);font-size:13px;font-weight:600;color:#6A5038;letter-spacing:1px;text-transform:uppercase;margin-top:4px;}
+.hero-name{font-family:var(--fd);font-size:36px;font-weight:800;color:#E8F8F8;text-transform:uppercase;letter-spacing:.5px;line-height:1;}
+.hero-sub{font-family:var(--fd);font-size:13px;font-weight:600;color:#1A5A5A;letter-spacing:1px;text-transform:uppercase;margin-top:4px;}
 .hero-stats{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;margin-top:20px;background:var(--bdr2);border-radius:10px;overflow:hidden;border:1px solid var(--bdr2);}
-.hero-stat{background:#1E1206;padding:14px 12px;text-align:center;}
-.hero-stat-lbl{font-family:var(--fd);font-size:10px;font-weight:700;color:#6A5038;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;}
+.hero-stat{background:#091414;padding:14px 12px;text-align:center;}
+.hero-stat-lbl{font-family:var(--fd);font-size:10px;font-weight:700;color:#1A5A5A;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;}
 .hero-stat-val{font-family:var(--fd);font-size:24px;font-weight:800;color:var(--or);letter-spacing:-.5px;line-height:1;}
 .hero-stat-sub{font-family:var(--fd);font-size:10px;color:#4A3020;margin-top:3px;letter-spacing:.3px;}
 
@@ -55,8 +55,8 @@ svg.chart{width:100%;height:100%;overflow:visible;}
 .chart-line{fill:none;stroke:var(--or);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;}
 .chart-line-avg{fill:none;stroke:var(--bdr2);stroke-width:1.5;stroke-dasharray:4,3;stroke-linecap:round;}
 .chart-line-rank{fill:none;stroke:#6050A8;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;}
-.chart-dot{fill:var(--or);stroke:#1E1206;stroke-width:2;}
-.chart-dot-rank{fill:#6050A8;stroke:#1E1206;stroke-width:2;}
+.chart-dot{fill:var(--or);stroke:#091414;stroke-width:2;}
+.chart-dot-rank{fill:#6050A8;stroke:#091414;stroke-width:2;}
 .chart-area{opacity:.12;}
 .chart-legend{display:flex;gap:16px;padding:4px 18px 12px;flex-wrap:wrap;}
 .legend-item{display:flex;align-items:center;gap:5px;font-family:var(--fd);font-size:11px;font-weight:600;color:var(--ink2);text-transform:uppercase;letter-spacing:.5px;}
@@ -127,36 +127,22 @@ tr:hover td{background:var(--or4);}
 </div>
 
 <script>
-var FB_API_KEY  = 'AIzaSyA-2hcf2hzThk7MuEm9DAvRICK95koE9gM';
 var FB_DB_URL   = 'https://fantasy-refresh-default-rtdb.firebaseio.com';
-var TOTAL_WEEKS = 17;
-var FB_TOKEN    = null;
+var TOTAL_WEEKS = 18;
 var seasonData  = {};
 var teamName    = decodeURIComponent((new URLSearchParams(window.location.search)).get('team') || '');
 
 // ── LOAD ───────────────────────────────────────────────────────
-function fbSignIn(cb){
-  if(FB_TOKEN){ cb(); return; }
-  fetch('https://identitytoolkit.googleapis.com/v1/accounts:signInAnonymously?key=' + FB_API_KEY, {
-    method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({returnSecureToken:true})
-  })
+fetch(FB_DB_URL + '/season2025.json')
   .then(function(r){ return r.json(); })
-  .then(function(d){ FB_TOKEN = d.idToken; cb(); })
-  .catch(function(){ cb(); });
-}
-
-fbSignIn(function(){
-  fetch(FB_DB_URL + '/season2025.json' + (FB_TOKEN ? '?auth=' + FB_TOKEN : ''))
-    .then(function(r){ return r.json(); })
-    .then(function(d){
-      if(d && typeof d === 'object' && !d.error) seasonData = d;
-      render();
-    })
-    .catch(function(){
-      try{ var d = localStorage.getItem('fr_2025_backup'); if(d) seasonData = JSON.parse(d); }catch(e){}
-      render();
-    });
-});
+  .then(function(d){
+    if(d && typeof d === 'object' && !d.error) seasonData = d;
+    render();
+  })
+  .catch(function(){
+    try{ var d = localStorage.getItem('fr_2025_backup'); if(d) seasonData = JSON.parse(d); }catch(e){}
+    render();
+  });
 
 // ── HELPERS ────────────────────────────────────────────────────
 function getWeeks(){
@@ -413,7 +399,7 @@ function buildScoreChart(weekData){
   }
 
   return '<svg class="chart" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none">'
-    + '<defs><linearGradient id="sg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#FF7B3A" stop-opacity=".3"/><stop offset="100%" stop-color="#FF7B3A" stop-opacity="0"/></linearGradient></defs>'
+    + '<defs><linearGradient id="sg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#00D4CC" stop-opacity=".3"/><stop offset="100%" stop-color="#00D4CC" stop-opacity="0"/></linearGradient></defs>'
     + yLabels + xLabels
     + '<path d="' + areaPath + '" fill="url(#sg)"/>'
     + '<path class="chart-line-avg" d="' + avgPath + '"/>'
@@ -454,7 +440,7 @@ function buildRankChart(weekData){
 
   // Dots for cumulative standing
   var standingDots = ranked.filter(function(d){ return d.cumStanding !== null; }).map(function(d,i){
-    return '<circle cx="' + xp(ranked.indexOf(d)).toFixed(1) + '" cy="' + yp(d.cumStanding).toFixed(1) + '" r="3.5" fill="var(--or)" stroke="#1E1206" stroke-width="2" opacity=".85"><title>After Wk ' + d.week + ': Standing #' + d.cumStanding + '</title></circle>';
+    return '<circle cx="' + xp(ranked.indexOf(d)).toFixed(1) + '" cy="' + yp(d.cumStanding).toFixed(1) + '" r="3.5" fill="var(--or)" stroke="#091414" stroke-width="2" opacity=".85"><title>After Wk ' + d.week + ': Standing #' + d.cumStanding + '</title></circle>';
   }).join('');
 
   var xLabels = ranked.map(function(d,i){
