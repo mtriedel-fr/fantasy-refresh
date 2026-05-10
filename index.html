@@ -1390,8 +1390,6 @@ function renderCompare(){
     + '<div class="cmp-chart-wrap">'+scoreChart+'</div></div>'
     + '<div class="cmp-section"><div class="cmp-section-hdr" style="color:var(--pu)">🏆 Season Standing Trajectory</div>'
     + '<div class="cmp-chart-wrap">'+rankChart+'</div></div>'
-    + '<div class="cmp-section"><div class="cmp-section-hdr" style="color:var(--or)">📅 Weekly Scores Grid</div>'
-    + wkRows + '</div>'
     + '<div class="cmp-section" id="cmp-roster-section"><div class="cmp-section-hdr" style="color:var(--pk)">👕 Roster Comparison</div>'
     + weekSelect + rosterRows + '</div>';
 }
@@ -1425,58 +1423,68 @@ function buildRosterComparison(teamStats, weeks){
   var wi = weeks.indexOf(cmpSelectedWeek);
   if(wi < 0) return '<div style="padding:16px 18px;color:var(--ink3);font-family:var(--fd)">No data for this week</div>';
 
-  var posOrder = ['QB','RB','WR','TE','FLEX','DST','K'];
-  var cols = teamStats.length;
-  var gridTpl = '60px ' + Array(cols).fill('1fr').join(' ');
+  var slotDefs = [
+    {pos:'QB',label:'QB'},{pos:'RB',label:'RB'},{pos:'RB',label:'RB'},
+    {pos:'WR',label:'WR'},{pos:'WR',label:'WR'},{pos:'WR',label:'WR'},
+    {pos:'TE',label:'TE'},{pos:'FLEX',label:'FLEX'},{pos:'DST',label:'DEF'}
+  ];
 
-  // Build roster slots for each team
   var teamRosters = teamStats.map(function(t){
     var d = t.weeklyData[wi];
     if(!d || !d.lineup) return null;
     return parseLineup(d.lineup);
   });
 
-  // Build one row per slot position
-  var rows = posOrder.map(function(pos, pi){
-    var filled = teamRosters.some(function(r){ return r && r.find(function(p){ return p.pos===pos; }); });
-    if(!filled) return '';
-    return '<div class="wk-grid-row" style="grid-template-columns:'+gridTpl+';align-items:start;">'
-      + '<div class="wk-label" style="color:var(--pk);font-weight:800">'+pos+'</div>'
-      + teamStats.map(function(t, ti){
-          var roster = teamRosters[ti];
-          if(!roster){ return '<div class="wk-cell" style="color:var(--ink3)">—</div>'; }
-          // Find matching pos entry (handle multiples like RB1/RB2)
-          var already = 0;
-          for(var k=0; k<pi; k++){
-            if(posOrder[k] === pos) already++;
-          }
-          var matches = roster.filter(function(p){ return p.pos===pos; });
-          var player = matches[already] || matches[0] || null;
-          if(!player) return '<div class="wk-cell" style="color:var(--ink3)">—</div>';
-          // Check if same player as another team
-          var shared = teamStats.filter(function(ot, oi){
-            if(oi===ti) return false;
-            var or2 = teamRosters[oi];
-            return or2 && or2.some(function(p){ return p.player === player.player; });
-          }).length > 0;
-          return '<div class="wk-cell mid" style="'+(shared?'color:var(--or);font-weight:700':'')+'text-align:left;font-size:12px;padding:7px 8px;">'
-            + player.player + '</div>';
-        }).join('')
-      + '</div>';
-  }).filter(Boolean).join('');
+  // Count shared players
+  var playerCounts = {};
+  teamRosters.forEach(function(r){
+    if(!r) return;
+    r.forEach(function(p){ playerCounts[p.player] = (playerCounts[p.player]||0) + 1; });
+  });
 
-  // Score row at top
-  var scoreRow = '<div class="wk-grid-row" style="grid-template-columns:'+gridTpl+';background:var(--bg2);font-weight:800;">'
-    + '<div class="wk-label" style="color:var(--ink2)">Score</div>'
+  // Resolve each team roster into ordered slots
+  var resolved = teamStats.map(function(t, ti){
+    var roster = teamRosters[ti];
+    if(!roster) return slotDefs.map(function(){ return null; });
+    var remaining = roster.slice();
+    return slotDefs.map(function(slot){
+      var idx = remaining.findIndex(function(p){ return p.pos === slot.pos; });
+      if(idx < 0) return null;
+      return remaining.splice(idx,1)[0];
+    });
+  });
+
+  // Score cards row
+  var scoreRow = '<div style="display:grid;grid-template-columns:repeat('+teamStats.length+',1fr);gap:8px;padding:16px 18px;border-bottom:1px solid var(--bdr);">'
     + teamStats.map(function(t){
         var d = t.weeklyData[wi];
-        return '<div class="wk-cell hi" style="color:'+t.color+';font-size:16px;">'+(d?d.score.toFixed(1):'—')+'</div>';
+        return '<div style="text-align:center;background:'+t.color+'18;border:2px solid '+t.color+';border-radius:10px;padding:12px 8px;">'
+          + '<div style="font-family:var(--fd);font-size:11px;font-weight:700;color:'+t.color+';text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+t.name+'</div>'
+          + '<div style="font-family:var(--fd);font-size:26px;font-weight:800;color:'+t.color+';">'+(d?d.score.toFixed(1):'—')+'</div>'
+          + '<div style="font-family:var(--fd);font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-top:2px;">pts</div>'
+          + '</div>';
       }).join('')
     + '</div>';
 
-  var legend = '<div style="padding:8px 18px;font-family:var(--fd);font-size:10px;color:var(--or);letter-spacing:.5px;border-bottom:1px solid var(--bdr);">⭐ Teal = player started by multiple teams</div>';
+  // Roster rows — one per slot, centered player names
+  var posRows = slotDefs.map(function(slot, si){
+    return '<div style="display:grid;grid-template-columns:48px repeat('+teamStats.length+',1fr);border-bottom:1px solid var(--bdr);align-items:stretch;min-width:'+(48+teamStats.length*120)+'px;">'
+      + '<div style="display:flex;align-items:center;justify-content:center;padding:8px 4px;background:var(--bg2);border-right:1px solid var(--bdr);">'
+      + '<span style="font-family:var(--fd);font-size:11px;font-weight:800;color:var(--pk);text-transform:uppercase;">'+slot.label+'</span></div>'
+      + teamStats.map(function(t, ti){
+          var player = resolved[ti][si];
+          if(!player) return '<div style="padding:9px 8px;background:var(--bg3);display:flex;align-items:center;justify-content:center;border-right:1px solid var(--bdr);"><span style="color:var(--ink3);font-size:12px;font-family:var(--fd);">—</span></div>';
+          var isShared = playerCounts[player.player] > 1;
+          return '<div style="padding:9px 8px;background:'+(isShared?'rgba(0,229,212,.06)':'var(--bg3)')+';display:flex;align-items:center;justify-content:center;text-align:center;border-right:1px solid var(--bdr);'+(isShared?'border-top:2px solid var(--or);':'')+'">'
+            + '<span style="font-family:var(--fd);font-size:13px;font-weight:700;color:'+(isShared?'var(--or)':'var(--ink)')+';">'+player.player+'</span>'
+            + '</div>';
+        }).join('')
+      + '</div>';
+  }).join('');
 
-  return legend + scoreRow + rows;
+  var legend = '<div style="padding:8px 18px;font-family:var(--fd);font-size:10px;color:var(--or);letter-spacing:.5px;border-bottom:1px solid var(--bdr);">⭐ Teal highlight = player started by multiple teams this week</div>';
+
+  return legend + scoreRow + '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">' + posRows + '</div>';
 }
 
 function buildCompareScoreChart(teamStats, weeks){
