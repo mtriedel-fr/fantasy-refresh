@@ -1179,8 +1179,403 @@ function confirmImport(){
 // ── COMMISSIONER ───────────────────────────────────────────────
 // ── COMPARISON ENGINE ─────────────────────────────────────────
 var compareTeams = [];
-var COLORS = ['#00E5D4','#FF5FA0','#9B6DFF','#FFE620','#69BE28','#7EC8E3'];
-var MAX_COMPARE = 6;
+var COLORS = ['#00E5D4','#FF5FA0','#9B6DFF','#FFE620','#69BE28'];
+var MAX_COMPARE = 5;
+var cmpSelectedWeek = null;
+
+function addToCompare(name, btn){
+  var idx = compareTeams.indexOf(name);
+  if(idx >= 0){
+    compareTeams.splice(idx, 1);
+    btn.textContent = '+';
+    btn.classList.remove('added');
+  } else {
+    if(compareTeams.length >= MAX_COMPARE){
+      showToast('Max 5 teams — remove one first', true);
+      return;
+    }
+    compareTeams.push(name);
+    btn.textContent = '✓';
+    btn.classList.add('added');
+  }
+  if(compareTeams.length >= 2){
+    openCompare();
+  } else if(compareTeams.length === 0){
+    document.getElementById('cmp-modal').classList.add('hidden');
+  } else {
+    renderCompareChips();
+  }
+}
+
+function openCompare(){
+  document.getElementById('cmp-modal').classList.remove('hidden');
+  renderCompare();
+}
+
+function closeCompare(){
+  document.getElementById('cmp-modal').classList.add('hidden');
+}
+
+function clearCompare(){
+  compareTeams = [];
+  document.querySelectorAll('.cmp-btn').forEach(function(b){
+    b.textContent = '+';
+    b.classList.remove('added');
+  });
+  document.getElementById('cmp-modal').classList.add('hidden');
+}
+
+function removeFromCompare(name){
+  compareTeams = compareTeams.filter(function(t){ return t !== name; });
+  document.querySelectorAll('.cmp-btn').forEach(function(b){
+    var oc = b.getAttribute('onclick') || '';
+    if(oc.indexOf(name.replace(/'/g,"\\'")) >= 0){
+      b.textContent = '+'; b.classList.remove('added');
+    }
+  });
+  if(compareTeams.length < 2){
+    document.getElementById('cmp-modal').classList.add('hidden');
+  } else { renderCompare(); }
+}
+
+function renderCompareChips(){
+  var chips = document.getElementById('cmp-chips');
+  if(!compareTeams.length){
+    chips.innerHTML = '<span class="cmp-empty">Click + next to any team to compare</span>';
+    return;
+  }
+  chips.innerHTML = compareTeams.map(function(name, i){
+    var col = COLORS[i];
+    return '<div class="cmp-chip" style="background:'+col+'22;border-color:'+col+';color:'+col+'">'
+      + name
+      + '<button class="cmp-chip-x" onclick="removeFromCompare(\''+name.replace(/'/g,"\\'")+'\')">✕</button>'
+      + '</div>';
+  }).join('');
+}
+
+function renderCompare(){
+  renderCompareChips();
+  document.getElementById('cmp-sub').textContent = compareTeams.length + ' of ' + MAX_COMPARE + ' teams selected';
+
+  var body = document.getElementById('cmp-body');
+  var weeks = Object.keys(seasonData).filter(function(k){
+    return !isNaN(Number(k)) && seasonData[k] && seasonData[k].length > 0;
+  }).map(Number).sort(function(a,b){ return a-b; });
+
+  if(!weeks.length || compareTeams.length < 2){
+    body.innerHTML = '<div style="padding:32px;text-align:center;color:var(--ink3);font-family:var(--fd);text-transform:uppercase;letter-spacing:.5px">Select 2+ teams from standings</div>';
+    return;
+  }
+
+  // Default selected week to latest
+  if(!cmpSelectedWeek || weeks.indexOf(cmpSelectedWeek) < 0) cmpSelectedWeek = weeks[weeks.length-1];
+
+  // Build per-team stats
+  var teamStats = compareTeams.map(function(name, ti){
+    var weeklyData = weeks.map(function(w){
+      var e = (seasonData[String(w)]||[]).find(function(e){ return teamMatch(e.name, name); });
+      return e ? {score: e.score, lineup: e.lineup||''} : null;
+    });
+    var scores = weeklyData.filter(Boolean).map(function(d){ return d.score; });
+    var total = scores.reduce(function(a,b){ return a+b; }, 0);
+    var avg = scores.length ? total/scores.length : 0;
+    var best = scores.length ? Math.max.apply(null,scores) : 0;
+    var worst = scores.length ? Math.min.apply(null,scores) : 0;
+    var allTotals = {};
+    weeks.forEach(function(w){ (seasonData[String(w)]||[]).forEach(function(e){ allTotals[e.name]=(allTotals[e.name]||0)+e.score; }); });
+    var sznRank = Object.keys(allTotals).sort(function(a,b){ return allTotals[b]-allTotals[a]; }).indexOf(name)+1;
+    var h2h = {};
+    compareTeams.forEach(function(other){
+      if(other === name) return;
+      var w2=0, t2=0;
+      weeks.forEach(function(w){
+        var me = (seasonData[String(w)]||[]).find(function(e){ return teamMatch(e.name, name); });
+        var opp = (seasonData[String(w)]||[]).find(function(e){ return teamMatch(e.name, other); });
+        if(me && opp){ t2++; if(me.score > opp.score) w2++; }
+      });
+      h2h[other] = {wins:w2, total:t2};
+    });
+    return {name:name, color:COLORS[ti], weeklyData:weeklyData, scores:scores, total:total, avg:avg, best:best, worst:worst, sznRank:sznRank, h2h:h2h};
+  });
+
+  var cols = compareTeams.length;
+  var gridTpl = '90px ' + Array(cols).fill('1fr').join(' ');
+
+  // ── NAME ROW ──
+  var nameRow = '<div class="cmp-name-row" style="grid-template-columns:'+gridTpl+';background:var(--bg2);">'
+    + '<div></div>'
+    + teamStats.map(function(t){ return '<div class="cmp-name-cell" style="color:'+t.color+';border-bottom:3px solid '+t.color+'">'
+      + '<a href="player.html?team='+encodeURIComponent(t.name)+'" style="color:inherit;text-decoration:none;">'+t.name+'</a></div>'; }).join('')
+    + '</div>';
+
+  // ── SEASON STATS ──
+  var statRows = [
+    {lbl:'Season rank', vals:teamStats.map(function(t){ return {v:'#'+t.sznRank, n:t.sznRank}; }), lo:true},
+    {lbl:'Total pts',   vals:teamStats.map(function(t){ return {v:t.total.toFixed(1), n:t.total}; }), lo:false},
+    {lbl:'Weekly avg',  vals:teamStats.map(function(t){ return {v:t.avg.toFixed(1), n:t.avg}; }), lo:false},
+    {lbl:'Best week',   vals:teamStats.map(function(t){ return {v:t.best.toFixed(1), n:t.best}; }), lo:false},
+    {lbl:'Worst week',  vals:teamStats.map(function(t){ return {v:t.worst.toFixed(1), n:t.worst}; }), lo:false},
+  ].map(function(row){
+    var ns = row.vals.map(function(v){ return v.n; });
+    var bestVal = row.lo ? Math.min.apply(null,ns) : Math.max.apply(null,ns);
+    var worstVal = row.lo ? Math.max.apply(null,ns) : Math.min.apply(null,ns);
+    return '<div class="cmp-stat-row" style="grid-template-columns:'+gridTpl+'">'
+      + '<div class="cmp-stat-label">'+row.lbl+'</div>'
+      + row.vals.map(function(v){
+          var isBest = v.n === bestVal, isWorst = v.n === worstVal && bestVal !== worstVal;
+          return '<div class="cmp-stat-cell" style="'+(isBest?'color:var(--or);font-weight:800':isWorst?'color:var(--pk)':'color:var(--ink)')+'">'+v.v+'</div>';
+        }).join('')
+      + '</div>';
+  }).join('');
+
+  // ── H2H ──
+  var h2hRows = compareTeams.map(function(name, ti){
+    var t = teamStats[ti];
+    return '<div class="wk-grid-row" style="grid-template-columns:'+gridTpl+'">'
+      + '<div class="wk-label" style="color:'+t.color+'">'+name.split(' ')[0]+'</div>'
+      + compareTeams.map(function(other){
+          if(other === name) return '<div class="wk-cell self">—</div>';
+          var h = t.h2h[other];
+          if(!h||!h.total) return '<div class="wk-cell empty">—</div>';
+          var cls = h.wins > h.total-h.wins ? 'hi' : h.wins < h.total-h.wins ? 'lo' : 'mid';
+          return '<div class="wk-cell '+cls+'">'+h.wins+'-'+(h.total-h.wins)+'</div>';
+        }).join('')
+      + '</div>';
+  }).join('');
+
+  // ── SCORE CHART ──
+  var scoreChart = buildCompareScoreChart(teamStats, weeks);
+
+  // ── RANK CHART ──
+  var rankChart = buildCompareRankChart(teamStats, weeks);
+
+  // ── WEEK ROSTER DROPDOWN ──
+  var weekOpts = weeks.map(function(w){
+    return '<option value="'+w+'"'+(w===cmpSelectedWeek?' selected':'')+'>Week '+w+'</option>';
+  }).join('');
+  var weekSelect = '<div style="padding:14px 18px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:12px;">'
+    + '<span style="font-family:var(--fd);font-size:11px;font-weight:700;color:var(--ink2);text-transform:uppercase;letter-spacing:.8px;">Show week:</span>'
+    + '<select class="wk-select" style="font-size:12px;padding:5px 28px 5px 10px;" onchange="setCmpWeek(this.value)">'
+    + weekOpts + '</select></div>';
+
+  // ── ROSTER COMPARISON ──
+  var rosterRows = buildRosterComparison(teamStats, weeks);
+
+  // ── WEEKLY SCORES TABLE ──
+  var wkRows = weeks.map(function(w, wi){
+    var vals = teamStats.map(function(t){ return t.weeklyData[wi] ? t.weeklyData[wi].score : null; });
+    var nonNull = vals.filter(function(v){ return v !== null; });
+    var maxV = nonNull.length ? Math.max.apply(null,nonNull) : null;
+    var minV = nonNull.length ? Math.min.apply(null,nonNull) : null;
+    return '<div class="wk-grid-row" style="grid-template-columns:'+gridTpl+'">'
+      + '<div class="wk-label">Wk '+w+'</div>'
+      + vals.map(function(v){
+          if(v===null) return '<div class="wk-cell empty">—</div>';
+          var cls = v===maxV?'hi':v===minV?'lo':'mid';
+          return '<div class="wk-cell '+cls+'">'+v.toFixed(1)+'</div>';
+        }).join('')
+      + '</div>';
+  }).join('');
+
+  body.innerHTML =
+    nameRow
+    + '<div class="cmp-section"><div class="cmp-section-hdr" style="color:var(--or)">📊 Season Stats</div>'
+    + statRows + '</div>'
+    + '<div class="cmp-section"><div class="cmp-section-hdr" style="color:var(--pu)">🤜 Head to Head (W-L)</div>'
+    + h2hRows + '</div>'
+    + '<div class="cmp-section"><div class="cmp-section-hdr" style="color:var(--pk)">📈 Weekly Scores</div>'
+    + '<div class="cmp-chart-wrap">'+scoreChart+'</div></div>'
+    + '<div class="cmp-section"><div class="cmp-section-hdr" style="color:var(--pu)">🏆 Season Standing Trajectory</div>'
+    + '<div class="cmp-chart-wrap">'+rankChart+'</div></div>'
+    + '<div class="cmp-section"><div class="cmp-section-hdr" style="color:var(--or)">📅 Weekly Scores Grid</div>'
+    + wkRows + '</div>'
+    + '<div class="cmp-section" id="cmp-roster-section"><div class="cmp-section-hdr" style="color:var(--pk)">👕 Roster Comparison</div>'
+    + weekSelect + rosterRows + '</div>';
+}
+
+function setCmpWeek(val){
+  cmpSelectedWeek = parseInt(val);
+  var weeks = Object.keys(seasonData).filter(function(k){
+    return !isNaN(Number(k)) && seasonData[k] && seasonData[k].length > 0;
+  }).map(Number).sort(function(a,b){ return a-b; });
+  var teamStats = compareTeams.map(function(name, ti){
+    var weeklyData = weeks.map(function(w){
+      var e = (seasonData[String(w)]||[]).find(function(e){ return teamMatch(e.name, name); });
+      return e ? {score:e.score, lineup:e.lineup||''} : null;
+    });
+    return {name:name, color:COLORS[ti], weeklyData:weeklyData};
+  });
+  var section = document.getElementById('cmp-roster-section');
+  if(!section) return;
+  var weekOpts = weeks.map(function(w){
+    return '<option value="'+w+'"'+(w===cmpSelectedWeek?' selected':'')+'>Week '+w+'</option>';
+  }).join('');
+  var weekSelect = '<div style="padding:14px 18px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:12px;">'
+    + '<span style="font-family:var(--fd);font-size:11px;font-weight:700;color:var(--ink2);text-transform:uppercase;letter-spacing:.8px;">Show week:</span>'
+    + '<select class="wk-select" style="font-size:12px;padding:5px 28px 5px 10px;" onchange="setCmpWeek(this.value)">'
+    + weekOpts + '</select></div>';
+  section.innerHTML = '<div class="cmp-section-hdr" style="color:var(--pk)">👕 Roster Comparison</div>'
+    + weekSelect + buildRosterComparison(teamStats, weeks);
+}
+
+function buildRosterComparison(teamStats, weeks){
+  var wi = weeks.indexOf(cmpSelectedWeek);
+  if(wi < 0) return '<div style="padding:16px 18px;color:var(--ink3);font-family:var(--fd)">No data for this week</div>';
+
+  var posOrder = ['QB','RB','WR','TE','FLEX','DST','K'];
+  var cols = teamStats.length;
+  var gridTpl = '60px ' + Array(cols).fill('1fr').join(' ');
+
+  // Build roster slots for each team
+  var teamRosters = teamStats.map(function(t){
+    var d = t.weeklyData[wi];
+    if(!d || !d.lineup) return null;
+    return parseLineup(d.lineup);
+  });
+
+  // Build one row per slot position
+  var rows = posOrder.map(function(pos, pi){
+    var filled = teamRosters.some(function(r){ return r && r.find(function(p){ return p.pos===pos; }); });
+    if(!filled) return '';
+    return '<div class="wk-grid-row" style="grid-template-columns:'+gridTpl+';align-items:start;">'
+      + '<div class="wk-label" style="color:var(--pk);font-weight:800">'+pos+'</div>'
+      + teamStats.map(function(t, ti){
+          var roster = teamRosters[ti];
+          if(!roster){ return '<div class="wk-cell" style="color:var(--ink3)">—</div>'; }
+          // Find matching pos entry (handle multiples like RB1/RB2)
+          var already = 0;
+          for(var k=0; k<pi; k++){
+            if(posOrder[k] === pos) already++;
+          }
+          var matches = roster.filter(function(p){ return p.pos===pos; });
+          var player = matches[already] || matches[0] || null;
+          if(!player) return '<div class="wk-cell" style="color:var(--ink3)">—</div>';
+          // Check if same player as another team
+          var shared = teamStats.filter(function(ot, oi){
+            if(oi===ti) return false;
+            var or2 = teamRosters[oi];
+            return or2 && or2.some(function(p){ return p.player === player.player; });
+          }).length > 0;
+          return '<div class="wk-cell mid" style="'+(shared?'color:var(--or);font-weight:700':'')+'text-align:left;font-size:12px;padding:7px 8px;">'
+            + player.player + '</div>';
+        }).join('')
+      + '</div>';
+  }).filter(Boolean).join('');
+
+  // Score row at top
+  var scoreRow = '<div class="wk-grid-row" style="grid-template-columns:'+gridTpl+';background:var(--bg2);font-weight:800;">'
+    + '<div class="wk-label" style="color:var(--ink2)">Score</div>'
+    + teamStats.map(function(t){
+        var d = t.weeklyData[wi];
+        return '<div class="wk-cell hi" style="color:'+t.color+';font-size:16px;">'+(d?d.score.toFixed(1):'—')+'</div>';
+      }).join('')
+    + '</div>';
+
+  var legend = '<div style="padding:8px 18px;font-family:var(--fd);font-size:10px;color:var(--or);letter-spacing:.5px;border-bottom:1px solid var(--bdr);">⭐ Teal = player started by multiple teams</div>';
+
+  return legend + scoreRow + rows;
+}
+
+function buildCompareScoreChart(teamStats, weeks){
+  if(!weeks.length) return '';
+  var W=800, H=180, PAD={t:16,r:10,b:28,l:42};
+  var iW=W-PAD.l-PAD.r, iH=H-PAD.t-PAD.b;
+
+  var allScores = [];
+  teamStats.forEach(function(t){ t.weeklyData.forEach(function(d){ if(d) allScores.push(d.score); }); });
+  if(!allScores.length) return '';
+  var minV = Math.min.apply(null,allScores)*0.95, maxV = Math.max.apply(null,allScores)*1.03;
+
+  function xp(i){ return PAD.l+(i/(weeks.length-1||1))*iW; }
+  function yp(v){ return PAD.t+iH-((v-minV)/(maxV-minV||1))*iH; }
+
+  var grid = '';
+  [minV, (minV+maxV)/2, maxV].forEach(function(v){
+    var y = yp(v);
+    grid += '<text class="chart-label" x="'+(PAD.l-3)+'" y="'+y.toFixed(1)+'" text-anchor="end" dominant-baseline="middle">'+Math.round(v)+'</text>';
+    grid += '<line x1="'+PAD.l+'" y1="'+y.toFixed(1)+'" x2="'+(W-PAD.r)+'" y2="'+y.toFixed(1)+'" stroke="rgba(13,53,53,0.5)" stroke-width="1"/>';
+  });
+
+  var xLabels = weeks.map(function(w,i){
+    return '<text class="chart-label" x="'+xp(i).toFixed(1)+'" y="'+(H-4)+'" text-anchor="middle">W'+w+'</text>';
+  }).join('');
+
+  var lines = teamStats.map(function(t){
+    var points = weeks.map(function(w,wi){ return t.weeklyData[wi] ? t.weeklyData[wi].score : null; });
+    var path = points.map(function(v,i){
+      if(v===null) return null;
+      return (i===0||points.slice(0,i).every(function(p){ return p===null; })?'M':'L')+xp(i).toFixed(1)+' '+yp(v).toFixed(1);
+    }).filter(Boolean).join(' ');
+    var dots = points.map(function(v,i){
+      if(v===null) return '';
+      return '<circle cx="'+xp(i).toFixed(1)+'" cy="'+yp(v).toFixed(1)+'" r="4" fill="'+t.color+'" stroke="#050808" stroke-width="2"><title>'+t.name+' Wk '+weeks[i]+': '+v.toFixed(1)+'</title></circle>';
+    }).join('');
+    return '<path d="'+path+'" fill="none" stroke="'+t.color+'" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" opacity=".9"/>' + dots;
+  }).join('');
+
+  var legend = '<div style="display:flex;gap:14px;padding:4px 0 8px;flex-wrap:wrap;">'
+    + teamStats.map(function(t){
+      return '<div style="display:flex;align-items:center;gap:5px;font-family:var(--fd);font-size:11px;font-weight:600;color:'+t.color+';text-transform:uppercase;">'
+        + '<div style="width:14px;height:3px;border-radius:2px;background:'+t.color+'"></div>'+t.name+'</div>';
+    }).join('')+'</div>';
+
+  return legend+'<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:160px;overflow:visible">'+grid+xLabels+lines+'</svg>';
+}
+
+function buildCompareRankChart(teamStats, weeks){
+  if(!weeks.length) return '';
+  var W=800, H=180, PAD={t:16,r:10,b:28,l:38};
+  var iW=W-PAD.l-PAD.r, iH=H-PAD.t-PAD.b;
+
+  var allNames = Object.keys((function(){
+    var t={};
+    weeks.forEach(function(w){ (seasonData[String(w)]||[]).forEach(function(e){ t[e.name]=1; }); });
+    return t;
+  })());
+
+  var maxRank = allNames.length || 68;
+  function xp(i){ return PAD.l+(i/(weeks.length-1||1))*iW; }
+  function yp(r){ return PAD.t+iH-((maxRank-r)/(maxRank-1||1))*iH; }
+
+  var grid = '';
+  [1, Math.round(maxRank/3), Math.round(maxRank*2/3), maxRank].forEach(function(r){
+    var y = yp(r);
+    grid += '<text class="chart-label" x="'+(PAD.l-3)+'" y="'+y.toFixed(1)+'" text-anchor="end" dominant-baseline="middle">#'+r+'</text>';
+    grid += '<line x1="'+PAD.l+'" y1="'+y.toFixed(1)+'" x2="'+(W-PAD.r)+'" y2="'+y.toFixed(1)+'" stroke="rgba(13,53,53,0.5)" stroke-width="1"/>';
+  });
+
+  var xLabels = weeks.map(function(w,i){
+    return '<text class="chart-label" x="'+xp(i).toFixed(1)+'" y="'+(H-4)+'" text-anchor="middle">W'+w+'</text>';
+  }).join('');
+
+  var lines = teamStats.map(function(t){
+    var cumTotals = {};
+    var points = weeks.map(function(w,wi){
+      (seasonData[String(w)]||[]).forEach(function(e){ cumTotals[e.name]=(cumTotals[e.name]||0)+e.score; });
+      var sorted = Object.keys(cumTotals).sort(function(a,b){ return cumTotals[b]-cumTotals[a]; });
+      var rank = sorted.indexOf(t.name)+1;
+      return rank > 0 ? rank : null;
+    });
+    var path = points.map(function(r,i){
+      if(r===null) return null;
+      return (i===0||points.slice(0,i).every(function(p){ return p===null; })?'M':'L')+xp(i).toFixed(1)+' '+yp(r).toFixed(1);
+    }).filter(Boolean).join(' ');
+    var dots = points.map(function(r,i){
+      if(r===null) return '';
+      return '<circle cx="'+xp(i).toFixed(1)+'" cy="'+yp(r).toFixed(1)+'" r="4" fill="'+t.color+'" stroke="#050808" stroke-width="2"><title>'+t.name+' after Wk '+weeks[i]+': #'+r+'</title></circle>';
+    }).join('');
+    return '<path d="'+path+'" fill="none" stroke="'+t.color+'" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>' + dots;
+  }).join('');
+
+  var legend = '<div style="display:flex;gap:14px;padding:4px 0 8px;flex-wrap:wrap;">'
+    + teamStats.map(function(t){
+      return '<div style="display:flex;align-items:center;gap:5px;font-family:var(--fd);font-size:11px;font-weight:600;color:'+t.color+';text-transform:uppercase;">'
+        + '<div style="width:14px;height:3px;border-radius:2px;background:'+t.color+'"></div>'+t.name+'</div>';
+    }).join('')+'</div>';
+
+  return legend+'<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:160px;overflow:visible">'+grid+xLabels+lines+'</svg>';
+}
+
 
 function addToCompare(name, btn){
   var idx = compareTeams.indexOf(name);
