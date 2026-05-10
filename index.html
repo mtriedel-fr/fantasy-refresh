@@ -9,13 +9,24 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 :root{
+  /* DARK MODE (default) */
   --hdr:#050808;--hdr2:#080E0E;
   --bg:#0A0F0F;--bg2:#0D1515;--bg3:#101C1C;--bg4:#142020;
   --or:#00E5D4;--or2:#33EDE0;--or4:#003A38;
-  --pk:#FF1A6E;--pk2:#FF4D8F;--pk4:#3A0018;
+  --pk:#FF5FA0;--pk2:#FF85B8;--pk4:#3A0020;
+  --pu:#9B6DFF;--pu2:#B899FF;--pu4:#1A0A3A;
   --ink:#F0FAFA;--ink2:#6ABFBF;--ink3:#3A8888;
-  --bdr:#0D3535;--bdr2:#104040;--red:#FF1A6E;--grn:#00E5D4;
+  --bdr:#0D3535;--bdr2:#104040;--red:#FF5FA0;--grn:#00E5D4;
   --fd:'Barlow Condensed',sans-serif;--fb:'Barlow',sans-serif;
+}
+[data-theme="light"]{
+  --hdr:#050808;--hdr2:#080E0E;
+  --bg:#F0FAFA;--bg2:#E0F5F5;--bg3:#FFFFFF;--bg4:#F5FEFE;
+  --or:#00A898;--or2:#00C4B4;--or4:#CCF0ED;
+  --pk:#E8337A;--pk2:#F05590;--pk4:#FFD6E8;
+  --pu:#7040E0;--pu2:#9068F8;--pu4:#EAE0FF;
+  --ink:#0A1818;--ink2:#1A6060;--ink3:#3A8888;
+  --bdr:#B8E8E0;--bdr2:#90D8D0;--red:#E8337A;--grn:#00A898;
 }
 body{background:#040A0A;min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:24px 16px;font-family:var(--fb);}
 .wrap{width:100%;max-width:960px;border-radius:16px;overflow:hidden;border:1px solid #0A2A2A;box-shadow:0 24px 80px rgba(0,210,200,.08);}
@@ -139,6 +150,15 @@ tr:hover td{background:var(--or4);}
 .bdg{white-space:nowrap;font-size:9px;}
 /* movement col fixed width */
 .move-col{width:52px;min-width:52px;max-width:52px;text-align:center;overflow:hidden;}
+/* SUB-TABS with horizontal scroll for mobile */
+.sub-tabs-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;border-bottom:2px solid var(--bdr);}
+.sub-tabs-scroll::-webkit-scrollbar{height:0;}
+.sub-tabs{display:flex;background:var(--bg2);min-width:max-content;padding:0 4px;}
+.sub-tab{padding:11px 18px;font-family:var(--fd);font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;color:var(--ink2);border-bottom:3px solid transparent;margin-bottom:-2px;transition:color .15s;white-space:nowrap;}
+.sub-tab.active{color:var(--pk);border-bottom:3px solid var(--pk);}
+.sub-tab:hover:not(.active){color:var(--pu);}
+/* MY SEASON wrap */
+.myseason-wrap{padding:20px 24px;display:flex;flex-direction:column;gap:16px;}
 
 /* DOT PLOT */
 .dotplot-wrap{padding:20px 24px 16px;border-top:1px solid var(--bdr);}
@@ -347,6 +367,7 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
     <div class="hdr-sub" id="hdr-sub">Ready to import</div>
     <div style="display:flex;gap:6px;align-items:center;justify-content:flex-end;">
       <button class="comm-btn" onclick="toggleComm()" id="comm-toggle">⚙ Commissioner</button>
+      <button class="comm-btn theme-toggle" onclick="toggleTheme()" id="theme-btn" title="Toggle light/dark mode">🌙</button>
     </div>
   </div>
 </div>
@@ -381,29 +402,40 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
   </div>
   <div class="nav-select-wrap">
     <select class="nav-select" id="nav-select" onchange="handleNav(this.value)">
-      <option value="myteam">👤 Your Week</option>
-      <option value="s">🏆 Standings</option>
-      <option value="m">📈 Movement</option>
+      <option value="yourweek">👤 Your Week</option>
+      <option value="yourseason">📅 Your Season</option>
       <option value="playoffs">🏈 Playoffs</option>
     </select>
   </div>
 </div>
 
-<!-- YOUR WEEK — main landing with 3 sub-tabs -->
-<div id="tab-myteam" class="content">
-  <div class="sub-tabs">
-    <div class="sub-tab active" onclick="showSubTab(this,'mylineup')">👤 My Lineup</div>
-    <div class="sub-tab" onclick="goToMySeason()">📈 My Season</div>
-    <div class="sub-tab" onclick="showSubTab(this,'finish')">📊 Overall Finish</div>
-    <div class="sub-tab" onclick="showSubTab(this,'numbers')">🔢 Weekly Numbers</div>
+<!-- YOUR WEEK — My Lineup / Weekly Standing / Weekly Numbers -->
+<div id="tab-yourweek" class="content">
+  <div class="sub-tabs-scroll">
+    <div class="sub-tabs">
+      <div class="sub-tab active" onclick="showSubTab(this,'mylineup','yourweek')">👤 My Lineup</div>
+      <div class="sub-tab" onclick="showSubTab(this,'weeklystanding','yourweek')">📊 Weekly Standing</div>
+      <div class="sub-tab" onclick="showSubTab(this,'numbers','yourweek')">🔢 Weekly Numbers</div>
+    </div>
   </div>
   <div id="sub-mylineup"><div id="wt"></div></div>
-  <div id="sub-finish" class="hidden"><div id="wf"></div></div>
+  <div id="sub-weeklystanding" class="hidden"><div id="wf"></div></div>
   <div id="sub-numbers" class="hidden"><div id="wn"></div></div>
 </div>
 
-<div id="tab-s" class="content hidden"><div id="sw"></div></div>
-<div id="tab-m" class="content hidden"><div id="mw"></div></div>
+<!-- YOUR SEASON — My Season / Seasonal Standings / Movement -->
+<div id="tab-yourseason" class="content hidden">
+  <div class="sub-tabs-scroll">
+    <div class="sub-tabs">
+      <div class="sub-tab active" onclick="showSubTab(this,'myseason','yourseason')">📈 My Season</div>
+      <div class="sub-tab" onclick="showSubTab(this,'standings','yourseason')">🏆 Seasonal Standings</div>
+      <div class="sub-tab" onclick="showSubTab(this,'movement','yourseason')">📉 Movement</div>
+    </div>
+  </div>
+  <div id="sub-myseason"><div id="my-season-wrap"></div></div>
+  <div id="sub-standings" class="hidden"><div id="sw"></div></div>
+  <div id="sub-movement" class="hidden"><div id="mw"></div></div>
+</div>
 
 <div class="comm-panel hidden" id="comm-panel">
   <div class="comm-inner">
@@ -506,20 +538,19 @@ function boot(){
   var loadedWks = Object.keys(seasonData).filter(function(k){
     return !isNaN(Number(k)) && seasonData[k] && seasonData[k].length > 0;
   }).map(Number);
-  // Default to latest imported week
   if(loadedWks.length) currentWeek = Math.max.apply(null, loadedWks);
-  // Default to Your Week view, My Lineup sub-tab
+  // Default to Your Week > My Lineup
   document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); });
-  var defaultTab = document.getElementById('tab-myteam');
+  var defaultTab = document.getElementById('tab-yourweek');
   if(defaultTab) defaultTab.classList.remove('hidden');
-  ['finish','numbers'].forEach(function(n){
+  ['weeklystanding','numbers','myseason','standings','movement'].forEach(function(n){
     var el = document.getElementById('sub-' + n);
     if(el) el.classList.add('hidden');
   });
   var mylineup = document.getElementById('sub-mylineup');
   if(mylineup) mylineup.classList.remove('hidden');
   var navSel = document.getElementById('nav-select');
-  if(navSel) navSel.value = 'myteam';
+  if(navSel) navSel.value = 'yourweek';
   initMyTeamInput();
   renderAll();
 }
@@ -637,16 +668,21 @@ function renderAll(){
   renderMyTeam(sorted, curEntries, prevRank, curMap);
   renderFinish(sorted, curEntries, prevRank);
   renderNumbers(curEntries);
+  renderMySeasonInline();
   initMyTeamInput();
   if(!document.getElementById('comm-panel').classList.contains('hidden')) renderHistory();
 }
 
 function showEmpty(){
   var html = '<div class="empty"><div class="empty-icon">🏈</div><div class="empty-title">No data yet</div><div class="empty-sub">Click <strong>Commissioner</strong> above<br>and import your first DraftKings CSV.</div></div>';
-  document.getElementById('sw').innerHTML = html;
-  document.getElementById('ww').innerHTML = html;
-  document.getElementById('mw').innerHTML = html;
-  ['s-leader','s-wkhigh','s-avg'].forEach(function(id){ document.getElementById(id).textContent = '—'; });
+  ['sw','mw','wt','wf','wn','my-season-wrap'].forEach(function(id){
+    var el = document.getElementById(id);
+    if(el) el.innerHTML = html;
+  });
+  ['s-wkhigh','s-avg','s-wklow','s-left'].forEach(function(id){
+    var el = document.getElementById(id);
+    if(el) el.textContent = '—';
+  });
 }
 
 // ── LINEUP PARSER ──────────────────────────────────────────────
@@ -1103,7 +1139,94 @@ function buildDotPlot(curEntries, myEntry){
     + '</div>';
 }
 
-// ── YOUR TEAM VIEW ────────────────────────────────────────────
+// ── MY SEASON (inline in Your Season tab) ─────────────────────
+function renderMySeasonInline(){
+  var el = document.getElementById('my-season-wrap');
+  if(!el) return;
+
+  if(!myTeam){
+    el.innerHTML = '<div class="myteam-empty"><div class="myteam-empty-icon">📅</div>'
+      + '<div class="myteam-empty-title">No team set</div>'
+      + '<div class="myteam-empty-sub">Enter your team name in the "Your Team" field to see your season.</div></div>';
+    return;
+  }
+
+  var weeks = Object.keys(seasonData).filter(function(k){
+    return !isNaN(Number(k)) && seasonData[k] && seasonData[k].length > 0;
+  }).map(Number).sort(function(a,b){ return a-b; });
+
+  var teamExists = weeks.some(function(w){
+    return (seasonData[String(w)]||[]).some(function(e){ return e.name === myTeam; });
+  });
+
+  if(!teamExists){
+    el.innerHTML = '<div class="myteam-empty"><div class="myteam-empty-icon">📭</div>'
+      + '<div class="myteam-empty-title">No data for "' + myTeam + '"</div>'
+      + '<div class="myteam-empty-sub">Make sure your team name matches exactly.</div></div>';
+    return;
+  }
+
+  var weekData = getPlayerWeekData(myTeam);
+  var scores = weekData.map(function(d){ return d.score; });
+  var total = scores.reduce(function(a,b){ return a+b; }, 0);
+  var avg = scores.length ? total / scores.length : 0;
+  var best = scores.length ? Math.max.apply(null, scores) : 0;
+  var bestWk = weekData.find(function(d){ return d.score === best; });
+  var allTotals = {};
+  weeks.forEach(function(w){
+    (seasonData[String(w)]||[]).forEach(function(e){ allTotals[e.name] = (allTotals[e.name]||0) + e.score; });
+  });
+  var sznRank = Object.keys(allTotals).sort(function(a,b){ return allTotals[b]-allTotals[a]; }).indexOf(myTeam) + 1;
+
+  var scoreChart = buildScoreChartInline(weekData);
+  var rankChart = buildRankChartInline(weekData);
+
+  // Week by week table
+  var tableRows = weekData.slice().reverse().map(function(d){
+    var moveStr = (d.cumStanding && weekData.indexOf(d) > 0)
+      ? '' : '';
+    return '<tr>'
+      + '<td class="wk-num">Week ' + d.week + '</td>'
+      + '<td style="font-family:var(--fd);font-weight:700;font-size:15px;color:var(--or);text-align:right">' + d.score.toFixed(1) + '</td>'
+      + '<td style="text-align:center;font-family:var(--fd);font-size:14px;color:var(--pk)">#' + d.rank + ' / ' + d.total + '</td>'
+      + '<td style="text-align:center;font-family:var(--fd);font-size:14px;color:var(--pu)">#' + d.cumStanding + '</td>'
+      + '<td style="text-align:right;font-size:13px;color:var(--ink2)">' + (d.score >= d.avg ? '<span style="color:var(--or)">+' : '<span style="color:var(--pk)">') + (d.score - d.avg).toFixed(1) + '</span></td>'
+      + '</tr>';
+  }).join('');
+
+  el.innerHTML = '<div class="myseason-wrap">'
+    // Hero stats
+    + '<div class="myteam-card">'
+    + '<div class="myteam-hero">'
+    + '<div><div class="myteam-name">' + myTeam + '</div>'
+    + '<div style="font-family:var(--fd);font-size:11px;color:#1A5A5A;text-transform:uppercase;letter-spacing:1px;margin-top:4px;">Full Season Overview</div></div>'
+    + '<div style="text-align:right"><div class="myteam-score">#' + sznRank + '</div><div class="myteam-score-lbl">Season rank</div></div>'
+    + '</div>'
+    + '<div class="myteam-stats">'
+    + '<div class="myteam-stat"><div class="myteam-stat-lbl">Season total</div><div class="myteam-stat-val">' + total.toFixed(1) + '</div></div>'
+    + '<div class="myteam-stat"><div class="myteam-stat-lbl">Weekly avg</div><div class="myteam-stat-val">' + avg.toFixed(1) + '</div></div>'
+    + '<div class="myteam-stat"><div class="myteam-stat-lbl">Best week</div><div class="myteam-stat-val">' + best.toFixed(1) + '</div></div>'
+    + '</div></div>'
+    // Score chart
+    + (scoreChart ? '<div class="chart-section"><div class="chart-section-hdr">Weekly Score vs League Average</div>'
+      + '<div class="chart-wrap"><div class="chart-canvas">' + scoreChart + '</div></div>'
+      + '<div class="chart-legend"><div class="legend-item"><div class="legend-dot" style="background:var(--pk)"></div>Your score</div>'
+      + '<div class="legend-item"><div class="legend-dot" style="background:var(--bdr2)"></div>League avg</div></div></div>' : '')
+    // Rank chart
+    + (rankChart ? '<div class="chart-section"><div class="chart-section-hdr">Weekly Finish & Season Standing</div>'
+      + '<div class="chart-wrap"><div class="chart-canvas">' + rankChart + '</div></div>'
+      + '<div class="chart-legend"><div class="legend-item"><div class="legend-dot" style="background:var(--pu)"></div>Weekly finish</div>'
+      + '<div class="legend-item"><div class="legend-dot" style="background:var(--or);opacity:.7"></div>Season standing</div></div></div>' : '')
+    // Week by week table
+    + '<div class="chart-section"><div class="chart-section-hdr">Week by Week</div>'
+    + '<div style="overflow-x:auto"><table><thead><tr>'
+    + '<th>Week</th><th style="text-align:right">Score</th><th style="text-align:center">Wk Rank</th>'
+    + '<th style="text-align:center">Season Rank</th><th style="text-align:right">vs Avg</th>'
+    + '</tr></thead><tbody>' + tableRows + '</tbody></table></div></div>'
+    + '</div>';
+}
+
+
 function renderMyTeam(sorted, curEntries, prevRank, curMap){
   var el = document.getElementById('wt');
   if(!el) return;
@@ -1316,6 +1439,21 @@ function renderNumbers(curEntries){
 }
 
 
+function toggleTheme(){
+  var html = document.documentElement;
+  var isDark = html.getAttribute('data-theme') !== 'light';
+  html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  document.getElementById('theme-btn').textContent = isDark ? '☀️' : '🌙';
+  try{ localStorage.setItem('fr_theme', isDark ? 'light' : 'dark'); }catch(e){}
+}
+// Load saved theme
+(function(){
+  try{
+    var t = localStorage.getItem('fr_theme');
+    if(t){ document.documentElement.setAttribute('data-theme', t); }
+  }catch(e){}
+})();
+
 function setMyTeam(val){
   myTeam = val.trim();
   try{ localStorage.setItem('fr_myteam', myTeam); }catch(e){}
@@ -1466,32 +1604,22 @@ function renderDistribution(data){
     + '</div>';
 }
 
-function goToMySeason(){
-  if(!myTeam){
-    showToast('Set your team name first to view your season', true);
-    return;
-  }
-  window.location.href = 'player.html?team=' + encodeURIComponent(myTeam);
-}
-
-function showSubTab(el, id){
-  // Toggle sub-tab active state
-  document.querySelectorAll('.sub-tab').forEach(function(t){ t.classList.remove('active'); });
-  el.classList.add('active');
-  // Toggle sub-content
-  ['mylineup','finish','numbers'].forEach(function(name){
-    var el = document.getElementById('sub-' + name);
-    if(el) el.classList.add('hidden');
+function showSubTab(el, id, section){
+  var allSubs = ['mylineup','weeklystanding','numbers','myseason','standings','movement'];
+  // Only deactivate tabs in the current section
+  var parent = document.getElementById('tab-' + section);
+  if(parent) parent.querySelectorAll('.sub-tab').forEach(function(t){ t.classList.remove('active'); });
+  allSubs.forEach(function(n){
+    var p = document.getElementById('sub-' + n);
+    if(p) p.classList.add('hidden');
   });
+  el.classList.add('active');
   var panel = document.getElementById('sub-' + id);
   if(panel) panel.classList.remove('hidden');
 }
 
 function handleNav(val){
-  if(val === 'playoffs'){
-    window.location.href = 'playoffs.html';
-    return;
-  }
+  if(val === 'playoffs'){ window.location.href = 'playoffs.html'; return; }
   document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); });
   var panel = document.getElementById('tab-' + val);
   if(panel) panel.classList.remove('hidden');

@@ -12,10 +12,20 @@
   --hdr:#050808;--hdr2:#080E0E;
   --bg:#0A0F0F;--bg2:#0D1515;--bg3:#101C1C;--bg4:#142020;
   --or:#00E5D4;--or2:#33EDE0;--or4:#003A38;
-  --pk:#FF1A6E;--pk2:#FF4D8F;--pk4:#3A0018;
+  --pk:#FF5FA0;--pk2:#FF85B8;--pk4:#3A0020;
+  --pu:#9B6DFF;--pu2:#B899FF;--pu4:#1A0A3A;
   --ink:#F0FAFA;--ink2:#6ABFBF;--ink3:#3A8888;
-  --bdr:#0D3535;--bdr2:#104040;--red:#FF1A6E;--grn:#00E5D4;
+  --bdr:#0D3535;--bdr2:#104040;--red:#FF5FA0;--grn:#00E5D4;
   --fd:'Barlow Condensed',sans-serif;--fb:'Barlow',sans-serif;
+}
+[data-theme="light"]{
+  --hdr:#050808;--hdr2:#080E0E;
+  --bg:#F0FAFA;--bg2:#E0F5F5;--bg3:#FFFFFF;--bg4:#F5FEFE;
+  --or:#00A898;--or2:#00C4B4;--or4:#CCF0ED;
+  --pk:#E8337A;--pk2:#F05590;--pk4:#FFD6E8;
+  --pu:#7040E0;--pu2:#9068F8;--pu4:#EAE0FF;
+  --ink:#0A1818;--ink2:#1A6060;--ink3:#3A8888;
+  --bdr:#B8E8E0;--bdr2:#90D8D0;--red:#E8337A;--grn:#00A898;
 }
 body{background:#091414;min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:24px 16px;font-family:var(--fb);}
 .wrap{width:100%;max-width:960px;border-radius:16px;overflow:hidden;border:1px solid #0A2A2A;box-shadow:0 24px 80px rgba(0,0,0,.6);}
@@ -106,6 +116,17 @@ body{background:#091414;min-height:100vh;display:flex;align-items:flex-start;jus
 .toast{position:fixed;bottom:24px;right:24px;background:var(--grn);color:#fff;font-family:var(--fd);font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:12px 20px;border-radius:8px;transform:translateY(80px);opacity:0;transition:all .3s;z-index:999;pointer-events:none;}
 .toast.show{transform:translateY(0);opacity:1;}
 .toast.error{background:var(--red);}
+
+html[data-theme="light"] body{background:#D8F0EE;}
+html[data-theme="light"] .wrap{box-shadow:0 8px 40px rgba(0,180,168,.15);}
+th{background:linear-gradient(90deg,var(--bg2),var(--pu4));}
+tr:nth-child(odd) td{background:rgba(155,109,255,.03);}
+tr:hover td{background:rgba(255,95,160,.08) !important;}
+.tier-label.elite{background:rgba(255,95,160,.15);color:var(--pk);border:1px solid rgba(255,95,160,.4);}
+.tier-label.mid{background:rgba(155,109,255,.15);color:var(--pu);border:1px solid rgba(155,109,255,.4);}
+.up{color:var(--or);}.dn{color:var(--pk);}
+.theme-toggle{font-size:14px;cursor:pointer;}
+html[data-theme="light"] body{background:#D8F0EE;}
 </style>
 </head>
 <body>
@@ -125,6 +146,7 @@ body{background:#091414;min-height:100vh;display:flex;align-items:flex-start;jus
     <div class="playoff-badge">🏆 Playoffs</div>
     <div class="hdr-sub" id="hdr-sub">Loading...</div>
     <a href="index.html" class="back-btn">← Back to Standings</a>
+    <button class="back-btn theme-toggle" onclick="toggleTheme()" id="theme-btn" title="Toggle light/dark">🌙</button>
   </div>
 </div>
 
@@ -383,6 +405,19 @@ function showToast(msg, isError){
 }
 
 loadFromCloud();
+
+function toggleTheme(){
+  var html = document.documentElement;
+  var isDark = html.getAttribute('data-theme') !== 'light';
+  html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  var btn = document.getElementById('theme-btn');
+  if(btn) btn.textContent = isDark ? '☀️' : '🌙';
+  try{ localStorage.setItem('fr_theme', isDark ? 'light' : 'dark'); }catch(e){}
+}
+(function(){
+  try{ var t=localStorage.getItem('fr_theme'); if(t) document.documentElement.setAttribute('data-theme',t); }catch(e){}
+})();
+
 </script>
 </body>
 </html>
