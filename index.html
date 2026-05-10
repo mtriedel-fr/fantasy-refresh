@@ -153,6 +153,11 @@ tr:hover td{background:var(--or4);}
 /* SUB-TABS with horizontal scroll for mobile */
 .sub-tabs-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;border-bottom:2px solid var(--bdr);}
 .sub-tabs-scroll::-webkit-scrollbar{height:0;}
+/* SEASONAL STANDINGS + MOVEMENT pink hover, purple me-highlight */
+.season-name-link{color:inherit;text-decoration:none;font-family:var(--fd);font-weight:700;font-size:15px;}
+.season-name-link:hover{color:var(--pk);text-decoration:underline;}
+tr.my-team td{background:rgba(155,109,255,.10) !important;border-left:3px solid var(--pu);}
+tr.my-team:hover td{background:rgba(155,109,255,.18) !important;}
 .sub-tabs{display:flex;background:var(--bg2);min-width:max-content;padding:0 4px;}
 .sub-tab{padding:11px 18px;font-family:var(--fd);font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;color:var(--ink2);border-bottom:3px solid transparent;margin-bottom:-2px;transition:color .15s;white-space:nowrap;}
 .sub-tab.active{color:var(--pk);border-bottom:3px solid var(--pk);}
@@ -220,8 +225,11 @@ svg.chart{width:100%;height:100%;overflow:visible;}
 .finish-table th{padding:10px 16px;text-align:left;font-family:var(--fd);font-size:10px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--ink2);border-bottom:1px solid var(--bdr);background:var(--bg2);}
 .finish-table td{padding:12px 16px;border-bottom:1px solid var(--bdr);font-size:14px;color:var(--ink);}
 .finish-table tr:last-child td{border-bottom:none;}
-.finish-table tr:hover td{background:var(--or4);}
-.finish-table tr.is-me td{background:rgba(0,212,204,.08);border-left:3px solid var(--or);}
+.finish-table tr:hover td{background:rgba(255,95,160,.08) !important;}
+.finish-table tr.is-me td{background:rgba(155,109,255,.12);border-left:3px solid var(--pu);}
+.finish-table tr:nth-child(odd) td{background:rgba(155,109,255,.03);}
+.finish-table a.t-name-link{color:inherit;text-decoration:none;}
+.finish-table a.t-name-link:hover{color:var(--pk);text-decoration:underline;}
 .finish-rank{font-family:var(--fd);font-weight:800;font-size:16px;color:var(--ink2);}
 .finish-rank.top{color:var(--or);}
 .finish-name{font-family:var(--fd);font-weight:700;font-size:15px;color:var(--ink);}
@@ -766,7 +774,7 @@ function renderStandings(sorted, prevRank, curMap, wkHighName){
 
     return '<tr class="' + tierClass + divider + (isMe ? ' my-team' : '') + '">'
       + '<td class="rk' + (r <= 3 ? ' g' : '') + '">' + (r <= 3 ? MED[r-1] : r) + '</td>'
-      + '<td><div class="tn-wrap"><a class="tn-link" href="player.html?team=' + encodeURIComponent(t.name) + '">' + t.name + '</a>'
+      + '<td><div class="tn-wrap"><a class="season-name-link" href="player.html?team=' + encodeURIComponent(t.name) + '">' + t.name + '</a>'
       + (isMe ? '<span class="my-team-badge">You</span>' : '')
       + (isHigh ? '<span class="bdg">🔥 Wk High</span>' : '')
       + streakBadge
@@ -845,8 +853,9 @@ function renderMovement(sorted, prevRank, curMap){
       : d > 0 ? '<div class="mu">' + AUP2 + '+' + d + '</div>'
       : d < 0 ? '<div class="md">' + ADN2 + d + '</div>'
       : '<div class="mf">—</div>';
-    return '<tr>'
-      + '<td><span class="tn-name">' + t.name + '</span></td>'
+    var isMe = myTeam && t.name.toLowerCase() === myTeam.toLowerCase();
+    return '<tr class="' + (isMe ? 'my-team' : '') + '">'
+      + '<td><a class="season-name-link" href="player.html?team=' + encodeURIComponent(t.name) + '">' + t.name + (isMe ? '<span class="my-team-badge">You</span>' : '') + '</a></td>'
       + '<td style="text-align:center;color:var(--ink2);font-family:var(--fd);font-weight:600">' + (t.prev || '—') + '</td>'
       + '<td style="text-align:center;font-family:var(--fd);font-weight:800;font-size:17px">' + t.curr + '</td>'
       + '<td style="text-align:center">' + mv + '</td>'
@@ -1223,6 +1232,27 @@ function renderMySeasonInline(){
     + '<th>Week</th><th style="text-align:right">Score</th><th style="text-align:center">Wk Rank</th>'
     + '<th style="text-align:center">Season Rank</th><th style="text-align:right">vs Avg</th>'
     + '</tr></thead><tbody>' + tableRows + '</tbody></table></div></div>'
+    // Top 3 most used players
+    + (function(){
+        var topPlayers = getTopPlayers(myTeam, 3);
+        if(!topPlayers.length) return '';
+        var medals = ['🥇','🥈','🥉'];
+        var posEmoji = {QB:'🏈',RB:'🏃',WR:'⚡',TE:'🎯',DST:'🛡️',FLEX:'💫',K:'🦵'};
+        var wksPlayed = weekData.length;
+        var cards = topPlayers.map(function(p,i){
+          var pct = Math.round(p.count / wksPlayed * 100);
+          var barPct = Math.round(p.count / topPlayers[0].count * 100);
+          return '<div class="pos-card" style="border-left:3px solid var(--' + ['or','pk','pu'][i] + ')">'
+            + '<div class="pos-card-pos" style="color:var(--' + ['or','pk','pu'][i] + ')">' + (posEmoji[p.pos]||'') + ' ' + p.pos + '</div>'
+            + '<div style="font-size:13px;font-weight:500;margin-bottom:3px;">' + medals[i] + '</div>'
+            + '<div class="pos-card-player">' + p.player + '</div>'
+            + '<div class="pos-card-count">Started ' + p.count + ' of ' + wksPlayed + ' weeks (' + pct + '%)</div>'
+            + '<div class="pos-bar-bg"><div class="pos-bar-fill" style="width:' + barPct + '%;background:var(--' + ['or','pk','pu'][i] + ')"></div></div>'
+            + '</div>';
+        }).join('');
+        return '<div class="chart-section"><div class="chart-section-hdr">🌟 Top 3 Most Used Players</div>'
+          + '<div class="num-body"><div class="pos-grid">' + cards + '</div></div></div>';
+      })()
     + '</div>';
 }
 
@@ -1301,8 +1331,8 @@ function renderMyTeam(sorted, curEntries, prevRank, curMap){
     + '<div class="myteam-stat"><div class="myteam-stat-lbl">Season rank</div><div class="myteam-stat-val">' + (currRank ? '#' + currRank : '—') + '</div></div>'
     + '<div class="myteam-stat"><div class="myteam-stat-lbl">Movement</div><div class="myteam-stat-val ' + moveClass + '">' + moveStr + '</div></div>'
     + '</div>'
-    + (players.length ? '<div class="myteam-lineup"><div class="myteam-lineup-title">Your lineup · League start % shown</div><div class="lineup-grid">' + lineupSlots + '</div></div>' : '')
     + dotPlot
+    + (players.length ? '<div class="myteam-lineup"><div class="myteam-lineup-title">Your lineup · League start % shown</div><div class="lineup-grid">' + lineupSlots + '</div></div>' : '')
     + '</div></div>';
 }
 
@@ -1344,7 +1374,7 @@ function renderFinish(sorted, curEntries, prevRank){
     var moveStr = move === null ? '—' : move > 0 ? '<span style="color:var(--grn)">+' + move + '</span>' : move < 0 ? '<span style="color:var(--red)">' + move + '</span>' : '—';
     var isMe = myTeam && e.name.toLowerCase() === myTeam.toLowerCase();
     var pct = Math.round(e.score / maxScore * 100);
-    var nameLink = '<a href="player.html?team=' + encodeURIComponent(e.name) + '" style="color:inherit;text-decoration:none;" onmouseover="this.style.color=\'var(--or)\'" onmouseout="this.style.color=\'inherit\'">' + e.name + (isMe ? '<span class="my-team-badge">You</span>' : '') + '</a>';
+    var nameLink = '<a class="t-name-link" href="player.html?team=' + encodeURIComponent(e.name) + '">' + e.name + (isMe ? '<span class="my-team-badge">You</span>' : '') + '</a>';
     return '<tr' + (isMe ? ' class="is-me"' : '') + '>'
       + '<td class="finish-rank' + (wkRank <= 3 ? ' top' : '') + '">' + (wkRank <= 3 ? med[wkRank-1] : wkRank) + '</td>'
       + '<td class="finish-name">' + nameLink + '</td>'
@@ -1598,9 +1628,9 @@ function renderDistribution(data){
     + '<div class="dist-title">Score distribution — Week ' + currentWeek + '</div>'
     + '<div class="dist-chart" style="position:relative">'
     + bars
-    + '<div class="dist-avg-line" style="left:' + avgPct + '%;height:' + (maxH+4) + 'px;bottom:0"></div>'
+    + '<div class="dist-avg-line" style="left:' + avgPct + '%;height:' + (maxH+4) + 'px;bottom:0;background:var(--pu);opacity:.8"></div>'
     + '</div>'
-    + '<div class="dist-axis"><span>' + min.toFixed(0) + '</span><span>Avg ' + avg.toFixed(1) + '</span><span>' + max.toFixed(0) + '</span></div>'
+    + '<div class="dist-axis"><span style="color:var(--pk)">' + min.toFixed(0) + '</span><span style="color:var(--pk)">Avg ' + avg.toFixed(1) + '</span><span style="color:var(--pk)">' + max.toFixed(0) + '</span></div>'
     + '</div>';
 }
 
