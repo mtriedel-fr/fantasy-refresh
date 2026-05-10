@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Fantasy Refresh — 2025 Season</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='50' fill='%23050808'/><path d='M75 30 C75 18 62 12 50 12 C38 12 25 18 25 30 C25 50 50 88 50 88 C50 88 75 50 75 30Z' fill='%2300E5D4'/><path d='M42 45 L58 45 M45 38 L45 52 M50 36 L50 54 M55 38 L55 52' stroke='%23FF5FA0' stroke-width='2.5' stroke-linecap='round' fill='none'/></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -519,18 +520,23 @@ function save(){
 function loadFromCloud(){
   setLoading(true);
   fetch(FB_DB_URL + '/season2025.json')
-  .then(function(r){ return r.json(); })
+  .then(function(r){
+    if(!r.ok){ throw new Error('HTTP ' + r.status + ' ' + r.statusText); }
+    return r.json();
+  })
   .then(function(data){
     if(data && typeof data === 'object' && !data.error){
       seasonData = data;
+      setLoading(false);
+      boot();
+    } else {
+      throw new Error(data && data.error ? data.error : 'Empty response');
     }
-    setLoading(false);
-    boot();
   })
-  .catch(function(){
+  .catch(function(err){
     try{ var d = localStorage.getItem('fr_2025_backup'); if(d) seasonData = JSON.parse(d); }catch(e){}
     setLoading(false);
-    showToast('Using local backup — cloud unavailable', true);
+    showToast('Cloud error: ' + (err && err.message ? err.message : 'unknown') , true);
     boot();
   });
 }
@@ -706,6 +712,24 @@ function parseLineup(str){
   var order = {QB:0,RB:1,WR:2,TE:3,FLEX:4,DST:5,K:6};
   result.sort(function(a,b){ return (order[a.pos] !== undefined ? order[a.pos] : 9) - (order[b.pos] !== undefined ? order[b.pos] : 9); });
   return result;
+}
+
+function getTopPlayers(name, limit){
+  var counts = {};
+  Object.keys(seasonData).filter(function(k){ return !isNaN(Number(k)) && seasonData[k] && seasonData[k].length; }).forEach(function(w){
+    var entry = (seasonData[w]||[]).find(function(e){ return e.name === name; });
+    if(!entry || !entry.lineup) return;
+    var players = parseLineup(entry.lineup);
+    var seen = {};
+    players.forEach(function(p){
+      var key = p.player + '|' + p.pos;
+      if(seen[key]) return;
+      seen[key] = true;
+      if(!counts[key]) counts[key] = {player:p.player, pos:p.pos, count:0};
+      counts[key].count++;
+    });
+  });
+  return Object.values(counts).sort(function(a,b){ return b.count - a.count; }).slice(0, limit || 3);
 }
 
 function buildTip(lineup){
