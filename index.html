@@ -138,11 +138,17 @@ tr:hover td{background:var(--or4);}
 #player-search{width:100%;padding:7px 12px 7px 32px;font-family:var(--fb);font-size:13px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:8px;color:var(--or);outline:none;transition:border-color .15s;}
 #player-search:focus{border-color:var(--or);}
 #player-search::placeholder{color:var(--pu2);opacity:.8;}
+[data-theme="light"] #player-search{color:#00706A;background:#FFFFFF;border-color:var(--bdr2);}
+[data-theme="light"] #player-search::placeholder{color:#7040E0;opacity:.7;}
 .search-dropdown{position:absolute;top:calc(100% + 4px);left:0;right:0;background:#0D1515;border:1px solid var(--pu);border-radius:8px;z-index:999;max-height:220px;overflow-y:auto;box-shadow:0 8px 24px rgba(155,109,255,.2);}
+[data-theme="light"] .search-dropdown{background:#FFFFFF;border-color:var(--pu);box-shadow:0 8px 24px rgba(112,64,224,.15);}
 .search-item{padding:9px 14px;font-family:var(--fd);font-size:14px;font-weight:600;color:var(--ink);cursor:pointer;border-bottom:1px solid var(--bdr);display:flex;justify-content:space-between;align-items:center;}
+[data-theme="light"] .search-item{color:#0A1818;border-bottom-color:#B8E8E0;}
 .search-item:last-child{border-bottom:none;}
 .search-item:hover{background:rgba(155,109,255,.15);color:var(--pu2);}
+[data-theme="light"] .search-item:hover{background:rgba(112,64,224,.08);color:#7040E0;}
 .search-item-rank{font-size:11px;color:var(--pu2);}
+[data-theme="light"] .search-item-rank{color:#7040E0;}
 .nav-select-wrap{flex-shrink:0;}
 .nav-select{background:#060E0E;border:1px solid #0A3A3A;color:#E8F8F8;font-family:var(--fd);font-size:13px;font-weight:700;letter-spacing:.3px;padding:7px 32px 7px 14px;border-radius:8px;cursor:pointer;outline:none;transition:border-color .15s;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23FF1A6E' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;}
 .nav-select:focus{border-color:var(--or);}
@@ -1435,11 +1441,21 @@ function buildRosterComparison(teamStats, weeks){
     return parseLineup(d.lineup);
   });
 
-  // Count shared players
+  // Count shared players and assign each shared player a unique color
   var playerCounts = {};
   teamRosters.forEach(function(r){
     if(!r) return;
     r.forEach(function(p){ playerCounts[p.player] = (playerCounts[p.player]||0) + 1; });
+  });
+  // Full palette cycling through all accent colors
+  var SHARED_PALETTE = ['#00E5D4','#FF5FA0','#9B6DFF','#FFE620','#69BE28','#7EC8E3','#FF9A3A','#E040FB','#00BCD4','#F44336'];
+  var playerColorMap = {};
+  var paletteIdx = 0;
+  Object.keys(playerCounts).forEach(function(player){
+    if(playerCounts[player] > 1){
+      playerColorMap[player] = SHARED_PALETTE[paletteIdx % SHARED_PALETTE.length];
+      paletteIdx++;
+    }
   });
 
   // Resolve each team roster into ordered slots
@@ -1474,15 +1490,16 @@ function buildRosterComparison(teamStats, weeks){
       + teamStats.map(function(t, ti){
           var player = resolved[ti][si];
           if(!player) return '<div style="padding:9px 8px;background:var(--bg3);display:flex;align-items:center;justify-content:center;border-right:1px solid var(--bdr);"><span style="color:var(--ink3);font-size:12px;font-family:var(--fd);">—</span></div>';
-          var isShared = playerCounts[player.player] > 1;
-          return '<div style="padding:9px 8px;background:'+(isShared?'rgba(0,229,212,.06)':'var(--bg3)')+';display:flex;align-items:center;justify-content:center;text-align:center;border-right:1px solid var(--bdr);'+(isShared?'border-top:2px solid var(--or);':'')+'">'
-            + '<span style="font-family:var(--fd);font-size:13px;font-weight:700;color:'+(isShared?'var(--or)':'var(--ink)')+';">'+player.player+'</span>'
+          var playerColor = playerColorMap[player.player] || null;
+          var isShared = !!playerColor;
+          return '<div style="padding:9px 8px;background:'+(isShared?playerColor+'12':'var(--bg3)')+';display:flex;align-items:center;justify-content:center;text-align:center;border-right:1px solid var(--bdr);'+(isShared?'border-top:2px solid '+playerColor+';':'')+'">'
+            + '<span style="font-family:var(--fd);font-size:13px;font-weight:700;color:'+(isShared?playerColor:'var(--ink)')+';">'+player.player+'</span>'
             + '</div>';
         }).join('')
       + '</div>';
   }).join('');
 
-  var legend = '<div style="padding:8px 18px;font-family:var(--fd);font-size:10px;color:var(--or);letter-spacing:.5px;border-bottom:1px solid var(--bdr);">⭐ Teal highlight = player started by multiple teams this week</div>';
+  var legend = '<div style="padding:8px 18px;font-family:var(--fd);font-size:10px;color:var(--or);letter-spacing:.5px;border-bottom:1px solid var(--bdr);">⭐ Colored = player started by multiple teams · each player gets their own unique color</div>';
 
   return legend + scoreRow + '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">' + posRows + '</div>';
 }
