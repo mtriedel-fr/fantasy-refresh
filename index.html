@@ -7,7 +7,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Fantasy Refresh — 2025 Season</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='50' fill='%23050808'/><path d='M75 30 C75 18 62 12 50 12 C38 12 25 18 25 30 C25 50 50 88 50 88 C50 88 75 50 75 30Z' fill='%2300E5D4'/><path d='M42 45 L58 45 M45 38 L45 52 M50 36 L50 54 M55 38 L55 52' stroke='%23FF5FA0' stroke-width='2.5' stroke-linecap='round' fill='none'/></svg>">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='50' fill='%23050808'/><!-- top arc teal with arrowhead --><path d='M80 50 C80 28 66 14 50 14 C34 14 20 28 20 50' fill='none' stroke='%2300E5D4' stroke-width='7' stroke-linecap='round'/><!-- teal arrowhead at top tip --><line x1='50' y1='14' x2='42' y2='24' stroke='%2300E5D4' stroke-width='7' stroke-linecap='round'/><line x1='50' y1='14' x2='58' y2='24' stroke='%2300E5D4' stroke-width='7' stroke-linecap='round'/><!-- bottom arc pink with arrowhead --><path d='M20 50 C20 72 34 86 50 86 C66 86 80 72 80 50' fill='none' stroke='%23FF5FA0' stroke-width='7' stroke-linecap='round'/><!-- pink arrowhead at bottom tip --><line x1='50' y1='86' x2='42' y2='76' stroke='%23FF5FA0' stroke-width='7' stroke-linecap='round'/><line x1='50' y1='86' x2='58' y2='76' stroke='%23FF5FA0' stroke-width='7' stroke-linecap='round'/><!-- lace seam --><line x1='35' y1='50' x2='65' y2='50' stroke='%23F0FAFA' stroke-width='2' stroke-linecap='round'/><!-- lace stitches --><line x1='46' y1='44' x2='46' y2='56' stroke='%23F0FAFA' stroke-width='2' stroke-linecap='round'/><line x1='54' y1='44' x2='54' y2='56' stroke='%23F0FAFA' stroke-width='2' stroke-linecap='round'/></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -484,6 +484,45 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
 .toast{position:fixed;bottom:24px;right:24px;background:var(--grn);color:#fff;font-family:var(--fd);font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:12px 20px;border-radius:8px;transform:translateY(80px);opacity:0;transition:all .3s;z-index:9999;pointer-events:none;}
 .toast.show{transform:translateY(0);opacity:1;}
 .toast.err{background:var(--red);}
+
+/* ── SEASON WRAP ── */
+.sw-wrap{padding:20px 24px;display:flex;flex-direction:column;gap:20px;}
+.sw-hero{background:linear-gradient(135deg,var(--hdr) 0%,var(--hdr2) 100%);border-radius:14px;padding:28px;border-top:3px solid var(--or);border-bottom:3px solid var(--pk);text-align:center;}
+.sw-hero-title{font-family:var(--fd);font-size:13px;font-weight:700;color:var(--pk);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;}
+.sw-hero-name{font-family:var(--fd);font-size:42px;font-weight:800;color:var(--or);text-transform:uppercase;letter-spacing:.5px;line-height:1;}
+.sw-hero-score{font-family:var(--fd);font-size:18px;color:var(--ink2);margin-top:6px;}
+.sw-section{background:var(--bg3);border-radius:12px;overflow:hidden;border:1px solid var(--bdr);}
+.sw-section-hdr{background:var(--bg2);padding:12px 20px;font-family:var(--fd);font-size:12px;font-weight:700;color:var(--ink2);text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--bdr);}
+.sw-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1px;background:var(--bdr);}
+.sw-card{background:var(--bg3);padding:16px 18px;}
+.sw-card-lbl{font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink2);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;}
+.sw-card-name{font-family:var(--fd);font-size:16px;font-weight:800;color:var(--ink);margin-bottom:2px;}
+.sw-card-val{font-family:var(--fd);font-size:24px;font-weight:800;color:var(--or);}
+.sw-card-sub{font-family:var(--fd);font-size:11px;color:var(--ink3);margin-top:3px;}
+.sw-podium{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--bdr);}
+.sw-pod-item{background:var(--bg3);padding:14px 16px;text-align:center;}
+.sw-pod-medal{font-size:24px;margin-bottom:6px;}
+.sw-pod-name{font-family:var(--fd);font-size:14px;font-weight:800;color:var(--ink);text-transform:uppercase;margin-bottom:4px;}
+.sw-pod-val{font-family:var(--fd);font-size:18px;font-weight:800;color:var(--or);}
+.sw-pod-sub{font-family:var(--fd);font-size:10px;color:var(--ink3);margin-top:2px;text-transform:uppercase;letter-spacing:.5px;}
+.sw-wk-grid{display:flex;flex-direction:column;gap:0;}
+.sw-wk-row{display:flex;align-items:center;padding:10px 18px;border-bottom:1px solid var(--bdr);gap:12px;}
+.sw-wk-row:last-child{border-bottom:none;}
+.sw-wk-num{font-family:var(--fd);font-size:11px;font-weight:700;color:var(--ink3);min-width:50px;text-transform:uppercase;}
+.sw-wk-name{font-family:var(--fd);font-size:15px;font-weight:700;color:var(--ink);flex:1;}
+.sw-wk-score{font-family:var(--fd);font-size:16px;font-weight:800;color:var(--or);}
+.sw-pos-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:1px;background:var(--bdr);}
+.sw-pos-card{background:var(--bg3);padding:14px 16px;}
+.sw-pos-lbl{font-family:var(--fd);font-size:10px;font-weight:800;color:var(--pk);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;}
+.sw-pos-player{font-family:var(--fd);font-size:16px;font-weight:800;color:var(--ink);margin-bottom:3px;}
+.sw-pos-bar-bg{height:4px;background:var(--bdr);border-radius:2px;margin-top:6px;}
+.sw-pos-bar-fill{height:4px;background:var(--pu);border-radius:2px;}
+.sw-locked{padding:60px 24px;text-align:center;}
+.sw-locked-icon{font-size:56px;margin-bottom:16px;opacity:.5;}
+.sw-locked-title{font-family:var(--fd);font-size:20px;font-weight:700;color:var(--ink2);text-transform:uppercase;margin-bottom:8px;}
+.sw-locked-sub{font-size:14px;color:var(--ink3);line-height:1.6;}
+.sw-streak-row{display:flex;align-items:center;padding:10px 18px;border-bottom:1px solid var(--bdr);gap:12px;}
+.sw-streak-row:last-child{border-bottom:none;}
 </style>
 </head>
 <body>
@@ -541,6 +580,7 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
     <select class="nav-select" id="nav-select" onchange="handleNav(this.value)">
       <option value="yourweek">👤 Your Week</option>
       <option value="yourseason">📅 Your Season</option>
+      <option value="seasonwrap">🏆 Season Wrap</option>
       <option value="playoffs">🏈 Playoffs</option>
     </select>
   </div>
@@ -573,6 +613,8 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
   <div id="sub-standings" class="hidden"><div id="sw"></div></div>
   <div id="sub-movement" class="hidden"><div id="mw"></div></div>
 </div>
+
+<div id="tab-seasonwrap" class="content hidden"><div id="wsw"></div></div>
 
 <div class="comm-panel hidden" id="comm-panel">
   <!-- PASSWORD GATE -->
@@ -857,9 +899,239 @@ function renderAll(){
   renderFinish(sorted, curEntries, prevRank);
   renderNumbers(curEntries);
   renderMySeasonInline();
+  renderSeasonWrap();
   initMyTeamInput();
   if(!document.getElementById('comm-panel').classList.contains('hidden')) renderHistory();
 }
+
+
+// ── SEASON WRAP ───────────────────────────────────────────────
+function renderSeasonWrap(){
+  var el = document.getElementById('wsw');
+  if(!el) return;
+
+  var weeks = Object.keys(seasonData).filter(function(k){
+    return !isNaN(Number(k)) && seasonData[k] && seasonData[k].length > 0;
+  }).map(Number).sort(function(a,b){ return a-b; });
+
+  var totalWeeks = WEEKS; // 18
+
+  // Show locked state until all weeks complete
+  if(weeks.length < totalWeeks){
+    el.innerHTML = '<div class="sw-locked">'
+      + '<div class="sw-locked-icon">🔒</div>'
+      + '<div class="sw-locked-title">Season Wrap unlocks after Week ' + totalWeeks + '</div>'
+      + '<div class="sw-locked-sub">' + weeks.length + ' of ' + totalWeeks + ' weeks complete · '
+      + (totalWeeks - weeks.length) + ' weeks remaining</div>'
+      + '</div>';
+    return;
+  }
+
+  // ── BUILD ALL DATA ─────────────────────────────────────────
+
+  // Cumulative totals
+  var teamTotals = {};
+  var weeklyHighs = []; // {week, name, score}
+  var allScores = []; // {week, name, score}
+
+  weeks.forEach(function(w){
+    var entries = seasonData[String(w)] || [];
+    var wkSorted = entries.slice().sort(function(a,b){ return b.score-a.score; });
+    if(wkSorted.length){
+      weeklyHighs.push({week:w, name:wkSorted[0].name, score:wkSorted[0].score});
+      if(wkSorted.length > 1) weeklyHighs.push({week:w, name:wkSorted[1].name, score:wkSorted[1].score, second:true});
+    }
+    entries.forEach(function(e){
+      teamTotals[e.name] = (teamTotals[e.name]||0) + e.score;
+      allScores.push({week:w, name:e.name, score:e.score});
+    });
+  });
+
+  var sortedTeams = Object.keys(teamTotals).sort(function(a,b){ return teamTotals[b]-teamTotals[a]; });
+
+  // Highest season scorer
+  var seasonChamp = sortedTeams[0];
+  var seasonChampTotal = teamTotals[seasonChamp];
+
+  // Tiers
+  var n = sortedTeams.length;
+  var t1end = Math.ceil(n/3);
+  var t2end = t1end + Math.ceil((n-t1end)/2);
+  var tier1 = sortedTeams.slice(0, t1end);
+  var tier2 = sortedTeams.slice(t1end, t2end);
+  var tier3 = sortedTeams.slice(t2end);
+
+  // Fun facts
+  var highestWkScore = allScores.reduce(function(best,e){ return e.score > best.score ? e : best; }, allScores[0]);
+  var lowestWkScore = allScores.reduce(function(best,e){ return e.score < best.score ? e : best; }, allScores[0]);
+
+  // Highest league total week (sum all scores that week)
+  var wkTotals = weeks.map(function(w){
+    var sum = (seasonData[String(w)]||[]).reduce(function(s,e){ return s+e.score; },0);
+    return {week:w, total:sum};
+  });
+  var highestLeagueWk = wkTotals.reduce(function(a,b){ return b.total > a.total ? b : a; });
+  var lowestLeagueWk = wkTotals.reduce(function(a,b){ return b.total < a.total ? b : a; });
+
+  // Most games above average
+  var aboveAvgCounts = {};
+  weeks.forEach(function(w){
+    var entries = seasonData[String(w)]||[];
+    var avg = entries.reduce(function(s,e){ return s+e.score; },0)/(entries.length||1);
+    entries.forEach(function(e){ if(e.score >= avg) aboveAvgCounts[e.name] = (aboveAvgCounts[e.name]||0)+1; });
+  });
+  var mostConsistent = Object.keys(aboveAvgCounts).sort(function(a,b){ return aboveAvgCounts[b]-aboveAvgCounts[a]; })[0];
+
+  // Biggest single-week improvement (score vs prior week)
+  var biggestJump = null, biggestJumpAmt = 0;
+  weeks.forEach(function(w, wi){
+    if(wi === 0) return;
+    var prev = weeks[wi-1];
+    (seasonData[String(w)]||[]).forEach(function(e){
+      var prevEntry = (seasonData[String(prev)]||[]).find(function(p){ return p.name===e.name; });
+      if(prevEntry){
+        var diff = e.score - prevEntry.score;
+        if(diff > biggestJumpAmt){ biggestJumpAmt = diff; biggestJump = {name:e.name, week:w, diff:diff}; }
+      }
+    });
+  });
+
+  // Most started players by position (whole season)
+  var posPlayers = {};
+  weeks.forEach(function(w){
+    (seasonData[String(w)]||[]).forEach(function(e){
+      if(!e.lineup) return;
+      var players = parseLineup(e.lineup);
+      var seen = {};
+      players.forEach(function(p){
+        var key = p.pos+'|'+p.player;
+        if(seen[key]) return;
+        seen[key] = true;
+        if(!posPlayers[p.pos]) posPlayers[p.pos] = {};
+        posPlayers[p.pos][p.player] = (posPlayers[p.pos][p.player]||0) + 1;
+      });
+    });
+  });
+  var posOrder = ['QB','RB','WR','TE','DST'];
+  var posEmoji = {QB:'🏈',RB:'🏃',WR:'⚡',TE:'🎯',DST:'🛡️'};
+
+  var totalStarts = weeks.length * ((seasonData[String(weeks[0])]||[]).length||1);
+
+  // Week every team scored their best
+  var teamBestWeek = {};
+  weeks.forEach(function(w){
+    (seasonData[String(w)]||[]).forEach(function(e){
+      if(!teamBestWeek[e.name] || e.score > teamBestWeek[e.name].score){
+        teamBestWeek[e.name] = {week:w, score:e.score};
+      }
+    });
+  });
+  // Most popular "best week" 
+  var bestWeekCounts = {};
+  Object.values(teamBestWeek).forEach(function(d){ bestWeekCounts[d.week] = (bestWeekCounts[d.week]||0)+1; });
+  var mostPopularBestWeek = Object.keys(bestWeekCounts).sort(function(a,b){ return bestWeekCounts[b]-bestWeekCounts[a]; })[0];
+
+  // ── BUILD HTML ─────────────────────────────────────────────
+
+  function podium3(teams, labelFn, valFn, subFn){
+    var medals = ['🥇','🥈','🥉'];
+    var order = [1,0,2]; // visual podium order: 2nd, 1st, 3rd
+    return '<div class="sw-podium">'
+      + order.map(function(i){
+          var t = teams[i];
+          if(!t) return '<div class="sw-pod-item"></div>';
+          return '<div class="sw-pod-item" style="'+(i===0?'border-top:3px solid var(--or)':i===1?'border-top:3px solid var(--pk)':'border-top:3px solid var(--pu)')+'">'
+            + '<div class="sw-pod-medal">'+medals[i]+'</div>'
+            + '<div class="sw-pod-name"><a href="player.html?team='+encodeURIComponent(t)+'" style="color:inherit;text-decoration:none;">'+t+'</a></div>'
+            + '<div class="sw-pod-val">'+valFn(t)+'</div>'
+            + (subFn ? '<div class="sw-pod-sub">'+subFn(t)+'</div>' : '')
+            + '</div>';
+        }).join('')
+      + '</div>';
+  }
+
+  // Weekly 1st scorers
+  var wkRows1 = weeklyHighs.filter(function(h){ return !h.second; }).map(function(h){
+    return '<div class="sw-wk-row">'
+      + '<span class="sw-wk-num">Wk '+h.week+'</span>'
+      + '<span class="sw-wk-name"><a href="player.html?team='+encodeURIComponent(h.name)+'" style="color:inherit;text-decoration:none;">'+h.name+'</a></span>'
+      + '<span class="sw-wk-score">'+h.score.toFixed(1)+'</span>'
+      + '</div>';
+  }).join('');
+
+  // Weekly 2nd scorers
+  var wkRows2 = weeklyHighs.filter(function(h){ return h.second; }).map(function(h){
+    return '<div class="sw-wk-row">'
+      + '<span class="sw-wk-num">Wk '+h.week+'</span>'
+      + '<span class="sw-wk-name"><a href="player.html?team='+encodeURIComponent(h.name)+'" style="color:inherit;text-decoration:none;">'+h.name+'</a></span>'
+      + '<span class="sw-wk-score" style="color:var(--pu)">'+h.score.toFixed(1)+'</span>'
+      + '</div>';
+  }).join('');
+
+  // Most started positions
+  var posCards = posOrder.map(function(pos){
+    var players = posPlayers[pos] || {};
+    var top = Object.keys(players).sort(function(a,b){ return players[b]-players[a]; })[0];
+    if(!top) return '';
+    var count = players[top];
+    var pct = Math.round(count / (weeks.length * sortedTeams.length) * 100);
+    var barPct = Math.round(count / (weeks.length * sortedTeams.length) * 100);
+    return '<div class="sw-pos-card">'
+      + '<div class="sw-pos-lbl">'+posEmoji[pos]+' '+pos+'</div>'
+      + '<div class="sw-pos-player">'+top+'</div>'
+      + '<div class="sw-card-sub">'+count+' starts · '+pct+'% of possible</div>'
+      + '<div class="sw-pos-bar-bg"><div class="sw-pos-bar-fill" style="width:'+barPct+'%"></div></div>'
+      + '</div>';
+  }).join('');
+
+  el.innerHTML = '<div class="sw-wrap">'
+
+    // CHAMPION HERO
+    + '<div class="sw-hero">'
+    + '<div class="sw-hero-title">🏆 2025 Season Champion — Highest Scorer</div>'
+    + '<div class="sw-hero-name">'+seasonChamp+'</div>'
+    + '<div class="sw-hero-score">'+seasonChampTotal.toFixed(1)+' total points · '+weeks.length+' weeks</div>'
+    + '</div>'
+
+    // TIER CHAMPIONS
+    + '<div class="sw-section"><div class="sw-section-hdr" style="color:var(--or)">🥇 Tier 1 — Top Finishers</div>'
+    + podium3(tier1.slice(0,3), function(t){ return t; }, function(t){ return teamTotals[t].toFixed(1); }, function(t){ return 'Season total'; })
+    + '</div>'
+
+    + '<div class="sw-section"><div class="sw-section-hdr" style="color:var(--pu)">🥈 Tier 2 — Mid Tier Finishers</div>'
+    + podium3(tier2.slice(0,3), function(t){ return t; }, function(t){ return teamTotals[t].toFixed(1); }, function(t){ return 'Season total'; })
+    + '</div>'
+
+    + '<div class="sw-section"><div class="sw-section-hdr" style="color:var(--pk)">🥉 Tier 3 — Survivor Finishers</div>'
+    + podium3(tier3.slice(0,3), function(t){ return t; }, function(t){ return teamTotals[t].toFixed(1); }, function(t){ return 'Season total'; })
+    + '</div>'
+
+    // WEEKLY WINNERS
+    + '<div class="sw-section"><div class="sw-section-hdr" style="color:var(--or)">🔥 Weekly High Scorer — Week by Week</div>'
+    + '<div class="sw-wk-grid">'+wkRows1+'</div></div>'
+
+    + '<div class="sw-section"><div class="sw-section-hdr" style="color:var(--pu)">🥈 Weekly Runner-Up — Week by Week</div>'
+    + '<div class="sw-wk-grid">'+wkRows2+'</div></div>'
+
+    // FUN FACTS
+    + '<div class="sw-section"><div class="sw-section-hdr" style="color:var(--pk)">📊 Season Facts</div>'
+    + '<div class="sw-grid">'
+    + '<div class="sw-card"><div class="sw-card-lbl">🔥 Highest single week</div><div class="sw-card-name">'+highestWkScore.name+'</div><div class="sw-card-val">'+highestWkScore.score.toFixed(1)+'</div><div class="sw-card-sub">Week '+highestWkScore.week+'</div></div>'
+    + '<div class="sw-card"><div class="sw-card-lbl">📉 Lowest single week</div><div class="sw-card-name">'+lowestWkScore.name+'</div><div class="sw-card-val" style="color:var(--pk)">'+lowestWkScore.score.toFixed(1)+'</div><div class="sw-card-sub">Week '+lowestWkScore.week+'</div></div>'
+    + '<div class="sw-card"><div class="sw-card-lbl">⚡ Highest league total week</div><div class="sw-card-name">Week '+highestLeagueWk.week+'</div><div class="sw-card-val">'+highestLeagueWk.total.toFixed(1)+'</div><div class="sw-card-sub">Combined all teams</div></div>'
+    + '<div class="sw-card"><div class="sw-card-lbl">🧊 Lowest league total week</div><div class="sw-card-name">Week '+lowestLeagueWk.week+'</div><div class="sw-card-val" style="color:var(--pk)">'+lowestLeagueWk.total.toFixed(1)+'</div><div class="sw-card-sub">Combined all teams</div></div>'
+    + '<div class="sw-card"><div class="sw-card-lbl">📈 Most consistent (above avg)</div><div class="sw-card-name"><a href="player.html?team='+encodeURIComponent(mostConsistent)+'" style="color:inherit;text-decoration:none;">'+mostConsistent+'</a></div><div class="sw-card-val" style="color:var(--pu)">'+aboveAvgCounts[mostConsistent]+'</div><div class="sw-card-sub">of '+weeks.length+' weeks above avg</div></div>'
+    + (biggestJump ? '<div class="sw-card"><div class="sw-card-lbl">🚀 Biggest week-over-week jump</div><div class="sw-card-name"><a href="player.html?team='+encodeURIComponent(biggestJump.name)+'" style="color:inherit;text-decoration:none;">'+biggestJump.name+'</a></div><div class="sw-card-val" style="color:var(--or)">+'+biggestJump.diff.toFixed(1)+'</div><div class="sw-card-sub">Week '+biggestJump.week+'</div></div>' : '')
+    + '<div class="sw-card"><div class="sw-card-lbl">📅 Most popular best week</div><div class="sw-card-name">Week '+mostPopularBestWeek+'</div><div class="sw-card-val" style="color:var(--pu)">'+bestWeekCounts[mostPopularBestWeek]+'</div><div class="sw-card-sub">teams had their best score</div></div>'
+    + '</div></div>'
+
+    // MOST STARTED BY POSITION
+    + '<div class="sw-section"><div class="sw-section-hdr" style="color:var(--or)">👥 Most Started Players — Full Season</div>'
+    + '<div class="sw-pos-grid">'+posCards+'</div></div>'
+
+    + '</div>';
+}
+
 
 function showEmpty(){
   var html = '<div class="empty"><div class="empty-icon">🏈</div><div class="empty-title">No data yet</div><div class="empty-sub">Click <strong>Commissioner</strong> above<br>and import your first DraftKings CSV.</div></div>';
