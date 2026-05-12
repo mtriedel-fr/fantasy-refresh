@@ -523,6 +523,62 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
 .sw-locked-sub{font-size:14px;color:var(--ink3);line-height:1.6;}
 .sw-streak-row{display:flex;align-items:center;padding:10px 18px;border-bottom:1px solid var(--bdr);gap:12px;}
 .sw-streak-row:last-child{border-bottom:none;}
+
+/* ── FIX 1: PRIMARY NAV TAB BAR ── */
+.search-bar-row{background:var(--bg4);padding:10px 20px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;}
+.search-bar-row .search-wrap{max-width:360px;flex:1;}
+.nav-tab-bar{background:var(--hdr);display:flex;border-bottom:2px solid var(--bdr);overflow-x:auto;-webkit-overflow-scrolling:touch;}
+.nav-tab-bar::-webkit-scrollbar{height:0;}
+.nav-tab{display:flex;flex-direction:column;align-items:center;gap:4px;padding:12px 20px;cursor:pointer;color:var(--ink3);font-family:var(--fd);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;border-bottom:3px solid transparent;transition:all .15s;white-space:nowrap;min-width:80px;}
+.nav-tab svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+.nav-tab:hover{color:var(--pu2);}
+.nav-tab.active{color:var(--or);border-bottom:3px solid var(--or);}
+.nav-tab.active svg{stroke:var(--or);}
+[data-theme="light"] .nav-tab-bar{background:var(--hdr);}
+
+/* ── FIX 2: FIRST RUN MODAL ── */
+.firstrun-modal{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;}
+.firstrun-modal.hidden{display:none;}
+.firstrun-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(6px);}
+.firstrun-box{position:relative;z-index:1;background:#080E0E;border:1px solid var(--or);border-radius:20px;padding:36px 32px;max-width:400px;width:100%;text-align:center;box-shadow:0 24px 80px rgba(0,229,212,.15);}
+.firstrun-logo{font-size:48px;margin-bottom:16px;}
+.firstrun-title{font-family:var(--fd);font-size:26px;font-weight:800;color:var(--or);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;}
+.firstrun-sub{font-size:14px;color:var(--ink2);line-height:1.6;margin-bottom:24px;}
+.firstrun-input{width:100%;padding:12px 16px;background:#060E0E;border:1px solid var(--bdr2);border-radius:10px;color:var(--or);font-family:var(--fb);font-size:16px;outline:none;text-align:center;margin-bottom:12px;transition:border-color .15s;}
+.firstrun-input:focus{border-color:var(--or);}
+.firstrun-input::placeholder{color:var(--ink3);}
+.firstrun-btn{width:100%;padding:12px;background:linear-gradient(135deg,var(--or),var(--pk));border:none;border-radius:10px;color:#050808;font-family:var(--fd);font-size:15px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;cursor:pointer;margin-bottom:10px;transition:opacity .15s;}
+.firstrun-btn:hover{opacity:.9;}
+.firstrun-skip{background:none;border:none;color:var(--ink3);font-family:var(--fd);font-size:12px;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;}
+.firstrun-skip:hover{color:var(--ink2);}
+
+/* ── FIX 3: CONTEXT STATS ── */
+/* stats already styled — just need toggle */
+
+/* ── FIX 4: MOBILE COLLAPSED HEADER ── */
+@media(max-width:600px){
+  .hdr{padding:10px 14px;}
+  .logo-txt{font-size:18px;}
+  .logo-box{width:32px;height:32px;}
+  .logo-box svg{width:16px;height:16px;}
+  .wk-bar{padding:8px 14px;}
+  .my-team-bar{padding:7px 14px;}
+  .stats .stat{padding:10px 8px;}
+  .stat-val{font-size:18px;}
+  .search-bar-row{padding:8px 12px;}
+  .nav-tab{padding:10px 14px;min-width:70px;font-size:11px;}
+  .nav-tab svg{width:16px;height:16px;}
+}
+
+/* ── FIX 5: SUB-TAB VISUAL UPGRADE ── */
+.sub-tabs-scroll{border-bottom:none;}
+.sub-tabs{background:var(--bg2);gap:0;padding:0;}
+.sub-tab{padding:12px 22px;font-size:13px;border-bottom:none;border-right:1px solid var(--bdr);position:relative;}
+.sub-tab::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;background:transparent;transition:background .15s;}
+.sub-tab.active{color:var(--or);background:var(--bg3);}
+.sub-tab.active::after{background:var(--or);}
+.sub-tab:hover:not(.active){color:var(--pu);background:rgba(155,109,255,.05);}
+
 </style>
 </head>
 <body>
@@ -562,27 +618,46 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
   <input type="text" id="my-team-input" placeholder="Type your team name to highlight your row..." oninput="setMyTeam(this.value)">
 </div>
 
-<div class="stats">
+<!-- CONTEXT-AWARE STATS BAR -->
+<div class="stats" id="stats-weekly">
   <div class="stat"><div class="stat-lbl">Week high</div><div class="stat-val" id="s-wkhigh">—</div><div class="stat-sub" id="s-wkhigh-name" style="font-family:var(--fd);font-size:11px;color:var(--ink3);letter-spacing:.5px;text-transform:uppercase;margin-top:2px"></div></div>
   <div class="stat"><div class="stat-lbl">Week avg</div><div class="stat-val" id="s-avg">—</div></div>
   <div class="stat"><div class="stat-lbl">Week low</div><div class="stat-val" id="s-wklow">—</div><div class="stat-sub" id="s-wklow-name" style="font-family:var(--fd);font-size:11px;color:var(--ink3);letter-spacing:.5px;text-transform:uppercase;margin-top:2px"></div></div>
   <div class="stat"><div class="stat-lbl">Weeks left</div><div class="stat-val" id="s-left">18</div></div>
 </div>
+<div class="stats hidden" id="stats-season">
+  <div class="stat"><div class="stat-lbl">Season leader</div><div class="stat-val" id="ss-leader">—</div><div class="stat-sub" id="ss-leader-name" style="font-family:var(--fd);font-size:11px;color:var(--ink3);letter-spacing:.5px;text-transform:uppercase;margin-top:2px"></div></div>
+  <div class="stat"><div class="stat-lbl">Season avg</div><div class="stat-val" id="ss-avg">—</div></div>
+  <div class="stat"><div class="stat-lbl">Most consistent</div><div class="stat-val" id="ss-streak">—</div><div class="stat-sub" id="ss-streak-name" style="font-family:var(--fd);font-size:11px;color:var(--ink3);letter-spacing:.5px;text-transform:uppercase;margin-top:2px"></div></div>
+  <div class="stat"><div class="stat-lbl">Weeks played</div><div class="stat-val" id="ss-weeks">—</div></div>
+</div>
 
-<!-- COMBINED SEARCH + NAV BAR -->
-<div class="action-bar">
+<!-- SEARCH BAR -->
+<div class="search-bar-row">
   <div class="search-wrap">
     <svg viewBox="0 0 24 24" class="search-icon"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
     <input type="text" id="player-search" placeholder="Search player profiles..." autocomplete="off" oninput="handleSearch(this.value)" onfocus="showDropdown()" onblur="hideDropdown()">
     <div class="search-dropdown hidden" id="search-dropdown"></div>
   </div>
-  <div class="nav-select-wrap">
-    <select class="nav-select" id="nav-select" onchange="handleNav(this.value)">
-      <option value="yourweek">👤 Your Week</option>
-      <option value="yourseason">📅 Your Season</option>
-      <option value="seasonwrap">🏆 Season Wrap</option>
-      <option value="playoffs">🏈 Playoffs</option>
-    </select>
+</div>
+
+<!-- PRIMARY NAV TAB BAR -->
+<div class="nav-tab-bar" id="nav-tab-bar">
+  <div class="nav-tab active" id="navtab-yourweek" onclick="handleNav('yourweek')">
+    <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+    <span>Your Week</span>
+  </div>
+  <div class="nav-tab" id="navtab-yourseason" onclick="handleNav('yourseason')">
+    <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+    <span>Your Season</span>
+  </div>
+  <div class="nav-tab" id="navtab-seasonwrap" onclick="handleNav('seasonwrap')">
+    <svg viewBox="0 0 24 24"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
+    <span>Season Wrap</span>
+  </div>
+  <div class="nav-tab" id="navtab-playoffs" onclick="handleNav('playoffs')">
+    <svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+    <span>Playoffs</span>
   </div>
 </div>
 
@@ -679,6 +754,20 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
     <div class="cmp-footer">
       <button class="cmp-clear-btn" onclick="clearCompare()">Clear all</button>
     </div>
+  </div>
+</div>
+
+
+<!-- FIRST RUN MODAL -->
+<div class="firstrun-modal hidden" id="firstrun-modal">
+  <div class="firstrun-backdrop"></div>
+  <div class="firstrun-box">
+    <div class="firstrun-logo">🏈</div>
+    <div class="firstrun-title">Welcome to Fantasy Refresh</div>
+    <div class="firstrun-sub">Enter your team name to personalize your experience. You'll see your score, lineup, and season stats highlighted throughout the site.</div>
+    <input type="text" id="firstrun-input" class="firstrun-input" placeholder="Your team name..." autocomplete="off" onkeydown="if(event.key==='Enter') saveFirstRun()">
+    <button class="firstrun-btn" onclick="saveFirstRun()">Let's Go →</button>
+    <button class="firstrun-skip" onclick="skipFirstRun()">Skip for now</button>
   </div>
 </div>
 
@@ -779,10 +868,12 @@ function boot(){
   });
   var mylineup = document.getElementById('sub-mylineup');
   if(mylineup) mylineup.classList.remove('hidden');
-  var navSel = document.getElementById('nav-select');
-  if(navSel) navSel.value = 'yourweek';
+  document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); });
+  var activeTab = document.getElementById('navtab-yourweek');
+  if(activeTab) activeTab.classList.add('active');
   initMyTeamInput();
   renderAll();
+  checkFirstRun();
 }
 
 loadFromCloud();
@@ -2473,6 +2564,36 @@ function renderNumbers(curEntries){
 }
 
 
+
+// ── FIRST RUN PROMPT ──────────────────────────────────────────
+function checkFirstRun(){
+  try{
+    var seen = localStorage.getItem('fr_seen');
+    var savedTeam = localStorage.getItem('fr_myteam');
+    if(!seen && !savedTeam){
+      document.getElementById('firstrun-modal').classList.remove('hidden');
+      setTimeout(function(){ document.getElementById('firstrun-input').focus(); }, 300);
+    }
+    localStorage.setItem('fr_seen','1');
+  }catch(e){}
+}
+
+function saveFirstRun(){
+  var val = document.getElementById('firstrun-input').value.trim();
+  if(val){
+    myTeam = val;
+    try{ localStorage.setItem('fr_myteam', val); }catch(e){}
+    var inp = document.getElementById('my-team-input');
+    if(inp) inp.value = val;
+  }
+  document.getElementById('firstrun-modal').classList.add('hidden');
+  if(val) renderAll();
+}
+
+function skipFirstRun(){
+  document.getElementById('firstrun-modal').classList.add('hidden');
+}
+
 function toggleTheme(){
   var html = document.documentElement;
   var isDark = html.getAttribute('data-theme') !== 'light';
@@ -2654,11 +2775,55 @@ function showSubTab(el, id, section){
 
 function handleNav(val){
   if(val === 'playoffs'){ window.location.href = 'playoffs.html'; return; }
+  // Hide all content
   document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); });
   var panel = document.getElementById('tab-' + val);
   if(panel) panel.classList.remove('hidden');
-  var sel = document.getElementById('nav-select');
-  if(sel) sel.value = val;
+  // Update tab bar active state
+  document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); });
+  var activeTab = document.getElementById('navtab-' + val);
+  if(activeTab) activeTab.classList.add('active');
+  // Context-aware stats bar
+  var isWeekly = (val === 'yourweek');
+  var wStats = document.getElementById('stats-weekly');
+  var sStats = document.getElementById('stats-season');
+  if(wStats) wStats.classList.toggle('hidden', !isWeekly);
+  if(sStats) sStats.classList.toggle('hidden', isWeekly);
+  // Update season stats if switching to season view
+  if(!isWeekly) updateSeasonStats();
+}
+
+function updateSeasonStats(){
+  var weeks = Object.keys(seasonData).filter(function(k){
+    return !isNaN(Number(k)) && seasonData[k] && seasonData[k].length > 0;
+  }).map(Number);
+  if(!weeks.length) return;
+  // Season leader
+  var totals = {};
+  weeks.forEach(function(w){
+    (seasonData[String(w)]||[]).forEach(function(e){ totals[e.name]=(totals[e.name]||0)+e.score; });
+  });
+  var sorted = Object.keys(totals).sort(function(a,b){ return totals[b]-totals[a]; });
+  var leader = sorted[0];
+  // Season avg (avg of all weekly avgs)
+  var allScores = [];
+  weeks.forEach(function(w){ (seasonData[String(w)]||[]).forEach(function(e){ allScores.push(e.score); }); });
+  var sznAvg = allScores.reduce(function(a,b){ return a+b; },0) / (allScores.length||1);
+  // Most consistent (most weeks above avg)
+  var aboveCounts = {};
+  weeks.forEach(function(w){
+    var entries = seasonData[String(w)]||[];
+    var avg = entries.reduce(function(s,e){ return s+e.score; },0)/(entries.length||1);
+    entries.forEach(function(e){ if(e.score >= avg) aboveCounts[e.name]=(aboveCounts[e.name]||0)+1; });
+  });
+  var consistent = Object.keys(aboveCounts).sort(function(a,b){ return aboveCounts[b]-aboveCounts[a]; })[0];
+  var el = function(id){ return document.getElementById(id); };
+  if(el('ss-leader')) el('ss-leader').textContent = totals[leader] ? totals[leader].toFixed(1) : '—';
+  if(el('ss-leader-name')) el('ss-leader-name').textContent = leader || '';
+  if(el('ss-avg')) el('ss-avg').textContent = sznAvg > 0 ? sznAvg.toFixed(1) : '—';
+  if(el('ss-streak')) el('ss-streak').textContent = consistent ? (aboveCounts[consistent] + ' wks') : '—';
+  if(el('ss-streak-name')) el('ss-streak-name').textContent = consistent || '';
+  if(el('ss-weeks')) el('ss-weeks').textContent = weeks.length;
 }
 
 // ── UTILS ──────────────────────────────────────────────────────
