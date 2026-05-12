@@ -379,6 +379,13 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
 .dist-avg-lbl{position:absolute;bottom:0;font-family:var(--fd);font-size:9px;color:var(--ink2);transform:translateX(-50%);white-space:nowrap;}
 
 /* ── FEATURE 5: MOBILE ── */
+
+  /* Weekly Numbers 3-col roster grid */
+  @media(max-width:600px){
+    .numbers-wrap .num-section [style*="grid-template-columns:1fr 1fr 1fr"]{
+      grid-template-columns:1fr !important;
+    }
+  }
 @media(max-width:600px){
   body{padding:0;}
   .wrap{border-radius:0;border:none;box-shadow:none;width:100%;min-width:0;}
@@ -2506,33 +2513,81 @@ function renderNumbers(curEntries){
   var stddev = Math.sqrt(scores.reduce(function(s,v){ return s + Math.pow(v-avg,2); }, 0) / scores.length);
   var above = scores.filter(function(s){ return s > avg; }).length;
 
-  // Most started by position
-  var topByPos = getMostStartedByPosition(curEntries);
-  var posOrder = ['QB','RB','WR','TE','DST'];
-  var posEmoji = {QB:'🏈',RB:'🏃',WR:'⚡',TE:'🎯',DST:'🛡️'};
+  // Full slot defs for most started - matches lineup format
+  var slotDefs = [
+    {pos:'QB', label:'QB', emoji:'🏈'},
+    {pos:'RB', label:'RB', emoji:'🏃'},
+    {pos:'RB', label:'RB', emoji:'🏃'},
+    {pos:'WR', label:'WR', emoji:'⚡'},
+    {pos:'WR', label:'WR', emoji:'⚡'},
+    {pos:'WR', label:'WR', emoji:'⚡'},
+    {pos:'TE', label:'TE', emoji:'🎯'},
+    {pos:'FLEX', label:'FLEX', emoji:'💫'},
+    {pos:'DST', label:'DEF', emoji:'🛡️'}
+  ];
 
-  function rosterHTML(entry){
-    if(!entry || !entry.lineup) return '<div style="color:var(--ink3);font-size:13px">No lineup data</div>';
-    var players = parseLineup(entry.lineup);
-    var posOrd = ['QB','RB','WR','TE','FLEX','DST','K'];
-    players.sort(function(a,b){ return posOrd.indexOf(a.pos) - posOrd.indexOf(b.pos); });
-    return '<div class="roster-list">' + players.map(function(p){
-      return '<div class="roster-item"><span class="roster-pos">' + p.pos + '</span><span class="roster-player">' + p.player + '</span></div>';
-    }).join('') + '</div>';
+  // Build most-started by resolving each slot greedily across all entries
+  function getMostStartedForSlots(entries){
+    var slotCounts = slotDefs.map(function(){ return {}; });
+    entries.forEach(function(entry){
+      if(!entry.lineup) return;
+      var players = parseLineup(entry.lineup);
+      var remaining = players.slice();
+      slotDefs.forEach(function(slot, si){
+        var idx = remaining.findIndex(function(p){ return p.pos === slot.pos; });
+        if(idx < 0) return;
+        var p = remaining.splice(idx,1)[0];
+        slotCounts[si][p.player] = (slotCounts[si][p.player]||0) + 1;
+      });
+    });
+    return slotCounts.map(function(counts){
+      var players = Object.keys(counts);
+      if(!players.length) return null;
+      var top = players.reduce(function(a,b){ return counts[a]>=counts[b]?a:b; });
+      return {player:top, count:counts[top], total:entries.length};
+    });
   }
 
-  var posCards = posOrder.map(function(pos){
-    var d = topByPos[pos];
-    if(!d) return '';
-    var pct = Math.round(d.count / d.total * 100);
-    var barPct = Math.round(d.count / d.total * 100);
-    return '<div class="pos-card">'
-      + '<div class="pos-card-pos">' + posEmoji[pos] + ' ' + pos + '</div>'
-      + '<div class="pos-card-player">' + d.player + '</div>'
-      + '<div class="pos-card-count">Started by ' + d.count + ' of ' + d.total + ' teams (' + pct + '%)</div>'
-      + '<div class="pos-bar-bg"><div class="pos-bar-fill" style="width:' + barPct + '%"></div></div>'
+  var slotStarters = getMostStartedForSlots(curEntries);
+
+  // Roster columns — high and low side by side using same slot format
+  function rosterCol(entry, accentColor){
+    if(!entry || !entry.lineup) return slotDefs.map(function(slot){
+      return '<div style="padding:9px 12px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:10px;background:var(--bg3);">'
+        + '<span style="font-family:var(--fd);font-size:11px;font-weight:800;color:'+accentColor+';min-width:36px;text-transform:uppercase;">'+slot.label+'</span>'
+        + '<span style="font-family:var(--fd);font-size:13px;color:var(--ink3);">—</span></div>';
+    }).join('');
+    var players = parseLineup(entry.lineup);
+    var remaining = players.slice();
+    return slotDefs.map(function(slot){
+      var idx = remaining.findIndex(function(p){ return p.pos === slot.pos; });
+      var player = idx >= 0 ? remaining.splice(idx,1)[0] : null;
+      return '<div style="padding:9px 12px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:10px;background:var(--bg3);">'
+        + '<span style="font-family:var(--fd);font-size:11px;font-weight:800;color:'+accentColor+';min-width:36px;text-transform:uppercase;">'+slot.label+'</span>'
+        + '<span style="font-family:var(--fd);font-size:13px;font-weight:600;color:var(--ink);">'+(player?player.player:'—')+'</span>'
+        + '</div>';
+    }).join('');
+  }
+
+  // Most started column
+  var mostStartedCol = slotStarters.map(function(d, si){
+    var slot = slotDefs[si];
+    var pct = d ? Math.round(d.count/d.total*100) : 0;
+    return '<div style="padding:9px 12px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:10px;background:var(--bg3);">'
+      + '<span style="font-family:var(--fd);font-size:11px;font-weight:800;color:var(--pu);min-width:36px;text-transform:uppercase;">'+slot.label+'</span>'
+      + '<span style="font-family:var(--fd);font-size:13px;font-weight:600;color:var(--ink);flex:1;">'+(d?d.player:'—')+'</span>'
+      + (d ? '<span style="font-family:var(--fd);font-size:11px;color:var(--ink3);white-space:nowrap;">'+d.count+' ('+pct+'%)</span>' : '')
       + '</div>';
   }).join('');
+
+  // Column header card
+  function colHeader(name, score, link, color){
+    return '<div style="background:'+color+'18;border-bottom:2px solid '+color+';padding:12px 14px;text-align:center;">'
+      + '<div style="font-family:var(--fd);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:'+color+';margin-bottom:2px;">'+name+'</div>'
+      + (link ? '<a href="'+link+'" style="font-family:var(--fd);font-size:11px;color:var(--ink3);text-decoration:none;text-transform:uppercase;letter-spacing:.3px;border-bottom:1px dotted var(--bdr2);">view profile</a>' : '')
+      + '<div style="font-family:var(--fd);font-size:28px;font-weight:800;color:'+color+';margin-top:4px;">'+score+'</div>'
+      + '</div>';
+  }
 
   el.innerHTML = '<div class="numbers-wrap">'
 
@@ -2548,18 +2603,33 @@ function renderNumbers(curEntries){
     + '<div class="num-section"><div class="num-section-hdr">📊 Score Distribution</div>'
     + '<div class="num-body">' + renderDistribution(curEntries) + '</div></div>'
 
-    // High score + roster
-    + '<div class="num-section"><div class="num-section-hdr">🔥 Highest Score — <a href="player.html?team=' + encodeURIComponent(high.name) + '" style="color:var(--or);text-decoration:none;">' + high.name + '</a> · ' + high.score.toFixed(1) + ' pts</div>'
-    + '<div class="num-body">' + rosterHTML(high) + '</div></div>'
+    // THREE COLUMNS SIDE BY SIDE
+    + '<div class="num-section"><div class="num-section-hdr">📋 Rosters & Most Started</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;background:var(--bdr);">'
 
-    // Low score + roster
-    + '<div class="num-section"><div class="num-section-hdr">📉 Lowest Score — <a href="player.html?team=' + encodeURIComponent(low.name) + '" style="color:var(--or);text-decoration:none;">' + low.name + '</a> · ' + low.score.toFixed(1) + ' pts</div>'
-    + '<div class="num-body">' + rosterHTML(low) + '</div></div>'
+    // Column 1 — High scorer
+    + '<div>'
+    + colHeader('🔥 High Score', high.score.toFixed(1), 'player.html?team='+encodeURIComponent(high.name), 'var(--or)')
+    + rosterCol(high, 'var(--or)')
+    + '</div>'
 
-    // Most started by position
-    + '<div class="num-section"><div class="num-section-hdr">👥 Most Started Players by Position</div>'
-    + '<div class="num-body"><div class="pos-grid">' + posCards + '</div></div></div>'
+    // Column 2 — Low scorer
+    + '<div>'
+    + colHeader('📉 Low Score', low.score.toFixed(1), 'player.html?team='+encodeURIComponent(low.name), 'var(--pk)')
+    + rosterCol(low, 'var(--pk)')
+    + '</div>'
 
+    // Column 3 — Most started
+    + '<div>'
+    + '<div style="background:rgba(155,109,255,.1);border-bottom:2px solid var(--pu);padding:12px 14px;text-align:center;">'
+    + '<div style="font-family:var(--fd);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--pu);margin-bottom:2px;">👥 Most Started</div>'
+    + '<div style="font-family:var(--fd);font-size:11px;color:var(--ink3);text-transform:uppercase;letter-spacing:.3px;">Week ' + currentWeek + '</div>'
+    + '<div style="font-family:var(--fd);font-size:28px;font-weight:800;color:var(--pu);margin-top:4px;">' + curEntries.length + ' teams</div>'
+    + '</div>'
+    + mostStartedCol
+    + '</div>'
+
+    + '</div></div>'
     + '</div>';
 }
 
