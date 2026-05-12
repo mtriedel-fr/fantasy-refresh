@@ -1165,39 +1165,77 @@ function renderSeasonWrap(){
       + '</div>';
   }
 
-  // Weekly 1st scorers
-  var wkRows1 = weeklyHighs.filter(function(h){ return !h.second; }).map(function(h){
-    return '<div class="sw-wk-row">'
-      + '<span class="sw-wk-num">Wk '+h.week+'</span>'
-      + '<span class="sw-wk-name"><a href="player.html?team='+encodeURIComponent(h.name)+'" style="color:inherit;text-decoration:none;">'+h.name+'</a></span>'
-      + '<span class="sw-wk-score">'+h.score.toFixed(1)+'</span>'
+  // Combined weekly scores table — 1st and 2nd side by side
+  var wkHighsBy1st = weeklyHighs.filter(function(h){ return !h.second; });
+  var wkHighsBy2nd = weeklyHighs.filter(function(h){ return h.second; });
+  var combinedWkRows = wkHighsBy1st.map(function(h1){
+    var h2 = wkHighsBy2nd.find(function(h){ return h.week === h1.week; });
+    return '<div class="sw-wk-row" style="display:grid;grid-template-columns:44px 1fr 56px 1fr 56px;align-items:center;gap:6px;">'
+      + '<span class="sw-wk-num">Wk '+h1.week+'</span>'
+      + '<span style="font-family:var(--fd);font-size:14px;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><a href="player.html?team='+encodeURIComponent(h1.name)+'" style="color:inherit;text-decoration:none;">'+h1.name+'</a></span>'
+      + '<span class="sw-wk-score">'+fmtScore(h1.score)+'</span>'
+      + '<span style="font-family:var(--fd);font-size:14px;font-weight:700;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(h2?'<a href="player.html?team='+encodeURIComponent(h2.name)+'" style="color:inherit;text-decoration:none;">'+h2.name+'</a>':'—')+'</span>'
+      + '<span class="sw-wk-score" style="color:var(--pu);">'+(h2?fmtScore(h2.score):'—')+'</span>'
       + '</div>';
   }).join('');
 
-  // Weekly 2nd scorers
-  var wkRows2 = weeklyHighs.filter(function(h){ return h.second; }).map(function(h){
-    return '<div class="sw-wk-row">'
-      + '<span class="sw-wk-num">Wk '+h.week+'</span>'
-      + '<span class="sw-wk-name"><a href="player.html?team='+encodeURIComponent(h.name)+'" style="color:inherit;text-decoration:none;">'+h.name+'</a></span>'
-      + '<span class="sw-wk-score" style="color:var(--pu)">'+h.score.toFixed(1)+'</span>'
-      + '</div>';
-  }).join('');
+  var wkTableHeader = '<div style="display:grid;grid-template-columns:44px 1fr 56px 1fr 56px;align-items:center;gap:6px;padding:8px 18px;background:var(--bg2);border-bottom:2px solid var(--bdr);">'
+    + '<span style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;">Wk</span>'
+    + '<span style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--or);text-transform:uppercase;letter-spacing:.8px;">🥇 Top Scorer</span>'
+    + '<span style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--or);text-transform:uppercase;letter-spacing:.8px;text-align:right;">Pts</span>'
+    + '<span style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--pu);text-transform:uppercase;letter-spacing:.8px;">🥈 Runner-Up</span>'
+    + '<span style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--pu);text-transform:uppercase;letter-spacing:.8px;text-align:right;">Pts</span>'
+    + '</div>';
 
-  // Most started positions
-  var posCards = posOrder.map(function(pos){
+  // Most started — full slot logic matching lineup format
+  // QB(1), RB(2), WR(3), TE(1), FLEX(1), DST(1)
+  function getTopNForPos(pos, n){
     var players = posPlayers[pos] || {};
-    var top = Object.keys(players).sort(function(a,b){ return players[b]-players[a]; })[0];
-    if(!top) return '';
-    var count = players[top];
-    var pct = Math.round(count / (weeks.length * sortedTeams.length) * 100);
-    var barPct = Math.round(count / (weeks.length * sortedTeams.length) * 100);
-    return '<div class="sw-pos-card">'
-      + '<div class="sw-pos-lbl">'+posEmoji[pos]+' '+pos+'</div>'
-      + '<div class="sw-pos-player">'+top+'</div>'
+    return Object.keys(players).sort(function(a,b){ return players[b]-players[a]; }).slice(0,n).map(function(p){
+      return {player:p, count:players[p]};
+    });
+  }
+
+  var totalPossible = weeks.length * sortedTeams.length;
+
+  function swPosCard(label, emoji, player, count, color){
+    if(!player) return '';
+    var pct = Math.round(count / totalPossible * 100);
+    var barPct = pct;
+    return '<div class="sw-pos-card" style="border-left:3px solid '+color+';">'
+      + '<div class="sw-pos-lbl" style="color:'+color+'">'+emoji+' '+label+'</div>'
+      + '<div class="sw-pos-player">'+player+'</div>'
       + '<div class="sw-card-sub">'+count+' starts · '+pct+'% of possible</div>'
-      + '<div class="sw-pos-bar-bg"><div class="sw-pos-bar-fill" style="width:'+barPct+'%"></div></div>'
+      + '<div class="sw-pos-bar-bg"><div class="sw-pos-bar-fill" style="width:'+barPct+'%;background:'+color+'"></div></div>'
       + '</div>';
-  }).join('');
+  }
+
+  var topQB = getTopNForPos('QB',1);
+  var topRBs = getTopNForPos('RB',2);
+  var topWRs = getTopNForPos('WR',3);
+  var topTE = getTopNForPos('TE',1);
+  var topDST = getTopNForPos('DST',1);
+
+  // FLEX: highest starts from 4th WR, 3rd RB, 2nd TE
+  var flexCandidates = [];
+  var wr4 = getTopNForPos('WR',4)[3];
+  var rb3 = getTopNForPos('RB',3)[2];
+  var te2 = getTopNForPos('TE',2)[1];
+  if(wr4) flexCandidates.push({player:wr4.player, count:wr4.count, label:'WR'});
+  if(rb3) flexCandidates.push({player:rb3.player, count:rb3.count, label:'RB'});
+  if(te2) flexCandidates.push({player:te2.player, count:te2.count, label:'TE'});
+  var topFlex = flexCandidates.length ? flexCandidates.reduce(function(a,b){ return a.count>=b.count?a:b; }) : null;
+
+  var posCards = ''
+    + (topQB[0] ? swPosCard('QB', '🏈', topQB[0].player, topQB[0].count, 'var(--or)') : '')
+    + (topRBs[0] ? swPosCard('RB 1', '🏃', topRBs[0].player, topRBs[0].count, 'var(--or)') : '')
+    + (topRBs[1] ? swPosCard('RB 2', '🏃', topRBs[1].player, topRBs[1].count, 'var(--pk)') : '')
+    + (topWRs[0] ? swPosCard('WR 1', '⚡', topWRs[0].player, topWRs[0].count, 'var(--or)') : '')
+    + (topWRs[1] ? swPosCard('WR 2', '⚡', topWRs[1].player, topWRs[1].count, 'var(--pk)') : '')
+    + (topWRs[2] ? swPosCard('WR 3', '⚡', topWRs[2].player, topWRs[2].count, 'var(--pu)') : '')
+    + (topTE[0] ? swPosCard('TE', '🎯', topTE[0].player, topTE[0].count, 'var(--or)') : '')
+    + (topFlex ? swPosCard('FLEX ('+topFlex.label+')', '💫', topFlex.player, topFlex.count, 'var(--pu)') : '')
+    + (topDST[0] ? swPosCard('DEF', '🛡️', topDST[0].player, topDST[0].count, 'var(--pk)') : '');
 
   el.innerHTML = '<div class="sw-wrap">'
 
@@ -1205,38 +1243,36 @@ function renderSeasonWrap(){
     + '<div class="sw-hero">'
     + '<div class="sw-hero-title">🏆 2025 Season Champion — Highest Scorer</div>'
     + '<div class="sw-hero-name">'+seasonChamp+'</div>'
-    + '<div class="sw-hero-score">'+seasonChampTotal.toFixed(1)+' total points · '+weeks.length+' weeks</div>'
+    + '<div class="sw-hero-score">'+fmtTotal(seasonChampTotal)+' total points · '+weeks.length+' weeks</div>'
     + '</div>'
 
     // TIER CHAMPIONS
     + '<div class="sw-section"><div class="sw-section-hdr" style="color:var(--or)">🥇 Tier 1 — Top Finishers</div>'
-    + podium3(tier1.slice(0,3), function(t){ return t; }, function(t){ return teamTotals[t].toFixed(1); }, function(t){ return 'Season total'; })
+    + podium3(tier1.slice(0,3), function(t){ return t; }, function(t){ return fmtTotal(teamTotals[t]); }, function(t){ return 'Season total'; })
     + '</div>'
 
     + '<div class="sw-section"><div class="sw-section-hdr" style="color:var(--pu)">🥈 Tier 2 — Mid Tier Finishers</div>'
-    + podium3(tier2.slice(0,3), function(t){ return t; }, function(t){ return teamTotals[t].toFixed(1); }, function(t){ return 'Season total'; })
+    + podium3(tier2.slice(0,3), function(t){ return t; }, function(t){ return fmtTotal(teamTotals[t]); }, function(t){ return 'Season total'; })
     + '</div>'
 
     + '<div class="sw-section"><div class="sw-section-hdr" style="color:var(--pk)">🥉 Tier 3 — Survivor Finishers</div>'
-    + podium3(tier3.slice(0,3), function(t){ return t; }, function(t){ return teamTotals[t].toFixed(1); }, function(t){ return 'Season total'; })
+    + podium3(tier3.slice(0,3), function(t){ return t; }, function(t){ return fmtTotal(teamTotals[t]); }, function(t){ return 'Season total'; })
     + '</div>'
 
-    // WEEKLY WINNERS
-    + '<div class="sw-section"><div class="sw-section-hdr" style="color:var(--or)">🔥 Weekly High Scorer — Week by Week</div>'
-    + '<div class="sw-wk-grid">'+wkRows1+'</div></div>'
-
-    + '<div class="sw-section"><div class="sw-section-hdr" style="color:var(--pu)">🥈 Weekly Runner-Up — Week by Week</div>'
-    + '<div class="sw-wk-grid">'+wkRows2+'</div></div>'
+    // WEEKLY WINNERS — combined table
+    + '<div class="sw-section"><div class="sw-section-hdr" style="color:var(--or)">📅 Weekly Scores</div>'
+    + wkTableHeader
+    + '<div class="sw-wk-grid">'+combinedWkRows+'</div></div>'
 
     // FUN FACTS
     + '<div class="sw-section"><div class="sw-section-hdr" style="color:var(--pk)">📊 Season Facts</div>'
     + '<div class="sw-grid">'
-    + '<div class="sw-card"><div class="sw-card-lbl">🔥 Highest single week</div><div class="sw-card-name">'+highestWkScore.name+'</div><div class="sw-card-val">'+highestWkScore.score.toFixed(1)+'</div><div class="sw-card-sub">Week '+highestWkScore.week+'</div></div>'
-    + '<div class="sw-card"><div class="sw-card-lbl">📉 Lowest single week</div><div class="sw-card-name">'+lowestWkScore.name+'</div><div class="sw-card-val" style="color:var(--pk)">'+lowestWkScore.score.toFixed(1)+'</div><div class="sw-card-sub">Week '+lowestWkScore.week+'</div></div>'
-    + '<div class="sw-card"><div class="sw-card-lbl">⚡ Highest league total week</div><div class="sw-card-name">Week '+highestLeagueWk.week+'</div><div class="sw-card-val">'+highestLeagueWk.total.toFixed(1)+'</div><div class="sw-card-sub">Combined all teams</div></div>'
-    + '<div class="sw-card"><div class="sw-card-lbl">🧊 Lowest league total week</div><div class="sw-card-name">Week '+lowestLeagueWk.week+'</div><div class="sw-card-val" style="color:var(--pk)">'+lowestLeagueWk.total.toFixed(1)+'</div><div class="sw-card-sub">Combined all teams</div></div>'
+    + '<div class="sw-card"><div class="sw-card-lbl">🔥 Highest single week</div><div class="sw-card-name">'+highestWkScore.name+'</div><div class="sw-card-val">'+fmtScore(highestWkScore.score)+'</div><div class="sw-card-sub">Week '+highestWkScore.week+'</div></div>'
+    + '<div class="sw-card"><div class="sw-card-lbl">📉 Lowest single week</div><div class="sw-card-name">'+lowestWkScore.name+'</div><div class="sw-card-val" style="color:var(--pk)">'+fmtScore(lowestWkScore.score)+'</div><div class="sw-card-sub">Week '+lowestWkScore.week+'</div></div>'
+    + '<div class="sw-card"><div class="sw-card-lbl">⚡ Highest league total week</div><div class="sw-card-name">Week '+highestLeagueWk.week+'</div><div class="sw-card-val">'+fmtTotal(highestLeagueWk.total)+'</div><div class="sw-card-sub">Combined all teams</div></div>'
+    + '<div class="sw-card"><div class="sw-card-lbl">🧊 Lowest league total week</div><div class="sw-card-name">Week '+lowestLeagueWk.week+'</div><div class="sw-card-val" style="color:var(--pk)">'+fmtTotal(lowestLeagueWk.total)+'</div><div class="sw-card-sub">Combined all teams</div></div>'
     + '<div class="sw-card"><div class="sw-card-lbl">📈 Most consistent (above avg)</div><div class="sw-card-name"><a href="player.html?team='+encodeURIComponent(mostConsistent)+'" style="color:inherit;text-decoration:none;">'+mostConsistent+'</a></div><div class="sw-card-val" style="color:var(--pu)">'+aboveAvgCounts[mostConsistent]+'</div><div class="sw-card-sub">of '+weeks.length+' weeks above avg</div></div>'
-    + (biggestJump ? '<div class="sw-card"><div class="sw-card-lbl">🚀 Biggest week-over-week jump</div><div class="sw-card-name"><a href="player.html?team='+encodeURIComponent(biggestJump.name)+'" style="color:inherit;text-decoration:none;">'+biggestJump.name+'</a></div><div class="sw-card-val" style="color:var(--or)">+'+biggestJump.diff.toFixed(1)+'</div><div class="sw-card-sub">Week '+biggestJump.week+'</div></div>' : '')
+    + (biggestJump ? '<div class="sw-card"><div class="sw-card-lbl">🚀 Biggest week-over-week jump</div><div class="sw-card-name"><a href="player.html?team='+encodeURIComponent(biggestJump.name)+'" style="color:inherit;text-decoration:none;">'+biggestJump.name+'</a></div><div class="sw-card-val" style="color:var(--or)">+'+fmtScore(biggestJump.diff)+'</div><div class="sw-card-sub">Week '+biggestJump.week+'</div></div>' : '')
     + '<div class="sw-card"><div class="sw-card-lbl">📅 Most popular best week</div><div class="sw-card-name">Week '+mostPopularBestWeek+'</div><div class="sw-card-val" style="color:var(--pu)">'+bestWeekCounts[mostPopularBestWeek]+'</div><div class="sw-card-sub">teams had their best score</div></div>'
     + '</div></div>'
 
@@ -1399,8 +1435,8 @@ function renderStandings(sorted, prevRank, curMap, wkHighName){
       + tierBadge
       + tip + '</div></td>'
       + '<td class="tp" style="text-align:right">' + fmtTotal(t.total) + '</td>'
-      + '<td class="ws" style="text-align:right">' + (wk !== undefined ? wk.toFixed(1) : '—') + '</td>'
-      + '<td class="av" style="text-align:right">' + t.avg.toFixed(1) + '</td>'
+      + '<td class="ws" style="text-align:right">' + (wk !== undefined ? fmtScore(wk) : '—') + '</td>'
+      + '<td class="av" style="text-align:right">' + fmtScore(t.avg) + '</td>'
       + '<td class="move-col">' + mv + '</td>'
       + '<td style="width:32px;text-align:center">' + compareBtn + '</td>'
       + '</tr>';
@@ -1435,9 +1471,9 @@ function renderWeek(data, maxScore){
 
   var t3 = sw.slice(0,3);
   var pod = '<div class="pod">'
-    + '<div class="ps"><div class="pn">' + (t3[1]?t3[1].name:'') + '</div><div class="pp">' + (t3[1]?t3[1].score.toFixed(1):'') + ' pts</div><div class="pb p2">2</div></div>'
-    + '<div class="ps"><div class="pn">' + (t3[0]?t3[0].name:'') + '</div><div class="pp">' + (t3[0]?t3[0].score.toFixed(1):'') + ' pts</div><div class="pb p1">1</div></div>'
-    + '<div class="ps"><div class="pn">' + (t3[2]?t3[2].name:'') + '</div><div class="pp">' + (t3[2]?t3[2].score.toFixed(1):'') + ' pts</div><div class="pb p3">3</div></div>'
+    + '<div class="ps"><div class="pn">' + (t3[1]?t3[1].name:'') + '</div><div class="pp">' + (t3[1]?fmtScore(t3[1].score):'') + ' pts</div><div class="pb p2">2</div></div>'
+    + '<div class="ps"><div class="pn">' + (t3[0]?t3[0].name:'') + '</div><div class="pp">' + (t3[0]?fmtScore(t3[0].score):'') + ' pts</div><div class="pb p1">1</div></div>'
+    + '<div class="ps"><div class="pn">' + (t3[2]?t3[2].name:'') + '</div><div class="pp">' + (t3[2]?fmtScore(t3[2].score):'') + ' pts</div><div class="pb p3">3</div></div>'
     + '</div>';
 
   var cards = sw.map(function(t,i){
@@ -1447,7 +1483,7 @@ function renderWeek(data, maxScore){
     }
     return '<div class="sc' + (i===0?' t1':'') + '">'
       + '<div class="sc-n">' + t.name + '</div>'
-      + '<div class="sc-p">' + t.score.toFixed(1) + '</div>'
+      + '<div class="sc-p">' + fmtScore(t.score) + '</div>'
       + '<div class="sc-r">Rank ' + (i+1) + ' this week</div>'
       + timeTag
       + '<div class="bb"><div class="bf" style="width:' + Math.round(t.score/maxScore*100) + '%"></div></div>'
@@ -1480,7 +1516,7 @@ function renderMovement(sorted, prevRank, curMap){
       + '<td style="text-align:center;color:var(--ink2);font-family:var(--fd);font-weight:600">' + (t.prev || '—') + '</td>'
       + '<td style="text-align:center;font-family:var(--fd);font-weight:800;font-size:17px">' + t.curr + '</td>'
       + '<td style="text-align:center">' + mv + '</td>'
-      + '<td style="text-align:right;font-family:var(--fd);font-weight:700;font-size:15px;color:var(--or)">' + (t.score !== undefined ? t.score.toFixed(1) : '—') + '</td>'
+      + '<td style="text-align:right;font-family:var(--fd);font-weight:700;font-size:15px;color:var(--or)">' + (t.score !== undefined ? fmtScore(t.score) : '—') + '</td>'
       + '</tr>';
   }).join('');
 
@@ -1562,7 +1598,7 @@ function showPreview(data){
   document.getElementById('prev-count').textContent = data.length;
   var top = data.slice(0,5);
   document.getElementById('prev-rows').innerHTML = top.map(function(d){
-    return '<div class="preview-row"><span class="pv-name">' + d.name + '</span><span class="pv-score">' + d.score.toFixed(1) + '</span></div>';
+    return '<div class="preview-row"><span class="pv-name">' + d.name + '</span><span class="pv-score">' + fmtScore(d.score) + '</span></div>';
   }).join('') + (data.length > 5 ? '<div class="preview-row"><span class="pv-name" style="color:#1A4A4A">...and ' + (data.length-5) + ' more</span></div>' : '');
   document.getElementById('prev-box').style.display = 'block';
   document.getElementById('imp-btn').style.display = 'block';
@@ -1580,7 +1616,7 @@ function confirmImport(){
   document.getElementById('prev-box').style.display = 'none';
   document.getElementById('imp-btn').style.display = 'none';
   document.getElementById('csv-inp').value = '';
-  showToast('Week ' + wk + ' imported · ' + seasonData[String(wk)].length + ' teams · High: ' + high.score.toFixed(1) + ' by ' + high.name);
+  showToast('Week ' + wk + ' imported · ' + seasonData[String(wk)].length + ' teams · High: ' + fmtScore(high.score) + ' by ' + high.name);
   save();
 }
 
@@ -1719,10 +1755,10 @@ function renderCompare(){
   // ── SEASON STATS ──
   var statRows = [
     {lbl:'Season rank', vals:teamStats.map(function(t){ return {v:'#'+t.sznRank, n:t.sznRank}; }), lo:true},
-    {lbl:'Total pts',   vals:teamStats.map(function(t){ return {v:t.total.toFixed(1), n:t.total}; }), lo:false},
-    {lbl:'Weekly avg',  vals:teamStats.map(function(t){ return {v:t.avg.toFixed(1), n:t.avg}; }), lo:false},
-    {lbl:'Best week',   vals:teamStats.map(function(t){ return {v:t.best.toFixed(1), n:t.best}; }), lo:false},
-    {lbl:'Worst week',  vals:teamStats.map(function(t){ return {v:t.worst.toFixed(1), n:t.worst}; }), lo:false},
+    {lbl:'Total pts',   vals:teamStats.map(function(t){ return {v:fmtTotal(t.total), n:t.total}; }), lo:false},
+    {lbl:'Weekly avg',  vals:teamStats.map(function(t){ return {v:fmtScore(t.avg), n:t.avg}; }), lo:false},
+    {lbl:'Best week',   vals:teamStats.map(function(t){ return {v:fmtScore(t.best), n:t.best}; }), lo:false},
+    {lbl:'Worst week',  vals:teamStats.map(function(t){ return {v:fmtScore(t.worst), n:t.worst}; }), lo:false},
   ].map(function(row){
     var ns = row.vals.map(function(v){ return v.n; });
     var bestVal = row.lo ? Math.min.apply(null,ns) : Math.max.apply(null,ns);
@@ -1780,7 +1816,7 @@ function renderCompare(){
       + vals.map(function(v){
           if(v===null) return '<div class="wk-cell empty">—</div>';
           var cls = v===maxV?'hi':v===minV?'lo':'mid';
-          return '<div class="wk-cell '+cls+'">'+v.toFixed(1)+'</div>';
+          return '<div class="wk-cell '+cls+'">'+fmtScore(v)+'</div>';
         }).join('')
       + '</div>';
   }).join('');
@@ -1875,7 +1911,7 @@ function buildRosterComparison(teamStats, weeks){
         var d = t.weeklyData[wi];
         return '<div style="text-align:center;background:'+t.color+'18;border:2px solid '+t.color+';border-radius:10px;padding:12px 8px;">'
           + '<div style="font-family:var(--fd);font-size:11px;font-weight:700;color:'+t.color+';text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+t.name+'</div>'
-          + '<div style="font-family:var(--fd);font-size:26px;font-weight:800;color:'+t.color+';">'+(d?d.score.toFixed(1):'—')+'</div>'
+          + '<div style="font-family:var(--fd);font-size:26px;font-weight:800;color:'+t.color+';">'+(d?fmtScore(d.score):'—')+'</div>'
           + '<div style="font-family:var(--fd);font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-top:2px;">pts</div>'
           + '</div>';
       }).join('')
@@ -2209,7 +2245,7 @@ function buildScoreChartInline(weekData){
   var sp=weekData.map(function(d,i){return(i?'L':'M')+xp(i).toFixed(1)+' '+yp(d.score).toFixed(1);}).join(' ');
   var ap=weekData.map(function(d,i){return(i?'L':'M')+xp(i).toFixed(1)+' '+yp(d.avg).toFixed(1);}).join(' ');
   var area=sp+' L'+xp(weekData.length-1).toFixed(1)+' '+(PAD.t+iH)+' L'+PAD.l+' '+(PAD.t+iH)+' Z';
-  var dots=weekData.map(function(d,i){return'<circle class="chart-dot" cx="'+xp(i).toFixed(1)+'" cy="'+yp(d.score).toFixed(1)+'" r="4"><title>Wk '+d.week+': '+d.score.toFixed(1)+'</title></circle>';}).join('');
+  var dots=weekData.map(function(d,i){return'<circle class="chart-dot" cx="'+xp(i).toFixed(1)+'" cy="'+yp(d.score).toFixed(1)+'" r="4"><title>Wk '+d.week+': '+fmtScore(d.score)+'</title></circle>';}).join('');
   var xlbl=weekData.map(function(d,i){return'<text class="chart-label" x="'+xp(i).toFixed(1)+'" y="'+(H-4)+'" text-anchor="middle">Wk'+d.week+'</text>';}).join('');
   var ylbl='';
   for(var s=0;s<=3;s++){var v=minV+(maxV-minV)*(s/3),y=yp(v);ylbl+='<text class="chart-label" x="'+(PAD.l-3)+'" y="'+y.toFixed(1)+'" text-anchor="end" dominant-baseline="middle">'+Math.round(v)+'</text><line x1="'+PAD.l+'" y1="'+y.toFixed(1)+'" x2="'+(W-PAD.r)+'" y2="'+y.toFixed(1)+'" stroke="rgba(184,152,106,0.2)" stroke-width="1"/>';}
@@ -2256,7 +2292,7 @@ function buildDotPlot(curEntries, myEntry){
   var otherDots = curEntries
     .filter(function(e){ return e.name !== myEntry.name; })
     .map(function(e){
-      return '<div class="dotplot-others" style="left:' + pct(e.score) + '%" title="' + e.name + ': ' + e.score.toFixed(1) + '"></div>';
+      return '<div class="dotplot-others" style="left:' + pct(e.score) + '%" title="' + e.name + ': ' + fmtScore(e.score) + '"></div>';
     }).join('');
 
   var myPct = pct(myEntry.score);
@@ -2270,10 +2306,10 @@ function buildDotPlot(curEntries, myEntry){
     + '<div class="dotplot-track">'
     + otherDots
     + '<div class="dotplot-avg" style="left:' + avgPct + '%">'
-    + '<div class="dotplot-avg-lbl">Avg ' + avg.toFixed(1) + '</div>'
+    + '<div class="dotplot-avg-lbl">Avg ' + fmtScore(avg) + '</div>'
     + '</div>'
-    + '<div class="dotplot-dot" style="left:' + myPct + '%" title="You: ' + myEntry.score.toFixed(1) + '">'
-    + '<div class="dotplot-dot-lbl">' + myEntry.score.toFixed(1) + '</div>'
+    + '<div class="dotplot-dot" style="left:' + myPct + '%" title="You: ' + fmtScore(myEntry.score) + '">'
+    + '<div class="dotplot-dot-lbl">' + fmtScore(myEntry.score) + '</div>'
     + '</div>'
     + '</div>'
     + '<div class="dotplot-axis"><span>Low ' + min.toFixed(1) + '</span><span>High ' + max.toFixed(1) + '</span></div>'
@@ -2326,7 +2362,7 @@ function renderMySeasonInline(){
       ? '' : '';
     return '<tr>'
       + '<td class="wk-num">Week ' + d.week + '</td>'
-      + '<td style="font-family:var(--fd);font-weight:700;font-size:15px;color:var(--or);text-align:right">' + d.score.toFixed(1) + '</td>'
+      + '<td style="font-family:var(--fd);font-weight:700;font-size:15px;color:var(--or);text-align:right">' + fmtScore(d.score) + '</td>'
       + '<td style="text-align:center;font-family:var(--fd);font-size:14px;color:var(--pk)">#' + d.rank + ' / ' + d.total + '</td>'
       + '<td style="text-align:center;font-family:var(--fd);font-size:14px;color:var(--pu)">#' + d.cumStanding + '</td>'
       + '<td style="text-align:right;font-size:13px;color:var(--ink2)">' + (d.score >= d.avg ? '<span style="color:var(--or)">+' : '<span style="color:var(--pk)">') + (d.score - d.avg).toFixed(1) + '</span></td>'
@@ -2342,9 +2378,9 @@ function renderMySeasonInline(){
     + '<div style="text-align:right"><div class="myteam-score">#' + sznRank + '</div><div class="myteam-score-lbl">Season rank</div></div>'
     + '</div>'
     + '<div class="myteam-stats">'
-    + '<div class="myteam-stat"><div class="myteam-stat-lbl">Season total</div><div class="myteam-stat-val">' + total.toFixed(1) + '</div></div>'
-    + '<div class="myteam-stat"><div class="myteam-stat-lbl">Weekly avg</div><div class="myteam-stat-val">' + avg.toFixed(1) + '</div></div>'
-    + '<div class="myteam-stat"><div class="myteam-stat-lbl">Best week</div><div class="myteam-stat-val">' + best.toFixed(1) + '</div></div>'
+    + '<div class="myteam-stat"><div class="myteam-stat-lbl">Season total</div><div class="myteam-stat-val">' + fmtTotal(total) + '</div></div>'
+    + '<div class="myteam-stat"><div class="myteam-stat-lbl">Weekly avg</div><div class="myteam-stat-val">' + fmtScore(avg) + '</div></div>'
+    + '<div class="myteam-stat"><div class="myteam-stat-lbl">Best week</div><div class="myteam-stat-val">' + fmtScore(best) + '</div></div>'
     + '</div></div>'
     // Score chart
     + (scoreChart ? '<div class="chart-section"><div class="chart-section-hdr">Weekly Score vs League Average</div>'
@@ -2455,7 +2491,7 @@ function renderMyTeam(sorted, curEntries, prevRank, curMap){
     + '<div class="myteam-hero">'
     + '<div><div class="myteam-name">' + entry.name + '</div>'
     + '<div style="font-family:var(--fd);font-size:11px;color:#1A5A5A;text-transform:uppercase;letter-spacing:1px;margin-top:4px;">Week ' + currentWeek + ' · Your dashboard</div></div>'
-    + '<div style="text-align:right"><div class="myteam-score">' + entry.score.toFixed(1) + '</div><div class="myteam-score-lbl">Points</div></div>'
+    + '<div style="text-align:right"><div class="myteam-score">' + fmtScore(entry.score) + '</div><div class="myteam-score-lbl">Points</div></div>'
     + '</div>'
     + '<div class="myteam-stats">'
     + '<div class="myteam-stat"><div class="myteam-stat-lbl">Week rank</div><div class="myteam-stat-val">' + rankDisplay + '</div></div>'
@@ -2509,7 +2545,7 @@ function renderFinish(sorted, curEntries, prevRank){
     return '<tr' + (isMe ? ' class="is-me"' : '') + '>'
       + '<td class="finish-rank' + (wkRank <= 3 ? ' top' : '') + '">' + (wkRank <= 3 ? med[wkRank-1] : wkRank) + '</td>'
       + '<td class="finish-name">' + nameLink + '</td>'
-      + '<td class="finish-score">' + e.score.toFixed(1) + '<div class="finish-pct-bar"><div class="finish-pct-fill" style="width:' + pct + '%"></div></div></td>'
+      + '<td class="finish-score">' + fmtScore(e.score) + '<div class="finish-pct-bar"><div class="finish-pct-fill" style="width:' + pct + '%"></div></div></td>'
       + '<td style="text-align:center;font-family:var(--fd);font-size:14px;color:var(--ink2)">' + (sznRank ? '#' + sznRank : '—') + '</td>'
       + '<td style="text-align:center">' + moveStr + '</td>'
       + '</tr>';
@@ -2585,37 +2621,46 @@ function renderNumbers(curEntries){
       var players = parseLineup(entry.lineup);
       var remaining = players.slice();
       slotDefs.forEach(function(slot, si){
+        if(slot.pos === 'FLEX') return; // handle separately
         var idx = remaining.findIndex(function(p){ return p.pos === slot.pos; });
         if(idx < 0) return;
         var p = remaining.splice(idx,1)[0];
         slotCounts[si][p.player] = (slotCounts[si][p.player]||0) + 1;
       });
     });
-    // For FLEX (index 7), instead use remaining WR/RB/TE across all entries
+
+    // FLEX: use same logic as season wrap — 4th WR, 3rd RB, or 2nd TE (highest starts)
     var flexIdx = slotDefs.findIndex(function(s){ return s.pos === 'FLEX'; });
     if(flexIdx >= 0){
-      var flexCounts = {};
+      // Count each position across all entries
+      var posCounts = {WR:{}, RB:{}, TE:{}};
       entries.forEach(function(entry){
         if(!entry.lineup) return;
         var players = parseLineup(entry.lineup);
-        var remaining = players.slice();
-        // Remove players already claimed by non-flex slots
-        slotDefs.forEach(function(slot, si){
-          if(si === flexIdx) return;
-          var idx = remaining.findIndex(function(p){ return p.pos === slot.pos; });
-          if(idx >= 0) remaining.splice(idx,1);
-        });
-        // Remaining eligible flex players (WR/RB/TE)
-        var flexEligible = remaining.filter(function(p){ return p.pos==='WR'||p.pos==='RB'||p.pos==='TE'; });
+        var posUsed = {WR:0, RB:0, TE:0};
         var seen = {};
-        flexEligible.forEach(function(p){
-          if(seen[p.player]) return;
-          seen[p.player] = true;
-          flexCounts[p.player] = (flexCounts[p.player]||0) + 1;
+        players.forEach(function(p){
+          if(!posCounts[p.pos]) return;
+          var key = p.player;
+          if(!seen[key]){
+            seen[key] = true;
+            posCounts[p.pos][p.player] = (posCounts[p.pos][p.player]||0) + 1;
+          }
         });
       });
-      slotCounts[flexIdx] = flexCounts;
+      // Get 4th WR, 3rd RB, 2nd TE
+      function nthTop(pos, n){
+        var sorted = Object.keys(posCounts[pos]).sort(function(a,b){ return posCounts[pos][b]-posCounts[pos][a]; });
+        return sorted[n-1] ? {player:sorted[n-1], count:posCounts[pos][sorted[n-1]]} : null;
+      }
+      var candidates = [nthTop('WR',4), nthTop('RB',3), nthTop('TE',2)].filter(Boolean);
+      if(candidates.length){
+        var best = candidates.reduce(function(a,b){ return a.count>=b.count?a:b; });
+        slotCounts[flexIdx] = {};
+        slotCounts[flexIdx][best.player] = best.count;
+      }
     }
+
     return slotCounts.map(function(counts){
       var players = Object.keys(counts);
       if(!players.length) return null;
@@ -2670,9 +2715,9 @@ function renderNumbers(curEntries){
     // Key stats
     + '<div class="num-section"><div class="num-section-hdr">📐 League Stats — Week ' + currentWeek + '</div>'
     + '<div class="num-body"><div class="num-stat-grid">'
-    + '<div class="num-stat"><div class="num-stat-lbl">High</div><div class="num-stat-val">' + high.score.toFixed(1) + '</div></div>'
-    + '<div class="num-stat"><div class="num-stat-lbl">Average</div><div class="num-stat-val">' + avg.toFixed(1) + '</div></div>'
-    + '<div class="num-stat"><div class="num-stat-lbl">Low</div><div class="num-stat-val">' + low.score.toFixed(1) + '</div></div>'
+    + '<div class="num-stat"><div class="num-stat-lbl">High</div><div class="num-stat-val">' + fmtScore(high.score) + '</div></div>'
+    + '<div class="num-stat"><div class="num-stat-lbl">Average</div><div class="num-stat-val">' + fmtScore(avg) + '</div></div>'
+    + '<div class="num-stat"><div class="num-stat-lbl">Low</div><div class="num-stat-val">' + fmtScore(low.score) + '</div></div>'
     + '</div></div></div>'
 
     // Score distribution
@@ -2853,8 +2898,8 @@ function renderRecap(sorted, curEntries, prevRank){
 
   banner.innerHTML = '<div class="recap-title">⚡ Week ' + currentWeek + ' Recap</div>'
     + '<div class="recap-grid">'
-    + '<div class="recap-item"><div class="recap-item-lbl">🔥 High score</div><div class="recap-item-val">' + high.name + '</div><div class="recap-item-sub">' + high.score.toFixed(1) + ' pts</div></div>'
-    + '<div class="recap-item"><div class="recap-item-lbl">📊 League avg</div><div class="recap-item-val">' + avg.toFixed(1) + ' pts</div><div class="recap-item-sub">Wk ' + currentWeek + ' average</div></div>'
+    + '<div class="recap-item"><div class="recap-item-lbl">🔥 High score</div><div class="recap-item-val">' + high.name + '</div><div class="recap-item-sub">' + fmtScore(high.score) + ' pts</div></div>'
+    + '<div class="recap-item"><div class="recap-item-lbl">📊 League avg</div><div class="recap-item-val">' + fmtScore(avg) + ' pts</div><div class="recap-item-sub">Wk ' + currentWeek + ' average</div></div>'
     + (biggestUp ? '<div class="recap-item"><div class="recap-item-lbl">📈 Biggest mover ↑</div><div class="recap-item-val">' + biggestUp + '</div><div class="recap-item-sub">+' + biggestUpDiff + ' spots</div></div>' : '')
     + (biggestDown ? '<div class="recap-item"><div class="recap-item-lbl">📉 Biggest drop ↓</div><div class="recap-item-val">' + biggestDown + '</div><div class="recap-item-sub">-' + biggestDownDiff + ' spots</div></div>' : '')
     + divider
@@ -2901,7 +2946,7 @@ function renderDistribution(data){
     + bars
     + '<div class="dist-avg-line" style="left:' + avgPct + '%;height:' + (maxH+4) + 'px;bottom:0;background:var(--pu);opacity:.8"></div>'
     + '</div>'
-    + '<div class="dist-axis"><span style="color:var(--pk)">' + min.toFixed(0) + '</span><span style="color:var(--pk)">Avg ' + avg.toFixed(1) + '</span><span style="color:var(--pk)">' + max.toFixed(0) + '</span></div>'
+    + '<div class="dist-axis"><span style="color:var(--pk)">' + Math.round(min).toLocaleString() + '</span><span style="color:var(--pk)">Avg ' + fmtScore(avg) + '</span><span style="color:var(--pk)">' + Math.round(max).toLocaleString() + '</span></div>'
     + '</div>';
 }
 
@@ -2964,9 +3009,9 @@ function updateSeasonStats(){
   });
   var consistent = Object.keys(aboveCounts).sort(function(a,b){ return aboveCounts[b]-aboveCounts[a]; })[0];
   var el = function(id){ return document.getElementById(id); };
-  if(el('ss-leader')) el('ss-leader').textContent = totals[leader] ? totals[leader].toFixed(1) : '—';
+  if(el('ss-leader')) el('ss-leader').textContent = totals[leader] ? fmtTotal(totals[leader]) : '—';
   if(el('ss-leader-name')) el('ss-leader-name').textContent = leader || '';
-  if(el('ss-avg')) el('ss-avg').textContent = sznAvg > 0 ? sznAvg.toFixed(1) : '—';
+  if(el('ss-avg')) el('ss-avg').textContent = sznAvg > 0 ? fmtScore(sznAvg) : '—';
   if(el('ss-streak')) el('ss-streak').textContent = consistent ? (aboveCounts[consistent] + ' wks') : '—';
   if(el('ss-streak-name')) el('ss-streak-name').textContent = consistent || '';
   if(el('ss-weeks')) el('ss-weeks').textContent = weeks.length;
