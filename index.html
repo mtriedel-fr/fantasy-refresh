@@ -733,7 +733,7 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
     </div>
     <div class="hdr-sub" id="hdr-sub">Ready to import</div>
     <div style="display:flex;gap:6px;align-items:center;justify-content:flex-end;">
-      <button class="login-badge" id="login-badge" onclick="showLoginModal()">🔑 Sign In</button>
+      <button class="login-badge" id="login-badge" onclick="showAuthView('signin')">🔑 Sign In</button>
       <button class="comm-btn" onclick="toggleComm()" id="comm-toggle">⚙ Commissioner</button>
       <button class="comm-btn theme-toggle" onclick="toggleTheme()" id="theme-btn" title="Toggle light/dark mode">🌙</button>
     </div>
@@ -1069,10 +1069,18 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
     messagingSenderId: "205961917241",
     appId: "1:205961917241:web:ae766ad61df8648d08aee8"
   };
-  firebase.initializeApp(firebaseConfig);
-  var fbAuth = firebase.auth();
-  var fbDb = firebase.database();
-  var googleProvider = new firebase.auth.GoogleAuthProvider();
+  try {
+    firebase.initializeApp(firebaseConfig);
+    var fbAuth = firebase.auth();
+    var fbDb = firebase.database();
+    var googleProvider = new firebase.auth.GoogleAuthProvider();
+    // Set language to browser default
+    fbAuth.useDeviceLanguage();
+  } catch(e) {
+    console.error('Firebase init failed:', e);
+    var fbAuth = null;
+    var googleProvider = null;
+  }
 </script>
 
 <script>
@@ -1165,8 +1173,8 @@ function boot(){
   if(activeTab) activeTab.classList.add('active');
   initMyTeamInput();
   renderAll();
-  checkFirstRun();
-  checkLoginState();
+  // checkFirstRun(); // replaced by Firebase auth
+  // checkLoginState(); // Firebase onAuthStateChanged handles this
 }
 
 loadFromCloud();
@@ -3683,6 +3691,7 @@ function saveUserProfile(uid, profile){
 
 // ── SIGN IN / SIGN UP ─────────────────────────────────────────
 function signInWithGoogle(){
+  if(!fbAuth){ alert('Auth not available — check console'); return; }
   fbAuth.signInWithPopup(googleProvider)
     .then(function(result){
       // onAuthStateChanged handles the rest
@@ -3699,6 +3708,7 @@ function submitEmailSignIn(){
   var err = document.getElementById('si-err');
   err.textContent = '';
   if(!email || !pass){ err.textContent = 'Enter email and password'; return; }
+  if(!fbAuth){ err.textContent = 'Auth not available'; return; }
   err.textContent = 'Signing in…';
   fbAuth.signInWithEmailAndPassword(email, pass)
     .catch(function(e){
