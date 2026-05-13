@@ -633,14 +633,17 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
 
 
 /* ── EMOJI REACTIONS ── */
-.react-bar{display:flex;gap:4px;align-items:center;padding:4px 0;flex-wrap:wrap;}
-.react-btn{background:var(--bg4);border:1px solid var(--bdr);border-radius:20px;padding:3px 9px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:4px;transition:all .15s;font-family:var(--fd);font-size:12px;color:var(--ink2);}
-.react-btn:hover{border-color:var(--or);background:rgba(0,229,212,.08);}
-.react-btn.reacted{border-color:var(--or);background:rgba(0,229,212,.12);color:var(--or);font-weight:700;}
-.react-btn.reacted.fire{border-color:var(--pk);background:rgba(255,95,160,.12);color:var(--pk);}
-.react-btn.reacted.skull{border-color:var(--pu);background:rgba(155,109,255,.12);color:var(--pu);}
-.react-count{font-family:var(--fd);font-size:11px;font-weight:700;}
-.react-section{padding:8px 14px;border-top:1px solid var(--bdr);background:var(--bg2);}
+.react-section{padding:6px 14px 8px;border-top:1px solid var(--bdr);background:var(--bg2);display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-height:34px;position:relative;}
+.react-trigger{background:none;border:1px solid var(--bdr2);border-radius:20px;padding:3px 9px;font-size:14px;cursor:pointer;color:var(--ink3);transition:all .15s;line-height:1;}
+.react-trigger:hover{border-color:var(--or);background:rgba(0,229,212,.08);transform:scale(1.15);}
+.react-picker{display:none;position:absolute;left:0;top:calc(100% + 4px);z-index:300;background:#0D1515;border:1px solid var(--pu);border-radius:12px;padding:6px 8px;gap:4px;box-shadow:0 8px 24px rgba(0,0,0,.6);flex-direction:row;}
+.react-picker.open{display:flex;}
+.react-picker-btn{background:none;border:none;font-size:18px;cursor:pointer;padding:4px 6px;border-radius:8px;transition:all .12s;line-height:1;}
+.react-picker-btn:hover{background:rgba(255,255,255,.1);transform:scale(1.3);}
+.react-chip{display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border-radius:20px;font-size:13px;border:1px solid;cursor:pointer;transition:all .15s;}
+.react-chip.mine{font-weight:800;}
+.react-chip:hover{opacity:.8;}
+.react-chip-count{font-family:var(--fd);font-size:11px;font-weight:800;}
 
 /* ── SHARE CARD ── */
 .share-btn{background:rgba(0,229,212,.1);border:1px solid rgba(0,229,212,.3);color:var(--or);font-family:var(--fd);font-size:11px;font-weight:700;padding:4px 10px;border-radius:8px;cursor:pointer;letter-spacing:.3px;text-transform:uppercase;transition:all .15s;display:inline-flex;align-items:center;gap:4px;}
@@ -2576,7 +2579,7 @@ function removeFromCompare(name){
 
 
 
-var COMM_PW = '$n0wb0ard45'; // Change this to your own password
+var COMM_PW = 'refresh2025'; // Change this to your own password
 var commUnlocked = false;
 
 function checkCommPw(){
@@ -3305,27 +3308,62 @@ function renderReactions(containerId, teamName, week){
   var myKey = 'my_react_' + week + '_' + teamName.replace(/[^a-z0-9]/gi,'_').toLowerCase();
   var myReacted = {};
   try{ myReacted = JSON.parse(localStorage.getItem(myKey) || '{}'); }catch(e){}
+  var pickerId = containerId + '_picker';
 
-  // Use codepoint to avoid emoji quote issues in onclick
-  el.innerHTML = '<div class="react-bar">' + REACTIONS.map(function(em){
-    var cls = 'react-btn' + (myReacted[em] ? ' reacted ' + (REACTION_NAMES[em]||'') : '');
-    var cp = em.codePointAt(0);
-    var safeContainer = containerId;
-    var safeName = teamName.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-    return '<button class="'+cls+'" onclick="toggleReaction(\''+safeContainer+'\',\''+safeName+'\','+week+','+cp+')">'+em+' <span class="react-count" id="rc_'+containerId+'_'+cp+'">…</span></button>';
-  }).join('') + '</div>';
+  // Chip colors per emoji
+  var CHIP_COLORS = {'🔥':'var(--pk)','💀':'var(--pu)','👑':'var(--or)','😤':'#FF9A3A','🤡':'#69BE28'};
 
-  // Load counts from Firebase
+  // Build trigger + empty picker
+  el.innerHTML = '<button class="react-trigger" onclick="togglePicker(event,\''+pickerId+'\')">😀</button>'
+    + '<div class="react-picker" id="'+pickerId+'">'
+    + REACTIONS.map(function(em){
+        var cp = em.codePointAt(0);
+        var sid = containerId.replace(/'/g,"\\'");
+        var sn = teamName.replace(/'/g,"\\'");
+        return '<button class="react-picker-btn" onclick="toggleReaction(\''+sid+'\',\''+sn+'\','+week+','+cp+',event)">'+em+'</button>';
+      }).join('')
+    + '</div>';
+
+  // Load counts and build chips
   loadReactions(teamName, week).then(function(data){
+    // Remove stale chips first
+    var existing = el.querySelectorAll('.react-chip');
+    existing.forEach(function(c){ c.remove(); });
     REACTIONS.forEach(function(em){
-      var countEl = document.getElementById('rc_'+containerId+'_'+em.codePointAt(0));
-      if(countEl) countEl.textContent = (data && data[em]) ? data[em] : '0';
+      var count = (data && data[em]) ? data[em] : 0;
+      if(count > 0){
+        var isMine = !!myReacted[em];
+        var col = CHIP_COLORS[em] || 'var(--or)';
+        var chip = document.createElement('span');
+        chip.className = 'react-chip' + (isMine ? ' mine' : '');
+        chip.style.cssText = 'border-color:'+col+';background:'+col+'18;color:'+col+';';
+        chip.innerHTML = em + ' <span class="react-chip-count">'+count+'</span>';
+        var cp = em.codePointAt(0);
+        var sid = containerId; var sn = teamName;
+        chip.onclick = function(ev){ toggleReaction(sid, sn, week, cp, ev); };
+        el.appendChild(chip);
+      }
     });
   });
 }
 
-function toggleReaction(containerId, teamName, week, cp){
-  // cp is codepoint of emoji
+function togglePicker(ev, pickerId){
+  ev.stopPropagation();
+  // Close all other open pickers
+  document.querySelectorAll('.react-picker.open').forEach(function(p){
+    if(p.id !== pickerId) p.classList.remove('open');
+  });
+  var picker = document.getElementById(pickerId);
+  if(picker) picker.classList.toggle('open');
+}
+
+// Close pickers when clicking outside
+document.addEventListener('click', function(){
+  document.querySelectorAll('.react-picker.open').forEach(function(p){ p.classList.remove('open'); });
+});
+
+function toggleReaction(containerId, teamName, week, cp, ev){
+  if(ev) ev.stopPropagation();
   var emoji = String.fromCodePoint(cp);
   var myKey = 'my_react_' + week + '_' + teamName.replace(/[^a-z0-9]/gi,'_').toLowerCase();
   var myReacted = {};
@@ -3333,6 +3371,8 @@ function toggleReaction(containerId, teamName, week, cp){
   var adding = !myReacted[emoji];
   myReacted[emoji] = adding ? 1 : 0;
   try{ localStorage.setItem(myKey, JSON.stringify(myReacted)); }catch(e){}
+  // Close picker
+  document.querySelectorAll('.react-picker.open').forEach(function(p){ p.classList.remove('open'); });
   saveReaction(teamName, week, emoji, adding).then(function(){
     renderReactions(containerId, teamName, week);
   });
