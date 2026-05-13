@@ -586,6 +586,43 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
 .sub-tab.active::after{background:var(--or);}
 .sub-tab:hover:not(.active){color:var(--pu);background:rgba(155,109,255,.05);}
 
+
+/* ── GUILLOTINE ── */
+.guill-wrap{padding:20px 24px;display:flex;flex-direction:column;gap:20px;}
+.guill-hero{background:linear-gradient(135deg,var(--hdr) 0%,var(--hdr2) 100%);border-radius:14px;padding:20px 24px;border-top:3px solid var(--or);border-bottom:3px solid var(--pk);display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1px;background-blend-mode:normal;}
+.guill-stat{background:rgba(0,0,0,.3);padding:14px 16px;text-align:center;border-radius:8px;}
+.guill-stat-lbl{font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;}
+.guill-stat-val{font-family:var(--fd);font-size:28px;font-weight:800;color:var(--or);}
+.guill-stat-sub{font-family:var(--fd);font-size:11px;color:var(--ink3);margin-top:2px;}
+.guill-section{background:var(--bg3);border-radius:12px;overflow:hidden;border:1px solid var(--bdr);}
+.guill-section-hdr{background:var(--bg2);padding:12px 20px;font-family:var(--fd);font-size:12px;font-weight:700;color:var(--ink2);text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--bdr);display:flex;justify-content:space-between;align-items:center;}
+.guill-section-hdr .badge{font-size:11px;padding:2px 10px;border-radius:12px;font-weight:700;}
+.guill-week-row{display:flex;align-items:stretch;border-bottom:1px solid var(--bdr);}
+.guill-week-row:last-child{border-bottom:none;}
+.guill-week-num{font-family:var(--fd);font-size:13px;font-weight:700;color:var(--ink3);min-width:64px;padding:12px 14px;display:flex;align-items:center;border-right:1px solid var(--bdr);background:var(--bg2);}
+.guill-week-content{flex:1;padding:10px 14px;display:flex;flex-direction:column;gap:6px;}
+.guill-elim-label{font-family:var(--fd);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--pk);margin-bottom:4px;}
+.guill-elim-chips{display:flex;flex-wrap:wrap;gap:4px;}
+.guill-chip{font-family:var(--fd);font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;white-space:nowrap;}
+.guill-chip.eliminated{background:rgba(255,95,160,.1);border:1px solid rgba(255,95,160,.4);color:var(--pk);text-decoration:line-through;opacity:.7;}
+.guill-chip.survivor{background:rgba(0,229,212,.1);border:1px solid rgba(0,229,212,.3);color:var(--or);}
+.guill-chip.winner{background:linear-gradient(135deg,var(--or),var(--pk));color:#050808;border:none;font-size:13px;}
+.guill-chip.pending{background:var(--bg4);border:1px solid var(--bdr2);color:var(--ink3);}
+.guill-chip.me{outline:2px solid var(--pu);outline-offset:2px;}
+.guill-score{font-family:var(--fd);font-size:11px;color:var(--ink3);margin-left:4px;}
+.guill-survivors{padding:14px 18px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.guill-progress-bar{height:6px;background:var(--bdr);border-radius:3px;overflow:hidden;}
+.guill-progress-fill{height:6px;background:linear-gradient(90deg,var(--or),var(--pk));border-radius:3px;transition:width .4s;}
+.guill-winners-podium{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:16px 18px;}
+.guill-winner-card{background:var(--bg4);border-radius:10px;padding:16px;text-align:center;border:2px solid;}
+.guill-winner-medal{font-size:32px;margin-bottom:6px;}
+.guill-winner-name{font-family:var(--fd);font-size:16px;font-weight:800;text-transform:uppercase;}
+.guill-winner-score{font-family:var(--fd);font-size:13px;color:var(--ink2);margin-top:4px;}
+@media(max-width:600px){
+  .guill-week-num{min-width:48px;font-size:11px;padding:10px 8px;}
+  .guill-winners-podium{grid-template-columns:1fr;}
+}
+
 </style>
 </head>
 <body>
@@ -662,6 +699,10 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
     <svg viewBox="0 0 24 24"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
     <span>Season Wrap</span>
   </div>
+  <div class="nav-tab" id="navtab-guillotine" onclick="handleNav('guillotine')">
+    <svg viewBox="0 0 24 24"><path d="M12 22V12"/><path d="M5 12H2a10 10 0 0 0 20 0h-3"/><path d="M8 6a4 4 0 0 1 8 0"/><path d="M5 12a7 7 0 0 1 14 0"/></svg>
+    <span>Guillotine</span>
+  </div>
   <div class="nav-tab" id="navtab-playoffs" onclick="handleNav('playoffs')">
     <svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
     <span>Playoffs</span>
@@ -697,6 +738,7 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
 </div>
 
 <div id="tab-seasonwrap" class="content hidden"><div id="wsw"></div></div>
+<div id="tab-guillotine" class="content hidden"><div id="wg"></div></div>
 
 <div class="comm-panel hidden" id="comm-panel">
   <!-- PASSWORD GATE -->
@@ -1015,10 +1057,208 @@ function renderAll(){
   renderNumbers(curEntries);
   renderMySeasonInline();
   renderSeasonWrap();
+  renderGuillotine();
   initMyTeamInput();
   if(!document.getElementById('comm-panel').classList.contains('hidden')) renderHistory();
 }
 
+
+
+// ── GUILLOTINE ────────────────────────────────────────────────
+function buildElimSchedule(totalTeams, totalWeeks){
+  var toElim = totalTeams - 3; // aim for 3 survivors
+  var base = Math.floor(toElim / totalWeeks);
+  var extra = toElim % totalWeeks;
+  var schedule = [];
+  var remaining = totalTeams;
+  for(var w = 1; w <= totalWeeks; w++){
+    var elim = base + (w <= extra ? 1 : 0);
+    remaining -= elim;
+    schedule.push({week: w, eliminate: elim, remaining: remaining});
+  }
+  return schedule;
+}
+
+function renderGuillotine(){
+  var el = document.getElementById('wg');
+  if(!el) return;
+
+  var weeks = Object.keys(seasonData).filter(function(k){
+    return !isNaN(Number(k)) && seasonData[k] && seasonData[k].length > 0;
+  }).map(Number).sort(function(a,b){ return a-b; });
+
+  if(!weeks.length){
+    el.innerHTML = '<div class="sw-locked"><div class="sw-locked-icon">⚔️</div>'
+      + '<div class="sw-locked-title">No data imported yet</div>'
+      + '<div class="sw-locked-sub">Import Week 1 to start the Guillotine.</div></div>';
+    return;
+  }
+
+  // Get all teams from week 1
+  var week1 = seasonData[String(weeks[0])] || [];
+  var totalTeams = week1.length;
+  var totalWeeks = WEEKS; // 18
+  var schedule = buildElimSchedule(totalTeams, totalWeeks);
+
+  // Run through each imported week, eliminate lowest scorers
+  // Track cumulative eliminated set
+  var eliminated = {}; // name → {week, score}
+  var survivors = null;
+  var weekResults = []; // {week, scores, eliminated, survivors}
+  var stillIn = week1.map(function(e){ return e.name; });
+
+  weeks.forEach(function(w){
+    var entries = (seasonData[String(w)] || []).filter(function(e){
+      return stillIn.indexOf(e.name) >= 0;
+    });
+    var sched = schedule.find(function(s){ return s.week === w; });
+    var elimCount = sched ? sched.eliminate : 0;
+
+    // Sort by score ascending — lowest get eliminated
+    var sorted = entries.slice().sort(function(a,b){ return a.score - b.score; });
+    var elimThisWeek = sorted.slice(0, elimCount);
+    var surviveThisWeek = sorted.slice(elimCount);
+
+    elimThisWeek.forEach(function(e){
+      eliminated[e.name] = {week: w, score: e.score};
+      var idx = stillIn.indexOf(e.name);
+      if(idx >= 0) stillIn.splice(idx, 1);
+    });
+
+    weekResults.push({
+      week: w,
+      scores: entries,
+      eliminatedThisWeek: elimThisWeek,
+      survivors: stillIn.slice(),
+      elimCount: elimCount
+    });
+  });
+
+  // Current survivors
+  var currentSurvivors = stillIn;
+  var weeksPlayed = weeks.length;
+  var weeksRemaining = totalWeeks - weeksPlayed;
+
+  // Season total scores for survivors (for final ranking)
+  var survivorTotals = {};
+  currentSurvivors.forEach(function(name){
+    var total = 0;
+    weeks.forEach(function(w){
+      var e = (seasonData[String(w)]||[]).find(function(e){ return teamMatch(e.name, name); });
+      if(e) total += e.score;
+    });
+    survivorTotals[name] = total;
+  });
+
+  var isComplete = weeksPlayed >= totalWeeks;
+
+  // ── HERO STATS ──
+  var heroHTML = '<div class="guill-hero" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;padding:20px 24px;">'
+    + '<div class="guill-stat"><div class="guill-stat-lbl">Started with</div><div class="guill-stat-val">'+totalTeams+'</div><div class="guill-stat-sub">teams</div></div>'
+    + '<div class="guill-stat"><div class="guill-stat-lbl">Survivors</div><div class="guill-stat-val" style="color:var(--or)">'+currentSurvivors.length+'</div><div class="guill-stat-sub">still alive</div></div>'
+    + '<div class="guill-stat"><div class="guill-stat-lbl">Eliminated</div><div class="guill-stat-val" style="color:var(--pk)">'+Object.keys(eliminated).length+'</div><div class="guill-stat-sub">teams gone</div></div>'
+    + '<div class="guill-stat"><div class="guill-stat-lbl">Weeks left</div><div class="guill-stat-val" style="color:var(--pu)">'+weeksRemaining+'</div><div class="guill-stat-sub">until final 3</div></div>'
+    + '</div>';
+
+  // Progress bar
+  var progressPct = Math.round((Object.keys(eliminated).length / (totalTeams - 3)) * 100);
+  var progressHTML = '<div class="guill-section">'
+    + '<div class="guill-section-hdr">⚔️ Guillotine Progress</div>'
+    + '<div style="padding:14px 18px;">'
+    + '<div style="display:flex;justify-content:space-between;font-family:var(--fd);font-size:11px;color:var(--ink2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">'
+    + '<span>'+Object.keys(eliminated).length+' eliminated</span><span>'+progressPct+'% complete</span><span>'+(totalTeams-3)+' total to eliminate</span></div>'
+    + '<div class="guill-progress-bar"><div class="guill-progress-fill" style="width:'+progressPct+'%"></div></div>'
+    + '</div></div>';
+
+  // ── WINNERS (if complete) ──
+  var winnersHTML = '';
+  if(isComplete && currentSurvivors.length <= 3){
+    var sortedSurvivors = currentSurvivors.slice().sort(function(a,b){ return survivorTotals[b] - survivorTotals[a]; });
+    var isMe1 = myTeam && teamMatch(sortedSurvivors[0], myTeam);
+    var isMe2 = sortedSurvivors[1] && myTeam && teamMatch(sortedSurvivors[1], myTeam);
+    winnersHTML = '<div class="guill-section">'
+      + '<div class="guill-section-hdr" style="color:var(--or)">🏆 Guillotine Winners</div>'
+      + '<div class="guill-winners-podium">'
+      + '<div class="guill-winner-card" style="border-color:var(--or)">'
+      + '<div class="guill-winner-medal">🥇</div>'
+      + '<div class="guill-winner-name" style="color:var(--or)">'+(isMe1?'👑 ':'')+sortedSurvivors[0]+'</div>'
+      + '<div class="guill-winner-score">'+fmtTotal(survivorTotals[sortedSurvivors[0]])+' season pts</div></div>'
+      + (sortedSurvivors[1] ? '<div class="guill-winner-card" style="border-color:var(--pk)">'
+        + '<div class="guill-winner-medal">🥈</div>'
+        + '<div class="guill-winner-name" style="color:var(--pk)">'+(isMe2?'👑 ':'')+sortedSurvivors[1]+'</div>'
+        + '<div class="guill-winner-score">'+fmtTotal(survivorTotals[sortedSurvivors[1]])+' season pts</div></div>' : '')
+      + '</div></div>';
+  }
+
+  // ── CURRENT SURVIVORS ──
+  var survivorChips = currentSurvivors.slice()
+    .sort(function(a,b){ return survivorTotals[b] - survivorTotals[a]; })
+    .map(function(name){
+      var isMe = myTeam && teamMatch(name, myTeam);
+      return '<span class="guill-chip survivor'+(isMe?' me':'')+'">'+name+(isMe?' 👤':'')+'</span>';
+    }).join('');
+
+  var survivorsHTML = '<div class="guill-section">'
+    + '<div class="guill-section-hdr" style="color:var(--or)">✅ Still Alive — '
+    + currentSurvivors.length+' teams'
+    + '<span class="badge" style="background:rgba(0,229,212,.15);color:var(--or);border:1px solid rgba(0,229,212,.3);">'+currentSurvivors.length+' remaining</span></div>'
+    + '<div class="guill-survivors">'+survivorChips+'</div></div>';
+
+  // ── WEEK BY WEEK RESULTS ──
+  var weekRowsHTML = weekResults.map(function(wr){
+    var sched = schedule.find(function(s){ return s.week === wr.week; });
+    var scores = wr.scores.slice().sort(function(a,b){ return a.score - b.score; });
+    var elimNames = wr.eliminatedThisWeek.map(function(e){ return e.name; });
+
+    var elimChips = wr.eliminatedThisWeek.slice()
+      .sort(function(a,b){ return a.score - b.score; })
+      .map(function(e){
+        var isMe = myTeam && teamMatch(e.name, myTeam);
+        return '<span class="guill-chip eliminated'+(isMe?' me':'')+'" title="'+fmtScore(e.score)+' pts">'+e.name+'<span class="guill-score">'+fmtScore(e.score)+'</span></span>';
+      }).join('');
+
+    // Low scorer of survivors this week
+    var lowSurvivor = scores.find(function(e){ return elimNames.indexOf(e.name) < 0; });
+    var highSurvivor = scores.slice().reverse().find(function(e){ return elimNames.indexOf(e.name) < 0; });
+
+    return '<div class="guill-week-row">'
+      + '<div class="guill-week-num">Wk '+wr.week+'</div>'
+      + '<div class="guill-week-content">'
+      + '<div class="guill-elim-label">☠️ Eliminated ('+wr.eliminatedThisWeek.length+')</div>'
+      + '<div class="guill-elim-chips">'+elimChips+'</div>'
+      + (lowSurvivor ? '<div style="font-family:var(--fd);font-size:10px;color:var(--ink3);margin-top:4px;letter-spacing:.3px;">🔥 High: '+highSurvivor.name+' '+fmtScore(highSurvivor.score)+' · 😤 Close call: '+lowSurvivor.name+' '+fmtScore(lowSurvivor.score)+'</div>' : '')
+      + '</div>'
+      + '</div>';
+  }).join('');
+
+  // ── UPCOMING SCHEDULE ──
+  var futureWeeks = schedule.filter(function(s){ return weeks.indexOf(s.week) < 0; });
+  var upcomingHTML = '';
+  if(futureWeeks.length){
+    var upRows = futureWeeks.map(function(s){
+      return '<div class="guill-week-row">'
+        + '<div class="guill-week-num" style="color:var(--ink3)">Wk '+s.week+'</div>'
+        + '<div class="guill-week-content" style="color:var(--ink3)">'
+        + '<div style="font-family:var(--fd);font-size:12px;">Eliminate '+s.eliminate+' · '+s.remaining+' teams survive</div>'
+        + '</div></div>';
+    }).join('');
+    upcomingHTML = '<div class="guill-section">'
+      + '<div class="guill-section-hdr" style="color:var(--ink3)">📅 Upcoming Eliminations</div>'
+      + upRows + '</div>';
+  }
+
+  el.innerHTML = '<div class="guill-wrap">'
+    + heroHTML
+    + progressHTML
+    + (winnersHTML || '')
+    + survivorsHTML
+    + '<div class="guill-section">'
+    + '<div class="guill-section-hdr" style="color:var(--pk)">☠️ Week by Week Eliminations</div>'
+    + weekRowsHTML
+    + '</div>'
+    + upcomingHTML
+    + '</div>';
+}
 
 // ── SEASON WRAP ───────────────────────────────────────────────
 function renderSeasonWrap(){
@@ -2966,6 +3206,7 @@ function showSubTab(el, id, section){
 
 function handleNav(val){
   if(val === 'playoffs'){ window.location.href = 'playoffs.html'; return; }
+  if(val === 'guillotine'){ document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); }); document.getElementById('tab-guillotine').classList.remove('hidden'); document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); }); document.getElementById('navtab-guillotine').classList.add('active'); return; }
   // Hide all content
   document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); });
   var panel = document.getElementById('tab-' + val);
