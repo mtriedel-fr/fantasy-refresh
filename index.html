@@ -1066,15 +1066,23 @@ function renderAll(){
 
 // ── GUILLOTINE ────────────────────────────────────────────────
 function buildElimSchedule(totalTeams, totalWeeks){
-  var toElim = totalTeams - 3; // aim for 3 survivors
-  var base = Math.floor(toElim / totalWeeks);
-  var extra = toElim % totalWeeks;
+  // Eliminate down to 3 teams by END of week 17
+  // Week 18 is the finale — 1st/2nd determined by week 18 score
+  var weeksToElim = totalWeeks - 1; // weeks 1-17
+  var toElim = totalTeams - 3;
+  var base = Math.floor(toElim / weeksToElim);
+  var extra = toElim % weeksToElim;
   var schedule = [];
   var remaining = totalTeams;
   for(var w = 1; w <= totalWeeks; w++){
-    var elim = base + (w <= extra ? 1 : 0);
-    remaining -= elim;
-    schedule.push({week: w, eliminate: elim, remaining: remaining});
+    if(w < totalWeeks){
+      var elim = base + (w <= extra ? 1 : 0);
+      remaining -= elim;
+      schedule.push({week: w, eliminate: elim, remaining: remaining, finale: false});
+    } else {
+      // Week 18: finale — no eliminations, just rank by score
+      schedule.push({week: w, eliminate: 0, remaining: remaining, finale: true});
+    }
   }
   return schedule;
 }
@@ -1107,20 +1115,39 @@ function renderGuillotine(){
   var weekResults = []; // {week, scores, eliminated, survivors}
   var stillIn = week1.map(function(e){ return e.name; });
 
+  var finaleResult = null;
+
   weeks.forEach(function(w){
-    // Get entries for surviving teams — give no-shows a score of 0
     var wkData = seasonData[String(w)] || [];
+    var sched = schedule.find(function(s){ return s.week === w; });
+    var isFinale = sched && sched.finale;
+
+    // Get entries for surviving teams — give no-shows a score of 0
     var entries = stillIn.map(function(name){
       var found = wkData.find(function(e){ return teamMatch(e.name, name); });
       return found ? found : {name: name, score: 0, noShow: true};
     });
-    var sched = schedule.find(function(s){ return s.week === w; });
-    var elimCount = sched ? sched.eliminate : 0;
 
+    if(isFinale){
+      // Week 18: no eliminations — rank by score for 1st/2nd/3rd
+      var finaleRanked = entries.slice().sort(function(a,b){ return b.score - a.score; });
+      finaleResult = finaleRanked;
+      weekResults.push({
+        week: w,
+        scores: entries,
+        eliminatedThisWeek: [],
+        survivors: stillIn.slice(),
+        elimCount: 0,
+        finale: true,
+        finaleRanked: finaleRanked
+      });
+      return;
+    }
+
+    var elimCount = sched ? sched.eliminate : 0;
     // Sort by score ascending — lowest get eliminated (no-shows at 0 go first)
     var sorted = entries.slice().sort(function(a,b){ return a.score - b.score; });
     var elimThisWeek = sorted.slice(0, elimCount);
-    var surviveThisWeek = sorted.slice(elimCount);
 
     elimThisWeek.forEach(function(e){
       eliminated[e.name] = {week: w, score: e.score, noShow: !!e.noShow};
@@ -1133,7 +1160,8 @@ function renderGuillotine(){
       scores: entries,
       eliminatedThisWeek: elimThisWeek,
       survivors: stillIn.slice(),
-      elimCount: elimCount
+      elimCount: elimCount,
+      finale: false
     });
   });
 
@@ -1142,7 +1170,7 @@ function renderGuillotine(){
   var weeksPlayed = weeks.length;
   var weeksRemaining = totalWeeks - weeksPlayed;
 
-  // Season total scores for survivors (for final ranking)
+  // Season total scores for survivors
   var survivorTotals = {};
   currentSurvivors.forEach(function(name){
     var total = 0;
@@ -1154,6 +1182,8 @@ function renderGuillotine(){
   });
 
   var isComplete = weeksPlayed >= totalWeeks;
+  // For winners: use week 18 finale result if available
+  var finaleRanking = finaleResult; // null until week 18 imported
 
   // ── HERO STATS ──
   var heroHTML = '<div class="guill-hero" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;padding:20px 24px;">'
@@ -1175,21 +1205,36 @@ function renderGuillotine(){
 
   // ── WINNERS (if complete) ──
   var winnersHTML = '';
-  if(isComplete && currentSurvivors.length <= 3){
-    var sortedSurvivors = currentSurvivors.slice().sort(function(a,b){ return survivorTotals[b] - survivorTotals[a]; });
-    var isMe1 = myTeam && teamMatch(sortedSurvivors[0], myTeam);
-    var isMe2 = sortedSurvivors[1] && myTeam && teamMatch(sortedSurvivors[1], myTeam);
+  // Show winners card when week 18 is imported (finale complete)
+  if(finaleRanking && finaleRanking.length >= 2){
+    var w1 = finaleRanking[0], w2 = finaleRanking[1], w3 = finaleRanking[2];
+    var isMe1 = myTeam && teamMatch(w1.name, myTeam);
+    var isMe2 = myTeam && teamMatch(w2.name, myTeam);
     winnersHTML = '<div class="guill-section">'
-      + '<div class="guill-section-hdr" style="color:var(--or)">🏆 Guillotine Winners</div>'
-      + '<div class="guill-winners-podium">'
+      + '<div class="guill-section-hdr" style="color:var(--or)">🏆 Guillotine Winners — Week 18 Finale</div>'
+      + '<div class="guill-winners-podium" style="grid-template-columns:1fr 1fr 1fr;">'
       + '<div class="guill-winner-card" style="border-color:var(--or)">'
       + '<div class="guill-winner-medal">🥇</div>'
-      + '<div class="guill-winner-name" style="color:var(--or)">'+(isMe1?'👑 ':'')+sortedSurvivors[0]+'</div>'
-      + '<div class="guill-winner-score">'+fmtTotal(survivorTotals[sortedSurvivors[0]])+' season pts</div></div>'
-      + (sortedSurvivors[1] ? '<div class="guill-winner-card" style="border-color:var(--pk)">'
-        + '<div class="guill-winner-medal">🥈</div>'
-        + '<div class="guill-winner-name" style="color:var(--pk)">'+(isMe2?'👑 ':'')+sortedSurvivors[1]+'</div>'
-        + '<div class="guill-winner-score">'+fmtTotal(survivorTotals[sortedSurvivors[1]])+' season pts</div></div>' : '')
+      + '<div class="guill-winner-name" style="color:var(--or)">'+(isMe1?'👑 ':'')+w1.name+'</div>'
+      + '<div class="guill-winner-score">'+fmtScore(w1.score)+' pts (Wk 18)</div>'
+      + '<div class="guill-winner-score" style="font-size:11px;margin-top:2px;">'+fmtTotal(survivorTotals[w1.name])+' season total</div></div>'
+      + '<div class="guill-winner-card" style="border-color:var(--pk)">'
+      + '<div class="guill-winner-medal">🥈</div>'
+      + '<div class="guill-winner-name" style="color:var(--pk)">'+(isMe2?'👑 ':'')+w2.name+'</div>'
+      + '<div class="guill-winner-score">'+fmtScore(w2.score)+' pts (Wk 18)</div>'
+      + '<div class="guill-winner-score" style="font-size:11px;margin-top:2px;">'+fmtTotal(survivorTotals[w2.name])+' season total</div></div>'
+      + (w3 ? '<div class="guill-winner-card" style="border-color:var(--pu)">'
+        + '<div class="guill-winner-medal">🥉</div>'
+        + '<div class="guill-winner-name" style="color:var(--pu)">'+w3.name+'</div>'
+        + '<div class="guill-winner-score">'+fmtScore(w3.score)+' pts (Wk 18)</div>'
+        + '<div class="guill-winner-score" style="font-size:11px;margin-top:2px;">'+fmtTotal(survivorTotals[w3.name])+' season total</div></div>' : '')
+      + '</div></div>';
+  } else if(isComplete){
+    // Fallback if week 18 not yet imported
+    var sortedSurvivors = currentSurvivors.slice().sort(function(a,b){ return survivorTotals[b]-survivorTotals[a]; });
+    winnersHTML = '<div class="guill-section"><div class="guill-section-hdr" style="color:var(--ink3)">⏳ Week 18 Finale Pending</div>'
+      + '<div style="padding:16px 18px;font-family:var(--fd);font-size:13px;color:var(--ink2);">3 finalists: '
+      + sortedSurvivors.map(function(n){ return '<span class="guill-chip survivor">'+n+'</span>'; }).join(' ')
       + '</div></div>';
   }
 
@@ -1225,6 +1270,22 @@ function renderGuillotine(){
     // Low scorer of survivors this week
     var lowSurvivor = scores.find(function(e){ return elimNames.indexOf(e.name) < 0; });
     var highSurvivor = scores.slice().reverse().find(function(e){ return elimNames.indexOf(e.name) < 0; });
+
+    // Week 18 finale — show ranking instead of eliminations
+    if(wr.finale && wr.finaleRanked){
+      var medals = ['🥇','🥈','🥉'];
+      var finaleChips = wr.finaleRanked.map(function(e, i){
+        var isMe = myTeam && teamMatch(e.name, myTeam);
+        return '<span class="guill-chip winner'+(isMe?' me':'')+'" style="background:'+(i===0?'linear-gradient(135deg,var(--or),var(--pk))':i===1?'rgba(155,109,255,.2)':'rgba(0,229,212,.1)')+';border-color:'+(i===1?'var(--pu)':'var(--or)')+';color:'+(i===0?'#050808':i===1?'var(--pu)':'var(--or)')+';">'
+          +medals[i]+' '+e.name+' · '+fmtScore(e.score)+'</span>';
+      }).join('');
+      return '<div class="guill-week-row" style="background:rgba(0,229,212,.04);border-left:3px solid var(--or);">'
+        + '<div class="guill-week-num" style="color:var(--or);font-weight:800;">Wk 18<br><span style="font-size:9px;letter-spacing:.3px;">FINALE</span></div>'
+        + '<div class="guill-week-content">'
+        + '<div class="guill-elim-label" style="color:var(--or);">🏆 Finale Results</div>'
+        + '<div class="guill-elim-chips">'+finaleChips+'</div>'
+        + '</div></div>';
+    }
 
     return '<div class="guill-week-row">'
       + '<div class="guill-week-num">Wk '+wr.week+'</div>'
@@ -1393,25 +1454,78 @@ function renderSeasonWrap(){
 
   // ── BUILD HTML ─────────────────────────────────────────────
 
-  // Tier podium ranking — use Week 18 score (playoff finish) not season total
-  var wk18entries = seasonData[String(totalWeeks)] || [];
-  function tierRank(teams){
-    // Sort by Week 18 score descending within the tier
-    return teams.slice().sort(function(a,b){
-      var aEntry = wk18entries.find(function(e){ return teamMatch(e.name, a); });
-      var bEntry = wk18entries.find(function(e){ return teamMatch(e.name, b); });
-      var aScore = aEntry ? aEntry.score : 0;
-      var bScore = bEntry ? bEntry.score : 0;
-      return bScore - aScore;
-    });
+  // ── PLAYOFF BRACKET RESULTS ────────────────────────────────
+  // Build playoff round results (same logic as playoffs.html)
+  var PLAYOFF_WKS = [16, 17, 18];
+  function applyPlayoffRound(teams, wkEntries){
+    if(!wkEntries || !wkEntries.length) return {advanced: teams, eliminated: [], scores: {}};
+    var scored = teams.map(function(name){
+      var e = wkEntries.find(function(e){ return teamMatch(e.name, name); });
+      return {name: name, score: e ? e.score : 0};
+    }).sort(function(a,b){ return b.score - a.score; });
+    var cutoff = Math.ceil(scored.length / 2);
+    return {
+      advanced: scored.slice(0, cutoff).map(function(e){ return e.name; }),
+      eliminated: scored.slice(cutoff).map(function(e){ return e.name; }),
+      scores: scored
+    };
   }
-  var tier1Ranked = tierRank(tier1);
-  var tier2Ranked = tierRank(tier2);
-  var tier3Ranked = tierRank(tier3);
 
-  function getWk18Score(name){
-    var e = wk18entries.find(function(e){ return teamMatch(e.name, name); });
-    return e ? fmtScore(e.score) + ' pts (Wk 18)' : 'Season total: ' + fmtTotal(teamTotals[name]);
+  // Tier podium ranking — use playoff bracket finish
+  // Top 3 within each tier ranked by: how many rounds they won, then final round score
+  function getTierPodium(tierTeams){
+    var wk16 = seasonData['16'] || [];
+    var wk17 = seasonData['17'] || [];
+    var wk18 = seasonData['18'] || [];
+    var r1 = applyPlayoffRound(tierTeams, wk16);
+    var r2 = applyPlayoffRound(r1.advanced, wk17);
+    var r3 = applyPlayoffRound(r2.advanced, wk18);
+
+    // Assign playoff finish position within tier
+    var ranked = [];
+    // Week 18 participants ranked by wk18 score
+    r3.scores.forEach(function(e, i){
+      ranked.push({name: e.name, playoffRank: i+1, finalScore: e.score, rounds: 3});
+    });
+    // Week 17 eliminated ranked by wk17 score after week 18 participants
+    var r2elim = r2.eliminated.map(function(name){
+      var e = wk17.find(function(e){ return teamMatch(e.name, name); });
+      return {name: name, playoffRank: r3.scores.length + r2.eliminated.indexOf(name) + 1, finalScore: e ? e.score : 0, rounds: 2};
+    }).sort(function(a,b){ return b.finalScore - a.finalScore; });
+    r2elim.forEach(function(e, i){ e.playoffRank = r3.scores.length + i + 1; ranked.push(e); });
+    // Week 16 eliminated
+    var r1elim = r1.eliminated.map(function(name){
+      var e = wk16.find(function(e){ return teamMatch(e.name, name); });
+      return {name: name, finalScore: e ? e.score : 0, rounds: 1};
+    }).sort(function(a,b){ return b.finalScore - a.finalScore; });
+    r1elim.forEach(function(e, i){ e.playoffRank = r3.scores.length + r2elim.length + i + 1; ranked.push(e); });
+    // Teams that didn't play in week 16
+    tierTeams.forEach(function(name){
+      if(!ranked.find(function(r){ return r.name === name; })){
+        ranked.push({name: name, playoffRank: ranked.length + 1, finalScore: 0, rounds: 0});
+      }
+    });
+
+    return ranked;
+  }
+
+  var tier1Ranked = getTierPodium(tier1);
+  var tier2Ranked = getTierPodium(tier2);
+  var tier3Ranked = getTierPodium(tier3);
+
+  function getPodiumScore(name, tierRanked){
+    var r = tierRanked.find(function(e){ return e.name === name; });
+    if(!r) return '—';
+    var wk = r.rounds === 3 ? 18 : r.rounds === 2 ? 17 : r.rounds === 1 ? 16 : null;
+    if(!wk) return fmtTotal(teamTotals[name]);
+    var e = (seasonData[String(wk)]||[]).find(function(e){ return teamMatch(e.name, name); });
+    return e ? fmtScore(e.score) : fmtTotal(teamTotals[name]);
+  }
+
+  function getPodiumSub(name, tierRanked){
+    var r = tierRanked.find(function(e){ return e.name === name; });
+    if(!r || r.rounds === 0) return 'Season total';
+    return 'Wk '+(r.rounds === 3 ? 18 : r.rounds === 2 ? 17 : 16)+' score';
   }
 
   function podium3(teams, labelFn, valFn, subFn){
@@ -1514,24 +1628,21 @@ function renderSeasonWrap(){
 
     // TIER CHAMPIONS
     + '<div class="sw-section"><div class="sw-section-hdr" style="color:var(--or)">🥇 Tier 1 — Top Finishers</div>'
-    + podium3(tier1Ranked.slice(0,3), function(t){ return t; }, function(t){
-        var e = wk18entries.find(function(e){ return teamMatch(e.name, t); });
-        return e ? fmtScore(e.score) : '—';
-      }, function(t){ return wk18entries.find(function(e){ return teamMatch(e.name, t); }) ? 'Wk 18 score' : 'Season total'; })
+    + podium3(tier1Ranked.slice(0,3).map(function(r){ return r.name; }), function(t){ return t; },
+        function(t){ return getPodiumScore(t, tier1Ranked); },
+        function(t){ return getPodiumSub(t, tier1Ranked); })
     + '</div>'
 
     + '<div class="sw-section"><div class="sw-section-hdr" style="color:var(--pu)">🥈 Tier 2 — Mid Tier Finishers</div>'
-    + podium3(tier2Ranked.slice(0,3), function(t){ return t; }, function(t){
-        var e = wk18entries.find(function(e){ return teamMatch(e.name, t); });
-        return e ? fmtScore(e.score) : '—';
-      }, function(t){ return wk18entries.find(function(e){ return teamMatch(e.name, t); }) ? 'Wk 18 score' : 'Season total'; })
+    + podium3(tier2Ranked.slice(0,3).map(function(r){ return r.name; }), function(t){ return t; },
+        function(t){ return getPodiumScore(t, tier2Ranked); },
+        function(t){ return getPodiumSub(t, tier2Ranked); })
     + '</div>'
 
     + '<div class="sw-section"><div class="sw-section-hdr" style="color:var(--pk)">🥉 Tier 3 — Survivor Finishers</div>'
-    + podium3(tier3Ranked.slice(0,3), function(t){ return t; }, function(t){
-        var e = wk18entries.find(function(e){ return teamMatch(e.name, t); });
-        return e ? fmtScore(e.score) : '—';
-      }, function(t){ return wk18entries.find(function(e){ return teamMatch(e.name, t); }) ? 'Wk 18 score' : 'Season total'; })
+    + podium3(tier3Ranked.slice(0,3).map(function(r){ return r.name; }), function(t){ return t; },
+        function(t){ return getPodiumScore(t, tier3Ranked); },
+        function(t){ return getPodiumSub(t, tier3Ranked); })
     + '</div>'
 
     // WEEKLY WINNERS — combined table
