@@ -1674,7 +1674,7 @@ function renderSeasonWrap(){
           topWRs[1] ? {label:'WR 2', emoji:'⚡', d:topWRs[1], color:'var(--pk)'} : null,
           topWRs[2] ? {label:'WR 3', emoji:'⚡', d:topWRs[2], color:'var(--pu)'} : null,
           topTE[0] ? {label:'TE', emoji:'🎯', d:topTE[0], color:'var(--or)'} : null,
-          topFlex ? {label:'FLEX ('+topFlex.label+')', emoji:'💫', d:topFlex, color:'var(--pu)'} : null,
+          topFlex ? {label:'FLEX', emoji:'💫', d:topFlex, color:'var(--pu)'} : null,
           topDST[0] ? {label:'DEF', emoji:'🛡️', d:topDST[0], color:'var(--pk)'} : null
         ].filter(Boolean).map(function(slot, i){
           var pct = Math.round(slot.d.count / totalPossible * 100);
