@@ -179,14 +179,14 @@ function teamLink(name){
 // ── LOAD ───────────────────────────────────────────────────────
 function loadFromCloud(){
   document.getElementById('hdr-sub').textContent = 'Loading...';
-  fetch(FB_DB_URL + '/season2025.json')
+  fetch(FB_DB_URL + '/season2026.json')
     .then(function(r){ return r.json(); })
     .then(function(data){
       if(data && typeof data === 'object' && !data.error) seasonData = data;
       render();
     })
     .catch(function(){
-      try{ var d = localStorage.getItem('fr_2025_backup'); if(d) seasonData = JSON.parse(d); }catch(e){}
+      try{ var d = localStorage.getItem('fr_2026_backup'); if(d) seasonData = JSON.parse(d); }catch(e){}
       render();
     });
 }

@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Fantasy Refresh — 2026 Season</title>
+<title>Fantasy Refresh — 2025 Archive Archive</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='50' fill='%23050808'/><!-- top arc teal with arrowhead --><path d='M80 50 C80 28 66 14 50 14 C34 14 20 28 20 50' fill='none' stroke='%2300E5D4' stroke-width='7' stroke-linecap='round'/><!-- teal arrowhead at top tip --><line x1='50' y1='14' x2='42' y2='24' stroke='%2300E5D4' stroke-width='7' stroke-linecap='round'/><line x1='50' y1='14' x2='58' y2='24' stroke='%2300E5D4' stroke-width='7' stroke-linecap='round'/><!-- bottom arc pink with arrowhead --><path d='M20 50 C20 72 34 86 50 86 C66 86 80 72 80 50' fill='none' stroke='%23FF5FA0' stroke-width='7' stroke-linecap='round'/><!-- pink arrowhead at bottom tip --><line x1='50' y1='86' x2='42' y2='76' stroke='%23FF5FA0' stroke-width='7' stroke-linecap='round'/><line x1='50' y1='86' x2='58' y2='76' stroke='%23FF5FA0' stroke-width='7' stroke-linecap='round'/><!-- lace seam --><line x1='35' y1='50' x2='65' y2='50' stroke='%23F0FAFA' stroke-width='2' stroke-linecap='round'/><!-- lace stitches --><line x1='46' y1='44' x2='46' y2='56' stroke='%23F0FAFA' stroke-width='2' stroke-linecap='round'/><line x1='54' y1='44' x2='54' y2='56' stroke='%23F0FAFA' stroke-width='2' stroke-linecap='round'/></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@400;500&display=swap" rel="stylesheet">
@@ -628,6 +628,7 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
 <body>
 <div class="wrap">
 
+<div style="background:#3A0018;padding:8px 20px;font-family:var(--fd);font-size:12px;font-weight:700;color:var(--pk);text-transform:uppercase;letter-spacing:1px;text-align:center;border-bottom:1px solid var(--pk);">📦 2025 Season Archive — Read Only · <a href="index.html" style="color:var(--or);text-decoration:none;">Go to 2026 Season →</a></div>
 <div class="hdr">
   <div class="logo">
     <div class="logo-box">
@@ -639,11 +640,10 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
     </div>
   </div>
   <div class="hdr-r">
-    <div class="s-badge">2026 Season</div>
+    <div class="s-badge">2025 Season</div>
     <div class="hdr-sub" id="hdr-sub">Ready to import</div>
     <div style="display:flex;gap:6px;align-items:center;justify-content:flex-end;">
-      <a href="archive2025.html" class="comm-btn" style="text-decoration:none;">📦 2025 Archive</a>
-      <button class="comm-btn" onclick="toggleComm()" id="comm-toggle">⚙ Commissioner</button>
+      <button class="comm-btn" onclick="toggleComm()" id="comm-toggle" style="display:none">⚙ Commissioner</button>
       <button class="comm-btn theme-toggle" onclick="toggleTheme()" id="theme-btn" title="Toggle light/dark mode">🌙</button>
     </div>
   </div>
@@ -651,7 +651,7 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
 
 <div class="wk-bar">
   <div class="wk-bar-label">
-    <span id="wk-bar-season">2026 Season</span>
+    <span id="wk-bar-season">2025 Season</span>
   </div>
   <select class="wk-select" id="wk-select" onchange="setWeekFromSelect(this.value)">
   </select>
@@ -858,8 +858,8 @@ var FB_DB_URL = 'https://fantasy-refresh-default-rtdb.firebaseio.com';
 
 // ── STORAGE ────────────────────────────────────────────────────
 function save(){
-  try{ localStorage.setItem('fr_2026_backup', JSON.stringify(seasonData)); }catch(e){}
-  fetch(FB_DB_URL + '/season2026.json', {
+  try{ localStorage.setItem('fr_2025_backup', JSON.stringify(seasonData)); }catch(e){}
+  fetch(FB_DB_URL + '/season2025.json', {
     method: 'PUT',
     headers: {'Content-Type':'application/json'},
     body: JSON.stringify(seasonData)
@@ -874,7 +874,7 @@ function save(){
 
 function loadFromCloud(){
   setLoading(true);
-  fetch(FB_DB_URL + '/season2026.json')
+  fetch(FB_DB_URL + '/season2025.json')
   .then(function(r){
     if(!r.ok){ throw new Error('HTTP ' + r.status + ' ' + r.statusText); }
     return r.json();
@@ -889,7 +889,7 @@ function loadFromCloud(){
     }
   })
   .catch(function(err){
-    try{ var d = localStorage.getItem('fr_2026_backup'); if(d) seasonData = JSON.parse(d); }catch(e){}
+    try{ var d = localStorage.getItem('fr_2025_backup'); if(d) seasonData = JSON.parse(d); }catch(e){}
     setLoading(false);
     showToast('Cloud error: ' + (err && err.message ? err.message : 'unknown') , true);
     boot();
@@ -1622,7 +1622,7 @@ function renderSeasonWrap(){
 
     // CHAMPION HERO
     + '<div class="sw-hero">'
-    + '<div class="sw-hero-title">🏆 2026 Season Champion — Highest Scorer</div>'
+    + '<div class="sw-hero-title">🏆 2025 Season Champion — Highest Scorer</div>'
     + '<div class="sw-hero-name">'+seasonChamp+'</div>'
     + '<div class="sw-hero-score">'+fmtTotal(seasonChampTotal)+' total points · '+weeks.length+' weeks</div>'
     + '</div>'
@@ -2513,7 +2513,7 @@ function removeFromCompare(name){
 
 
 
-var COMM_PW = 'Sn0wb0ard45'; // Change this to your own password
+var COMM_PW = 'refresh2025'; // Change this to your own password
 var commUnlocked = false;
 
 function checkCommPw(){

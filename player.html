@@ -156,14 +156,14 @@ var seasonData  = {};
 var teamName    = decodeURIComponent((new URLSearchParams(window.location.search)).get('team') || '');
 
 // ── LOAD ───────────────────────────────────────────────────────
-fetch(FB_DB_URL + '/season2025.json')
+fetch(FB_DB_URL + '/season2026.json')
   .then(function(r){ return r.json(); })
   .then(function(d){
     if(d && typeof d === 'object' && !d.error) seasonData = d;
     render();
   })
   .catch(function(){
-    try{ var d = localStorage.getItem('fr_2025_backup'); if(d) seasonData = JSON.parse(d); }catch(e){}
+    try{ var d = localStorage.getItem('fr_2026_backup'); if(d) seasonData = JSON.parse(d); }catch(e){}
     render();
   });
 
