@@ -710,6 +710,26 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
 .pc-export-btn{background:transparent;border:1px solid var(--or);color:var(--or);font-family:var(--fd);font-size:12px;font-weight:700;padding:8px 16px;border-radius:8px;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;}
 
 </style>
+  <!-- Firebase SDK — must load before main script -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+  <script>
+    var firebaseConfig = {
+      apiKey: "AIzaSyA-2hcf2hzThk7MuEm9DAvRICK95koE9gM",
+      authDomain: "fantasy-refresh.firebaseapp.com",
+      databaseURL: "https://fantasy-refresh-default-rtdb.firebaseio.com",
+      projectId: "fantasy-refresh",
+      storageBucket: "fantasy-refresh.firebasestorage.app",
+      messagingSenderId: "205961917241",
+      appId: "1:205961917241:web:ae766ad61df8648d08aee8"
+    };
+    firebase.initializeApp(firebaseConfig);
+    var fbAuth = firebase.auth();
+    var googleProvider = new firebase.auth.GoogleAuthProvider();
+    fbAuth.useDeviceLanguage();
+    console.log('Firebase Auth ready:', !!fbAuth);
+  </script>
 </head>
 <body>
 <div class="wrap">
@@ -1055,33 +1075,6 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
 <div class="toast" id="toast"></div>
 
 
-<!-- Firebase App + Auth SDK -->
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
-<script>
-  const firebaseConfig = {
-    apiKey: "AIzaSyA-2hcf2hzThk7MuEm9DAvRICK95koE9gM",
-    authDomain: "fantasy-refresh.firebaseapp.com",
-    databaseURL: "https://fantasy-refresh-default-rtdb.firebaseio.com",
-    projectId: "fantasy-refresh",
-    storageBucket: "fantasy-refresh.firebasestorage.app",
-    messagingSenderId: "205961917241",
-    appId: "1:205961917241:web:ae766ad61df8648d08aee8"
-  };
-  try {
-    firebase.initializeApp(firebaseConfig);
-    var fbAuth = firebase.auth();
-    var fbDb = firebase.database();
-    var googleProvider = new firebase.auth.GoogleAuthProvider();
-    // Set language to browser default
-    fbAuth.useDeviceLanguage();
-  } catch(e) {
-    console.error('Firebase init failed:', e);
-    var fbAuth = null;
-    var googleProvider = null;
-  }
-</script>
 
 <script>
 // ── CONSTANTS ──────────────────────────────────────────────────
