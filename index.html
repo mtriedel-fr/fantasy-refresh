@@ -633,7 +633,7 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
 
 
 /* ── EMOJI REACTIONS ── */
-.react-section{padding:6px 14px 8px;border-top:1px solid var(--bdr);background:var(--bg2);display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-height:34px;position:relative;}
+.react-section{display:flex;align-items:center;gap:4px;flex-wrap:nowrap;position:relative;padding:0;background:none;border:none;min-height:unset;}
 .react-trigger{background:none;border:1px solid var(--bdr2);border-radius:20px;padding:3px 9px;font-size:14px;cursor:pointer;color:var(--ink3);transition:all .15s;line-height:1;}
 .react-trigger:hover{border-color:var(--or);background:rgba(0,229,212,.08);transform:scale(1.15);}
 .react-picker{display:none;position:absolute;left:0;top:calc(100% + 4px);z-index:300;background:#0D1515;border:1px solid var(--pu);border-radius:12px;padding:6px 8px;gap:4px;box-shadow:0 8px 24px rgba(0,0,0,.6);flex-direction:row;}
@@ -3023,15 +3023,17 @@ function renderFinish(sorted, curEntries, prevRank){
     var nameLink = '<a class="t-name-link" href="player.html?team=' + encodeURIComponent(e.name) + '">' + e.name + (isMe ? '<span class="my-team-badge">You</span>' : '') + '</a>';
     return '<tr' + (isMe ? ' class="is-me"' : '') + '>'
       + '<td class="finish-rank' + (wkRank <= 3 ? ' top' : '') + '">' + (wkRank <= 3 ? med[wkRank-1] : wkRank) + '</td>'
-      + '<td class="finish-name">' + nameLink + '<div class="react-section" id="' + reactId + '"></div></td>'
+      + '<td class="finish-name">' + nameLink + '</td>'
+      + '<td style="white-space:nowrap;padding:6px 10px;"><div class="react-section" id="' + reactId + '"></div></td>'
       + '<td class="finish-score">' + fmtScore(e.score) + '<div class="finish-pct-bar"><div class="finish-pct-fill" style="width:' + pct + '%"></div></div></td>'
       + '<td style="text-align:center;font-family:var(--fd);font-size:14px;color:var(--ink2)">' + (sznRank ? '#' + sznRank : '—') + '</td>'
       + '<td style="text-align:center">' + moveStr + '</td>'
       + '</tr>';
   }).join('');
 
-  el.innerHTML = '<div class="finish-wrap" style="overflow-x:auto;-webkit-overflow-scrolling:touch;"><table class="finish-table" style="min-width:480px"><thead><tr>'
+  el.innerHTML = '<div class="finish-wrap" style="overflow-x:auto;-webkit-overflow-scrolling:touch;"><table class="finish-table" style="min-width:520px"><thead><tr>'
     + '<th style="width:44px">Wk #</th><th>Team</th>'
+    + '<th style="width:120px"></th>'
     + '<th>Score</th>'
     + '<th style="text-align:center">Season rank</th>'
     + '<th style="text-align:center">Move</th>'
