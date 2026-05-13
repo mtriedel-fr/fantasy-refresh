@@ -666,6 +666,49 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
 .share-copy-btn{flex:1;padding:10px;background:var(--or);color:#050808;border:none;border-radius:8px;font-family:var(--fd);font-size:13px;font-weight:800;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;}
 .share-close-btn{padding:10px 14px;background:transparent;border:1px solid var(--bdr2);color:var(--ink3);border-radius:8px;font-family:var(--fd);font-size:13px;cursor:pointer;}
 
+
+
+/* ── AUTH SYSTEM ── */
+.google-btn{width:100%;padding:12px;background:#FFFFFF;border:1px solid #DADCE0;border-radius:10px;color:#3C4043;font-family:var(--fb);font-size:14px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:12px;transition:background .15s;}
+.google-btn:hover{background:#F8F9FA;box-shadow:0 2px 8px rgba(0,0,0,.15);}
+.auth-divider{display:flex;align-items:center;gap:10px;margin:12px 0;color:var(--ink3);font-size:12px;}
+.auth-divider::before,.auth-divider::after{content:'';flex:1;height:1px;background:var(--bdr);}
+.prof-dk-item{padding:8px 12px;background:var(--bg4);border-radius:8px;border:1px solid var(--bdr);margin-bottom:4px;cursor:pointer;font-family:var(--fd);font-size:13px;color:var(--ink);transition:all .15s;}
+.prof-dk-item:hover{border-color:var(--or);color:var(--or);}
+
+/* ── TEAM LOGIN ── */
+.login-modal{position:fixed;inset:0;z-index:9800;display:flex;align-items:center;justify-content:center;padding:20px;}
+.login-modal.hidden{display:none;}
+.login-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.92);backdrop-filter:blur(8px);}
+.login-box{position:relative;z-index:1;background:#080E0E;border:1px solid var(--or);border-radius:20px;padding:36px 32px;max-width:420px;width:100%;text-align:center;box-shadow:0 24px 80px rgba(0,229,212,.15);}
+.login-logo{font-size:44px;margin-bottom:14px;}
+.login-title{font-family:var(--fd);font-size:26px;font-weight:800;color:var(--or);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;}
+.login-sub{font-size:13px;color:var(--ink2);line-height:1.6;margin-bottom:24px;}
+.login-field{margin-bottom:12px;text-align:left;}
+.login-label{font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink2);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;display:block;}
+.login-input{width:100%;padding:11px 14px;background:#060E0E;border:1px solid var(--bdr2);border-radius:10px;color:var(--or);font-family:var(--fb);font-size:15px;outline:none;transition:border-color .15s;}
+.login-input:focus{border-color:var(--or);}
+.login-input::placeholder{color:var(--ink3);}
+.login-btn{width:100%;padding:13px;background:linear-gradient(135deg,var(--or),var(--pk));border:none;border-radius:10px;color:#050808;font-family:var(--fd);font-size:15px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;cursor:pointer;margin-top:4px;margin-bottom:12px;transition:opacity .15s;}
+.login-btn:hover{opacity:.9;}
+.login-err{font-family:var(--fd);font-size:12px;color:var(--pk);text-transform:uppercase;letter-spacing:.5px;min-height:18px;margin-bottom:4px;}
+.login-skip{background:none;border:none;color:var(--ink3);font-family:var(--fd);font-size:11px;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;}
+.login-skip:hover{color:var(--ink2);}
+.login-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(0,229,212,.1);border:1px solid rgba(0,229,212,.3);border-radius:20px;padding:4px 12px;font-family:var(--fd);font-size:12px;font-weight:700;color:var(--or);cursor:pointer;transition:all .15s;}
+.login-badge:hover{background:rgba(0,229,212,.15);}
+.login-badge svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2.5;}
+
+/* COMM — Passcode Manager */
+.pc-table{width:100%;border-collapse:collapse;margin-top:8px;}
+.pc-table th{padding:7px 10px;font-family:var(--fd);font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--ink2);border-bottom:1px solid var(--bdr);text-align:left;}
+.pc-table td{padding:8px 10px;border-bottom:1px solid var(--bdr);font-family:var(--fd);font-size:13px;color:var(--ink);}
+.pc-table tr:last-child td{border-bottom:none;}
+.pc-code{font-family:monospace;font-size:14px;font-weight:700;color:var(--or);letter-spacing:2px;background:var(--bg4);padding:2px 8px;border-radius:6px;}
+.pc-reset-btn{background:none;border:1px solid var(--bdr2);color:var(--ink3);font-family:var(--fd);font-size:11px;padding:3px 8px;border-radius:6px;cursor:pointer;transition:all .15s;}
+.pc-reset-btn:hover{border-color:var(--pk);color:var(--pk);}
+.pc-gen-btn{background:var(--or);color:#050808;border:none;font-family:var(--fd);font-size:12px;font-weight:700;padding:8px 16px;border-radius:8px;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;}
+.pc-export-btn{background:transparent;border:1px solid var(--or);color:var(--or);font-family:var(--fd);font-size:12px;font-weight:700;padding:8px 16px;border-radius:8px;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;}
+
 </style>
 </head>
 <body>
@@ -690,6 +733,7 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
     </div>
     <div class="hdr-sub" id="hdr-sub">Ready to import</div>
     <div style="display:flex;gap:6px;align-items:center;justify-content:flex-end;">
+      <button class="login-badge" id="login-badge" onclick="showLoginModal()">🔑 Sign In</button>
       <button class="comm-btn" onclick="toggleComm()" id="comm-toggle">⚙ Commissioner</button>
       <button class="comm-btn theme-toggle" onclick="toggleTheme()" id="theme-btn" title="Toggle light/dark mode">🌙</button>
     </div>
@@ -826,8 +870,24 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
         <button class="import-btn" id="imp-btn" onclick="confirmImport()">↑ Import Week Scores</button>
       </div>
       <div>
+        <div class="csect">👥 Registered Users</div>
+        <div style="font-size:12px;color:var(--ink2);margin-bottom:10px;line-height:1.5;">Players who have created accounts. Shows their 2026 team name, login method, and linked 2025 DraftKings team.</div>
+        <div id="user-panel"><div style="color:var(--ink3);font-size:13px;">Loading…</div></div>
+        <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--bdr);">
+          <div class="csect">League Join Code</div>
+          <div style="font-size:12px;color:var(--ink2);margin-bottom:8px;">Share this code with new players so they can create an account.</div>
+          <div style="font-family:monospace;font-size:22px;font-weight:700;color:var(--or);letter-spacing:4px;background:var(--bg4);padding:10px 16px;border-radius:8px;display:inline-block;">REFRESH26</div>
+          <div style="font-size:11px;color:var(--ink3);margin-top:6px;">To change the join code, find <code>LEAGUE_JOIN_CODE</code> in the file.</div>
+        </div>
+        <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--bdr);">
+        <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--bdr);">
         <div class="csect">Season history</div>
         <div id="hist-list"></div>
+        <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--bdr);">
+          <div class="csect">🔑 Team Passcodes</div>
+          <div style="font-size:12px;color:var(--ink2);margin-bottom:10px;line-height:1.5;">Generate a unique passcode for each team. Share each team's code with their player — they use it to sign in on the site.</div>
+          <div id="passcode-manager"><div style="color:var(--ink3);font-size:13px;">Loading…</div></div>
+        </div>
         <div style="margin-top:20px;padding-top:16px;border-top:1px solid #060E0E;">
           <div class="csect">Danger zone</div>
           <button class="del-btn" style="width:100%;padding:9px;" onclick="resetAll()">Clear entire season</button>
@@ -869,6 +929,101 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
 </div>
 
 
+
+<!-- AUTH MODAL -->
+<div class="login-modal hidden" id="login-modal">
+  <div class="login-backdrop"></div>
+  <div class="login-box">
+    <!-- SIGN IN VIEW -->
+    <div id="auth-signin">
+      <div class="login-logo">🏈</div>
+      <div class="login-title">Fantasy Refresh</div>
+      <div class="login-sub">Sign in to track your team, submit lineups, and see your personal stats.</div>
+      <!-- Google -->
+      <button class="google-btn" onclick="signInWithGoogle()">
+        <svg viewBox="0 0 24 24" width="18" height="18"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+        Continue with Google
+      </button>
+      <div class="auth-divider"><span>or</span></div>
+      <div class="login-field">
+        <label class="login-label">Email</label>
+        <input type="email" id="si-email" class="login-input" placeholder="your@email.com" onkeydown="if(event.key==='Enter') document.getElementById('si-pass').focus()">
+      </div>
+      <div class="login-field">
+        <label class="login-label">Password</label>
+        <input type="password" id="si-pass" class="login-input" placeholder="••••••••" onkeydown="if(event.key==='Enter') submitEmailSignIn()">
+      </div>
+      <div class="login-err" id="si-err"></div>
+      <button class="login-btn" onclick="submitEmailSignIn()">Sign In →</button>
+      <div style="display:flex;justify-content:space-between;margin-top:4px;">
+        <button class="login-skip" onclick="showAuthView('signup')">New? Create account</button>
+        <button class="login-skip" onclick="showForgotPassword()">Forgot password?</button>
+      </div>
+      <div style="border-top:1px solid var(--bdr);margin-top:16px;padding-top:12px;">
+        <button class="login-skip" onclick="skipLogin()">Browse without signing in</button>
+      </div>
+    </div>
+
+    <!-- SIGN UP VIEW -->
+    <div id="auth-signup" style="display:none;">
+      <div class="login-logo">🎉</div>
+      <div class="login-title">Join the League</div>
+      <div class="login-sub">Create your account. You'll choose your team name and link your 2025 history after signing up.</div>
+      <button class="google-btn" onclick="signInWithGoogle()">
+        <svg viewBox="0 0 24 24" width="18" height="18"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+        Sign up with Google
+      </button>
+      <div class="auth-divider"><span>or</span></div>
+      <div class="login-field">
+        <label class="login-label">Email</label>
+        <input type="email" id="su-email" class="login-input" placeholder="your@email.com">
+      </div>
+      <div class="login-field">
+        <label class="login-label">Password (min 6 characters)</label>
+        <input type="password" id="su-pass" class="login-input" placeholder="••••••••">
+      </div>
+      <div class="login-field">
+        <label class="login-label">League Join Code</label>
+        <input type="text" id="su-code" class="login-input" placeholder="Ask your commissioner..." style="text-transform:uppercase;letter-spacing:2px;" maxlength="8" onkeydown="if(event.key==='Enter') submitEmailSignUp()">
+      </div>
+      <div class="login-err" id="su-err"></div>
+      <button class="login-btn" onclick="submitEmailSignUp()">Create Account →</button>
+      <button class="login-skip" onclick="showAuthView('signin')">← Back to sign in</button>
+    </div>
+
+    <!-- PROFILE SETUP VIEW -->
+    <div id="auth-profile" style="display:none;">
+      <div class="login-logo">✏️</div>
+      <div class="login-title">Set Up Your Team</div>
+      <div class="login-sub">Choose your 2026 team name. This is how you'll appear in standings and scores.</div>
+      <div class="login-field">
+        <label class="login-label">Your 2026 Team Name</label>
+        <input type="text" id="prof-team" class="login-input" placeholder="The Mahomies..." maxlength="40" oninput="checkTeamAvail(this.value)">
+        <div id="prof-team-status" style="font-family:var(--fd);font-size:11px;margin-top:4px;letter-spacing:.3px;"></div>
+      </div>
+      <div class="login-field" style="margin-top:16px;">
+        <label class="login-label">Link 2025 DraftKings Team (optional)</label>
+        <div style="font-size:12px;color:var(--ink3);margin-bottom:6px;line-height:1.5;">Search for your old team name to link your 2025 history to your new account.</div>
+        <input type="text" id="prof-dk" class="login-input" placeholder="Search 2025 teams..." oninput="searchDkTeams(this.value)" style="color:var(--ink);">
+        <div id="prof-dk-results" style="margin-top:4px;"></div>
+        <div id="prof-dk-linked" style="font-family:var(--fd);font-size:12px;color:var(--or);margin-top:4px;"></div>
+      </div>
+      <div class="login-err" id="prof-err"></div>
+      <button class="login-btn" onclick="submitProfile()">Save & Enter →</button>
+    </div>
+
+    <!-- VERIFY EMAIL VIEW -->
+    <div id="auth-verify" style="display:none;">
+      <div class="login-logo">📧</div>
+      <div class="login-title">Check Your Email</div>
+      <div class="login-sub">We've sent a verification link to <strong id="verify-email-addr"></strong>. Click the link then come back here.</div>
+      <button class="login-btn" onclick="checkEmailVerified()">I've verified — continue →</button>
+      <button class="login-skip" onclick="resendVerification()">Resend email</button>
+      <button class="login-skip" style="margin-top:8px;" onclick="fbAuth.signOut();showAuthView('signin')">Use a different account</button>
+    </div>
+  </div>
+</div>
+
 <!-- SHARE CARD MODAL -->
 <div class="share-modal hidden" id="share-modal">
   <div class="share-backdrop" onclick="closeShare()"></div>
@@ -898,6 +1053,27 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
 </div>
 
 <div class="toast" id="toast"></div>
+
+
+<!-- Firebase App + Auth SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyA-2hcf2hzThk7MuEm9DAvRICK95koE9gM",
+    authDomain: "fantasy-refresh.firebaseapp.com",
+    databaseURL: "https://fantasy-refresh-default-rtdb.firebaseio.com",
+    projectId: "fantasy-refresh",
+    storageBucket: "fantasy-refresh.firebasestorage.app",
+    messagingSenderId: "205961917241",
+    appId: "1:205961917241:web:ae766ad61df8648d08aee8"
+  };
+  firebase.initializeApp(firebaseConfig);
+  var fbAuth = firebase.auth();
+  var fbDb = firebase.database();
+  var googleProvider = new firebase.auth.GoogleAuthProvider();
+</script>
 
 <script>
 // ── CONSTANTS ──────────────────────────────────────────────────
@@ -990,6 +1166,7 @@ function boot(){
   initMyTeamInput();
   renderAll();
   checkFirstRun();
+  checkLoginState();
 }
 
 loadFromCloud();
@@ -2592,6 +2769,8 @@ function checkCommPw(){
     err.classList.add('hidden');
     try{ sessionStorage.setItem('fr_comm','1'); }catch(e){}
     renderHistory();
+    renderPasscodeManager();
+    renderUserPanel();
   } else {
     err.classList.remove('hidden');
     document.getElementById('comm-pw-input').value = '';
@@ -2611,6 +2790,8 @@ function toggleComm(){
     document.getElementById('comm-gate').classList.add('hidden');
     document.getElementById('comm-tools').classList.remove('hidden');
     renderHistory();
+    renderPasscodeManager();
+    renderUserPanel();
   }
   // Wire up drag and drop once
   var zone = document.getElementById('drop-zone');
@@ -3451,6 +3632,298 @@ function copyShareText(){
 
 function closeShare(){
   document.getElementById('share-modal').classList.add('hidden');
+}
+
+
+// ── AUTH SYSTEM ──────────────────────────────────────────────
+var currentUser = null;
+var LEAGUE_JOIN_CODE = 'REFRESH26'; // Commissioner can change this
+
+// Firebase auth state listener
+fbAuth.onAuthStateChanged(function(user){
+  if(user){
+    currentUser = user;
+    loadUserProfile(user.uid).then(function(profile){
+      if(!profile){
+        // New user — needs profile setup
+        if(!user.emailVerified && user.providerData[0].providerId === 'password'){
+          showAuthView('verify');
+          document.getElementById('verify-email-addr').textContent = user.email;
+        } else {
+          showAuthView('profile');
+          document.getElementById('login-modal').classList.remove('hidden');
+        }
+      } else {
+        // Existing user — load their team
+        myTeam = profile.team2026 || '';
+        try{ localStorage.setItem('fr_myteam', myTeam); }catch(e){}
+        var inp = document.getElementById('my-team-input');
+        if(inp) inp.value = myTeam;
+        document.getElementById('login-modal').classList.add('hidden');
+        updateLoginBadge(user, profile);
+        renderAll();
+      }
+    });
+  } else {
+    currentUser = null;
+    updateLoginBadge(null, null);
+  }
+});
+
+function loadUserProfile(uid){
+  return fetch(FB_DB_URL + '/users2026/' + uid + '.json')
+    .then(function(r){ return r.json(); });
+}
+
+function saveUserProfile(uid, profile){
+  return fetch(FB_DB_URL + '/users2026/' + uid + '.json', {
+    method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(profile)
+  });
+}
+
+// ── SIGN IN / SIGN UP ─────────────────────────────────────────
+function signInWithGoogle(){
+  fbAuth.signInWithPopup(googleProvider)
+    .then(function(result){
+      // onAuthStateChanged handles the rest
+    })
+    .catch(function(err){
+      var errEl = document.getElementById('si-err') || document.getElementById('su-err');
+      if(errEl) errEl.textContent = err.message;
+    });
+}
+
+function submitEmailSignIn(){
+  var email = document.getElementById('si-email').value.trim();
+  var pass = document.getElementById('si-pass').value;
+  var err = document.getElementById('si-err');
+  err.textContent = '';
+  if(!email || !pass){ err.textContent = 'Enter email and password'; return; }
+  err.textContent = 'Signing in…';
+  fbAuth.signInWithEmailAndPassword(email, pass)
+    .catch(function(e){
+      err.textContent = e.code === 'auth/wrong-password' || e.code === 'auth/user-not-found'
+        ? 'Incorrect email or password' : e.message;
+    });
+}
+
+function submitEmailSignUp(){
+  var email = document.getElementById('su-email').value.trim();
+  var pass = document.getElementById('su-pass').value;
+  var code = document.getElementById('su-code').value.trim().toUpperCase();
+  var err = document.getElementById('su-err');
+  err.textContent = '';
+
+  if(!email){ err.textContent = 'Enter your email'; return; }
+  if(pass.length < 6){ err.textContent = 'Password must be at least 6 characters'; return; }
+  if(code !== LEAGUE_JOIN_CODE){ err.textContent = 'Incorrect join code — ask your commissioner'; return; }
+
+  err.textContent = 'Creating account…';
+  fbAuth.createUserWithEmailAndPassword(email, pass)
+    .then(function(result){
+      result.user.sendEmailVerification();
+      showAuthView('verify');
+      document.getElementById('verify-email-addr').textContent = email;
+    })
+    .catch(function(e){
+      err.textContent = e.code === 'auth/email-already-in-use'
+        ? 'An account with this email already exists' : e.message;
+    });
+}
+
+function checkEmailVerified(){
+  fbAuth.currentUser.reload().then(function(){
+    if(fbAuth.currentUser.emailVerified){
+      showAuthView('profile');
+    } else {
+      showToast('Email not verified yet — check your inbox', true);
+    }
+  });
+}
+
+function resendVerification(){
+  fbAuth.currentUser.sendEmailVerification()
+    .then(function(){ showToast('Verification email resent ✓'); })
+    .catch(function(){ showToast('Could not resend — try again shortly', true); });
+}
+
+function showForgotPassword(){
+  var email = document.getElementById('si-email').value.trim();
+  if(!email){ document.getElementById('si-err').textContent = 'Enter your email first'; return; }
+  fbAuth.sendPasswordResetEmail(email)
+    .then(function(){ showToast('Password reset email sent to ' + email + ' ✓'); })
+    .catch(function(e){ document.getElementById('si-err').textContent = e.message; });
+}
+
+// ── PROFILE SETUP ─────────────────────────────────────────────
+var selectedDkTeam = null;
+var teamNameAvail = false;
+
+function checkTeamAvail(name){
+  var status = document.getElementById('prof-team-status');
+  if(!name || name.length < 2){ status.textContent = ''; teamNameAvail = false; return; }
+  status.textContent = 'Checking…';
+  status.style.color = 'var(--ink3)';
+  // Check if team name already claimed
+  fetch(FB_DB_URL + '/teamNames2026/' + encodeURIComponent(name.trim().toLowerCase()) + '.json')
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      if(data && data.uid && data.uid !== fbAuth.currentUser.uid){
+        status.textContent = '✗ That name is taken';
+        status.style.color = 'var(--pk)';
+        teamNameAvail = false;
+      } else {
+        status.textContent = '✓ Available!';
+        status.style.color = 'var(--or)';
+        teamNameAvail = true;
+      }
+    });
+}
+
+function searchDkTeams(query){
+  var el = document.getElementById('prof-dk-results');
+  if(!query || query.length < 2){ el.innerHTML = ''; return; }
+  // Search 2025 season data for matching team names
+  var weeks = Object.keys(seasonData).filter(function(k){ return !isNaN(Number(k)) && seasonData[k]; });
+  var allTeams = {};
+  weeks.forEach(function(w){ (seasonData[w]||[]).forEach(function(e){ allTeams[e.name]=1; }); });
+  var matches = Object.keys(allTeams).filter(function(n){
+    return n.toLowerCase().includes(query.toLowerCase());
+  }).slice(0, 6);
+  el.innerHTML = matches.map(function(name){
+    return '<div class="prof-dk-item" data-name="'+encodeURIComponent(name)+'" onclick="selectDkTeam(decodeURIComponent(this.dataset.name))">'+name+'</div>';
+  }).join('') || '<div style="font-size:12px;color:var(--ink3);padding:4px;">No matches found</div>';
+}
+
+function selectDkTeam(name){
+  selectedDkTeam = name;
+  document.getElementById('prof-dk').value = name;
+  document.getElementById('prof-dk-results').innerHTML = '';
+  document.getElementById('prof-dk-linked').textContent = '✓ Linked to 2025 history as "' + name + '"';
+}
+
+function submitProfile(){
+  var teamName = document.getElementById('prof-team').value.trim();
+  var err = document.getElementById('prof-err');
+  err.textContent = '';
+
+  if(!teamName){ err.textContent = 'Choose a team name'; return; }
+  if(!teamNameAvail){ err.textContent = 'That team name is taken — try another'; return; }
+
+  var uid = fbAuth.currentUser.uid;
+  var profile = {
+    team2026: teamName,
+    dk2025: selectedDkTeam || null,
+    email: fbAuth.currentUser.email || null,
+    displayName: fbAuth.currentUser.displayName || null,
+    created: Date.now()
+  };
+
+  err.textContent = 'Saving…';
+
+  // Save profile + claim team name
+  Promise.all([
+    saveUserProfile(uid, profile),
+    fetch(FB_DB_URL + '/teamNames2026/' + encodeURIComponent(teamName.toLowerCase()) + '.json', {
+      method:'PUT', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({uid: uid, team: teamName})
+    })
+  ]).then(function(){
+    myTeam = teamName;
+    try{ localStorage.setItem('fr_myteam', teamName); }catch(e){}
+    var inp = document.getElementById('my-team-input');
+    if(inp) inp.value = teamName;
+    document.getElementById('login-modal').classList.add('hidden');
+    updateLoginBadge(fbAuth.currentUser, profile);
+    renderAll();
+    showToast('Welcome to Fantasy Refresh, ' + teamName + '! 🏈');
+  }).catch(function(e){
+    err.textContent = 'Could not save profile — try again';
+  });
+}
+
+// ── UI HELPERS ────────────────────────────────────────────────
+function showAuthView(view){
+  ['auth-signin','auth-signup','auth-profile','auth-verify'].forEach(function(id){
+    var el = document.getElementById(id);
+    if(el) el.style.display = 'none';
+  });
+  var target = document.getElementById('auth-' + view);
+  if(target) target.style.display = 'block';
+  document.getElementById('login-modal').classList.remove('hidden');
+}
+
+function skipLogin(){
+  document.getElementById('login-modal').classList.add('hidden');
+}
+
+function updateLoginBadge(user, profile){
+  var badge = document.getElementById('login-badge');
+  if(!badge) return;
+  if(user && profile && profile.team2026){
+    badge.innerHTML = '👤 ' + profile.team2026;
+    badge.onclick = showUserMenu;
+  } else if(user){
+    badge.innerHTML = '✏️ Set up team';
+    badge.onclick = function(){ showAuthView('profile'); };
+  } else {
+    badge.innerHTML = '🔑 Sign In';
+    badge.onclick = function(){ showAuthView('signin'); };
+  }
+}
+
+function showUserMenu(){
+  var name = myTeam || (fbAuth.currentUser ? fbAuth.currentUser.email : '');
+  var opts = confirm('Signed in as: ' + name + '\n\nSign out?');
+  if(opts){
+    fbAuth.signOut().then(function(){
+      myTeam = '';
+      try{ localStorage.removeItem('fr_myteam'); }catch(e){}
+      var inp = document.getElementById('my-team-input');
+      if(inp) inp.value = '';
+      renderAll();
+      showToast('Signed out');
+    });
+  }
+}
+
+function showLoginModal(){ showAuthView('signin'); }
+
+function checkLoginState(){
+  // onAuthStateChanged handles everything — this is a no-op now
+  // but kept so existing calls don't break
+}
+
+// ── COMMISSIONER USER PANEL ───────────────────────────────────
+function renderUserPanel(){
+  var el = document.getElementById('user-panel');
+  if(!el) return;
+  el.innerHTML = '<div style="color:var(--ink3);font-size:13px;margin-bottom:8px;">Loading registered users…</div>';
+  fetch(FB_DB_URL + '/users2026.json')
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      if(!data){ el.innerHTML = '<div style="color:var(--ink3);font-size:13px;">No users registered yet.</div>'; return; }
+      var users = Object.entries(data).map(function(kv){ return Object.assign({uid:kv[0]}, kv[1]); })
+        .sort(function(a,b){ return (a.team2026||'').localeCompare(b.team2026||''); });
+      var rows = users.map(function(u){
+        return '<tr>'
+          +'<td style="font-family:var(--fd);font-size:13px;font-weight:700;color:var(--or);">'+(u.team2026||'<em style="color:var(--ink3)">Not set</em>')+'</td>'
+          +'<td style="font-size:12px;color:var(--ink2);">'+(u.email||u.displayName||'Google')+'</td>'
+          +'<td style="font-size:12px;color:var(--ink3);">'+(u.dk2025||'—')+'</td>'
+          +'</tr>';
+      }).join('');
+      el.innerHTML = '<table class="pc-table"><thead><tr>'
+        +'<th>2026 Team</th><th>Account</th><th>2025 DK Team</th>'
+        +'</tr></thead><tbody>'+rows+'</tbody></table>';
+    });
+}
+
+// ── PASSCODE FUNCTIONS (kept as fallback) ─────────────────────
+function generatePasscode(){
+  var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  var code = '';
+  for(var i=0; i<6; i++) code += chars[Math.floor(Math.random()*chars.length)];
+  return code;
 }
 
 // ── SEASON SWITCHER ───────────────────────────────────────────
