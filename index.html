@@ -631,6 +631,38 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
   .guill-winners-podium{grid-template-columns:1fr;}
 }
 
+
+/* ── EMOJI REACTIONS ── */
+.react-bar{display:flex;gap:4px;align-items:center;padding:4px 0;flex-wrap:wrap;}
+.react-btn{background:var(--bg4);border:1px solid var(--bdr);border-radius:20px;padding:3px 9px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:4px;transition:all .15s;font-family:var(--fd);font-size:12px;color:var(--ink2);}
+.react-btn:hover{border-color:var(--or);background:rgba(0,229,212,.08);}
+.react-btn.reacted{border-color:var(--or);background:rgba(0,229,212,.12);color:var(--or);font-weight:700;}
+.react-btn.reacted.fire{border-color:var(--pk);background:rgba(255,95,160,.12);color:var(--pk);}
+.react-btn.reacted.skull{border-color:var(--pu);background:rgba(155,109,255,.12);color:var(--pu);}
+.react-count{font-family:var(--fd);font-size:11px;font-weight:700;}
+.react-section{padding:8px 14px;border-top:1px solid var(--bdr);background:var(--bg2);}
+
+/* ── SHARE CARD ── */
+.share-btn{background:rgba(0,229,212,.1);border:1px solid rgba(0,229,212,.3);color:var(--or);font-family:var(--fd);font-size:11px;font-weight:700;padding:4px 10px;border-radius:8px;cursor:pointer;letter-spacing:.3px;text-transform:uppercase;transition:all .15s;display:inline-flex;align-items:center;gap:4px;}
+.share-btn:hover{background:rgba(0,229,212,.2);border-color:var(--or);}
+.share-modal{position:fixed;inset:0;z-index:9500;display:flex;align-items:center;justify-content:center;padding:20px;}
+.share-modal.hidden{display:none;}
+.share-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(6px);}
+.share-box{position:relative;z-index:1;background:#080E0E;border:1px solid var(--or);border-radius:16px;padding:24px;max-width:380px;width:100%;text-align:center;box-shadow:0 24px 80px rgba(0,229,212,.15);}
+.share-card-preview{background:linear-gradient(135deg,#050808 0%,#0A1818 100%);border-radius:12px;padding:24px;margin-bottom:16px;border-top:3px solid var(--or);border-bottom:3px solid var(--pk);text-align:center;}
+.share-card-league{font-family:var(--fd);font-size:11px;font-weight:700;color:var(--pk);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;}
+.share-card-name{font-family:var(--fd);font-size:22px;font-weight:800;color:var(--ink);text-transform:uppercase;letter-spacing:.3px;margin-bottom:12px;}
+.share-card-score{font-family:var(--fd);font-size:52px;font-weight:800;color:var(--or);line-height:1;letter-spacing:-2px;}
+.share-card-pts{font-family:var(--fd);font-size:12px;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;}
+.share-card-stats{display:flex;justify-content:center;gap:20px;}
+.share-card-stat{text-align:center;}
+.share-card-stat-val{font-family:var(--fd);font-size:16px;font-weight:800;color:var(--pu);}
+.share-card-stat-lbl{font-family:var(--fd);font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;}
+.share-card-url{font-family:var(--fd);font-size:10px;color:var(--ink3);margin-top:10px;letter-spacing:.3px;}
+.share-actions{display:flex;gap:8px;justify-content:center;}
+.share-copy-btn{flex:1;padding:10px;background:var(--or);color:#050808;border:none;border-radius:8px;font-family:var(--fd);font-size:13px;font-weight:800;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;}
+.share-close-btn{padding:10px 14px;background:transparent;border:1px solid var(--bdr2);color:var(--ink3);border-radius:8px;font-family:var(--fd);font-size:13px;cursor:pointer;}
+
 </style>
 </head>
 <body>
@@ -830,6 +862,21 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
     <input type="text" id="firstrun-input" class="firstrun-input" placeholder="Your team name..." autocomplete="off" onkeydown="if(event.key==='Enter') saveFirstRun()">
     <button class="firstrun-btn" onclick="saveFirstRun()">Let's Go →</button>
     <button class="firstrun-skip" onclick="skipFirstRun()">Skip for now</button>
+  </div>
+</div>
+
+
+<!-- SHARE CARD MODAL -->
+<div class="share-modal hidden" id="share-modal">
+  <div class="share-backdrop" onclick="closeShare()"></div>
+  <div class="share-box">
+    <div style="font-family:var(--fd);font-size:14px;font-weight:700;color:var(--or);text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px;">📤 Share Your Score</div>
+    <div class="share-card-preview" id="share-preview"></div>
+    <div class="share-actions">
+      <button class="share-copy-btn" onclick="copyShareText()">📋 Copy to clipboard</button>
+      <button class="share-close-btn" onclick="closeShare()">✕</button>
+    </div>
+    <div style="font-family:var(--fd);font-size:10px;color:var(--ink3);margin-top:10px;text-transform:uppercase;letter-spacing:.5px;" id="share-copy-confirm"></div>
   </div>
 </div>
 
@@ -2529,7 +2576,7 @@ function removeFromCompare(name){
 
 
 
-var COMM_PW = 'Sn0wb0ard45'; // Change this to your own password
+var COMM_PW = '$n0wb0ard45'; // Change this to your own password
 var commUnlocked = false;
 
 function checkCommPw(){
@@ -2918,7 +2965,8 @@ function renderMyTeam(sorted, curEntries, prevRank, curMap){
     + '<div class="myteam-hero">'
     + '<div><div class="myteam-name">' + entry.name + '</div>'
     + '<div style="font-family:var(--fd);font-size:11px;color:#1A5A5A;text-transform:uppercase;letter-spacing:1px;margin-top:4px;">Week ' + currentWeek + ' · Your dashboard</div></div>'
-    + '<div style="text-align:right"><div class="myteam-score">' + fmtScore(entry.score) + '</div><div class="myteam-score-lbl">Points</div></div>'
+    + '<div style="text-align:right"><div class="myteam-score">' + fmtScore(entry.score) + '</div><div class="myteam-score-lbl">Points</div>'
+    + '<button class="share-btn" onclick="openShareCard()" style="margin-top:8px;">📤 Share</button></div>'
     + '</div>'
     + '<div class="myteam-stats">'
     + '<div class="myteam-stat"><div class="myteam-stat-lbl">Week rank</div><div class="myteam-stat-val">' + rankDisplay + '</div></div>'
@@ -2968,10 +3016,11 @@ function renderFinish(sorted, curEntries, prevRank){
     var moveStr = move === null ? '—' : move > 0 ? '<span style="color:var(--grn)">+' + move + '</span>' : move < 0 ? '<span style="color:var(--red)">' + move + '</span>' : '—';
     var isMe = myTeam && e.name.toLowerCase() === myTeam.toLowerCase();
     var pct = Math.round(e.score / maxScore * 100);
+    var reactId = 'react_' + e.name.replace(/[^a-z0-9]/gi,'_').toLowerCase() + '_' + currentWeek;
     var nameLink = '<a class="t-name-link" href="player.html?team=' + encodeURIComponent(e.name) + '">' + e.name + (isMe ? '<span class="my-team-badge">You</span>' : '') + '</a>';
     return '<tr' + (isMe ? ' class="is-me"' : '') + '>'
       + '<td class="finish-rank' + (wkRank <= 3 ? ' top' : '') + '">' + (wkRank <= 3 ? med[wkRank-1] : wkRank) + '</td>'
-      + '<td class="finish-name">' + nameLink + '</td>'
+      + '<td class="finish-name">' + nameLink + '<div class="react-section" id="' + reactId + '"></div></td>'
       + '<td class="finish-score">' + fmtScore(e.score) + '<div class="finish-pct-bar"><div class="finish-pct-fill" style="width:' + pct + '%"></div></div></td>'
       + '<td style="text-align:center;font-family:var(--fd);font-size:14px;color:var(--ink2)">' + (sznRank ? '#' + sznRank : '—') + '</td>'
       + '<td style="text-align:center">' + moveStr + '</td>'
@@ -2984,6 +3033,12 @@ function renderFinish(sorted, curEntries, prevRank){
     + '<th style="text-align:center">Season rank</th>'
     + '<th style="text-align:center">Move</th>'
     + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+
+  // Load reactions for all teams after render
+  byScore.forEach(function(e){
+    var reactId = 'react_' + e.name.replace(/[^a-z0-9]/gi,'_').toLowerCase() + '_' + currentWeek;
+    renderReactions(reactId, e.name, currentWeek);
+  });
 }
 
 // ── WEEKLY NUMBERS VIEW ───────────────────────────────────────
@@ -3210,6 +3265,150 @@ function saveFirstRun(){
 
 function skipFirstRun(){
   document.getElementById('firstrun-modal').classList.add('hidden');
+}
+
+
+// ── EMOJI REACTIONS ──────────────────────────────────────────
+var REACTIONS = ['🔥','💀','👑','😤','🤡'];
+var REACTION_NAMES = {
+  '🔥': 'fire', '💀': 'skull', '👑': 'crown', '😤': 'grind', '🤡': 'clown'
+};
+
+function getReactionKey(teamName, week){
+  return 'react_' + week + '_' + teamName.replace(/[^a-z0-9]/gi,'_').toLowerCase();
+}
+
+function loadReactions(teamName, week){
+  // Load from Firebase — path: /reactions/{week}/{teamSlug}
+  var slug = teamName.replace(/[^a-z0-9]/gi,'_').toLowerCase();
+  return fetch(FB_DB_URL + '/reactions2026/' + week + '/' + slug + '.json')
+    .then(function(r){ return r.json(); })
+    .catch(function(){ return null; });
+}
+
+function saveReaction(teamName, week, emoji, add){
+  var slug = teamName.replace(/[^a-z0-9]/gi,'_').toLowerCase();
+  var path = FB_DB_URL + '/reactions2026/' + week + '/' + slug + '/' + encodeURIComponent(emoji) + '.json';
+  // Get current count
+  return fetch(path)
+    .then(function(r){ return r.json(); })
+    .then(function(cur){
+      var count = (cur || 0) + (add ? 1 : -1);
+      if(count < 0) count = 0;
+      return fetch(path, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(count)});
+    });
+}
+
+function renderReactions(containerId, teamName, week){
+  var el = document.getElementById(containerId);
+  if(!el) return;
+  var myKey = 'my_react_' + week + '_' + teamName.replace(/[^a-z0-9]/gi,'_').toLowerCase();
+  var myReacted = {};
+  try{ myReacted = JSON.parse(localStorage.getItem(myKey) || '{}'); }catch(e){}
+
+  // Use codepoint to avoid emoji quote issues in onclick
+  el.innerHTML = '<div class="react-bar">' + REACTIONS.map(function(em){
+    var cls = 'react-btn' + (myReacted[em] ? ' reacted ' + (REACTION_NAMES[em]||'') : '');
+    var cp = em.codePointAt(0);
+    var safeContainer = containerId;
+    var safeName = teamName.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    return '<button class="'+cls+'" onclick="toggleReaction(\''+safeContainer+'\',\''+safeName+'\','+week+','+cp+')">'+em+' <span class="react-count" id="rc_'+containerId+'_'+cp+'">…</span></button>';
+  }).join('') + '</div>';
+
+  // Load counts from Firebase
+  loadReactions(teamName, week).then(function(data){
+    REACTIONS.forEach(function(em){
+      var countEl = document.getElementById('rc_'+containerId+'_'+em.codePointAt(0));
+      if(countEl) countEl.textContent = (data && data[em]) ? data[em] : '0';
+    });
+  });
+}
+
+function toggleReaction(containerId, teamName, week, cp){
+  // cp is codepoint of emoji
+  var emoji = String.fromCodePoint(cp);
+  var myKey = 'my_react_' + week + '_' + teamName.replace(/[^a-z0-9]/gi,'_').toLowerCase();
+  var myReacted = {};
+  try{ myReacted = JSON.parse(localStorage.getItem(myKey) || '{}'); }catch(e){}
+  var adding = !myReacted[emoji];
+  myReacted[emoji] = adding ? 1 : 0;
+  try{ localStorage.setItem(myKey, JSON.stringify(myReacted)); }catch(e){}
+  saveReaction(teamName, week, emoji, adding).then(function(){
+    renderReactions(containerId, teamName, week);
+  });
+}
+
+// ── SHARE CARD ───────────────────────────────────────────────
+var shareCardData = null;
+
+function openShareCard(){
+  if(!myTeam){
+    showToast('Set your team name first', true);
+    return;
+  }
+  var weeks = Object.keys(seasonData).filter(function(k){
+    return !isNaN(Number(k)) && seasonData[k] && seasonData[k].length > 0;
+  }).map(Number).sort(function(a,b){ return a-b; });
+  if(!weeks.length){ showToast('No data yet', true); return; }
+
+  var curWk = currentWeek;
+  var curEntries = seasonData[String(curWk)] || [];
+  var myEntry = curEntries.find(function(e){ return teamMatch(e.name, myTeam); });
+  if(!myEntry){ showToast('No data for your team this week', true); return; }
+
+  var sorted = curEntries.slice().sort(function(a,b){ return b.score-a.score; });
+  var wkRank = sorted.findIndex(function(e){ return e.name === myEntry.name; }) + 1;
+
+  // Season rank
+  var totals = {};
+  weeks.forEach(function(w){ (seasonData[String(w)]||[]).forEach(function(e){ totals[e.name]=(totals[e.name]||0)+e.score; }); });
+  var sznRanked = Object.keys(totals).sort(function(a,b){ return totals[b]-totals[a]; });
+  var sznRank = sznRanked.indexOf(myEntry.name) + 1;
+
+  shareCardData = {
+    name: myEntry.name,
+    score: myEntry.score,
+    wkRank: wkRank,
+    total: curEntries.length,
+    sznRank: sznRank,
+    week: curWk
+  };
+
+  var preview = document.getElementById('share-preview');
+  preview.innerHTML = '<div class="share-card-league">Fantasy Refresh · 2026 Season</div>'
+    + '<div class="share-card-name">' + myEntry.name + '</div>'
+    + '<div class="share-card-score">' + fmtScore(myEntry.score) + '</div>'
+    + '<div class="share-card-pts">points · week ' + curWk + '</div>'
+    + '<div class="share-card-stats">'
+    + '<div class="share-card-stat"><div class="share-card-stat-val">#' + wkRank + '</div><div class="share-card-stat-lbl">Week finish</div></div>'
+    + '<div class="share-card-stat"><div class="share-card-stat-val">#' + sznRank + '</div><div class="share-card-stat-lbl">Season rank</div></div>'
+    + '<div class="share-card-stat"><div class="share-card-stat-val">' + sorted.length + '</div><div class="share-card-stat-lbl">Teams</div></div>'
+    + '</div>'
+    + '<div class="share-card-url">fantasyrefresh.com</div>';
+
+  document.getElementById('share-modal').classList.remove('hidden');
+  document.getElementById('share-copy-confirm').textContent = '';
+}
+
+function copyShareText(){
+  if(!shareCardData) return;
+  var d = shareCardData;
+  var medals = ['🥇','🥈','🥉'];
+  var rankEmoji = d.wkRank <= 3 ? medals[d.wkRank-1] : '#'+d.wkRank;
+  var text = '🏈 Fantasy Refresh — Week ' + d.week + '\n'
+    + '👤 ' + d.name + '\n'
+    + '📊 ' + fmtScore(d.score) + ' pts · ' + rankEmoji + ' of ' + d.total + ' teams\n'
+    + '📈 Season rank: #' + d.sznRank + '\n'
+    + '🌐 fantasyrefresh.com';
+  navigator.clipboard.writeText(text).then(function(){
+    document.getElementById('share-copy-confirm').textContent = '✅ Copied! Paste into your group chat.';
+  }).catch(function(){
+    document.getElementById('share-copy-confirm').textContent = text;
+  });
+}
+
+function closeShare(){
+  document.getElementById('share-modal').classList.add('hidden');
 }
 
 // ── SEASON SWITCHER ───────────────────────────────────────────
