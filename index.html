@@ -675,8 +675,8 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
 .prof-dk-item:hover{border-color:var(--or);color:var(--or);}
 
 /* ── TEAM LOGIN ── */
-.login-modal{position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;}
-.login-modal.hidden{display:none !important;pointer-events:none !important;}
+.login-modal{position:fixed;inset:0;z-index:10000;align-items:center;justify-content:center;padding:20px;}
+.login-modal.hidden{display:none !important;}
 .login-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.92);backdrop-filter:blur(8px);z-index:-1;}
 .login-box{position:relative;z-index:1;background:#080E0E;border:1px solid var(--or);border-radius:20px;padding:36px 32px;max-width:420px;width:100%;text-align:center;box-shadow:0 24px 80px rgba(0,229,212,.15);}
 .login-logo{font-size:44px;margin-bottom:14px;}
@@ -708,113 +708,12 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
 .pc-export-btn{background:transparent;border:1px solid var(--or);color:var(--or);font-family:var(--fd);font-size:12px;font-weight:700;padding:8px 16px;border-radius:8px;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;}
 
 </style>
-  <!-- Firebase Auth via REST API — no SDK needed, no CSP issues -->
+  <!-- Auth config -->
   <script>
-    // Firebase config
     var FB_API_KEY = 'AIzaSyA-2hcf2hzThk7MuEm9DAvRICK95koE9gM';
-    var FB_AUTH_URL = 'https://identitytoolkit.googleapis.com/v1/accounts';
-    var GOOGLE_CLIENT_ID = '205961917241-webapp';
-
-    // Lightweight auth object that mimics Firebase SDK interface
-    var fbAuth = {
-      _user: null,
-      _listeners: [],
-      _token: null,
-
-      onAuthStateChanged: function(cb){
-        this._listeners.push(cb);
-        // Check stored session immediately
-        try{
-          var stored = localStorage.getItem('fr_auth_user');
-          if(stored){
-            var user = JSON.parse(stored);
-            // Verify token still valid
-            fbAuth._verifyToken(user).then(function(valid){
-              if(valid){
-                fbAuth._user = user;
-                fbAuth._token = user.idToken;
-                cb(user);
-              } else {
-                localStorage.removeItem('fr_auth_user');
-                cb(null);
-              }
-            });
-          } else {
-            setTimeout(function(){ cb(null); }, 100);
-          }
-        }catch(e){ cb(null); }
-      },
-
-      _verifyToken: function(user){
-        if(!user || !user.idToken) return Promise.resolve(false);
-        // Simple check — if token refresh time is recent, assume valid
-        var age = Date.now() - (user.lastRefresh || 0);
-        return Promise.resolve(age < 55 * 60 * 1000); // 55 min
-      },
-
-      _notify: function(user){
-        this._user = user;
-        this._listeners.forEach(function(cb){ cb(user); });
-      },
-
-      createUserWithEmailAndPassword: function(email, password){
-        return fetch(FB_AUTH_URL + ':signUp?key=' + FB_API_KEY, {
-          method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({email:email, password:password, returnSecureToken:true})
-        }).then(function(r){ return r.json(); }).then(function(d){
-          if(d.error) throw {code: d.error.message.toLowerCase().replace(/ /g,'_'), message: d.error.message};
-          var user = {uid:d.localId, email:d.email, idToken:d.idToken, refreshToken:d.refreshToken,
-            emailVerified:false, providerData:[{providerId:'password'}], lastRefresh:Date.now()};
-          return {user: user};
-        });
-      },
-
-      signInWithEmailAndPassword: function(email, password){
-        return fetch(FB_AUTH_URL + ':signInWithPassword?key=' + FB_API_KEY, {
-          method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({email:email, password:password, returnSecureToken:true})
-        }).then(function(r){ return r.json(); }).then(function(d){
-          if(d.error) throw {code:'auth/wrong-password', message:'Incorrect email or password'};
-          var user = {uid:d.localId, email:d.email, idToken:d.idToken, refreshToken:d.refreshToken,
-            emailVerified:true, providerData:[{providerId:'password'}], lastRefresh:Date.now()};
-          try{ localStorage.setItem('fr_auth_user', JSON.stringify(user)); }catch(e){}
-          fbAuth._token = d.idToken;
-          fbAuth._notify(user);
-          return {user:user};
-        });
-      },
-
-      sendEmailVerification: function(){
-        if(!fbAuth._token) return Promise.resolve();
-        return fetch(FB_AUTH_URL + ':sendOobCode?key=' + FB_API_KEY, {
-          method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({requestType:'VERIFY_EMAIL', idToken:fbAuth._token})
-        }).then(function(r){ return r.json(); });
-      },
-
-      sendPasswordResetEmail: function(email){
-        return fetch(FB_AUTH_URL + ':sendOobCode?key=' + FB_API_KEY, {
-          method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({requestType:'PASSWORD_RESET', email:email})
-        }).then(function(r){ return r.json(); }).then(function(d){
-          if(d.error) throw {message: d.error.message};
-        });
-      },
-
-      signOut: function(){
-        try{ localStorage.removeItem('fr_auth_user'); }catch(e){}
-        fbAuth._token = null;
-        fbAuth._notify(null);
-        return Promise.resolve();
-      },
-
-      get currentUser(){ return this._user; }
-    };
-
-    // Google Sign-In via redirect — uses Firebase REST
-    var googleProvider = {type: 'google'};
-
-    console.log('Firebase Auth REST ready ✓');
+    var FB_DB_URL  = 'https://fantasy-refresh-default-rtdb.firebaseio.com';
+    var LEAGUE_JOIN_CODE = 'REFRESH26';
+    var currentUser = null;
   </script>
 </head>
 <body>
@@ -838,7 +737,7 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
       </select>
     </div>
     <div style="display:flex;gap:6px;align-items:center;justify-content:flex-end;">
-      <button class="login-badge" id="login-badge" onclick="openSignIn()" style="position:relative;z-index:500;cursor:pointer;">🔑 Sign In</button>
+      <button class="login-badge" id="login-badge" onclick="openSignIn()">🔑 Sign In</button>
       <button class="comm-btn" onclick="toggleComm()" id="comm-toggle">⚙ Commissioner</button>
       <button class="comm-btn theme-toggle" onclick="toggleTheme()" id="theme-btn" title="Toggle light/dark mode">🌙</button>
     </div>
@@ -1164,7 +1063,7 @@ var myTeam = '';
 try{ myTeam = localStorage.getItem('fr_myteam') || ''; }catch(e){}
 
 // ── FIREBASE CONFIG ────────────────────────────────────────────
-var FB_DB_URL = 'https://fantasy-refresh-default-rtdb.firebaseio.com';
+// FB_DB_URL declared in head
 
 // ── STORAGE ────────────────────────────────────────────────────
 function save(){
@@ -3702,174 +3601,179 @@ function closeShare(){
 
 
 // ── AUTH SYSTEM ──────────────────────────────────────────────
-var currentUser = null;
-var LEAGUE_JOIN_CODE = 'REFRESH26'; // Commissioner can change this
 
-// Firebase auth state listener
-// ── AUTH INIT — runs after all functions defined ──────────────
-document.addEventListener('DOMContentLoaded', function(){
-  fbAuth.onAuthStateChanged(function(user){
-  if(user){
-    currentUser = user;
-    loadUserProfile(user.uid).then(function(profile){
-      if(!profile){
-        // New user — needs profile setup
-        if(!user.emailVerified && user.providerData[0].providerId === 'password'){
-          showAuthView('verify');
-          document.getElementById('verify-email-addr').textContent = user.email;
-        } else {
-          showAuthView('profile');
-          document.getElementById('login-modal').classList.remove('hidden');
-        }
-      } else {
-        // Existing user — load their team
-        myTeam = profile.team2026 || '';
+// ── SIGN IN MODAL ─────────────────────────────────────────────
+function openSignIn(){
+  var m = document.getElementById('login-modal');
+  if(!m){ console.error('login-modal not found'); return; }
+  // Show signin panel, hide others
+  ['auth-signin','auth-signup','auth-profile','auth-verify'].forEach(function(id){
+    var el = document.getElementById(id);
+    if(el) el.style.display = (id === 'auth-signin') ? 'block' : 'none';
+  });
+  m.style.cssText = 'display:flex !important;';
+  m.classList.remove('hidden');
+}
+
+function showAuthView(view){
+  var m = document.getElementById('login-modal');
+  if(!m) return;
+  ['auth-signin','auth-signup','auth-profile','auth-verify'].forEach(function(id){
+    var el = document.getElementById(id);
+    if(el) el.style.display = (id === 'auth-' + view) ? 'block' : 'none';
+  });
+  m.style.cssText = 'display:flex !important;';
+  m.classList.remove('hidden');
+}
+
+function skipLogin(){
+  var m = document.getElementById('login-modal');
+  if(m){ m.style.display = ''; m.classList.add('hidden'); }
+}
+
+function showLoginModal(){ openSignIn(); }
+function checkLoginState(){
+  // Check localStorage for saved session
+  try{
+    var stored = localStorage.getItem('fr_auth_user');
+    if(stored){
+      var user = JSON.parse(stored);
+      currentUser = user;
+      myTeam = user.team2026 || '';
+      try{ localStorage.setItem('fr_myteam', myTeam); }catch(e){}
+      var inp = document.getElementById('my-team-input');
+      if(inp) inp.value = myTeam;
+      updateLoginBadge(user);
+    }
+  }catch(e){}
+}
+
+// ── EMAIL SIGN IN ─────────────────────────────────────────────
+function submitEmailSignIn(){
+  var email = document.getElementById('si-email').value.trim();
+  var pass  = document.getElementById('si-pass').value;
+  var err   = document.getElementById('si-err');
+  err.textContent = '';
+  if(!email || !pass){ err.textContent = 'Enter email and password'; return; }
+  err.textContent = 'Signing in…';
+
+  fetch('https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=' + FB_API_KEY, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({email:email, password:pass, returnSecureToken:true})
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    if(d.error){ err.textContent = 'Incorrect email or password'; return; }
+    // Load profile from Firebase
+    return fetch(FB_DB_URL + '/users2026/' + d.localId + '.json')
+      .then(function(r){ return r.json(); })
+      .then(function(profile){
+        var user = {
+          uid: d.localId, email: d.email,
+          idToken: d.idToken, team2026: profile ? profile.team2026 : null,
+          dk2025: profile ? profile.dk2025 : null
+        };
+        try{ localStorage.setItem('fr_auth_user', JSON.stringify(user)); }catch(e){}
+        currentUser = user;
+        myTeam = user.team2026 || '';
         try{ localStorage.setItem('fr_myteam', myTeam); }catch(e){}
         var inp = document.getElementById('my-team-input');
         if(inp) inp.value = myTeam;
-        document.getElementById('login-modal').classList.add('hidden');
-        updateLoginBadge(user, profile);
-        renderAll();
-      }
-    });
-  } else {
-    currentUser = null;
-    updateLoginBadge(null, null);
-  }
-  });
-}); // end DOMContentLoaded
-
-function loadUserProfile(uid){
-  return fetch(FB_DB_URL + '/users2026/' + uid + '.json')
-    .then(function(r){ return r.json(); });
+        skipLogin();
+        updateLoginBadge(user);
+        if(!user.team2026){ showAuthView('profile'); }
+        else { renderAll(); showToast('Welcome back, ' + myTeam + '! 🏈'); }
+      });
+  })
+  .catch(function(e){ err.textContent = 'Sign in failed — try again'; });
 }
 
-function saveUserProfile(uid, profile){
-  return fetch(FB_DB_URL + '/users2026/' + uid + '.json', {
-    method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(profile)
-  });
-}
-
-// ── SIGN IN / SIGN UP ─────────────────────────────────────────
-function signInWithGoogle(){
-  // Google Sign-In via Firebase Auth REST redirect
-  var redirectUrl = encodeURIComponent(window.location.href);
-  var googleAuthUrl = 'https://accounts.google.com/o/oauth2/v2/auth'
-    + '?client_id=205961917241-webapp.apps.googleusercontent.com'
-    + '&redirect_uri=' + encodeURIComponent('https://fantasy-refresh.firebaseapp.com/__/auth/handler')
-    + '&response_type=code&scope=email%20profile'
-    + '&state=' + encodeURIComponent(JSON.stringify({redirectUrl:window.location.href}));
-  
-  // Use Firebase hosted UI for Google — simplest approach
-  var firebaseUiUrl = 'https://fantasy-refresh.firebaseapp.com/__/auth/action'
-    + '?mode=signIn&apiKey=' + FB_API_KEY;
-  
-  // Simplest working approach: tell user to use email for now
-  var errEl = document.getElementById('si-err');
-  if(errEl){
-    errEl.textContent = 'Google sign-in coming soon — please use email/password below';
-    errEl.style.color = 'var(--or)';
-  }
-  showAuthView('signin');
-}
-
-function submitEmailSignIn(){
-  var email = document.getElementById('si-email').value.trim();
-  var pass = document.getElementById('si-pass').value;
-  var err = document.getElementById('si-err');
-  err.textContent = '';
-  if(!email || !pass){ err.textContent = 'Enter email and password'; return; }
-  if(!fbAuth){ err.textContent = 'Auth not available'; return; }
-  err.textContent = 'Signing in…';
-  fbAuth.signInWithEmailAndPassword(email, pass)
-    .catch(function(e){
-      err.textContent = e.code === 'auth/wrong-password' || e.code === 'auth/user-not-found'
-        ? 'Incorrect email or password' : e.message;
-    });
-}
-
+// ── EMAIL SIGN UP ─────────────────────────────────────────────
 function submitEmailSignUp(){
   var email = document.getElementById('su-email').value.trim();
-  var pass = document.getElementById('su-pass').value;
-  var code = document.getElementById('su-code').value.trim().toUpperCase();
-  var err = document.getElementById('su-err');
+  var pass  = document.getElementById('su-pass').value;
+  var code  = document.getElementById('su-code').value.trim().toUpperCase();
+  var err   = document.getElementById('su-err');
   err.textContent = '';
-
   if(!email){ err.textContent = 'Enter your email'; return; }
   if(pass.length < 6){ err.textContent = 'Password must be at least 6 characters'; return; }
   if(code !== LEAGUE_JOIN_CODE){ err.textContent = 'Incorrect join code — ask your commissioner'; return; }
-
   err.textContent = 'Creating account…';
-  fbAuth.createUserWithEmailAndPassword(email, pass)
-    .then(function(result){
-      var user = result.user;
-      try{ localStorage.setItem('fr_auth_user', JSON.stringify(user)); }catch(e){}
-      fbAuth._token = user.idToken;
-      fbAuth.sendEmailVerification();
-      showAuthView('verify');
-      document.getElementById('verify-email-addr').textContent = email;
-    })
-    .catch(function(e){
-      err.textContent = e.code === 'auth/email_exists' || (e.message && e.message.includes('EMAIL_EXISTS'))
-        ? 'An account with this email already exists' : (e.message || 'Sign up failed');
+
+  fetch('https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=' + FB_API_KEY, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({email:email, password:pass, returnSecureToken:true})
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    if(d.error){
+      err.textContent = d.error.message.includes('EMAIL_EXISTS')
+        ? 'An account with this email already exists' : d.error.message;
+      return;
+    }
+    currentUser = {uid:d.localId, email:d.email, idToken:d.idToken};
+    try{ localStorage.setItem('fr_auth_user', JSON.stringify(currentUser)); }catch(e){}
+    // Send verification email
+    fetch('https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=' + FB_API_KEY, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({requestType:'VERIFY_EMAIL', idToken:d.idToken})
     });
+    showAuthView('verify');
+    document.getElementById('verify-email-addr').textContent = email;
+  })
+  .catch(function(){ err.textContent = 'Sign up failed — try again'; });
 }
 
-function checkEmailVerified(){
-  // For REST auth, skip email verification for simplicity
-  // Just proceed to profile setup
-  showAuthView('profile');
-}
+// ── OTHER AUTH FUNCTIONS ──────────────────────────────────────
+function checkEmailVerified(){ showAuthView('profile'); }
 
 function resendVerification(){
-  fbAuth.currentUser.sendEmailVerification()
-    .then(function(){ showToast('Verification email resent ✓'); })
-    .catch(function(){ showToast('Could not resend — try again shortly', true); });
+  if(!currentUser || !currentUser.idToken) return;
+  fetch('https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=' + FB_API_KEY, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({requestType:'VERIFY_EMAIL', idToken:currentUser.idToken})
+  }).then(function(){ showToast('Verification email resent ✓'); });
 }
 
 function showForgotPassword(){
   var email = document.getElementById('si-email').value.trim();
   if(!email){ document.getElementById('si-err').textContent = 'Enter your email first'; return; }
-  fbAuth.sendPasswordResetEmail(email)
-    .then(function(){ showToast('Password reset email sent to ' + email + ' ✓'); })
-    .catch(function(e){ document.getElementById('si-err').textContent = e.message; });
+  fetch('https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=' + FB_API_KEY, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({requestType:'PASSWORD_RESET', email:email})
+  }).then(function(){ showToast('Password reset email sent to ' + email); });
+}
+
+function signInWithGoogle(){
+  document.getElementById('si-err').textContent = 'Google sign-in coming soon — please use email/password';
+  document.getElementById('si-err').style.color = 'var(--or)';
 }
 
 // ── PROFILE SETUP ─────────────────────────────────────────────
 var selectedDkTeam = null;
-var teamNameAvail = false;
+var teamNameAvail  = false;
 
 function checkTeamAvail(name){
   var status = document.getElementById('prof-team-status');
   if(!name || name.length < 2){ status.textContent = ''; teamNameAvail = false; return; }
-  status.textContent = 'Checking…';
-  status.style.color = 'var(--ink3)';
-  // Check if team name already claimed
+  status.textContent = 'Checking…'; status.style.color = 'var(--ink3)';
   fetch(FB_DB_URL + '/teamNames2026/' + encodeURIComponent(name.trim().toLowerCase()) + '.json')
     .then(function(r){ return r.json(); })
     .then(function(data){
-      if(data && data.uid && data.uid !== fbAuth.currentUser.uid){
-        status.textContent = '✗ That name is taken';
-        status.style.color = 'var(--pk)';
-        teamNameAvail = false;
-      } else {
-        status.textContent = '✓ Available!';
-        status.style.color = 'var(--or)';
-        teamNameAvail = true;
-      }
+      var taken = data && data.uid && currentUser && data.uid !== currentUser.uid;
+      status.textContent = taken ? '✗ That name is taken' : '✓ Available!';
+      status.style.color = taken ? 'var(--pk)' : 'var(--or)';
+      teamNameAvail = !taken;
     });
 }
 
 function searchDkTeams(query){
   var el = document.getElementById('prof-dk-results');
   if(!query || query.length < 2){ el.innerHTML = ''; return; }
-  // Search 2025 season data for matching team names
   var weeks = Object.keys(seasonData).filter(function(k){ return !isNaN(Number(k)) && seasonData[k]; });
   var allTeams = {};
   weeks.forEach(function(w){ (seasonData[w]||[]).forEach(function(e){ allTeams[e.name]=1; }); });
-  var matches = Object.keys(allTeams).filter(function(n){
-    return n.toLowerCase().includes(query.toLowerCase());
-  }).slice(0, 6);
+  var matches = Object.keys(allTeams).filter(function(n){ return n.toLowerCase().includes(query.toLowerCase()); }).slice(0,6);
   el.innerHTML = matches.map(function(name){
     return '<div class="prof-dk-item" data-name="'+encodeURIComponent(name)+'" onclick="selectDkTeam(decodeURIComponent(this.dataset.name))">'+name+'</div>';
   }).join('') || '<div style="font-size:12px;color:var(--ink3);padding:4px;">No matches found</div>';
@@ -3886,112 +3790,70 @@ function submitProfile(){
   var teamName = document.getElementById('prof-team').value.trim();
   var err = document.getElementById('prof-err');
   err.textContent = '';
-
   if(!teamName){ err.textContent = 'Choose a team name'; return; }
-  if(!teamNameAvail){ err.textContent = 'That team name is taken — try another'; return; }
-
-  var uid = fbAuth.currentUser.uid;
-  var profile = {
-    team2026: teamName,
-    dk2025: selectedDkTeam || null,
-    email: fbAuth.currentUser.email || null,
-    displayName: fbAuth.currentUser.displayName || null,
-    created: Date.now()
-  };
-
+  if(!teamNameAvail){ err.textContent = 'That name is taken — try another'; return; }
+  if(!currentUser){ err.textContent = 'Not signed in'; return; }
   err.textContent = 'Saving…';
 
-  // Save profile + claim team name
+  var profile = { team2026:teamName, dk2025:selectedDkTeam||null, email:currentUser.email||null, created:Date.now() };
+
   Promise.all([
-    saveUserProfile(uid, profile),
+    fetch(FB_DB_URL + '/users2026/' + currentUser.uid + '.json', {
+      method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(profile)
+    }),
     fetch(FB_DB_URL + '/teamNames2026/' + encodeURIComponent(teamName.toLowerCase()) + '.json', {
       method:'PUT', headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({uid: uid, team: teamName})
+      body:JSON.stringify({uid:currentUser.uid, team:teamName})
     })
   ]).then(function(){
+    currentUser.team2026 = teamName;
+    currentUser.dk2025   = selectedDkTeam || null;
+    try{ localStorage.setItem('fr_auth_user', JSON.stringify(currentUser)); }catch(e){}
     myTeam = teamName;
     try{ localStorage.setItem('fr_myteam', teamName); }catch(e){}
     var inp = document.getElementById('my-team-input');
     if(inp) inp.value = teamName;
-    document.getElementById('login-modal').classList.add('hidden');
-    updateLoginBadge(fbAuth.currentUser, profile);
+    skipLogin();
+    updateLoginBadge(currentUser);
     renderAll();
     showToast('Welcome to Fantasy Refresh, ' + teamName + '! 🏈');
-  }).catch(function(e){
-    err.textContent = 'Could not save profile — try again';
-  });
+  }).catch(function(){ err.textContent = 'Could not save — try again'; });
 }
 
-// ── UI HELPERS ────────────────────────────────────────────────
-function openSignIn(){
-  console.log('openSignIn called');
-  var modal = document.getElementById('login-modal');
-  var signin = document.getElementById('auth-signin');
-  console.log('modal:', modal);
-  console.log('signin:', signin);
-  if(modal){
-    modal.style.display = 'flex';
-    modal.style.zIndex = '99999';
-    modal.classList.remove('hidden');
-  }
-  if(signin) signin.style.display = 'block';
-}
-
-function showAuthView(view){
-  ['auth-signin','auth-signup','auth-profile','auth-verify'].forEach(function(id){
-    var el = document.getElementById(id);
-    if(el) el.style.display = 'none';
-  });
-  var target = document.getElementById('auth-' + view);
-  if(target) target.style.display = 'block';
-  document.getElementById('login-modal').classList.remove('hidden');
-}
-
-function skipLogin(){
-  document.getElementById('login-modal').classList.add('hidden');
-}
-
-function updateLoginBadge(user, profile){
+// ── BADGE + SIGN OUT ──────────────────────────────────────────
+function updateLoginBadge(user){
   var badge = document.getElementById('login-badge');
   if(!badge) return;
-  if(user && profile && profile.team2026){
-    badge.innerHTML = '👤 ' + profile.team2026;
+  if(user && user.team2026){
+    badge.textContent = '👤 ' + user.team2026;
     badge.onclick = showUserMenu;
   } else if(user){
-    badge.innerHTML = '✏️ Set up team';
+    badge.textContent = '✏️ Set up team';
     badge.onclick = function(){ showAuthView('profile'); };
   } else {
-    badge.innerHTML = '🔑 Sign In';
-    badge.onclick = function(){ showAuthView('signin'); };
+    badge.textContent = '🔑 Sign In';
+    badge.onclick = openSignIn;
   }
 }
 
 function showUserMenu(){
-  var name = myTeam || (fbAuth.currentUser ? fbAuth.currentUser.email : '');
+  var name = myTeam || (currentUser ? currentUser.email : '');
   if(confirm('Signed in as: ' + name + ' — Sign out?')){
-    fbAuth.signOut().then(function(){
-      myTeam = '';
-      try{ localStorage.removeItem('fr_myteam'); }catch(e){}
-      var inp = document.getElementById('my-team-input');
-      if(inp) inp.value = '';
-      renderAll();
-      showToast('Signed out');
-    });
+    currentUser = null;
+    myTeam = '';
+    try{ localStorage.removeItem('fr_auth_user'); localStorage.removeItem('fr_myteam'); }catch(e){}
+    var inp = document.getElementById('my-team-input');
+    if(inp) inp.value = '';
+    updateLoginBadge(null);
+    renderAll();
+    showToast('Signed out');
   }
-}
-
-function showLoginModal(){ showAuthView('signin'); }
-
-function checkLoginState(){
-  // onAuthStateChanged handles everything — this is a no-op now
-  // but kept so existing calls don't break
 }
 
 // ── COMMISSIONER USER PANEL ───────────────────────────────────
 function renderUserPanel(){
   var el = document.getElementById('user-panel');
   if(!el) return;
-  el.innerHTML = '<div style="color:var(--ink3);font-size:13px;margin-bottom:8px;">Loading registered users…</div>';
   fetch(FB_DB_URL + '/users2026.json')
     .then(function(r){ return r.json(); })
     .then(function(data){
@@ -3999,24 +3861,91 @@ function renderUserPanel(){
       var users = Object.entries(data).map(function(kv){ return Object.assign({uid:kv[0]}, kv[1]); })
         .sort(function(a,b){ return (a.team2026||'').localeCompare(b.team2026||''); });
       var rows = users.map(function(u){
-        return '<tr>'
-          +'<td style="font-family:var(--fd);font-size:13px;font-weight:700;color:var(--or);">'+(u.team2026||'<em style="color:var(--ink3)">Not set</em>')+'</td>'
-          +'<td style="font-size:12px;color:var(--ink2);">'+(u.email||u.displayName||'Google')+'</td>'
-          +'<td style="font-size:12px;color:var(--ink3);">'+(u.dk2025||'—')+'</td>'
-          +'</tr>';
+        return '<tr><td style="font-family:var(--fd);font-size:13px;font-weight:700;color:var(--or);">'+(u.team2026||'<em style="color:var(--ink3)">Not set</em>')+'</td>'
+          +'<td style="font-size:12px;color:var(--ink2);">'+(u.email||'Google')+'</td>'
+          +'<td style="font-size:12px;color:var(--ink3);">'+(u.dk2025||'—')+'</td></tr>';
       }).join('');
-      el.innerHTML = '<table class="pc-table"><thead><tr>'
-        +'<th>2026 Team</th><th>Account</th><th>2025 DK Team</th>'
-        +'</tr></thead><tbody>'+rows+'</tbody></table>';
-    });
+      el.innerHTML = '<table class="pc-table"><thead><tr><th>2026 Team</th><th>Account</th><th>2025 DK</th></tr></thead><tbody>'+rows+'</tbody></table>';
+    })
+    .catch(function(){ el.innerHTML = '<div style="color:var(--pk);font-size:13px;">Could not load</div>'; });
 }
 
-// ── PASSCODE FUNCTIONS (kept as fallback) ─────────────────────
 function generatePasscode(){
   var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   var code = '';
-  for(var i=0; i<6; i++) code += chars[Math.floor(Math.random()*chars.length)];
+  for(var i=0;i<6;i++) code += chars[Math.floor(Math.random()*chars.length)];
   return code;
+}
+
+function renderPasscodeManager(){
+  var el = document.getElementById('passcode-manager');
+  if(!el) return;
+  fetch(FB_DB_URL + '/passcodes2026.json')
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      if(!data){
+        el.innerHTML = '<button class="pc-gen-btn" onclick="generateAllPasscodes()">⚡ Generate Passcodes for All Teams</button>';
+        return;
+      }
+      var entries = Object.values(data).sort(function(a,b){ return a.team.localeCompare(b.team); });
+      var rows = entries.map(function(e){
+        var slug = e.team.toLowerCase().replace(/[^a-z0-9]/g,'_');
+        return '<tr><td>'+e.team+'</td><td><span class="pc-code">'+e.passcode+'</span></td>'
+          +'<td><button class="pc-reset-btn" data-slug="'+slug+'" data-team="'+encodeURIComponent(e.team)+'" onclick="handleResetPasscode(this)">Reset</button></td></tr>';
+      }).join('');
+      el.innerHTML = '<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">'
+        +'<button class="pc-gen-btn" onclick="generateAllPasscodes()">⚡ Generate for All Teams</button>'
+        +'<button class="pc-export-btn" onclick="exportPasscodes()">📋 Copy All</button></div>'
+        +'<div style="overflow-x:auto;max-height:300px;overflow-y:auto;">'
+        +'<table class="pc-table"><thead><tr><th>Team</th><th>Passcode</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+    })
+    .catch(function(){ el.innerHTML = '<div style="color:var(--pk);">Could not load</div>'; });
+}
+
+function handleResetPasscode(btn){
+  var slug = btn.getAttribute('data-slug');
+  var teamName = decodeURIComponent(btn.getAttribute('data-team'));
+  resetPasscode(slug, teamName);
+}
+
+function resetPasscode(slug, teamName){
+  var newCode = generatePasscode();
+  fetch(FB_DB_URL + '/passcodes2026/' + slug + '.json', {
+    method:'PUT', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({team:teamName, passcode:newCode, created:Date.now()})
+  }).then(function(){
+    showToast('New code for ' + teamName + ': ' + newCode);
+    renderPasscodeManager();
+  });
+}
+
+function generateAllPasscodes(){
+  var weeks = Object.keys(seasonData).filter(function(k){ return !isNaN(Number(k)) && seasonData[k] && seasonData[k].length; });
+  if(!weeks.length){ showToast('Import at least one week first', true); return; }
+  var teams = {};
+  weeks.forEach(function(w){ (seasonData[w]||[]).forEach(function(e){ teams[e.name]=1; }); });
+  var passcodes = {};
+  Object.keys(teams).sort().forEach(function(name){
+    var slug = name.toLowerCase().replace(/[^a-z0-9]/g,'_');
+    passcodes[slug] = {team:name, passcode:generatePasscode(), created:Date.now()};
+  });
+  fetch(FB_DB_URL + '/passcodes2026.json', {
+    method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(passcodes)
+  }).then(function(){
+    showToast('Passcodes generated ✓');
+    renderPasscodeManager();
+  });
+}
+
+function exportPasscodes(){
+  fetch(FB_DB_URL + '/passcodes2026.json')
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      if(!data){ showToast('No passcodes yet', true); return; }
+      var text = Object.values(data).sort(function(a,b){ return a.team.localeCompare(b.team); })
+        .map(function(e){ return e.team + ' → ' + e.passcode; }).join('\n');
+      navigator.clipboard.writeText(text).then(function(){ showToast('Copied ✓'); });
+    });
 }
 
 // ── SEASON SWITCHER ───────────────────────────────────────────
