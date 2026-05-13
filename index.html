@@ -543,6 +543,14 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
 .nav-tab.active svg{stroke:var(--or);}
 [data-theme="light"] .nav-tab-bar{background:var(--hdr);}
 
+/* SEASON SWITCHER */
+.season-switcher{display:flex;align-items:center;}
+.season-select{background:rgba(0,229,212,.1);border:1px solid var(--or);color:var(--or);font-family:var(--fd);font-size:13px;font-weight:800;letter-spacing:.5px;padding:6px 28px 6px 12px;border-radius:20px;cursor:pointer;outline:none;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2300E5D4' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;transition:all .15s;}
+.season-select:hover{background-color:rgba(0,229,212,.15);}
+.season-select option{background:#060E0E;color:var(--ink);font-weight:700;}
+[data-theme="light"] .season-select option{background:#FFFFFF;color:#0A1818;}
+.theme-toggle{font-size:15px;padding:4px 8px;}
+
 /* ── FIX 2: FIRST RUN MODAL ── */
 .firstrun-modal{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;}
 .firstrun-modal.hidden{display:none;}
@@ -639,10 +647,14 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
     </div>
   </div>
   <div class="hdr-r">
-    <div class="s-badge">2026 Season</div>
+    <div class="season-switcher">
+      <select class="season-select" id="season-select" onchange="switchSeason(this.value)" title="Switch season">
+        <option value="2026" selected>📅 2026 Season</option>
+        <option value="2025">📦 2025 Archive</option>
+      </select>
+    </div>
     <div class="hdr-sub" id="hdr-sub">Ready to import</div>
     <div style="display:flex;gap:6px;align-items:center;justify-content:flex-end;">
-      <a href="archive2025.html" class="comm-btn" style="text-decoration:none;">📦 2025 Archive</a>
       <button class="comm-btn" onclick="toggleComm()" id="comm-toggle">⚙ Commissioner</button>
       <button class="comm-btn theme-toggle" onclick="toggleTheme()" id="theme-btn" title="Toggle light/dark mode">🌙</button>
     </div>
@@ -882,6 +894,10 @@ function loadFromCloud(){
   .then(function(data){
     if(data && typeof data === 'object' && !data.error){
       seasonData = data;
+      setLoading(false);
+      boot();
+    } else if(data === null){
+      // Empty database — new season, no data yet
       setLoading(false);
       boot();
     } else {
@@ -3194,6 +3210,17 @@ function saveFirstRun(){
 
 function skipFirstRun(){
   document.getElementById('firstrun-modal').classList.add('hidden');
+}
+
+// ── SEASON SWITCHER ───────────────────────────────────────────
+function switchSeason(val){
+  if(val === '2025'){
+    window.location.href = 'archive2025.html';
+  } else {
+    // Already on 2026 — reset selector in case they navigated back
+    var sel = document.getElementById('season-select');
+    if(sel) sel.value = '2026';
+  }
 }
 
 function toggleTheme(){

@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Fantasy Refresh — 2025 Archive Archive</title>
+<title>Fantasy Refresh — 2025 Season Archive</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='50' fill='%23050808'/><!-- top arc teal with arrowhead --><path d='M80 50 C80 28 66 14 50 14 C34 14 20 28 20 50' fill='none' stroke='%2300E5D4' stroke-width='7' stroke-linecap='round'/><!-- teal arrowhead at top tip --><line x1='50' y1='14' x2='42' y2='24' stroke='%2300E5D4' stroke-width='7' stroke-linecap='round'/><line x1='50' y1='14' x2='58' y2='24' stroke='%2300E5D4' stroke-width='7' stroke-linecap='round'/><!-- bottom arc pink with arrowhead --><path d='M20 50 C20 72 34 86 50 86 C66 86 80 72 80 50' fill='none' stroke='%23FF5FA0' stroke-width='7' stroke-linecap='round'/><!-- pink arrowhead at bottom tip --><line x1='50' y1='86' x2='42' y2='76' stroke='%23FF5FA0' stroke-width='7' stroke-linecap='round'/><line x1='50' y1='86' x2='58' y2='76' stroke='%23FF5FA0' stroke-width='7' stroke-linecap='round'/><!-- lace seam --><line x1='35' y1='50' x2='65' y2='50' stroke='%23F0FAFA' stroke-width='2' stroke-linecap='round'/><!-- lace stitches --><line x1='46' y1='44' x2='46' y2='56' stroke='%23F0FAFA' stroke-width='2' stroke-linecap='round'/><line x1='54' y1='44' x2='54' y2='56' stroke='%23F0FAFA' stroke-width='2' stroke-linecap='round'/></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@400;500&display=swap" rel="stylesheet">
@@ -543,6 +543,14 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
 .nav-tab.active svg{stroke:var(--or);}
 [data-theme="light"] .nav-tab-bar{background:var(--hdr);}
 
+/* SEASON SWITCHER */
+.season-switcher{display:flex;align-items:center;}
+.season-select{background:rgba(0,229,212,.1);border:1px solid var(--or);color:var(--or);font-family:var(--fd);font-size:13px;font-weight:800;letter-spacing:.5px;padding:6px 28px 6px 12px;border-radius:20px;cursor:pointer;outline:none;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2300E5D4' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;transition:all .15s;}
+.season-select:hover{background-color:rgba(0,229,212,.15);}
+.season-select option{background:#060E0E;color:var(--ink);font-weight:700;}
+[data-theme="light"] .season-select option{background:#FFFFFF;color:#0A1818;}
+.theme-toggle{font-size:15px;padding:4px 8px;}
+
 /* ── FIX 2: FIRST RUN MODAL ── */
 .firstrun-modal{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;}
 .firstrun-modal.hidden{display:none;}
@@ -628,7 +636,6 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
 <body>
 <div class="wrap">
 
-<div style="background:#3A0018;padding:8px 20px;font-family:var(--fd);font-size:12px;font-weight:700;color:var(--pk);text-transform:uppercase;letter-spacing:1px;text-align:center;border-bottom:1px solid var(--pk);">📦 2025 Season Archive — Read Only · <a href="index.html" style="color:var(--or);text-decoration:none;">Go to 2026 Season →</a></div>
 <div class="hdr">
   <div class="logo">
     <div class="logo-box">
@@ -640,7 +647,12 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
     </div>
   </div>
   <div class="hdr-r">
-    <div class="s-badge">2025 Season</div>
+    <div class="season-switcher">
+      <select class="season-select" id="season-select" onchange="switchSeason(this.value)" title="Switch season">
+        <option value="2026">📅 2026 Season</option>
+        <option value="2025" selected>📦 2025 Archive</option>
+      </select>
+    </div>
     <div class="hdr-sub" id="hdr-sub">Ready to import</div>
     <div style="display:flex;gap:6px;align-items:center;justify-content:flex-end;">
       <button class="comm-btn" onclick="toggleComm()" id="comm-toggle" style="display:none">⚙ Commissioner</button>
@@ -651,7 +663,7 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
 
 <div class="wk-bar">
   <div class="wk-bar-label">
-    <span id="wk-bar-season">2025 Season</span>
+    <span id="wk-bar-season">2025 Archive</span>
   </div>
   <select class="wk-select" id="wk-select" onchange="setWeekFromSelect(this.value)">
   </select>
@@ -882,6 +894,10 @@ function loadFromCloud(){
   .then(function(data){
     if(data && typeof data === 'object' && !data.error){
       seasonData = data;
+      setLoading(false);
+      boot();
+    } else if(data === null){
+      // Empty database — new season, no data yet
       setLoading(false);
       boot();
     } else {
@@ -3194,6 +3210,16 @@ function saveFirstRun(){
 
 function skipFirstRun(){
   document.getElementById('firstrun-modal').classList.add('hidden');
+}
+
+// ── SEASON SWITCHER ───────────────────────────────────────────
+function switchSeason(val){
+  if(val === '2026'){
+    window.location.href = 'index.html';
+  } else {
+    var sel = document.getElementById('season-select');
+    if(sel) sel.value = '2025';
+  }
 }
 
 function toggleTheme(){
