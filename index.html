@@ -677,9 +677,9 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
 .prof-dk-item:hover{border-color:var(--or);color:var(--or);}
 
 /* ── TEAM LOGIN ── */
-.login-modal{position:fixed;inset:0;z-index:9800;display:flex;align-items:center;justify-content:center;padding:20px;}
+.login-modal{position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;}
 .login-modal.hidden{display:none;}
-.login-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.92);backdrop-filter:blur(8px);}
+.login-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.92);backdrop-filter:blur(8px);z-index:-1;}
 .login-box{position:relative;z-index:1;background:#080E0E;border:1px solid var(--or);border-radius:20px;padding:36px 32px;max-width:420px;width:100%;text-align:center;box-shadow:0 24px 80px rgba(0,229,212,.15);}
 .login-logo{font-size:44px;margin-bottom:14px;}
 .login-title{font-family:var(--fd);font-size:26px;font-weight:800;color:var(--or);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;}
@@ -733,7 +733,7 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
     </div>
     <div class="hdr-sub" id="hdr-sub">Ready to import</div>
     <div style="display:flex;gap:6px;align-items:center;justify-content:flex-end;">
-      <button class="login-badge" id="login-badge" onclick="showAuthView('signin')">🔑 Sign In</button>
+      <button class="login-badge" id="login-badge" onclick="document.getElementById('login-modal').classList.remove('hidden');document.getElementById('auth-signin').style.display='block';">🔑 Sign In</button>
       <button class="comm-btn" onclick="toggleComm()" id="comm-toggle">⚙ Commissioner</button>
       <button class="comm-btn theme-toggle" onclick="toggleTheme()" id="theme-btn" title="Toggle light/dark mode">🌙</button>
     </div>
@@ -3434,15 +3434,8 @@ function renderNumbers(curEntries){
 
 // ── FIRST RUN PROMPT ──────────────────────────────────────────
 function checkFirstRun(){
-  try{
-    var seen = localStorage.getItem('fr_seen');
-    var savedTeam = localStorage.getItem('fr_myteam');
-    if(!seen && !savedTeam){
-      document.getElementById('firstrun-modal').classList.remove('hidden');
-      setTimeout(function(){ document.getElementById('firstrun-input').focus(); }, 300);
-    }
-    localStorage.setItem('fr_seen','1');
-  }catch(e){}
+  // Disabled — Firebase auth system handles new user onboarding
+  try{ localStorage.setItem('fr_seen','1'); }catch(e){}
 }
 
 function saveFirstRun(){
