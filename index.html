@@ -1413,6 +1413,8 @@ function renderSeasonWrap(){
     var e = wk18entries.find(function(e){ return teamMatch(e.name, name); });
     return e ? fmtScore(e.score) + ' pts (Wk 18)' : 'Season total: ' + fmtTotal(teamTotals[name]);
   }
+
+  function podium3(teams, labelFn, valFn, subFn){
     var medals = ['🥇','🥈','🥉'];
     var order = [1,0,2]; // visual podium order: 2nd, 1st, 3rd
     return '<div class="sw-podium">'
@@ -1552,29 +1554,29 @@ function renderSeasonWrap(){
     // MOST STARTED BY POSITION
     + '<div class="sw-section"><div class="sw-section-hdr" style="color:var(--or)">👥 Most Started Players — Full Season</div>'
     + '<div style="display:flex;flex-direction:column;gap:0;">'
-    + [
-        topQB[0] ? {label:'QB', emoji:'🏈', d:topQB[0], color:'var(--or)'} : null,
-        topRBs[0] ? {label:'RB 1', emoji:'🏃', d:topRBs[0], color:'var(--or)'} : null,
-        topRBs[1] ? {label:'RB 2', emoji:'🏃', d:topRBs[1], color:'var(--pk)'} : null,
-        topWRs[0] ? {label:'WR 1', emoji:'⚡', d:topWRs[0], color:'var(--or)'} : null,
-        topWRs[1] ? {label:'WR 2', emoji:'⚡', d:topWRs[1], color:'var(--pk)'} : null,
-        topWRs[2] ? {label:'WR 3', emoji:'⚡', d:topWRs[2], color:'var(--pu)'} : null,
-        topTE[0] ? {label:'TE', emoji:'🎯', d:topTE[0], color:'var(--or)'} : null,
-        topFlex ? {label:'FLEX ('+topFlex.label+')', emoji:'💫', d:topFlex, color:'var(--pu)'} : null,
-        topDST[0] ? {label:'DEF', emoji:'🛡️', d:topDST[0], color:'var(--pk)'} : null
-      ].filter(Boolean).map(function(slot, i){
-        var pct = Math.round(slot.d.count / totalPossible * 100);
-        var barPct = pct;
-        return '<div style="display:flex;align-items:center;gap:0;border-bottom:1px solid var(--bdr);background:'+(i%2===0?'var(--bg3)':'var(--bg4)')+';">'
-          + '<div style="min-width:72px;padding:11px 14px;font-family:var(--fd);font-size:12px;font-weight:800;color:'+slot.color+';text-transform:uppercase;letter-spacing:.5px;border-right:1px solid var(--bdr);">'+slot.label+'</div>'
-          + '<div style="flex:1;padding:11px 14px;font-family:var(--fd);font-size:15px;font-weight:700;color:var(--ink);">'+slot.d.player+'</div>'
-          + '<div style="padding:11px 14px;text-align:right;border-left:1px solid var(--bdr);min-width:120px;">'
-          + '<div style="font-family:var(--fd);font-size:13px;font-weight:700;color:'+slot.color+';">'+slot.d.count+' starts</div>'
-          + '<div style="font-size:10px;color:var(--ink3);font-family:var(--fd);">'+pct+'% of possible</div>'
-          + '<div style="height:3px;background:var(--bdr);border-radius:2px;margin-top:4px;"><div style="height:3px;background:'+slot.color+';border-radius:2px;width:'+barPct+'%"></div></div>'
-          + '</div>'
-          + '</div>';
-      }).join('')
+    + (function(){
+        return [
+          topQB[0] ? {label:'QB', emoji:'🏈', d:topQB[0], color:'var(--or)'} : null,
+          topRBs[0] ? {label:'RB 1', emoji:'🏃', d:topRBs[0], color:'var(--or)'} : null,
+          topRBs[1] ? {label:'RB 2', emoji:'🏃', d:topRBs[1], color:'var(--pk)'} : null,
+          topWRs[0] ? {label:'WR 1', emoji:'⚡', d:topWRs[0], color:'var(--or)'} : null,
+          topWRs[1] ? {label:'WR 2', emoji:'⚡', d:topWRs[1], color:'var(--pk)'} : null,
+          topWRs[2] ? {label:'WR 3', emoji:'⚡', d:topWRs[2], color:'var(--pu)'} : null,
+          topTE[0] ? {label:'TE', emoji:'🎯', d:topTE[0], color:'var(--or)'} : null,
+          topFlex ? {label:'FLEX ('+topFlex.label+')', emoji:'💫', d:topFlex, color:'var(--pu)'} : null,
+          topDST[0] ? {label:'DEF', emoji:'🛡️', d:topDST[0], color:'var(--pk)'} : null
+        ].filter(Boolean).map(function(slot, i){
+          var pct = Math.round(slot.d.count / totalPossible * 100);
+          return '<div style="display:flex;align-items:center;border-bottom:1px solid var(--bdr);background:'+(i%2===0?'var(--bg3)':'var(--bg4)')+';">'
+            + '<div style="min-width:72px;padding:11px 14px;font-family:var(--fd);font-size:12px;font-weight:800;color:'+slot.color+';text-transform:uppercase;letter-spacing:.5px;border-right:1px solid var(--bdr);">'+slot.label+'</div>'
+            + '<div style="flex:1;padding:11px 14px;font-family:var(--fd);font-size:15px;font-weight:700;color:var(--ink);">'+slot.d.player+'</div>'
+            + '<div style="padding:11px 14px;text-align:right;border-left:1px solid var(--bdr);min-width:120px;">'
+            + '<div style="font-family:var(--fd);font-size:13px;font-weight:700;color:'+slot.color+';">'+slot.d.count+' starts</div>'
+            + '<div style="font-size:10px;color:var(--ink3);font-family:var(--fd);">'+pct+'% of possible</div>'
+            + '<div style="height:3px;background:var(--bdr);border-radius:2px;margin-top:4px;"><div style="height:3px;background:'+slot.color+';border-radius:2px;width:'+pct+'%"></div></div>'
+            + '</div></div>';
+        }).join('');
+      })()
     + '</div></div>'
 
     + '</div>';
