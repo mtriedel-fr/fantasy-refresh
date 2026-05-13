@@ -180,10 +180,7 @@ tr.my-team:hover td{background:rgba(155,109,255,.18) !important;}
 .cmp-btn:hover{background:var(--pu);color:#050808;border-color:var(--pu);}
 .cmp-btn.added{background:var(--pk);color:#050808;border-color:var(--pk);}
 
-/* COMPARISON MODAL */
-.cmp-modal{position:fixed;inset:0;z-index:9000;display:flex;align-items:center;justify-content:center;padding:16px;}
-.cmp-modal.hidden{display:none;pointer-events:none;}
-.cmp-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(4px);}
+/* cmp-modal CSS consolidated below */
 .cmp-box{position:relative;z-index:1;background:#080E0E;border:1px solid var(--pu);border-radius:16px;width:100%;max-width:900px;max-height:90vh;overflow-y:auto;box-shadow:0 24px 80px rgba(155,109,255,.25);}
 .cmp-hdr{padding:18px 24px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:12px;position:sticky;top:0;background:#080E0E;z-index:2;}
 .cmp-title{font-family:var(--fd);font-size:22px;font-weight:800;color:var(--pu);text-transform:uppercase;letter-spacing:.5px;flex:1;}
@@ -223,7 +220,7 @@ tr.my-team:hover td{background:rgba(155,109,255,.18) !important;}
 .wk-grid-row:nth-child(odd){background:rgba(155,109,255,.03);}
 /* COMPARE MODAL */
 .cmp-modal{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px;}
-.cmp-modal.hidden{display:none;pointer-events:none;}
+.cmp-modal.hidden{display:none !important;pointer-events:none !important;}
 .cmp-overlay{position:absolute;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(4px);pointer-events:none;}
 .cmp-box{position:relative;background:#0A0F0F;border:1px solid var(--bdr2);border-top:3px solid var(--or);border-bottom:3px solid var(--pk);border-radius:16px;width:100%;max-width:900px;max-height:90vh;overflow-y:auto;box-shadow:0 24px 80px rgba(0,229,212,.1);}
 .cmp-hdr{padding:18px 22px 12px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;border-bottom:1px solid var(--bdr);}
@@ -553,7 +550,7 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
 
 /* ── FIX 2: FIRST RUN MODAL ── */
 .firstrun-modal{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;}
-.firstrun-modal.hidden{display:none;pointer-events:none;}
+.firstrun-modal.hidden{display:none !important;pointer-events:none !important;}
 .firstrun-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(6px);pointer-events:none;}
 .firstrun-box{position:relative;z-index:1;background:#080E0E;border:1px solid var(--or);border-radius:20px;padding:36px 32px;max-width:400px;width:100%;text-align:center;box-shadow:0 24px 80px rgba(0,229,212,.15);}
 .firstrun-logo{font-size:48px;margin-bottom:16px;}
@@ -649,7 +646,7 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
 .share-btn{background:rgba(0,229,212,.1);border:1px solid rgba(0,229,212,.3);color:var(--or);font-family:var(--fd);font-size:11px;font-weight:700;padding:4px 10px;border-radius:8px;cursor:pointer;letter-spacing:.3px;text-transform:uppercase;transition:all .15s;display:inline-flex;align-items:center;gap:4px;}
 .share-btn:hover{background:rgba(0,229,212,.2);border-color:var(--or);}
 .share-modal{position:fixed;inset:0;z-index:9500;display:flex;align-items:center;justify-content:center;padding:20px;}
-.share-modal.hidden{display:none;pointer-events:none;}
+.share-modal.hidden{display:none !important;pointer-events:none !important;}
 .share-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(6px);pointer-events:none;}
 .share-box{position:relative;z-index:1;background:#080E0E;border:1px solid var(--or);border-radius:16px;padding:24px;max-width:380px;width:100%;text-align:center;box-shadow:0 24px 80px rgba(0,229,212,.15);}
 .share-card-preview{background:linear-gradient(135deg,#050808 0%,#0A1818 100%);border-radius:12px;padding:24px;margin-bottom:16px;border-top:3px solid var(--or);border-bottom:3px solid var(--pk);text-align:center;}
@@ -678,7 +675,7 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
 
 /* ── TEAM LOGIN ── */
 .login-modal{position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;}
-.login-modal.hidden{display:none;pointer-events:none;}
+.login-modal.hidden{display:none !important;pointer-events:none !important;}
 .login-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.92);backdrop-filter:blur(8px);z-index:-1;}
 .login-box{position:relative;z-index:1;background:#080E0E;border:1px solid var(--or);border-radius:20px;padding:36px 32px;max-width:420px;width:100%;text-align:center;box-shadow:0 24px 80px rgba(0,229,212,.15);}
 .login-logo{font-size:44px;margin-bottom:14px;}
@@ -841,7 +838,7 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
     </div>
     <div class="hdr-sub" id="hdr-sub">Ready to import</div>
     <div style="display:flex;gap:6px;align-items:center;justify-content:flex-end;">
-      <button class="login-badge" id="login-badge" onclick="document.getElementById('login-modal').classList.remove('hidden');document.getElementById('auth-signin').style.display='block';">🔑 Sign In</button>
+      <button class="login-badge" id="login-badge" onclick="openSignIn()">🔑 Sign In</button>
       <button class="comm-btn" onclick="toggleComm()" id="comm-toggle">⚙ Commissioner</button>
       <button class="comm-btn theme-toggle" onclick="toggleTheme()" id="theme-btn" title="Toggle light/dark mode">🌙</button>
     </div>
@@ -3224,7 +3221,7 @@ function renderMyTeam(sorted, curEntries, prevRank, curMap){
     + '<div><div class="myteam-name">' + entry.name + '</div>'
     + '<div style="font-family:var(--fd);font-size:11px;color:#1A5A5A;text-transform:uppercase;letter-spacing:1px;margin-top:4px;">Week ' + currentWeek + ' · Your dashboard</div></div>'
     + '<div style="text-align:right"><div class="myteam-score">' + fmtScore(entry.score) + '</div><div class="myteam-score-lbl">Points</div>'
-    + '<button class="share-btn" onclick="openShareCard()" style="margin-top:8px;">📤 Share</button></div>'
+    + '<button class="share-btn" onclick="openShareCard()" style="margin-top:8px;position:relative;z-index:100;">📤 Share</button></div>'
     + '</div>'
     + '<div class="myteam-stats">'
     + '<div class="myteam-stat"><div class="myteam-stat-lbl">Week rank</div><div class="myteam-stat-val">' + rankDisplay + '</div></div>'
@@ -3632,6 +3629,7 @@ function toggleReaction(containerId, teamName, week, cp, ev){
 var shareCardData = null;
 
 function openShareCard(){
+  console.log('openShareCard called');
   if(!myTeam){
     showToast('Set your team name first', true);
     return;
@@ -3921,6 +3919,20 @@ function submitProfile(){
 }
 
 // ── UI HELPERS ────────────────────────────────────────────────
+function openSignIn(){
+  console.log('openSignIn called');
+  var modal = document.getElementById('login-modal');
+  var signin = document.getElementById('auth-signin');
+  console.log('modal:', modal);
+  console.log('signin:', signin);
+  if(modal){
+    modal.style.display = 'flex';
+    modal.style.zIndex = '99999';
+    modal.classList.remove('hidden');
+  }
+  if(signin) signin.style.display = 'block';
+}
+
 function showAuthView(view){
   ['auth-signin','auth-signup','auth-profile','auth-verify'].forEach(function(id){
     var el = document.getElementById(id);
