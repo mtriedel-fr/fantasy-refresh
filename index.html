@@ -1108,19 +1108,22 @@ function renderGuillotine(){
   var stillIn = week1.map(function(e){ return e.name; });
 
   weeks.forEach(function(w){
-    var entries = (seasonData[String(w)] || []).filter(function(e){
-      return stillIn.indexOf(e.name) >= 0;
+    // Get entries for surviving teams — give no-shows a score of 0
+    var wkData = seasonData[String(w)] || [];
+    var entries = stillIn.map(function(name){
+      var found = wkData.find(function(e){ return teamMatch(e.name, name); });
+      return found ? found : {name: name, score: 0, noShow: true};
     });
     var sched = schedule.find(function(s){ return s.week === w; });
     var elimCount = sched ? sched.eliminate : 0;
 
-    // Sort by score ascending — lowest get eliminated
+    // Sort by score ascending — lowest get eliminated (no-shows at 0 go first)
     var sorted = entries.slice().sort(function(a,b){ return a.score - b.score; });
     var elimThisWeek = sorted.slice(0, elimCount);
     var surviveThisWeek = sorted.slice(elimCount);
 
     elimThisWeek.forEach(function(e){
-      eliminated[e.name] = {week: w, score: e.score};
+      eliminated[e.name] = {week: w, score: e.score, noShow: !!e.noShow};
       var idx = stillIn.indexOf(e.name);
       if(idx >= 0) stillIn.splice(idx, 1);
     });
@@ -1214,7 +1217,9 @@ function renderGuillotine(){
       .sort(function(a,b){ return a.score - b.score; })
       .map(function(e){
         var isMe = myTeam && teamMatch(e.name, myTeam);
-        return '<span class="guill-chip eliminated'+(isMe?' me':'')+'" title="'+fmtScore(e.score)+' pts">'+e.name+'<span class="guill-score">'+fmtScore(e.score)+'</span></span>';
+        var noShowBadge = e.noShow ? '<span style="font-size:9px;background:rgba(255,95,160,.3);border-radius:4px;padding:1px 4px;margin-left:3px;vertical-align:middle;">NO SHOW</span>' : '';
+        return '<span class="guill-chip eliminated'+(isMe?' me':'')+'" title="'+fmtScore(e.score)+' pts'+(e.noShow?' — did not submit':'')+'">'
+          +e.name+noShowBadge+'<span class="guill-score">'+fmtScore(e.score)+'</span></span>';
       }).join('');
 
     // Low scorer of survivors this week
@@ -1388,7 +1393,26 @@ function renderSeasonWrap(){
 
   // ── BUILD HTML ─────────────────────────────────────────────
 
-  function podium3(teams, labelFn, valFn, subFn){
+  // Tier podium ranking — use Week 18 score (playoff finish) not season total
+  var wk18entries = seasonData[String(totalWeeks)] || [];
+  function tierRank(teams){
+    // Sort by Week 18 score descending within the tier
+    return teams.slice().sort(function(a,b){
+      var aEntry = wk18entries.find(function(e){ return teamMatch(e.name, a); });
+      var bEntry = wk18entries.find(function(e){ return teamMatch(e.name, b); });
+      var aScore = aEntry ? aEntry.score : 0;
+      var bScore = bEntry ? bEntry.score : 0;
+      return bScore - aScore;
+    });
+  }
+  var tier1Ranked = tierRank(tier1);
+  var tier2Ranked = tierRank(tier2);
+  var tier3Ranked = tierRank(tier3);
+
+  function getWk18Score(name){
+    var e = wk18entries.find(function(e){ return teamMatch(e.name, name); });
+    return e ? fmtScore(e.score) + ' pts (Wk 18)' : 'Season total: ' + fmtTotal(teamTotals[name]);
+  }
     var medals = ['🥇','🥈','🥉'];
     var order = [1,0,2]; // visual podium order: 2nd, 1st, 3rd
     return '<div class="sw-podium">'
@@ -1488,15 +1512,24 @@ function renderSeasonWrap(){
 
     // TIER CHAMPIONS
     + '<div class="sw-section"><div class="sw-section-hdr" style="color:var(--or)">🥇 Tier 1 — Top Finishers</div>'
-    + podium3(tier1.slice(0,3), function(t){ return t; }, function(t){ return fmtTotal(teamTotals[t]); }, function(t){ return 'Season total'; })
+    + podium3(tier1Ranked.slice(0,3), function(t){ return t; }, function(t){
+        var e = wk18entries.find(function(e){ return teamMatch(e.name, t); });
+        return e ? fmtScore(e.score) : '—';
+      }, function(t){ return wk18entries.find(function(e){ return teamMatch(e.name, t); }) ? 'Wk 18 score' : 'Season total'; })
     + '</div>'
 
     + '<div class="sw-section"><div class="sw-section-hdr" style="color:var(--pu)">🥈 Tier 2 — Mid Tier Finishers</div>'
-    + podium3(tier2.slice(0,3), function(t){ return t; }, function(t){ return fmtTotal(teamTotals[t]); }, function(t){ return 'Season total'; })
+    + podium3(tier2Ranked.slice(0,3), function(t){ return t; }, function(t){
+        var e = wk18entries.find(function(e){ return teamMatch(e.name, t); });
+        return e ? fmtScore(e.score) : '—';
+      }, function(t){ return wk18entries.find(function(e){ return teamMatch(e.name, t); }) ? 'Wk 18 score' : 'Season total'; })
     + '</div>'
 
     + '<div class="sw-section"><div class="sw-section-hdr" style="color:var(--pk)">🥉 Tier 3 — Survivor Finishers</div>'
-    + podium3(tier3.slice(0,3), function(t){ return t; }, function(t){ return fmtTotal(teamTotals[t]); }, function(t){ return 'Season total'; })
+    + podium3(tier3Ranked.slice(0,3), function(t){ return t; }, function(t){
+        var e = wk18entries.find(function(e){ return teamMatch(e.name, t); });
+        return e ? fmtScore(e.score) : '—';
+      }, function(t){ return wk18entries.find(function(e){ return teamMatch(e.name, t); }) ? 'Wk 18 score' : 'Season total'; })
     + '</div>'
 
     // WEEKLY WINNERS — combined table
@@ -1518,7 +1551,31 @@ function renderSeasonWrap(){
 
     // MOST STARTED BY POSITION
     + '<div class="sw-section"><div class="sw-section-hdr" style="color:var(--or)">👥 Most Started Players — Full Season</div>'
-    + '<div class="sw-pos-grid">'+posCards+'</div></div>'
+    + '<div style="display:flex;flex-direction:column;gap:0;">'
+    + [
+        topQB[0] ? {label:'QB', emoji:'🏈', d:topQB[0], color:'var(--or)'} : null,
+        topRBs[0] ? {label:'RB 1', emoji:'🏃', d:topRBs[0], color:'var(--or)'} : null,
+        topRBs[1] ? {label:'RB 2', emoji:'🏃', d:topRBs[1], color:'var(--pk)'} : null,
+        topWRs[0] ? {label:'WR 1', emoji:'⚡', d:topWRs[0], color:'var(--or)'} : null,
+        topWRs[1] ? {label:'WR 2', emoji:'⚡', d:topWRs[1], color:'var(--pk)'} : null,
+        topWRs[2] ? {label:'WR 3', emoji:'⚡', d:topWRs[2], color:'var(--pu)'} : null,
+        topTE[0] ? {label:'TE', emoji:'🎯', d:topTE[0], color:'var(--or)'} : null,
+        topFlex ? {label:'FLEX ('+topFlex.label+')', emoji:'💫', d:topFlex, color:'var(--pu)'} : null,
+        topDST[0] ? {label:'DEF', emoji:'🛡️', d:topDST[0], color:'var(--pk)'} : null
+      ].filter(Boolean).map(function(slot, i){
+        var pct = Math.round(slot.d.count / totalPossible * 100);
+        var barPct = pct;
+        return '<div style="display:flex;align-items:center;gap:0;border-bottom:1px solid var(--bdr);background:'+(i%2===0?'var(--bg3)':'var(--bg4)')+';">'
+          + '<div style="min-width:72px;padding:11px 14px;font-family:var(--fd);font-size:12px;font-weight:800;color:'+slot.color+';text-transform:uppercase;letter-spacing:.5px;border-right:1px solid var(--bdr);">'+slot.label+'</div>'
+          + '<div style="flex:1;padding:11px 14px;font-family:var(--fd);font-size:15px;font-weight:700;color:var(--ink);">'+slot.d.player+'</div>'
+          + '<div style="padding:11px 14px;text-align:right;border-left:1px solid var(--bdr);min-width:120px;">'
+          + '<div style="font-family:var(--fd);font-size:13px;font-weight:700;color:'+slot.color+';">'+slot.d.count+' starts</div>'
+          + '<div style="font-size:10px;color:var(--ink3);font-family:var(--fd);">'+pct+'% of possible</div>'
+          + '<div style="height:3px;background:var(--bdr);border-radius:2px;margin-top:4px;"><div style="height:3px;background:'+slot.color+';border-radius:2px;width:'+barPct+'%"></div></div>'
+          + '</div>'
+          + '</div>';
+      }).join('')
+    + '</div></div>'
 
     + '</div>';
 }
