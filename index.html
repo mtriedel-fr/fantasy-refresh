@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- FR v2.1 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -43,7 +44,7 @@ body{background:#040A0A;min-height:100vh;display:flex;align-items:flex-start;jus
 .logo-txt{font-family:var(--fd);font-size:28px;font-weight:800;color:#E8F8F8;text-transform:uppercase;letter-spacing:.5px;line-height:1;}
 .logo-txt span{color:var(--pk);}
 .logo-sub{font-family:var(--fd);font-size:11px;font-weight:600;color:#1A5A5A;letter-spacing:2px;text-transform:uppercase;margin-top:2px;}
-.hdr-r{text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:6px;}
+.hdr-r{text-align:right;display:flex;flex-direction:row;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
 .s-badge{background:rgba(255,26,110,.12);color:var(--pk);font-family:var(--fd);font-size:11px;font-weight:700;padding:4px 13px;border-radius:20px;letter-spacing:1.2px;text-transform:uppercase;border:1px solid rgba(255,26,110,.35);}
 .hdr-sub{color:#1A5A5A;font-size:11px;font-family:var(--fd);letter-spacing:.8px;text-transform:uppercase;}
 .comm-btn{background:transparent;border:1px solid #0A3A3A;color:#1A5A5A;font-family:var(--fd);font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;padding:4px 12px;border-radius:6px;cursor:pointer;transition:all .15s;}
@@ -836,9 +837,8 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
         <option value="2025">📦 2025 Archive</option>
       </select>
     </div>
-    <div class="hdr-sub" id="hdr-sub">Ready to import</div>
     <div style="display:flex;gap:6px;align-items:center;justify-content:flex-end;">
-      <button class="login-badge" id="login-badge" onclick="openSignIn()">🔑 Sign In</button>
+      <button class="login-badge" id="login-badge" onclick="openSignIn()" style="position:relative;z-index:500;cursor:pointer;">🔑 Sign In</button>
       <button class="comm-btn" onclick="toggleComm()" id="comm-toggle">⚙ Commissioner</button>
       <button class="comm-btn theme-toggle" onclick="toggleTheme()" id="theme-btn" title="Toggle light/dark mode">🌙</button>
     </div>
@@ -848,6 +848,7 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
 <div class="wk-bar">
   <div class="wk-bar-label">
     <span id="wk-bar-season">2026 Season</span>
+    <span id="hdr-sub" style="font-size:11px;color:var(--ink3);margin-left:8px;"></span>
   </div>
   <select class="wk-select" id="wk-select" onchange="setWeekFromSelect(this.value)">
   </select>
@@ -3705,7 +3706,9 @@ var currentUser = null;
 var LEAGUE_JOIN_CODE = 'REFRESH26'; // Commissioner can change this
 
 // Firebase auth state listener
-fbAuth.onAuthStateChanged(function(user){
+// ── AUTH INIT — runs after all functions defined ──────────────
+document.addEventListener('DOMContentLoaded', function(){
+  fbAuth.onAuthStateChanged(function(user){
   if(user){
     currentUser = user;
     loadUserProfile(user.uid).then(function(profile){
@@ -3733,7 +3736,8 @@ fbAuth.onAuthStateChanged(function(user){
     currentUser = null;
     updateLoginBadge(null, null);
   }
-});
+  });
+}); // end DOMContentLoaded
 
 function loadUserProfile(uid){
   return fetch(FB_DB_URL + '/users2026/' + uid + '.json')
