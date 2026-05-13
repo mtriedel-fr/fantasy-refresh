@@ -182,7 +182,7 @@ tr.my-team:hover td{background:rgba(155,109,255,.18) !important;}
 
 /* COMPARISON MODAL */
 .cmp-modal{position:fixed;inset:0;z-index:9000;display:flex;align-items:center;justify-content:center;padding:16px;}
-.cmp-modal.hidden{display:none;}
+.cmp-modal.hidden{display:none;pointer-events:none;}
 .cmp-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(4px);}
 .cmp-box{position:relative;z-index:1;background:#080E0E;border:1px solid var(--pu);border-radius:16px;width:100%;max-width:900px;max-height:90vh;overflow-y:auto;box-shadow:0 24px 80px rgba(155,109,255,.25);}
 .cmp-hdr{padding:18px 24px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:12px;position:sticky;top:0;background:#080E0E;z-index:2;}
@@ -223,8 +223,8 @@ tr.my-team:hover td{background:rgba(155,109,255,.18) !important;}
 .wk-grid-row:nth-child(odd){background:rgba(155,109,255,.03);}
 /* COMPARE MODAL */
 .cmp-modal{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px;}
-.cmp-modal.hidden{display:none;}
-.cmp-overlay{position:absolute;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(4px);}
+.cmp-modal.hidden{display:none;pointer-events:none;}
+.cmp-overlay{position:absolute;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(4px);pointer-events:none;}
 .cmp-box{position:relative;background:#0A0F0F;border:1px solid var(--bdr2);border-top:3px solid var(--or);border-bottom:3px solid var(--pk);border-radius:16px;width:100%;max-width:900px;max-height:90vh;overflow-y:auto;box-shadow:0 24px 80px rgba(0,229,212,.1);}
 .cmp-hdr{padding:18px 22px 12px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;border-bottom:1px solid var(--bdr);}
 .cmp-title{font-family:var(--fd);font-size:22px;font-weight:800;color:var(--or);text-transform:uppercase;letter-spacing:.5px;}
@@ -553,8 +553,8 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
 
 /* ── FIX 2: FIRST RUN MODAL ── */
 .firstrun-modal{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;}
-.firstrun-modal.hidden{display:none;}
-.firstrun-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(6px);}
+.firstrun-modal.hidden{display:none;pointer-events:none;}
+.firstrun-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(6px);pointer-events:none;}
 .firstrun-box{position:relative;z-index:1;background:#080E0E;border:1px solid var(--or);border-radius:20px;padding:36px 32px;max-width:400px;width:100%;text-align:center;box-shadow:0 24px 80px rgba(0,229,212,.15);}
 .firstrun-logo{font-size:48px;margin-bottom:16px;}
 .firstrun-title{font-family:var(--fd);font-size:26px;font-weight:800;color:var(--or);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;}
@@ -649,8 +649,8 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
 .share-btn{background:rgba(0,229,212,.1);border:1px solid rgba(0,229,212,.3);color:var(--or);font-family:var(--fd);font-size:11px;font-weight:700;padding:4px 10px;border-radius:8px;cursor:pointer;letter-spacing:.3px;text-transform:uppercase;transition:all .15s;display:inline-flex;align-items:center;gap:4px;}
 .share-btn:hover{background:rgba(0,229,212,.2);border-color:var(--or);}
 .share-modal{position:fixed;inset:0;z-index:9500;display:flex;align-items:center;justify-content:center;padding:20px;}
-.share-modal.hidden{display:none;}
-.share-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(6px);}
+.share-modal.hidden{display:none;pointer-events:none;}
+.share-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(6px);pointer-events:none;}
 .share-box{position:relative;z-index:1;background:#080E0E;border:1px solid var(--or);border-radius:16px;padding:24px;max-width:380px;width:100%;text-align:center;box-shadow:0 24px 80px rgba(0,229,212,.15);}
 .share-card-preview{background:linear-gradient(135deg,#050808 0%,#0A1818 100%);border-radius:12px;padding:24px;margin-bottom:16px;border-top:3px solid var(--or);border-bottom:3px solid var(--pk);text-align:center;}
 .share-card-league{font-family:var(--fd);font-size:11px;font-weight:700;color:var(--pk);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;}
@@ -678,7 +678,7 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
 
 /* ── TEAM LOGIN ── */
 .login-modal{position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;}
-.login-modal.hidden{display:none;}
+.login-modal.hidden{display:none;pointer-events:none;}
 .login-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.92);backdrop-filter:blur(8px);z-index:-1;}
 .login-box{position:relative;z-index:1;background:#080E0E;border:1px solid var(--or);border-radius:20px;padding:36px 32px;max-width:420px;width:100%;text-align:center;box-shadow:0 24px 80px rgba(0,229,212,.15);}
 .login-logo{font-size:44px;margin-bottom:14px;}
@@ -918,21 +918,6 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
   </div><!-- end comm-tools -->
 </div><!-- end comm-panel -->
 <!-- COMPARE MODAL -->
-<div id="cmp-modal" class="cmp-modal hidden">
-  <div class="cmp-overlay" onclick="closeCompare()"></div>
-  <div class="cmp-box">
-    <div class="cmp-hdr">
-      <div class="cmp-title">⚡ Compare Teams</div>
-      <div class="cmp-sub" id="cmp-sub">Select up to 6 teams from the standings</div>
-      <button class="cmp-close" onclick="closeCompare()">✕</button>
-    </div>
-    <div class="cmp-chips" id="cmp-chips"></div>
-    <div id="cmp-body"></div>
-    <div class="cmp-footer">
-      <button class="cmp-clear-btn" onclick="clearCompare()">Clear all</button>
-    </div>
-  </div>
-</div>
 
 
 <!-- FIRST RUN MODAL -->
