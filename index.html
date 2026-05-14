@@ -3745,10 +3745,12 @@ function searchDkTeams(query){
 }
 
 function selectDkTeam(name){
+  console.log('selectDkTeam called:', name);
   selectedDkTeam = name;
   document.getElementById('prof-dk').value = name;
   document.getElementById('prof-dk-results').innerHTML = '';
   document.getElementById('prof-dk-linked').textContent = '✓ Linked: "' + name + '"';
+  console.log('selectedDkTeam set to:', selectedDkTeam);
 }
 
 function submitProfile(){
@@ -3760,6 +3762,7 @@ function submitProfile(){
   if(!currentUser){ err.textContent = 'Not signed in'; return; }
   err.textContent = 'Saving…';
   var profile = {team2026:teamName, dk2025:selectedDkTeam||null, email:currentUser.email||null, created:Date.now()};
+  console.log('submitProfile saving:', profile);
   Promise.all([
     fetch(FB_DB_URL + '/users2026/' + currentUser.uid + '.json', {
       method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(profile)
