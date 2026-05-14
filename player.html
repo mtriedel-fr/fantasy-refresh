@@ -217,6 +217,11 @@ function getCumulativeStanding(upToWeek, name){
 }
 
 // ── RENDER ─────────────────────────────────────────────────────
+function teamMatch(a, b){
+  if(!a || !b) return false;
+  return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
 function render(){
   if(!teamName){
     document.getElementById('main').innerHTML = '<div class="empty"><div class="empty-icon">🔍</div><div class="empty-title">No team selected</div><div class="empty-sub"><a href="index.html" style="color:var(--or)">← Back to standings</a></div></div>';
@@ -257,12 +262,47 @@ function render(){
 
   document.title = teamName + ' — Fantasy Refresh';
 
+  // Look up if this team has a linked 2026 account or is a 2025 DK name
+  fetch('https://fantasy-refresh-default-rtdb.firebaseio.com/users2026.json?shallow=true')
+    .then(function(r){ return r.json(); })
+    .then(function(keys){
+      if(!keys) return renderHero(null);
+      // Find user whose dk2025 matches this teamName OR whose team2026 matches
+      return fetch('https://fantasy-refresh-default-rtdb.firebaseio.com/users2026.json')
+        .then(function(r){ return r.json(); })
+        .then(function(users){
+          if(!users) return renderHero(null);
+          var match = Object.values(users).find(function(u){
+            return (u.dk2025 && u.dk2025.trim().toLowerCase() === teamName.trim().toLowerCase())
+                || (u.team2026 && u.team2026.trim().toLowerCase() === teamName.trim().toLowerCase());
+          });
+          renderHero(match || null);
+        });
+    })
+    .catch(function(){ renderHero(null); });
+
+  function renderHero(userProfile){
+    var dk2025callout = '';
+    if(userProfile && userProfile.dk2025 && userProfile.team2026){
+      // This is a 2025 DK name — show their 2026 name
+      if(teamMatch(teamName, userProfile.dk2025)){
+        dk2025callout = '<div style="margin-top:10px;padding:8px 14px;background:rgba(0,229,212,.08);border:1px solid rgba(0,229,212,.2);border-radius:8px;font-family:var(--fd);font-size:12px;color:var(--or);">'
+          + '🏈 Competing in 2026 as <strong><a href="index.html" style="color:var(--or);text-decoration:none;">' + userProfile.team2026 + '</a></strong></div>';
+      }
+      // This is a 2026 team name — show their 2025 DK name
+      if(teamMatch(teamName, userProfile.team2026)){
+        dk2025callout = '<div style="margin-top:10px;padding:8px 14px;background:rgba(0,229,212,.08);border:1px solid rgba(0,229,212,.2);border-radius:8px;font-family:var(--fd);font-size:12px;color:var(--ink2);">'
+          + '📦 Previously competed in 2025 as <strong><a href="archive2025.html?team=' + encodeURIComponent(userProfile.dk2025) + '" style="color:var(--or);text-decoration:none;">' + userProfile.dk2025 + '</a></strong></div>';
+      }
+    }
+
   var html = '';
 
   // HERO
   html += '<div class="hero">'
     + '<div class="hero-name">' + teamName + '</div>'
     + '<div class="hero-sub">2025 Season · ' + teamWeeks.length + ' weeks played</div>'
+    + dk2025callout
     + '<div class="hero-stats">'
     + heroStat('Season Total', total.toFixed(1), myStanding ? '#' + myStanding.rank + ' overall' : '')
     + heroStat('Weekly Avg', avg.toFixed(1), leagueAvg > 0 ? (avg >= leagueAvg ? '+' : '') + (avg - leagueAvg).toFixed(1) + ' vs league' : '')
@@ -343,6 +383,7 @@ function render(){
   html += '</div>'; // body
 
   document.getElementById('main').innerHTML = html;
+  } // end renderHero
 }
 
 function heroStat(lbl, val, sub){

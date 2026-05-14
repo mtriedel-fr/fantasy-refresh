@@ -1817,26 +1817,15 @@ function teamMatch(a, b){
   return a.trim().toLowerCase() === b.trim().toLowerCase();
 }
 
-// Check if a team name matches the current user (either their 2026 name or linked 2025 DK name)
+// Simple helper — is this entry mine?
 function isMyTeam(name){
-  if(!name) return false;
-  if(myTeam && teamMatch(name, myTeam)) return true;
-  if(myDkTeam && teamMatch(name, myDkTeam)) return true;
-  return false;
+  if(!name || !myTeam) return false;
+  return teamMatch(name, myTeam);
 }
 
-// Find my entry in a list of entries — checks both 2026 name and DK name
 function findMyEntry(entries){
-  if(!entries) return null;
-  if(myTeam){
-    var e = entries.find(function(e){ return teamMatch(e.name, myTeam); });
-    if(e) return e;
-  }
-  if(myDkTeam){
-    var e2 = entries.find(function(e){ return teamMatch(e.name, myDkTeam); });
-    if(e2) return e2;
-  }
-  return null;
+  if(!entries || !myTeam) return null;
+  return entries.find(function(e){ return teamMatch(e.name, myTeam); }) || null;
 }
 // Resolves typed input to the exact stored team name
 function resolveTeamName(input){
