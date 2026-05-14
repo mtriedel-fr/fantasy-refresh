@@ -1554,7 +1554,7 @@ function renderSeasonWrap(){
           if(!t) return '<div class="sw-pod-item"></div>';
           return '<div class="sw-pod-item" style="'+(i===0?'border-top:3px solid var(--or)':i===1?'border-top:3px solid var(--pk)':'border-top:3px solid var(--pu)')+'">'
             + '<div class="sw-pod-medal">'+medals[i]+'</div>'
-            + '<div class="sw-pod-name"><a href="player.html?team='+encodeURIComponent(t)+'" style="color:inherit;text-decoration:none;">'+t+'</a></div>'
+            + '<div class="sw-pod-name"><a href="player.html?season=2025&amp;team='+encodeURIComponent(t)+'" style="color:inherit;text-decoration:none;">'+t+'</a></div>'
             + '<div class="sw-pod-val">'+valFn(t)+'</div>'
             + (subFn ? '<div class="sw-pod-sub">'+subFn(t)+'</div>' : '')
             + '</div>';
@@ -1569,9 +1569,9 @@ function renderSeasonWrap(){
     var h2 = wkHighsBy2nd.find(function(h){ return h.week === h1.week; });
     return '<div class="sw-wk-row" style="display:grid;grid-template-columns:44px 1fr 56px 1fr 56px;align-items:center;gap:6px;">'
       + '<span class="sw-wk-num">Wk '+h1.week+'</span>'
-      + '<span style="font-family:var(--fd);font-size:14px;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><a href="player.html?team='+encodeURIComponent(h1.name)+'" style="color:inherit;text-decoration:none;">'+h1.name+'</a></span>'
+      + '<span style="font-family:var(--fd);font-size:14px;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><a href="player.html?season=2025&amp;team='+encodeURIComponent(h1.name)+'" style="color:inherit;text-decoration:none;">'+h1.name+'</a></span>'
       + '<span class="sw-wk-score">'+fmtScore(h1.score)+'</span>'
-      + '<span style="font-family:var(--fd);font-size:14px;font-weight:700;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(h2?'<a href="player.html?team='+encodeURIComponent(h2.name)+'" style="color:inherit;text-decoration:none;">'+h2.name+'</a>':'—')+'</span>'
+      + '<span style="font-family:var(--fd);font-size:14px;font-weight:700;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(h2?'<a href="player.html?season=2025&amp;team='+encodeURIComponent(h2.name)+'" style="color:inherit;text-decoration:none;">'+h2.name+'</a>':'—')+'</span>'
       + '<span class="sw-wk-score" style="color:var(--pu);">'+(h2?fmtScore(h2.score):'—')+'</span>'
       + '</div>';
   }).join('');
@@ -1674,8 +1674,8 @@ function renderSeasonWrap(){
     + '<div class="sw-card"><div class="sw-card-lbl">📉 Lowest single week</div><div class="sw-card-name">'+lowestWkScore.name+'</div><div class="sw-card-val" style="color:var(--pk)">'+fmtScore(lowestWkScore.score)+'</div><div class="sw-card-sub">Week '+lowestWkScore.week+'</div></div>'
     + '<div class="sw-card"><div class="sw-card-lbl">⚡ Highest league total week</div><div class="sw-card-name">Week '+highestLeagueWk.week+'</div><div class="sw-card-val">'+fmtTotal(highestLeagueWk.total)+'</div><div class="sw-card-sub">Combined all teams</div></div>'
     + '<div class="sw-card"><div class="sw-card-lbl">🧊 Lowest league total week</div><div class="sw-card-name">Week '+lowestLeagueWk.week+'</div><div class="sw-card-val" style="color:var(--pk)">'+fmtTotal(lowestLeagueWk.total)+'</div><div class="sw-card-sub">Combined all teams</div></div>'
-    + '<div class="sw-card"><div class="sw-card-lbl">📈 Most consistent (above avg)</div><div class="sw-card-name"><a href="player.html?team='+encodeURIComponent(mostConsistent)+'" style="color:inherit;text-decoration:none;">'+mostConsistent+'</a></div><div class="sw-card-val" style="color:var(--pu)">'+aboveAvgCounts[mostConsistent]+'</div><div class="sw-card-sub">of '+weeks.length+' weeks above avg</div></div>'
-    + (biggestJump ? '<div class="sw-card"><div class="sw-card-lbl">🚀 Biggest week-over-week jump</div><div class="sw-card-name"><a href="player.html?team='+encodeURIComponent(biggestJump.name)+'" style="color:inherit;text-decoration:none;">'+biggestJump.name+'</a></div><div class="sw-card-val" style="color:var(--or)">+'+fmtScore(biggestJump.diff)+'</div><div class="sw-card-sub">Week '+biggestJump.week+'</div></div>' : '')
+    + '<div class="sw-card"><div class="sw-card-lbl">📈 Most consistent (above avg)</div><div class="sw-card-name"><a href="player.html?season=2025&amp;team='+encodeURIComponent(mostConsistent)+'" style="color:inherit;text-decoration:none;">'+mostConsistent+'</a></div><div class="sw-card-val" style="color:var(--pu)">'+aboveAvgCounts[mostConsistent]+'</div><div class="sw-card-sub">of '+weeks.length+' weeks above avg</div></div>'
+    + (biggestJump ? '<div class="sw-card"><div class="sw-card-lbl">🚀 Biggest week-over-week jump</div><div class="sw-card-name"><a href="player.html?season=2025&amp;team='+encodeURIComponent(biggestJump.name)+'" style="color:inherit;text-decoration:none;">'+biggestJump.name+'</a></div><div class="sw-card-val" style="color:var(--or)">+'+fmtScore(biggestJump.diff)+'</div><div class="sw-card-sub">Week '+biggestJump.week+'</div></div>' : '')
     + '<div class="sw-card"><div class="sw-card-lbl">📅 Most popular best week</div><div class="sw-card-name">Week '+mostPopularBestWeek+'</div><div class="sw-card-val" style="color:var(--pu)">'+bestWeekCounts[mostPopularBestWeek]+'</div><div class="sw-card-sub">teams had their best score</div></div>'
     + '</div></div>'
 
@@ -1855,7 +1855,7 @@ function renderStandings(sorted, prevRank, curMap, wkHighName){
 
     return '<tr class="' + tierClass + divider + (isMe ? ' my-team' : '') + '">'
       + '<td class="rk' + (r <= 3 ? ' g' : '') + '">' + (r <= 3 ? MED[r-1] : r) + '</td>'
-      + '<td><div class="tn-wrap"><a class="season-name-link" href="player.html?team=' + encodeURIComponent(t.name) + '">' + t.name + '</a>'
+      + '<td><div class="tn-wrap"><a class="season-name-link" href="player.html?season=2025&amp;team=' + encodeURIComponent(t.name) + '">' + t.name + '</a>'
       + (isMe ? '<span class="my-team-badge">You</span>' : '')
       + (isHigh ? '<span class="bdg">🔥 Wk High</span>' : '')
       + streakBadge
@@ -1939,7 +1939,7 @@ function renderMovement(sorted, prevRank, curMap){
       : '<div class="mf">—</div>';
     var isMe = myTeam && t.name.toLowerCase() === myTeam.toLowerCase();
     return '<tr class="' + (isMe ? 'my-team' : '') + '">'
-      + '<td><a class="season-name-link" href="player.html?team=' + encodeURIComponent(t.name) + '">' + t.name + (isMe ? '<span class="my-team-badge">You</span>' : '') + '</a></td>'
+      + '<td><a class="season-name-link" href="player.html?season=2025&amp;team=' + encodeURIComponent(t.name) + '">' + t.name + (isMe ? '<span class="my-team-badge">You</span>' : '') + '</a></td>'
       + '<td style="text-align:center;color:var(--ink2);font-family:var(--fd);font-weight:600">' + (t.prev || '—') + '</td>'
       + '<td style="text-align:center;font-family:var(--fd);font-weight:800;font-size:17px">' + t.curr + '</td>'
       + '<td style="text-align:center">' + mv + '</td>'
@@ -2176,7 +2176,7 @@ function renderCompare(){
   var nameRow = '<div class="cmp-name-row" style="grid-template-columns:'+gridTpl+';background:var(--bg2);">'
     + '<div></div>'
     + teamStats.map(function(t){ return '<div class="cmp-name-cell" style="color:'+t.color+';border-bottom:3px solid '+t.color+'">'
-      + '<a href="player.html?team='+encodeURIComponent(t.name)+'" style="color:inherit;text-decoration:none;">'+t.name+'</a></div>'; }).join('')
+      + '<a href="player.html?season=2025&amp;team='+encodeURIComponent(t.name)+'" style="color:inherit;text-decoration:none;">'+t.name+'</a></div>'; }).join('')
     + '</div>';
 
   // ── SEASON STATS ──
@@ -2634,7 +2634,7 @@ function hideDropdown(){
 }
 
 function goToProfile(encodedName){
-  window.location.href = 'player.html?team=' + encodedName;
+  window.location.href = 'player.html?season=2025&team=' + encodedName;
 }
 
 // ── PLAYER CHART HELPERS ──────────────────────────────────────
@@ -2968,7 +2968,7 @@ function renderFinish(sorted, curEntries, prevRank){
     var moveStr = move === null ? '—' : move > 0 ? '<span style="color:var(--grn)">+' + move + '</span>' : move < 0 ? '<span style="color:var(--red)">' + move + '</span>' : '—';
     var isMe = myTeam && e.name.toLowerCase() === myTeam.toLowerCase();
     var pct = Math.round(e.score / maxScore * 100);
-    var nameLink = '<a class="t-name-link" href="player.html?team=' + encodeURIComponent(e.name) + '">' + e.name + (isMe ? '<span class="my-team-badge">You</span>' : '') + '</a>';
+    var nameLink = '<a class="t-name-link" href="player.html?season=2025&amp;team=' + encodeURIComponent(e.name) + '">' + e.name + (isMe ? '<span class="my-team-badge">You</span>' : '') + '</a>';
     return '<tr' + (isMe ? ' class="is-me"' : '') + '>'
       + '<td class="finish-rank' + (wkRank <= 3 ? ' top' : '') + '">' + (wkRank <= 3 ? med[wkRank-1] : wkRank) + '</td>'
       + '<td class="finish-name">' + nameLink + '</td>'
@@ -3157,13 +3157,13 @@ function renderNumbers(curEntries){
 
     // Column 1 — High scorer
     + '<div>'
-    + colHeader('🔥 High Score', fmtScore(high.score), 'player.html?team='+encodeURIComponent(high.name), 'var(--or)', high.name)
+    + colHeader('🔥 High Score', fmtScore(high.score), 'player.html?season=2025&team='+encodeURIComponent(high.name), 'var(--or)', high.name)
     + rosterCol(high, 'var(--or)')
     + '</div>'
 
     // Column 2 — Low scorer
     + '<div>'
-    + colHeader('📉 Low Score', fmtScore(low.score), 'player.html?team='+encodeURIComponent(low.name), 'var(--pk)', low.name)
+    + colHeader('📉 Low Score', fmtScore(low.score), 'player.html?season=2025&team='+encodeURIComponent(low.name), 'var(--pk)', low.name)
     + rosterCol(low, 'var(--pk)')
     + '</div>'
 

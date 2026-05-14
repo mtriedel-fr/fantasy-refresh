@@ -163,7 +163,7 @@ fetch(FB_DB_URL + '/season2026.json')
     render();
   })
   .catch(function(){
-    try{ var d = localStorage.getItem('fr_2026_backup'); if(d) seasonData = JSON.parse(d); }catch(e){}
+    try{ var d = localStorage.getItem(backupKey); if(d) seasonData = JSON.parse(d); }catch(e){}
     render();
   });
 
@@ -260,7 +260,7 @@ function render(){
   var myStanding = allTotals.find(function(t){ return t.name === teamName; });
   var leagueAvg = getLeagueAvgOverall();
 
-  document.title = teamName + ' — Fantasy Refresh';
+  document.title = teamName + ' — Fantasy Refresh ' + urlSeason;
 
   // Look up if this team has a linked 2026 account or is a 2025 DK name
   fetch('https://fantasy-refresh-default-rtdb.firebaseio.com/users2026.json?shallow=true')
@@ -301,7 +301,7 @@ function render(){
   // HERO
   html += '<div class="hero">'
     + '<div class="hero-name">' + teamName + '</div>'
-    + '<div class="hero-sub">2025 Season · ' + teamWeeks.length + ' weeks played</div>'
+    + '<div class="hero-sub">' + urlSeason + ' Season · ' + teamWeeks.length + ' weeks played</div>'
     + dk2025callout
     + '<div class="hero-stats">'
     + heroStat('Season Total', total.toFixed(1), myStanding ? '#' + myStanding.rank + ' overall' : '')
