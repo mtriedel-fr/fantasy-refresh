@@ -716,7 +716,6 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
         <option value="2025">📦 2025 Archive</option>
       </select>
     </div>
-    <div class="hdr-sub" id="hdr-sub">Ready to import</div>
     <div style="display:flex;gap:6px;align-items:center;justify-content:flex-end;">
       <button class="login-badge" id="login-badge" onclick="openSignIn()">🔑 Sign In</button>
       <button class="comm-btn" onclick="toggleComm()" id="comm-toggle">⚙ Commissioner</button>
@@ -728,15 +727,22 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
 <div class="wk-bar">
   <div class="wk-bar-label">
     <span id="wk-bar-season">2026 Season</span>
+    <span id="hdr-sub" style="font-size:11px;color:var(--ink3);margin-left:8px;"></span>
   </div>
   <select class="wk-select" id="wk-select" onchange="setWeekFromSelect(this.value)">
   </select>
 </div>
 
 <!-- YOUR TEAM — directly below week bar -->
-<div class="my-team-bar">
+<div class="my-team-bar" id="my-team-bar">
   <span class="my-team-lbl">Your team:</span>
-  <input type="text" id="my-team-input" placeholder="Type your team name to highlight your row..." oninput="setMyTeam(this.value)">
+  <!-- Signed-in state: shows team name badge -->
+  <div id="my-team-auth" style="display:none;flex:1;display:none;align-items:center;gap:8px;">
+    <span id="my-team-name-badge" style="font-family:var(--fd);font-size:14px;font-weight:700;color:var(--or);"></span>
+    <button onclick="showUserMenu()" style="background:none;border:none;font-family:var(--fd);font-size:11px;color:var(--ink3);cursor:pointer;text-transform:uppercase;letter-spacing:.5px;padding:0;">Change ↗</button>
+  </div>
+  <!-- Guest state: shows text input -->
+  <input type="text" id="my-team-input" placeholder="Type your team name..." oninput="setMyTeam(this.value)">
 </div>
 
 <!-- CONTEXT-AWARE STATS BAR -->
@@ -3574,11 +3580,28 @@ function checkLoginState(){
       currentUser = user;
       myTeam = user.team2026 || '';
       try{ localStorage.setItem('fr_myteam', myTeam); }catch(e){}
-      var inp = document.getElementById('my-team-input');
-      if(inp) inp.value = myTeam;
+      syncTeamBar(user);
       updateLoginBadge(user);
     }
   }catch(e){}
+}
+
+function syncTeamBar(user){
+  var inp = document.getElementById('my-team-input');
+  var authDiv = document.getElementById('my-team-auth');
+  var badge = document.getElementById('my-team-name-badge');
+  if(user && user.team2026){
+    // Signed in with team — show badge, hide input
+    if(inp) inp.style.display = 'none';
+    if(authDiv){ authDiv.style.display = 'flex'; }
+    if(badge) badge.textContent = user.team2026;
+    if(inp) inp.value = user.team2026;
+  } else {
+    // Guest or no team set — show input
+    if(inp) inp.style.display = '';
+    if(authDiv) authDiv.style.display = 'none';
+    if(inp && myTeam) inp.value = myTeam;
+  }
 }
 
 function submitEmailSignIn(){
@@ -3606,6 +3629,7 @@ function submitEmailSignIn(){
         var inp = document.getElementById('my-team-input');
         if(inp) inp.value = myTeam;
         closeAuth();
+        syncTeamBar(user);
         updateLoginBadge(user);
         if(!user.team2026){ openSignIn(); showAuthPanel('profile'); }
         else{ renderAll(); showToast('Welcome back, ' + myTeam + '! 🏈'); }
@@ -3711,6 +3735,7 @@ function submitProfile(){
     var inp = document.getElementById('my-team-input');
     if(inp) inp.value = teamName;
     closeAuth();
+    syncTeamBar(currentUser);
     updateLoginBadge(currentUser);
     renderAll();
     showToast('Welcome, ' + teamName + '! 🏈');
@@ -3729,6 +3754,7 @@ function showUserMenu(){
   if(confirm('Sign out of ' + myTeam + '?')){
     currentUser = null; myTeam = '';
     try{ localStorage.removeItem('fr_auth_user'); localStorage.removeItem('fr_myteam'); }catch(e){}
+    syncTeamBar(null);
     updateLoginBadge(null);
     var inp = document.getElementById('my-team-input');
     if(inp) inp.value = '';
