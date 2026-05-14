@@ -933,7 +933,12 @@ var seasonData = {};   // {"1": [{name, score, lineup}, ...], ...}
 var currentWeek = 1;
 var parsedCSV = null;
 var myTeam = '';
+var myDkTeam = ''; // 2025 DK team name linked during profile setup
 try{ myTeam = localStorage.getItem('fr_myteam') || ''; }catch(e){}
+try{
+  var _storedUser = localStorage.getItem('fr_auth_user');
+  if(_storedUser){ var _u = JSON.parse(_storedUser); myDkTeam = _u.dk2025 || ''; }
+}catch(e){}
 
 // ── FIREBASE CONFIG ────────────────────────────────────────────
 var FB_DB_URL = 'https://fantasy-refresh-default-rtdb.firebaseio.com';
@@ -1110,11 +1115,12 @@ function renderAll(){
   var sortedEntries = curEntries.slice().sort(function(a,b){ return b.score - a.score; });
 
   // Your score this week
-  var myEntry = myTeam ? curEntries.find(function(e){ return teamMatch(e.name, myTeam); }) : null;
+  var myEntry = findMyEntry(curEntries);
   var myWkRank = myEntry ? sortedEntries.findIndex(function(e){ return e.name === myEntry.name; }) + 1 : null;
 
   // Your season movement (rank this week vs last week)
-  var mySeasonRankNow = myTeam ? sorted.findIndex(function(t){ return teamMatch(t.name, myTeam); }) + 1 : null;
+  var mySeasonRankNow = sorted.findIndex(function(t){ return isMyTeam(t.name); });
+mySeasonRankNow = mySeasonRankNow >= 0 ? mySeasonRankNow + 1 : null;
   var mySeasonRankPrev = myTeam && mySeasonRankNow ? (prevRank[sorted[mySeasonRankNow-1].name] || null) : null;
   var myMove = (mySeasonRankNow && mySeasonRankPrev) ? mySeasonRankPrev - mySeasonRankNow : null;
 
@@ -1295,8 +1301,8 @@ function renderGuillotine(){
   // Show winners card when week 18 is imported (finale complete)
   if(finaleRanking && finaleRanking.length >= 2){
     var w1 = finaleRanking[0], w2 = finaleRanking[1], w3 = finaleRanking[2];
-    var isMe1 = myTeam && teamMatch(w1.name, myTeam);
-    var isMe2 = myTeam && teamMatch(w2.name, myTeam);
+    var isMe1 = isMyTeam(w1.name);
+    var isMe2 = isMyTeam(w2.name);
     winnersHTML = '<div class="guill-section">'
       + '<div class="guill-section-hdr" style="color:var(--or)">🏆 Guillotine Winners — Week 18 Finale</div>'
       + '<div class="guill-winners-podium" style="grid-template-columns:1fr 1fr 1fr;">'
@@ -1348,7 +1354,7 @@ function renderGuillotine(){
     var elimChips = wr.eliminatedThisWeek.slice()
       .sort(function(a,b){ return a.score - b.score; })
       .map(function(e){
-        var isMe = myTeam && teamMatch(e.name, myTeam);
+        var isMe = isMyTeam(e.name);
         var noShowBadge = e.noShow ? '<span style="font-size:9px;background:rgba(255,95,160,.3);border-radius:4px;padding:1px 4px;margin-left:3px;vertical-align:middle;">NO SHOW</span>' : '';
         return '<span class="guill-chip eliminated'+(isMe?' me':'')+'" title="'+fmtScore(e.score)+' pts'+(e.noShow?' — did not submit':'')+'">'
           +e.name+noShowBadge+'<span class="guill-score">'+fmtScore(e.score)+'</span></span>';
@@ -1362,7 +1368,7 @@ function renderGuillotine(){
     if(wr.finale && wr.finaleRanked){
       var medals = ['🥇','🥈','🥉'];
       var finaleChips = wr.finaleRanked.map(function(e, i){
-        var isMe = myTeam && teamMatch(e.name, myTeam);
+        var isMe = isMyTeam(e.name);
         return '<span class="guill-chip winner'+(isMe?' me':'')+'" style="background:'+(i===0?'linear-gradient(135deg,var(--or),var(--pk))':i===1?'rgba(155,109,255,.2)':'rgba(0,229,212,.1)')+';border-color:'+(i===1?'var(--pu)':'var(--or)')+';color:'+(i===0?'#050808':i===1?'var(--pu)':'var(--or)')+';">'
           +medals[i]+' '+e.name+' · '+fmtScore(e.score)+'</span>';
       }).join('');
@@ -1809,6 +1815,28 @@ function fmtTotal(n){
 function teamMatch(a, b){
   if(!a || !b) return false;
   return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
+// Check if a team name matches the current user (either their 2026 name or linked 2025 DK name)
+function isMyTeam(name){
+  if(!name) return false;
+  if(myTeam && teamMatch(name, myTeam)) return true;
+  if(myDkTeam && teamMatch(name, myDkTeam)) return true;
+  return false;
+}
+
+// Find my entry in a list of entries — checks both 2026 name and DK name
+function findMyEntry(entries){
+  if(!entries) return null;
+  if(myTeam){
+    var e = entries.find(function(e){ return teamMatch(e.name, myTeam); });
+    if(e) return e;
+  }
+  if(myDkTeam){
+    var e2 = entries.find(function(e){ return teamMatch(e.name, myDkTeam); });
+    if(e2) return e2;
+  }
+  return null;
 }
 // Resolves typed input to the exact stored team name
 function resolveTeamName(input){
@@ -3036,7 +3064,7 @@ function renderFinish(sorted, curEntries, prevRank){
     var prev = prevRank[e.name];
     var move = (sznRank && prev) ? prev - sznRank : null;
     var moveStr = move === null ? '—' : move > 0 ? '<span style="color:var(--grn)">+' + move + '</span>' : move < 0 ? '<span style="color:var(--red)">' + move + '</span>' : '—';
-    var isMe = myTeam && e.name.toLowerCase() === myTeam.toLowerCase();
+    var isMe = isMyTeam(e.name);
     var pct = Math.round(e.score / maxScore * 100);
     var reactId = 'react_' + e.name.replace(/[^a-z0-9]/gi,'_').toLowerCase() + '_' + currentWeek;
     var nameLink = '<a class="t-name-link" href="player.html?team=' + encodeURIComponent(e.name) + '">' + e.name + (isMe ? '<span class="my-team-badge">You</span>' : '') + '</a>';
@@ -3579,6 +3607,7 @@ function checkLoginState(){
       var user = JSON.parse(stored);
       currentUser = user;
       myTeam = user.team2026 || '';
+      myDkTeam = user.dk2025 || '';
       try{ localStorage.setItem('fr_myteam', myTeam); }catch(e){}
       syncTeamBar(user);
       updateLoginBadge(user);
@@ -3625,6 +3654,7 @@ function submitEmailSignIn(){
         try{ localStorage.setItem('fr_auth_user', JSON.stringify(user)); }catch(e){}
         currentUser = user;
         myTeam = user.team2026 || '';
+        myDkTeam = user.dk2025 || '';
         try{ localStorage.setItem('fr_myteam', myTeam); }catch(e){}
         var inp = document.getElementById('my-team-input');
         if(inp) inp.value = myTeam;
@@ -3777,6 +3807,7 @@ function submitProfile(){
     currentUser.team2026 = teamName;
     try{ localStorage.setItem('fr_auth_user', JSON.stringify(currentUser)); }catch(e){}
     myTeam = teamName;
+    myDkTeam = selectedDkTeam || '';
     try{ localStorage.setItem('fr_myteam', teamName); }catch(e){}
     var inp = document.getElementById('my-team-input');
     if(inp) inp.value = teamName;
