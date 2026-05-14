@@ -3731,16 +3731,18 @@ function searchDkTeams(query){
         .slice(0, 8);
       console.log('matches:', matches);
       el.innerHTML = matches.map(function(name){
-        return '<div style="padding:8px 12px;background:#142020;border-radius:8px;border:1px solid #0D3535;margin-bottom:4px;cursor:pointer;color:#F0FAFA;font-size:13px;" data-name="'+encodeURIComponent(name)+'" onclick="selectDkTeam(decodeURIComponent(this.dataset.name))">'+name+'</div>';
+        return '<div class="dk-result-item" style="padding:8px 12px;background:#142020;border-radius:8px;border:1px solid #0D3535;margin-bottom:4px;cursor:pointer;color:#F0FAFA;font-size:13px;" data-name="'+encodeURIComponent(name)+'">'+name+'</div>';
       }).join('') || '<div style="font-size:12px;color:#3A8888;">No matches — try a different name</div>';
+      // Wire clicks via event delegation
+      el.querySelectorAll('.dk-result-item').forEach(function(div){
+        div.addEventListener('click', function(){
+          selectDkTeam(decodeURIComponent(this.getAttribute('data-name')));
+        });
+      });
     })
-    .catch(function(err){ 
+    .catch(function(err){
       console.error('searchDkTeams error:', err);
-      var matches = Object.keys(allTeams)
-        .filter(function(n){ return n.toLowerCase().includes(query.toLowerCase()); }).slice(0,8);
-      el.innerHTML = matches.map(function(name){
-        return '<div style="padding:8px 12px;background:#142020;border-radius:8px;border:1px solid #0D3535;margin-bottom:4px;cursor:pointer;color:#F0FAFA;font-size:13px;" data-name="'+encodeURIComponent(name)+'" onclick="selectDkTeam(decodeURIComponent(this.dataset.name))">'+name+'</div>';
-      }).join('') || '<div style="font-size:12px;color:#FF5FA0;">Could not load team data</div>';
+      el.innerHTML = '<div style="font-size:12px;color:#FF5FA0;">Could not load team data</div>';
     });
 }
 
