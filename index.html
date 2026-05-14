@@ -682,12 +682,6 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
     </div>
   </div>
   <div class="hdr-r">
-    <div class="season-switcher">
-      <select class="season-select" id="season-select" onchange="switchSeason(this.value)" title="Switch season">
-        <option value="2026" selected>📅 2026 Season</option>
-        <option value="2025">📦 2025 Archive</option>
-      </select>
-    </div>
     <div class="hdr-sub" id="hdr-sub">Ready to import</div>
     <div style="display:flex;gap:6px;align-items:center;justify-content:flex-end;">
       <button class="comm-btn" onclick="toggleComm()" id="comm-toggle">⚙ Commissioner</button>
@@ -701,6 +695,10 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
     <span id="wk-bar-season">2026 Season</span>
   </div>
   <select class="wk-select" id="wk-select" onchange="setWeekFromSelect(this.value)">
+  </select>
+  <select class="season-select" id="season-select" onchange="switchSeason(this.value)" title="Switch season" style="margin-left:auto;">
+    <option value="2026" selected>2026</option>
+    <option value="2025">2025</option>
   </select>
 </div>
 
