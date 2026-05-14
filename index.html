@@ -3767,17 +3767,39 @@ function openShareCard(){
   var totals = {};
   weeks.forEach(function(w){ (seasonData[String(w)]||[]).forEach(function(e){ totals[e.name]=(totals[e.name]||0)+e.score; }); });
   var sznRank = Object.keys(totals).sort(function(a,b){ return totals[b]-totals[a]; }).indexOf(myEntry.name) + 1;
-  shareCardData = {name:myEntry.name, score:myEntry.score, wkRank:wkRank, total:curEntries.length, sznRank:sznRank, week:currentWeek};
+  shareCardData = {name:myEntry.name, score:myEntry.score, wkRank:wkRank, total:curEntries.length, sznRank:sznRank, week:currentWeek, lineup:myEntry.lineup||''};
   var medals = ['🥇','🥈','🥉'];
+
+  // Build roster rows
+  var slotDefs = [
+    {pos:'QB',label:'QB'},{pos:'RB',label:'RB'},{pos:'RB',label:'RB'},
+    {pos:'WR',label:'WR'},{pos:'WR',label:'WR'},{pos:'WR',label:'WR'},
+    {pos:'TE',label:'TE'},{pos:'FLEX',label:'FLEX'},{pos:'DST',label:'DEF'}
+  ];
+  var players = parseLineup(myEntry.lineup || '');
+  var remaining = players.slice();
+  var rosterRows = slotDefs.map(function(slot){
+    var idx = remaining.findIndex(function(p){ return p.pos === slot.pos; });
+    var player = idx >= 0 ? remaining.splice(idx,1)[0] : null;
+    return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #0D3535;">'
+      + '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;color:#FF5FA0;min-width:36px;text-transform:uppercase;">'+slot.label+'</span>'
+      + '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:600;color:#F0FAFA;flex:1;">'+(player ? player.player : '—')+'</span>'
+      + '<span style="font-family:monospace;font-size:12px;color:#3A8888;min-width:36px;text-align:right;">—</span>'
+      + '</div>';
+  }).join('');
+
   document.getElementById('share-preview').innerHTML =
     '<div class="share-card-league">Fantasy Refresh · 2026 Season</div>'
     + '<div class="share-card-name">'+myEntry.name+'</div>'
     + '<div class="share-card-score">'+fmtScore(myEntry.score)+'</div>'
     + '<div class="share-card-pts">points · week '+currentWeek+'</div>'
-    + '<div class="share-card-stats">'
+    + '<div class="share-card-stats" style="margin-bottom:14px;">'
     + '<div class="share-card-stat"><div class="share-card-stat-val">'+(wkRank<=3?medals[wkRank-1]:'#'+wkRank)+'</div><div class="share-card-stat-lbl">Week finish</div></div>'
     + '<div class="share-card-stat"><div class="share-card-stat-val">#'+sznRank+'</div><div class="share-card-stat-lbl">Season rank</div></div>'
-    + '</div><div style="font-size:10px;color:#3A8888;margin-top:8px;font-family:sans-serif;">fantasyrefresh.com</div>';
+    + '</div>'
+    + (players.length ? '<div style="margin-top:8px;">'+rosterRows+'</div>' : '')
+    + '<div style="font-size:10px;color:#3A8888;margin-top:10px;font-family:sans-serif;">fantasyrefresh.com</div>';
+
   document.getElementById('share-overlay').style.display = 'flex';
   document.getElementById('share-copy-confirm').textContent = '';
 }
@@ -3787,7 +3809,25 @@ function copyShareText(){
   var d = shareCardData;
   var medals = ['🥇','🥈','🥉'];
   var rankEmoji = d.wkRank<=3 ? medals[d.wkRank-1] : '#'+d.wkRank;
-  var text = '🏈 Fantasy Refresh — Week '+d.week+'\n👤 '+d.name+'\n📊 '+fmtScore(d.score)+' pts · '+rankEmoji+' of '+d.total+' teams\n📈 Season rank: #'+d.sznRank+'\n🌐 fantasyrefresh.com';
+  // Build roster text
+  var slotDefs = [
+    {pos:'QB',label:'QB'},{pos:'RB',label:'RB'},{pos:'RB',label:'RB'},
+    {pos:'WR',label:'WR'},{pos:'WR',label:'WR'},{pos:'WR',label:'WR'},
+    {pos:'TE',label:'TE'},{pos:'FLEX',label:'FLEX'},{pos:'DST',label:'DEF'}
+  ];
+  var players = parseLineup(d.lineup || '');
+  var remaining = players.slice();
+  var rosterText = slotDefs.map(function(slot){
+    var idx = remaining.findIndex(function(p){ return p.pos === slot.pos; });
+    var player = idx >= 0 ? remaining.splice(idx,1)[0] : null;
+    return slot.label.padEnd(5) + (player ? player.player : '—');
+  }).join('\n');
+  var text = '🏈 Fantasy Refresh — Week '+d.week
+    +'\n👤 '+d.name
+    +'\n📊 '+fmtScore(d.score)+' pts · '+rankEmoji+' of '+d.total+' teams'
+    +'\n📈 Season rank: #'+d.sznRank
+    +'\n\n'+rosterText
+    +'\n\n🌐 fantasyrefresh.com';
   navigator.clipboard.writeText(text).then(function(){
     document.getElementById('share-copy-confirm').textContent = '✅ Copied! Paste into your group chat.';
   }).catch(function(){ document.getElementById('share-copy-confirm').textContent = text; });
