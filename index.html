@@ -3655,8 +3655,8 @@ function submitEmailSignUp(){
     if(d.error){ err.textContent = d.error.message.includes('EMAIL_EXISTS') ? 'Account already exists' : d.error.message; return; }
     currentUser = {uid:d.localId, email:d.email, idToken:d.idToken};
     try{ localStorage.setItem('fr_auth_user', JSON.stringify(currentUser)); }catch(e){}
-    showAuthPanel('verify');
-    document.getElementById('verify-email-addr').textContent = email;
+    // Skip email verification — go straight to profile setup
+    showAuthPanel('profile');
   }).catch(function(){ err.textContent = 'Sign up failed — try again'; });
 }
 
