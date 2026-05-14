@@ -675,9 +675,11 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
 .prof-dk-item:hover{border-color:var(--or);color:var(--or);}
 
 /* ── TEAM LOGIN ── */
-.login-modal{position:fixed;inset:0;z-index:10000;align-items:center;justify-content:center;padding:20px;}
+.login-modal{position:fixed;inset:0;z-index:10000;display:none;align-items:center;justify-content:center;padding:20px;}
 .login-modal.hidden{display:none !important;}
-.login-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.92);backdrop-filter:blur(8px);z-index:-1;}
+.login-modal:not(.hidden){display:flex !important;}
+.login-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:-1;}
+.login-box{position:relative;z-index:1;background:#080E0E;border:1px solid var(--or);border-radius:20px;padding:36px 32px;max-width:420px;width:100%;text-align:center;box-shadow:0 24px 80px rgba(0,229,212,.15);color:#F0FAFA;}
 .login-box{position:relative;z-index:1;background:#080E0E;border:1px solid var(--or);border-radius:20px;padding:36px 32px;max-width:420px;width:100%;text-align:center;box-shadow:0 24px 80px rgba(0,229,212,.15);}
 .login-logo{font-size:44px;margin-bottom:14px;}
 .login-title{font-family:var(--fd);font-size:26px;font-weight:800;color:var(--or);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;}
@@ -927,7 +929,7 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
 
 
 <!-- AUTH MODAL -->
-<div class="login-modal hidden" id="login-modal">
+<div class="login-modal hidden" id="login-modal" style="display:none;">
   <div class="login-backdrop"></div>
   <div class="login-box">
     <!-- SIGN IN VIEW -->
@@ -3612,13 +3614,15 @@ function closeShare(){
 function openSignIn(){
   var m = document.getElementById('login-modal');
   if(!m){ console.error('login-modal not found'); return; }
-  // Show signin panel, hide others
+  console.log('openSignIn: showing modal');
   ['auth-signin','auth-signup','auth-profile','auth-verify'].forEach(function(id){
     var el = document.getElementById(id);
     if(el) el.style.display = (id === 'auth-signin') ? 'block' : 'none';
   });
-  m.style.cssText = 'display:flex !important;';
+  m.style.display = 'flex';
+  m.style.zIndex = '10000';
   m.classList.remove('hidden');
+  console.log('openSignIn: modal display =', m.style.display);
 }
 
 function showAuthView(view){
