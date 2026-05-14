@@ -140,7 +140,7 @@ html[data-theme="light"] body{background:#D8F0EE;}
     </div>
   </div>
   <div class="hdr-r">
-    <a href="index.html" class="back-btn">← Back to Standings</a>
+    <a id="back-btn" href="index.html" class="back-btn">← Back to Standings</a>
     <button class="back-btn theme-toggle" onclick="toggleTheme()" id="theme-btn" title="Toggle light/dark">🌙</button>
   </div>
 </div>
@@ -157,6 +157,9 @@ var teamName    = decodeURIComponent((new URLSearchParams(window.location.search
 var urlSeason   = (new URLSearchParams(window.location.search)).get('season') || '2026';
 var backupKey   = 'fr_' + urlSeason + '_backup';
 var backLink    = urlSeason === '2025' ? 'archive2025.html' : 'index.html';
+// Set back button immediately
+var _backBtn = document.getElementById('back-btn');
+if(_backBtn) _backBtn.href = backLink;
 
 // ── LOAD ───────────────────────────────────────────────────────
 fetch(FB_DB_URL + '/season' + urlSeason + '.json')

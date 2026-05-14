@@ -145,7 +145,7 @@ html[data-theme="light"] body{background:#D8F0EE;}
   <div class="hdr-r">
     <div class="playoff-badge">🏆 Playoffs</div>
     <div class="hdr-sub" id="hdr-sub">Loading...</div>
-    <a href="index.html" class="back-btn">← Back to Standings</a>
+    <a id="back-btn" href="index.html" class="back-btn">← Back to Standings</a>
     <button class="back-btn theme-toggle" onclick="toggleTheme()" id="theme-btn" title="Toggle light/dark">🌙</button>
   </div>
 </div>
@@ -180,13 +180,24 @@ function teamLink(name){
 function loadFromCloud(){
   document.getElementById('hdr-sub').textContent = 'Loading...';
   var urlSeason = (new URLSearchParams(window.location.search)).get('season') || '2026';
+  var backLink  = urlSeason === '2025' ? 'archive2025.html' : 'index.html';
+  var backBtn   = document.getElementById('back-btn');
+  if(backBtn) backBtn.href = backLink;
+  console.log('playoffs loading season:', urlSeason);
   fetch(FB_DB_URL + '/season' + urlSeason + '.json')
     .then(function(r){ return r.json(); })
     .then(function(data){
-      if(data && typeof data === 'object' && !data.error) seasonData = data;
+      console.log('playoffs data received, null?', data === null, 'keys:', data ? Object.keys(data).length : 0);
+      if(data && typeof data === 'object' && !data.error){
+        seasonData = data;
+      } else if(data === null){
+        // Empty season — try localStorage backup
+        try{ var d = localStorage.getItem('fr_'+urlSeason+'_backup'); if(d) seasonData = JSON.parse(d); }catch(e){}
+      }
       render();
     })
-    .catch(function(){
+    .catch(function(err){
+      console.error('playoffs load error:', err);
       try{ var d = localStorage.getItem('fr_'+urlSeason+'_backup'); if(d) seasonData = JSON.parse(d); }catch(e){}
       render();
     });
