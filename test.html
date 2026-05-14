@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Modal Test</title>
+<style>
+body { font-family: sans-serif; padding: 40px; background: #111; color: #fff; }
+button { padding: 12px 24px; font-size: 16px; cursor: pointer; margin: 8px; background: teal; color: white; border: none; border-radius: 8px; }
+.modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 9999; align-items: center; justify-content: center; }
+.modal.open { display: flex; }
+.modal-box { background: #222; padding: 40px; border-radius: 12px; text-align: center; }
+</style>
+</head>
+<body>
+  <h2>Modal Test</h2>
+  <button onclick="openModal()">Open Modal</button>
+  <button onclick="alert('alert works')">Alert Test</button>
+
+  <div class="modal" id="mymodal">
+    <div class="modal-box">
+      <h3>Modal Works! ✅</h3>
+      <button onclick="closeModal()">Close</button>
+    </div>
+  </div>
+
+  <script>
+    function openModal(){
+      console.log('openModal called');
+      document.getElementById('mymodal').classList.add('open');
+    }
+    function closeModal(){
+      document.getElementById('mymodal').classList.remove('open');
+    }
+    console.log('Script loaded OK');
+  </script>
+</body>
+</html>
