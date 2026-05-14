@@ -656,6 +656,37 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
 .auth-divider::before,.auth-divider::after{content:'';flex:1;height:1px;background:#0D3535;}
 .google-btn{width:100%;padding:11px;background:#fff;border:1px solid #DADCE0;border-radius:10px;color:#3C4043;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:12px;}
 
+
+/* ── SHARE BUTTON ── */
+.share-btn{background:rgba(0,229,212,.1);border:1px solid rgba(0,229,212,.3);color:#00E5D4;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;padding:4px 10px;border-radius:8px;cursor:pointer;letter-spacing:.3px;text-transform:uppercase;transition:all .15s;display:inline-flex;align-items:center;gap:4px;}
+.share-btn:hover{background:rgba(0,229,212,.2);}
+
+/* ── SHARE MODAL ── */
+.share-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);z-index:99998;display:none;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;}
+.share-box{background:#080E0E;border:2px solid #00E5D4;border-radius:16px;padding:24px;max-width:380px;width:100%;text-align:center;color:#F0FAFA;}
+.share-card{background:linear-gradient(135deg,#050808 0%,#0A1818 100%);border-radius:12px;padding:24px;margin-bottom:16px;border-top:3px solid #00E5D4;border-bottom:3px solid #FF5FA0;}
+.share-card-league{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;color:#FF5FA0;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;}
+.share-card-name{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:800;color:#F0FAFA;text-transform:uppercase;margin-bottom:12px;}
+.share-card-score{font-family:'Barlow Condensed',sans-serif;font-size:52px;font-weight:800;color:#00E5D4;line-height:1;letter-spacing:-2px;}
+.share-card-pts{font-family:'Barlow Condensed',sans-serif;font-size:12px;color:#3A8888;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;}
+.share-card-stats{display:flex;justify-content:center;gap:20px;}
+.share-card-stat-val{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:800;color:#9B6DFF;}
+.share-card-stat-lbl{font-family:'Barlow Condensed',sans-serif;font-size:10px;color:#3A8888;text-transform:uppercase;letter-spacing:.5px;}
+.share-actions{display:flex;gap:8px;justify-content:center;margin-top:12px;}
+.share-copy-btn{flex:1;padding:10px;background:#00E5D4;color:#050808;border:none;border-radius:8px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;cursor:pointer;text-transform:uppercase;}
+.share-close-btn{padding:10px 14px;background:transparent;border:1px solid #0D3535;color:#3A8888;border-radius:8px;cursor:pointer;font-size:13px;}
+
+/* ── EMOJI REACTIONS ── */
+.react-section{display:flex;align-items:center;gap:4px;flex-wrap:nowrap;position:relative;padding:4px 0;}
+.react-trigger{background:none;border:1px solid #0D3535;border-radius:20px;padding:3px 9px;font-size:14px;cursor:pointer;color:#3A8888;transition:all .15s;line-height:1;}
+.react-trigger:hover{border-color:#00E5D4;background:rgba(0,229,212,.08);transform:scale(1.15);}
+.react-picker{display:none;position:absolute;left:0;top:calc(100% + 4px);z-index:300;background:#0D1515;border:1px solid #9B6DFF;border-radius:12px;padding:6px 8px;gap:4px;box-shadow:0 8px 24px rgba(0,0,0,.6);}
+.react-picker.open{display:flex;}
+.react-picker-btn{background:none;border:none;font-size:18px;cursor:pointer;padding:4px 6px;border-radius:8px;transition:all .12s;line-height:1;}
+.react-picker-btn:hover{background:rgba(255,255,255,.1);transform:scale(1.3);}
+.react-chip{display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border-radius:20px;font-size:13px;border:1px solid;cursor:pointer;transition:all .15s;}
+.react-chip-count{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:800;}
+
 </style>
   <!-- Auth config -->
   <script>
@@ -2951,7 +2982,7 @@ function renderMyTeam(sorted, curEntries, prevRank, curMap){
     + '<div class="myteam-hero">'
     + '<div><div class="myteam-name">' + entry.name + '</div>'
     + '<div style="font-family:var(--fd);font-size:11px;color:#1A5A5A;text-transform:uppercase;letter-spacing:1px;margin-top:4px;">Week ' + currentWeek + ' · Your dashboard</div></div>'
-    + '<div style="text-align:right"><div class="myteam-score">' + fmtScore(entry.score) + '</div><div class="myteam-score-lbl">Points</div></div>'
+    + '<div style="text-align:right"><div class="myteam-score">' + fmtScore(entry.score) + '</div><div class="myteam-score-lbl">Points</div><button class="share-btn" onclick="openShareCard()" style="margin-top:8px;">📤 Share</button></div>'
     + '</div>'
     + '<div class="myteam-stats">'
     + '<div class="myteam-stat"><div class="myteam-stat-lbl">Week rank</div><div class="myteam-stat-val">' + rankDisplay + '</div></div>'
@@ -3001,22 +3032,31 @@ function renderFinish(sorted, curEntries, prevRank){
     var moveStr = move === null ? '—' : move > 0 ? '<span style="color:var(--grn)">+' + move + '</span>' : move < 0 ? '<span style="color:var(--red)">' + move + '</span>' : '—';
     var isMe = myTeam && e.name.toLowerCase() === myTeam.toLowerCase();
     var pct = Math.round(e.score / maxScore * 100);
+    var reactId = 'react_' + e.name.replace(/[^a-z0-9]/gi,'_').toLowerCase() + '_' + currentWeek;
     var nameLink = '<a class="t-name-link" href="player.html?team=' + encodeURIComponent(e.name) + '">' + e.name + (isMe ? '<span class="my-team-badge">You</span>' : '') + '</a>';
     return '<tr' + (isMe ? ' class="is-me"' : '') + '>'
       + '<td class="finish-rank' + (wkRank <= 3 ? ' top' : '') + '">' + (wkRank <= 3 ? med[wkRank-1] : wkRank) + '</td>'
       + '<td class="finish-name">' + nameLink + '</td>'
+      + '<td style="white-space:nowrap;padding:6px 10px;"><div class="react-section" id="' + reactId + '"></div></td>'
       + '<td class="finish-score">' + fmtScore(e.score) + '<div class="finish-pct-bar"><div class="finish-pct-fill" style="width:' + pct + '%"></div></div></td>'
       + '<td style="text-align:center;font-family:var(--fd);font-size:14px;color:var(--ink2)">' + (sznRank ? '#' + sznRank : '—') + '</td>'
       + '<td style="text-align:center">' + moveStr + '</td>'
       + '</tr>';
   }).join('');
 
-  el.innerHTML = '<div class="finish-wrap" style="overflow-x:auto;-webkit-overflow-scrolling:touch;"><table class="finish-table" style="min-width:480px"><thead><tr>'
+  el.innerHTML = '<div class="finish-wrap" style="overflow-x:auto;-webkit-overflow-scrolling:touch;"><table class="finish-table" style="min-width:520px"><thead><tr>'
     + '<th style="width:44px">Wk #</th><th>Team</th>'
+    + '<th style="width:80px"></th>'
     + '<th>Score</th>'
     + '<th style="text-align:center">Season rank</th>'
     + '<th style="text-align:center">Move</th>'
     + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+
+  // Load reactions for all rows
+  byScore.forEach(function(e){
+    var reactId = 'react_' + e.name.replace(/[^a-z0-9]/gi,'_').toLowerCase() + '_' + currentWeek;
+    renderReactions(reactId, e.name, currentWeek);
+  });
 }
 
 // ── WEEKLY NUMBERS VIEW ───────────────────────────────────────
@@ -3709,7 +3749,148 @@ function renderUserPanel(){
     }).catch(function(){ el.innerHTML = '<div style="color:#FF5FA0;">Could not load</div>'; });
 }
 
+
+// ── SHARE CARD ────────────────────────────────────────────────
+var shareCardData = null;
+
+function openShareCard(){
+  if(!myTeam){ showToast('Set your team name first', true); return; }
+  var weeks = Object.keys(seasonData).filter(function(k){
+    return !isNaN(Number(k)) && seasonData[k] && seasonData[k].length > 0;
+  }).map(Number).sort(function(a,b){ return a-b; });
+  if(!weeks.length){ showToast('No data yet', true); return; }
+  var curEntries = seasonData[String(currentWeek)] || [];
+  var myEntry = curEntries.find(function(e){ return teamMatch(e.name, myTeam); });
+  if(!myEntry){ showToast('No data for your team this week', true); return; }
+  var sorted = curEntries.slice().sort(function(a,b){ return b.score-a.score; });
+  var wkRank = sorted.findIndex(function(e){ return e.name === myEntry.name; }) + 1;
+  var totals = {};
+  weeks.forEach(function(w){ (seasonData[String(w)]||[]).forEach(function(e){ totals[e.name]=(totals[e.name]||0)+e.score; }); });
+  var sznRank = Object.keys(totals).sort(function(a,b){ return totals[b]-totals[a]; }).indexOf(myEntry.name) + 1;
+  shareCardData = {name:myEntry.name, score:myEntry.score, wkRank:wkRank, total:curEntries.length, sznRank:sznRank, week:currentWeek};
+  var medals = ['🥇','🥈','🥉'];
+  document.getElementById('share-preview').innerHTML =
+    '<div class="share-card-league">Fantasy Refresh · 2026 Season</div>'
+    + '<div class="share-card-name">'+myEntry.name+'</div>'
+    + '<div class="share-card-score">'+fmtScore(myEntry.score)+'</div>'
+    + '<div class="share-card-pts">points · week '+currentWeek+'</div>'
+    + '<div class="share-card-stats">'
+    + '<div class="share-card-stat"><div class="share-card-stat-val">'+(wkRank<=3?medals[wkRank-1]:'#'+wkRank)+'</div><div class="share-card-stat-lbl">Week finish</div></div>'
+    + '<div class="share-card-stat"><div class="share-card-stat-val">#'+sznRank+'</div><div class="share-card-stat-lbl">Season rank</div></div>'
+    + '</div><div style="font-size:10px;color:#3A8888;margin-top:8px;font-family:sans-serif;">fantasyrefresh.com</div>';
+  document.getElementById('share-overlay').style.display = 'flex';
+  document.getElementById('share-copy-confirm').textContent = '';
+}
+
+function copyShareText(){
+  if(!shareCardData) return;
+  var d = shareCardData;
+  var medals = ['🥇','🥈','🥉'];
+  var rankEmoji = d.wkRank<=3 ? medals[d.wkRank-1] : '#'+d.wkRank;
+  var text = '🏈 Fantasy Refresh — Week '+d.week+'\n👤 '+d.name+'\n📊 '+fmtScore(d.score)+' pts · '+rankEmoji+' of '+d.total+' teams\n📈 Season rank: #'+d.sznRank+'\n🌐 fantasyrefresh.com';
+  navigator.clipboard.writeText(text).then(function(){
+    document.getElementById('share-copy-confirm').textContent = '✅ Copied! Paste into your group chat.';
+  }).catch(function(){ document.getElementById('share-copy-confirm').textContent = text; });
+}
+
+function closeShare(){
+  document.getElementById('share-overlay').style.display = 'none';
+}
+
+// ── EMOJI REACTIONS ────────────────────────────────────────────
+var REACTIONS = ['🔥','💀','👑','😤','🤡'];
+var CHIP_COLORS = {'🔥':'#FF5FA0','💀':'#9B6DFF','👑':'#00E5D4','😤':'#FF9A3A','🤡':'#69BE28'};
+
+function renderReactions(containerId, teamName, week){
+  var el = document.getElementById(containerId);
+  if(!el) return;
+  var myKey = 'my_react_'+week+'_'+teamName.replace(/[^a-z0-9]/gi,'_').toLowerCase();
+  var myReacted = {};
+  try{ myReacted = JSON.parse(localStorage.getItem(myKey)||'{}'); }catch(e){}
+  var pickerId = containerId+'_picker';
+  el.innerHTML = '<button class="react-trigger" data-picker="'+pickerId+'" onclick="togglePicker(event,this.dataset.picker)">😀</button>'
+    + '<div class="react-picker" id="'+pickerId+'">'
+    + REACTIONS.map(function(em){
+        var cp = em.codePointAt(0);
+        return '<button class="react-picker-btn" data-cp="'+cp+'" data-cid="'+containerId+'" data-name="'+encodeURIComponent(teamName)+'" data-week="'+week+'" onclick="handleReactBtn(this)">'+ em +'</button>';
+      }).join('')+'</div>';
+  // Load counts
+  fetch(FB_DB_URL + '/reactions2026/'+week+'/'+teamName.replace(/[^a-z0-9]/gi,'_').toLowerCase()+'.json')
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      var existing = el.querySelectorAll('.react-chip');
+      existing.forEach(function(c){ c.remove(); });
+      REACTIONS.forEach(function(em){
+        var count = (data && data[em]) ? data[em] : 0;
+        if(count > 0){
+          var isMine = !!myReacted[em];
+          var col = CHIP_COLORS[em]||'#00E5D4';
+          var chip = document.createElement('span');
+          chip.className = 'react-chip'+(isMine?' mine':'');
+          chip.style.cssText = 'border-color:'+col+';background:'+col+'18;color:'+col+';';
+          chip.innerHTML = em+' <span class="react-chip-count">'+count+'</span>';
+          var cp = em.codePointAt(0);
+          chip.onclick = function(ev){ toggleReaction(containerId, encodeURIComponent(teamName), week, cp, ev); };
+          el.appendChild(chip);
+        }
+      });
+    }).catch(function(){});
+}
+
+function handleReactBtn(btn){
+  var cp = parseInt(btn.getAttribute('data-cp'));
+  var cid = btn.getAttribute('data-cid');
+  var name = decodeURIComponent(btn.getAttribute('data-name'));
+  var week = parseInt(btn.getAttribute('data-week'));
+  toggleReaction(cid, encodeURIComponent(name), week, cp, event);
+}
+
+function togglePicker(ev, pickerId){
+  ev.stopPropagation();
+  document.querySelectorAll('.react-picker.open').forEach(function(p){ if(p.id!==pickerId) p.classList.remove('open'); });
+  var picker = document.getElementById(pickerId);
+  if(picker) picker.classList.toggle('open');
+}
+
+document.addEventListener('click', function(){
+  document.querySelectorAll('.react-picker.open').forEach(function(p){ p.classList.remove('open'); });
+});
+
+function toggleReaction(containerId, encodedName, week, cp, ev){
+  if(ev) ev.stopPropagation();
+  var teamName = decodeURIComponent(encodedName);
+  var emoji = String.fromCodePoint(cp);
+  var myKey = 'my_react_'+week+'_'+teamName.replace(/[^a-z0-9]/gi,'_').toLowerCase();
+  var myReacted = {};
+  try{ myReacted = JSON.parse(localStorage.getItem(myKey)||'{}'); }catch(e){}
+  var adding = !myReacted[emoji];
+  myReacted[emoji] = adding ? 1 : 0;
+  try{ localStorage.setItem(myKey, JSON.stringify(myReacted)); }catch(e){}
+  document.querySelectorAll('.react-picker.open').forEach(function(p){ p.classList.remove('open'); });
+  var slug = teamName.replace(/[^a-z0-9]/gi,'_').toLowerCase();
+  var path = FB_DB_URL+'/reactions2026/'+week+'/'+slug+'/'+encodeURIComponent(emoji)+'.json';
+  fetch(path).then(function(r){ return r.json(); }).then(function(cur){
+    var count = (cur||0)+(adding?1:-1);
+    if(count<0) count=0;
+    return fetch(path, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(count)});
+  }).then(function(){ renderReactions(containerId, teamName, week); }).catch(function(){});
+}
+
 </script>
+
+
+<!-- SHARE MODAL -->
+<div class="share-overlay" id="share-overlay" onclick="if(event.target===this)closeShare()">
+  <div class="share-box">
+    <div style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;color:#00E5D4;text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px;">📤 Share Your Score</div>
+    <div class="share-card" id="share-preview"></div>
+    <div class="share-actions">
+      <button class="share-copy-btn" onclick="copyShareText()">📋 Copy to clipboard</button>
+      <button class="share-close-btn" onclick="closeShare()">✕</button>
+    </div>
+    <div style="font-size:10px;color:#3A8888;margin-top:8px;text-transform:uppercase;letter-spacing:.5px;" id="share-copy-confirm"></div>
+  </div>
+</div>
 
 <!-- AUTH MODAL — outside all containers -->
 <div class="auth-overlay" id="auth-overlay" onclick="handleOverlayClick(event)">
