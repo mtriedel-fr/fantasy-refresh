@@ -631,6 +631,34 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
   .guill-winners-podium{grid-template-columns:1fr;}
 }
 
+
+/* ── INLINE PROFILE PANEL ── */
+.profile-drawer{position:fixed;top:0;right:-100%;width:min(520px,100%);height:100%;background:var(--bg2);border-left:2px solid var(--or);z-index:8000;overflow-y:auto;transition:right .3s ease;box-shadow:-8px 0 32px rgba(0,0,0,.5);}
+.profile-drawer.open{right:0;}
+.profile-drawer-hdr{background:var(--hdr);padding:16px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--bdr);position:sticky;top:0;z-index:1;}
+.profile-drawer-title{font-family:var(--fd);font-size:20px;font-weight:800;color:var(--or);text-transform:uppercase;}
+.profile-drawer-close{background:none;border:1px solid var(--bdr2);color:var(--ink2);font-size:18px;width:32px;height:32px;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.profile-drawer-close:hover{border-color:var(--pk);color:var(--pk);}
+.profile-drawer-body{padding:20px;}
+.profile-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:7999;display:none;}
+.profile-overlay.open{display:block;}
+/* Profile stats inside drawer */
+.dp-hero{background:var(--bg3);border-radius:10px;padding:16px;margin-bottom:16px;border-top:2px solid var(--or);}
+.dp-name{font-family:var(--fd);font-size:28px;font-weight:800;color:var(--or);text-transform:uppercase;}
+.dp-sub{font-family:var(--fd);font-size:11px;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;margin-top:2px;}
+.dp-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px;}
+.dp-stat{text-align:center;background:var(--bg4);border-radius:8px;padding:10px 6px;}
+.dp-stat-lbl{font-family:var(--fd);font-size:9px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:3px;}
+.dp-stat-val{font-family:var(--fd);font-size:20px;font-weight:800;color:var(--or);}
+.dp-week-row{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--bdr);font-family:var(--fd);}
+.dp-week-row:last-child{border-bottom:none;}
+.dp-week-num{font-size:11px;font-weight:700;color:var(--ink3);min-width:48px;text-transform:uppercase;}
+.dp-week-score{font-size:16px;font-weight:800;color:var(--or);}
+.dp-week-rank{font-size:11px;color:var(--ink3);margin-left:auto;}
+.dp-week-bar{flex:1;height:4px;background:var(--bdr);border-radius:2px;overflow:hidden;}
+.dp-week-bar-fill{height:4px;background:var(--or);border-radius:2px;}
+.dp-2026-note{margin-bottom:14px;padding:10px 14px;background:rgba(0,229,212,.08);border:1px solid rgba(0,229,212,.25);border-radius:8px;font-family:var(--fd);font-size:12px;color:var(--or);}
+
 </style>
 </head>
 <body>
@@ -2634,7 +2662,100 @@ function hideDropdown(){
 }
 
 function goToProfile(encodedName){
-  window.location.href = 'player.html?season=2025&team=' + encodedName;
+  openProfileDrawer(decodeURIComponent(encodedName));
+}
+
+function openProfileDrawer(teamName){
+  document.getElementById('profile-overlay').classList.add('open');
+  document.getElementById('profile-drawer').classList.add('open');
+  document.getElementById('drawer-title').textContent = teamName;
+  document.getElementById('drawer-body').innerHTML = '<div style="color:var(--ink3);font-size:13px;text-align:center;padding:40px 0;">Loading…</div>';
+  renderProfileDrawer(teamName);
+}
+
+function closeProfile(){
+  document.getElementById('profile-overlay').classList.remove('open');
+  document.getElementById('profile-drawer').classList.remove('open');
+}
+
+function renderProfileDrawer(teamName){
+  var body = document.getElementById('drawer-body');
+  var weeks = Object.keys(seasonData).filter(function(k){
+    return !isNaN(Number(k)) && seasonData[k] && seasonData[k].length > 0;
+  }).map(Number).sort(function(a,b){ return a-b; });
+
+  var teamWeeks = weeks.filter(function(w){
+    return (seasonData[String(w)]||[]).some(function(e){ return e.name === teamName; });
+  });
+
+  if(!teamWeeks.length){
+    body.innerHTML = '<div style="color:var(--ink3);font-size:13px;text-align:center;padding:40px 0;">No data found for this team</div>';
+    return;
+  }
+
+  var weekData = teamWeeks.map(function(w){
+    var entries = seasonData[String(w)] || [];
+    var entry = entries.find(function(e){ return e.name === teamName; });
+    var sorted = entries.slice().sort(function(a,b){ return b.score-a.score; });
+    var rank = sorted.findIndex(function(e){ return e.name === teamName; }) + 1;
+    var avg = entries.reduce(function(s,e){ return s+e.score; },0) / (entries.length||1);
+    var maxScore = Math.max.apply(null, entries.map(function(e){ return e.score; }));
+    return {week:w, score:entry?entry.score:0, rank:rank, total:entries.length, avg:avg, maxScore:maxScore};
+  });
+
+  var scores = weekData.map(function(d){ return d.score; });
+  var total = scores.reduce(function(a,b){ return a+b; },0);
+  var avg = total / scores.length;
+  var best = Math.max.apply(null, scores);
+  var worst = Math.min.apply(null, scores);
+
+  // Season rank
+  var allTotals = {};
+  weeks.forEach(function(w){ (seasonData[String(w)]||[]).forEach(function(e){ allTotals[e.name]=(allTotals[e.name]||0)+e.score; }); });
+  var ranked = Object.keys(allTotals).sort(function(a,b){ return allTotals[b]-allTotals[a]; });
+  var sznRank = ranked.indexOf(teamName) + 1;
+
+  // Check for 2026 account link
+  var note2026 = '';
+  fetch(FB_DB_URL + '/users2026.json')
+    .then(function(r){ return r.json(); })
+    .then(function(users){
+      if(users){
+        var match = Object.values(users).find(function(u){ return u.dk2025 && u.dk2025.trim().toLowerCase() === teamName.trim().toLowerCase(); });
+        if(match && match.team2026){
+          var noteEl = document.getElementById('drawer-2026-note');
+          if(noteEl) noteEl.innerHTML = '🏈 Playing in 2026 as <strong>' + match.team2026 + '</strong>';
+          noteEl.style.display = 'block';
+        }
+      }
+    }).catch(function(){});
+
+  var html = '<div class="dp-hero">'
+    + '<div class="dp-name">' + teamName + '</div>'
+    + '<div class="dp-sub">2025 Season · ' + teamWeeks.length + ' weeks</div>'
+    + '<div class="dp-2026-note" id="drawer-2026-note" style="display:none;margin-top:10px;"></div>'
+    + '<div class="dp-stats">'
+    + '<div class="dp-stat"><div class="dp-stat-lbl">Total</div><div class="dp-stat-val">'+fmtTotal(total)+'</div></div>'
+    + '<div class="dp-stat"><div class="dp-stat-lbl">Avg</div><div class="dp-stat-val">'+fmtScore(avg)+'</div></div>'
+    + '<div class="dp-stat"><div class="dp-stat-lbl">Best</div><div class="dp-stat-val">'+fmtScore(best)+'</div></div>'
+    + '<div class="dp-stat"><div class="dp-stat-lbl">Rank</div><div class="dp-stat-val">#'+sznRank+'</div></div>'
+    + '</div></div>'
+
+    + '<div style="font-family:var(--fd);font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;">Week by Week</div>'
+    + '<div style="background:var(--bg3);border-radius:10px;overflow:hidden;border:1px solid var(--bdr);">'
+    + weekData.map(function(d){
+        var pct = d.maxScore > 0 ? Math.round(d.score/d.maxScore*100) : 0;
+        var medal = d.rank===1?'🥇':d.rank===2?'🥈':d.rank===3?'🥉':'';
+        return '<div class="dp-week-row">'
+          + '<span class="dp-week-num">Wk '+d.week+'</span>'
+          + '<div class="dp-week-bar"><div class="dp-week-bar-fill" style="width:'+pct+'%"></div></div>'
+          + '<span class="dp-week-score">'+fmtScore(d.score)+'</span>'
+          + '<span class="dp-week-rank">'+(medal||'#'+d.rank)+' of '+d.total+'</span>'
+          + '</div>';
+      }).join('')
+    + '</div>';
+
+  body.innerHTML = html;
 }
 
 // ── PLAYER CHART HELPERS ──────────────────────────────────────
@@ -3464,6 +3585,19 @@ function showToast(msg, isErr){
   t.className = 'toast' + (isErr ? ' err' : '') + ' show';
   setTimeout(function(){ t.className = 'toast' + (isErr ? ' err' : ''); }, 3000);
 }
+
+// Intercept all player.html?season=2025 links and open drawer instead
+document.addEventListener('click', function(e){
+  var a = e.target.closest('a[href*="player.html"]');
+  if(!a) return;
+  var href = a.getAttribute('href');
+  if(!href || !href.includes('player.html')) return;
+  e.preventDefault();
+  var params = new URLSearchParams(href.split('?')[1] || '');
+  var team = params.get('team');
+  if(team) openProfileDrawer(decodeURIComponent(team));
+});
+
 </script>
 </body>
 </html>
