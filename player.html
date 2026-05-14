@@ -154,9 +154,12 @@ var FB_DB_URL   = 'https://fantasy-refresh-default-rtdb.firebaseio.com';
 var TOTAL_WEEKS = 18;
 var seasonData  = {};
 var teamName    = decodeURIComponent((new URLSearchParams(window.location.search)).get('team') || '');
+var urlSeason   = (new URLSearchParams(window.location.search)).get('season') || '2026';
+var backupKey   = 'fr_' + urlSeason + '_backup';
+var backLink    = urlSeason === '2025' ? 'archive2025.html' : 'index.html';
 
 // ── LOAD ───────────────────────────────────────────────────────
-fetch(FB_DB_URL + '/season2026.json')
+fetch(FB_DB_URL + '/season' + urlSeason + '.json')
   .then(function(r){ return r.json(); })
   .then(function(d){
     if(d && typeof d === 'object' && !d.error) seasonData = d;
@@ -224,7 +227,7 @@ function teamMatch(a, b){
 
 function render(){
   if(!teamName){
-    document.getElementById('main').innerHTML = '<div class="empty"><div class="empty-icon">🔍</div><div class="empty-title">No team selected</div><div class="empty-sub"><a href="index.html" style="color:var(--or)">← Back to standings</a></div></div>';
+    document.getElementById('main').innerHTML = '<div class="empty"><div class="empty-icon">🔍</div><div class="empty-title">No team selected</div><div class="empty-sub"><a href="' + backLink + '" style="color:var(--or)">← Back to ' + urlSeason + ' season</a></div></div>';
     return;
   }
 
@@ -232,7 +235,7 @@ function render(){
   var teamWeeks = weeks.filter(function(w){ return !!getTeamEntry(w, teamName); });
 
   if(!teamWeeks.length){
-    document.getElementById('main').innerHTML = '<div class="empty"><div class="empty-icon">🏈</div><div class="empty-title">No data for ' + teamName + '</div><div class="empty-sub"><a href="index.html" style="color:var(--or)">← Back to standings</a></div></div>';
+    document.getElementById('main').innerHTML = '<div class="empty"><div class="empty-icon">🏈</div><div class="empty-title">No data for ' + teamName + '</div><div class="empty-sub"><a href="' + backLink + '" style="color:var(--or)">← Back to ' + urlSeason + ' season</a></div></div>';
     return;
   }
 
