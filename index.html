@@ -3695,6 +3695,8 @@ function searchDkTeams(query){
   var el = document.getElementById('prof-dk-results');
   if(!query || query.length < 2){ el.innerHTML = ''; return; }
   el.innerHTML = '<div style="font-size:12px;color:#3A8888;padding:4px;">Searching teams…</div>';
+  console.log('searchDkTeams called, query:', query);
+  console.log('FB_DB_URL:', FB_DB_URL);
 
   // Search both 2025 archive and current 2026 data
   var allTeams = {};
@@ -3702,17 +3704,24 @@ function searchDkTeams(query){
   // First collect any teams already in 2026 seasonData
   Object.keys(seasonData).filter(function(k){ return !isNaN(Number(k)) && seasonData[k]; })
     .forEach(function(w){ (seasonData[w]||[]).forEach(function(e){ if(e.name) allTeams[e.name]=1; }); });
+  console.log('2026 teams found:', Object.keys(allTeams).length);
 
   // Then fetch 2025 week 1 for historical names
   fetch(FB_DB_URL + '/season2025.json?shallow=true')
-    .then(function(r){ return r.json(); })
+    .then(function(r){ 
+      console.log('season2025 shallow response status:', r.status);
+      return r.json(); 
+    })
     .then(function(weekKeys){
+      console.log('season2025 weekKeys:', weekKeys);
       if(!weekKeys) return null;
       var firstWeek = Object.keys(weekKeys).filter(function(k){ return !isNaN(Number(k)); })
         .sort(function(a,b){ return Number(a)-Number(b); })[0];
+      console.log('fetching week:', firstWeek);
       return firstWeek ? fetch(FB_DB_URL + '/season2025/' + firstWeek + '.json').then(function(r){ return r.json(); }) : null;
     })
     .then(function(entries){
+      console.log('entries returned:', entries ? entries.length : 'none');
       if(entries && Array.isArray(entries)){
         entries.forEach(function(e){ if(e.name) allTeams[e.name] = 1; });
       }
@@ -3720,12 +3729,13 @@ function searchDkTeams(query){
         .filter(function(n){ return n.toLowerCase().includes(query.toLowerCase()); })
         .sort()
         .slice(0, 8);
+      console.log('matches:', matches);
       el.innerHTML = matches.map(function(name){
         return '<div style="padding:8px 12px;background:#142020;border-radius:8px;border:1px solid #0D3535;margin-bottom:4px;cursor:pointer;color:#F0FAFA;font-size:13px;" data-name="'+encodeURIComponent(name)+'" onclick="selectDkTeam(decodeURIComponent(this.dataset.name))">'+name+'</div>';
       }).join('') || '<div style="font-size:12px;color:#3A8888;">No matches — try a different name</div>';
     })
-    .catch(function(){ 
-      // Fallback to just 2026 data if Firebase fetch fails
+    .catch(function(err){ 
+      console.error('searchDkTeams error:', err);
       var matches = Object.keys(allTeams)
         .filter(function(n){ return n.toLowerCase().includes(query.toLowerCase()); }).slice(0,8);
       el.innerHTML = matches.map(function(name){
