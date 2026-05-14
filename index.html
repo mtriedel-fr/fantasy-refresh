@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- FR v3.0 -->
+<!-- FR v4.0 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -633,68 +633,40 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
 }
 
 
-/* ── LOGIN BADGE ── */
-.login-badge{background:rgba(0,229,212,.1);border:1px solid rgba(0,229,212,.3);color:var(--or);font-family:var(--fd);font-size:12px;font-weight:700;padding:5px 12px;border-radius:20px;cursor:pointer;transition:all .15s;letter-spacing:.3px;}
-.login-badge:hover{background:rgba(0,229,212,.2);}
 
-/* ── AUTH MODAL ── */
-.auth-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);z-index:99999;display:none;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;}
-.auth-box{background:#080E0E;border:2px solid #00E5D4;border-radius:20px;padding:36px 32px;max-width:420px;width:100%;text-align:center;box-shadow:0 24px 80px rgba(0,229,212,.2);color:#F0FAFA;position:relative;z-index:1;max-height:90vh;overflow-y:auto;}
-.auth-logo{font-size:44px;margin-bottom:14px;}
-.auth-title{font-family:'Barlow Condensed',sans-serif;font-size:26px;font-weight:800;color:#00E5D4;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;}
-.auth-sub{font-size:13px;color:#7ABFBF;line-height:1.6;margin-bottom:24px;}
-.auth-field{margin-bottom:12px;text-align:left;}
-.auth-label{font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:700;color:#7ABFBF;text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;display:block;}
-.auth-input{width:100%;padding:11px 14px;background:#060E0E;border:1px solid #0D3535;border-radius:10px;color:#00E5D4;font-family:sans-serif;font-size:15px;outline:none;box-sizing:border-box;}
-.auth-input:focus{border-color:#00E5D4;}
-.auth-input::placeholder{color:#3A8888;}
-.auth-btn{width:100%;padding:13px;background:linear-gradient(135deg,#00E5D4,#FF5FA0);border:none;border-radius:10px;color:#050808;font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;cursor:pointer;margin-bottom:12px;}
-.auth-err{font-size:12px;color:#FF5FA0;min-height:16px;margin-bottom:8px;font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;letter-spacing:.5px;}
-.auth-link{background:none;border:none;color:#7ABFBF;font-family:'Barlow Condensed',sans-serif;font-size:12px;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;padding:4px;}
-.auth-link:hover{color:#F0FAFA;}
-.auth-divider{display:flex;align-items:center;gap:10px;margin:12px 0;color:#3A8888;font-size:12px;}
-.auth-divider::before,.auth-divider::after{content:'';flex:1;height:1px;background:#0D3535;}
-.google-btn{width:100%;padding:11px;background:#fff;border:1px solid #DADCE0;border-radius:10px;color:#3C4043;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:12px;}
 
 
 /* ── SHARE BUTTON ── */
-.share-btn{background:rgba(0,229,212,.1);border:1px solid rgba(0,229,212,.3);color:#00E5D4;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;padding:4px 10px;border-radius:8px;cursor:pointer;letter-spacing:.3px;text-transform:uppercase;transition:all .15s;display:inline-flex;align-items:center;gap:4px;}
+.share-btn{background:rgba(0,229,212,.1);border:1px solid rgba(0,229,212,.3);color:var(--or);font-family:var(--fd);font-size:11px;font-weight:700;padding:4px 10px;border-radius:8px;cursor:pointer;letter-spacing:.3px;text-transform:uppercase;transition:all .15s;display:inline-flex;align-items:center;gap:4px;}
 .share-btn:hover{background:rgba(0,229,212,.2);}
 
 /* ── SHARE MODAL ── */
 .share-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);z-index:99998;display:none;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;}
-.share-box{background:#080E0E;border:2px solid #00E5D4;border-radius:16px;padding:24px;max-width:380px;width:100%;text-align:center;color:#F0FAFA;}
-.share-card{background:linear-gradient(135deg,#050808 0%,#0A1818 100%);border-radius:12px;padding:24px;margin-bottom:16px;border-top:3px solid #00E5D4;border-bottom:3px solid #FF5FA0;}
-.share-card-league{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;color:#FF5FA0;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;}
-.share-card-name{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:800;color:#F0FAFA;text-transform:uppercase;margin-bottom:12px;}
-.share-card-score{font-family:'Barlow Condensed',sans-serif;font-size:52px;font-weight:800;color:#00E5D4;line-height:1;letter-spacing:-2px;}
-.share-card-pts{font-family:'Barlow Condensed',sans-serif;font-size:12px;color:#3A8888;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;}
+.share-box{background:#080E0E;border:2px solid var(--or);border-radius:16px;padding:24px;max-width:380px;width:100%;text-align:center;color:var(--ink);}
+.share-card-inner{background:linear-gradient(135deg,#050808 0%,#0A1818 100%);border-radius:12px;padding:24px;margin-bottom:16px;border-top:3px solid var(--or);border-bottom:3px solid var(--pk);}
+.share-card-league{font-family:var(--fd);font-size:11px;font-weight:700;color:var(--pk);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;}
+.share-card-name{font-family:var(--fd);font-size:22px;font-weight:800;color:var(--ink);text-transform:uppercase;margin-bottom:12px;}
+.share-card-score{font-family:var(--fd);font-size:52px;font-weight:800;color:var(--or);line-height:1;letter-spacing:-2px;}
+.share-card-pts{font-family:var(--fd);font-size:12px;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;}
 .share-card-stats{display:flex;justify-content:center;gap:20px;}
-.share-card-stat-val{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:800;color:#9B6DFF;}
-.share-card-stat-lbl{font-family:'Barlow Condensed',sans-serif;font-size:10px;color:#3A8888;text-transform:uppercase;letter-spacing:.5px;}
+.share-card-stat-val{font-family:var(--fd);font-size:16px;font-weight:800;color:var(--pu);}
+.share-card-stat-lbl{font-family:var(--fd);font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;}
 .share-actions{display:flex;gap:8px;justify-content:center;margin-top:12px;}
-.share-copy-btn{flex:1;padding:10px;background:#00E5D4;color:#050808;border:none;border-radius:8px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;cursor:pointer;text-transform:uppercase;}
-.share-close-btn{padding:10px 14px;background:transparent;border:1px solid #0D3535;color:#3A8888;border-radius:8px;cursor:pointer;font-size:13px;}
+.share-copy-btn{flex:1;padding:10px;background:var(--or);color:#050808;border:none;border-radius:8px;font-family:var(--fd);font-size:13px;font-weight:800;cursor:pointer;text-transform:uppercase;}
+.share-close-btn{padding:10px 14px;background:transparent;border:1px solid var(--bdr2);color:var(--ink3);border-radius:8px;cursor:pointer;font-size:13px;}
 
 /* ── EMOJI REACTIONS ── */
 .react-section{display:flex;align-items:center;gap:4px;flex-wrap:nowrap;position:relative;padding:4px 0;}
-.react-trigger{background:none;border:1px solid #0D3535;border-radius:20px;padding:3px 9px;font-size:14px;cursor:pointer;color:#3A8888;transition:all .15s;line-height:1;}
-.react-trigger:hover{border-color:#00E5D4;background:rgba(0,229,212,.08);transform:scale(1.15);}
-.react-picker{display:none;position:absolute;left:0;top:calc(100% + 4px);z-index:300;background:#0D1515;border:1px solid #9B6DFF;border-radius:12px;padding:6px 8px;gap:4px;box-shadow:0 8px 24px rgba(0,0,0,.6);}
+.react-trigger{background:none;border:1px solid var(--bdr2);border-radius:20px;padding:3px 9px;font-size:14px;cursor:pointer;color:var(--ink3);transition:all .15s;line-height:1;}
+.react-trigger:hover{border-color:var(--or);background:rgba(0,229,212,.08);transform:scale(1.15);}
+.react-picker{display:none;position:absolute;left:0;top:calc(100% + 4px);z-index:300;background:#0D1515;border:1px solid var(--pu);border-radius:12px;padding:6px 8px;gap:4px;box-shadow:0 8px 24px rgba(0,0,0,.6);}
 .react-picker.open{display:flex;}
 .react-picker-btn{background:none;border:none;font-size:18px;cursor:pointer;padding:4px 6px;border-radius:8px;transition:all .12s;line-height:1;}
 .react-picker-btn:hover{background:rgba(255,255,255,.1);transform:scale(1.3);}
 .react-chip{display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border-radius:20px;font-size:13px;border:1px solid;cursor:pointer;transition:all .15s;}
-.react-chip-count{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:800;}
+.react-chip-count{font-family:var(--fd);font-size:11px;font-weight:800;}
 
 </style>
-  <!-- Auth config -->
-  <script>
-    var FB_API_KEY = 'AIzaSyA-2hcf2hzThk7MuEm9DAvRICK95koE9gM';
-    var LEAGUE_JOIN_CODE = 'REFRESH26';
-    var currentUser = null;
-    console.log('Fantasy Refresh 2026 ready');
-  </script>
 </head>
 <body>
 <div class="wrap">
@@ -716,8 +688,8 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
         <option value="2025">📦 2025 Archive</option>
       </select>
     </div>
+    <div class="hdr-sub" id="hdr-sub">Ready to import</div>
     <div style="display:flex;gap:6px;align-items:center;justify-content:flex-end;">
-      <button class="login-badge" id="login-badge" onclick="openSignIn()">🔑 Sign In</button>
       <button class="comm-btn" onclick="toggleComm()" id="comm-toggle">⚙ Commissioner</button>
       <button class="comm-btn theme-toggle" onclick="toggleTheme()" id="theme-btn" title="Toggle light/dark mode">🌙</button>
     </div>
@@ -727,22 +699,15 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
 <div class="wk-bar">
   <div class="wk-bar-label">
     <span id="wk-bar-season">2026 Season</span>
-    <span id="hdr-sub" style="font-size:11px;color:var(--ink3);margin-left:8px;"></span>
   </div>
   <select class="wk-select" id="wk-select" onchange="setWeekFromSelect(this.value)">
   </select>
 </div>
 
 <!-- YOUR TEAM — directly below week bar -->
-<div class="my-team-bar" id="my-team-bar">
+<div class="my-team-bar">
   <span class="my-team-lbl">Your team:</span>
-  <!-- Signed-in state: shows team name badge -->
-  <div id="my-team-auth" style="display:none;flex:1;display:none;align-items:center;gap:8px;">
-    <span id="my-team-name-badge" style="font-family:var(--fd);font-size:14px;font-weight:700;color:var(--or);"></span>
-    <button onclick="showUserMenu()" style="background:none;border:none;font-family:var(--fd);font-size:11px;color:var(--ink3);cursor:pointer;text-transform:uppercase;letter-spacing:.5px;padding:0;">Change ↗</button>
-  </div>
-  <!-- Guest state: shows text input -->
-  <input type="text" id="my-team-input" placeholder="Type your team name..." oninput="setMyTeam(this.value)">
+  <input type="text" id="my-team-input" placeholder="Type your team name to highlight your row..." oninput="setMyTeam(this.value)">
 </div>
 
 <!-- CONTEXT-AWARE STATS BAR -->
@@ -933,12 +898,7 @@ var seasonData = {};   // {"1": [{name, score, lineup}, ...], ...}
 var currentWeek = 1;
 var parsedCSV = null;
 var myTeam = '';
-var myDkTeam = ''; // 2025 DK team name linked during profile setup
 try{ myTeam = localStorage.getItem('fr_myteam') || ''; }catch(e){}
-try{
-  var _storedUser = localStorage.getItem('fr_auth_user');
-  if(_storedUser){ var _u = JSON.parse(_storedUser); myDkTeam = _u.dk2025 || ''; }
-}catch(e){}
 
 // ── FIREBASE CONFIG ────────────────────────────────────────────
 var FB_DB_URL = 'https://fantasy-refresh-default-rtdb.firebaseio.com';
@@ -972,7 +932,6 @@ function loadFromCloud(){
       setLoading(false);
       boot();
     } else if(data === null){
-      // Empty database — new season, no data yet
       setLoading(false);
       boot();
     } else {
@@ -1115,12 +1074,11 @@ function renderAll(){
   var sortedEntries = curEntries.slice().sort(function(a,b){ return b.score - a.score; });
 
   // Your score this week
-  var myEntry = findMyEntry(curEntries);
+  var myEntry = myTeam ? curEntries.find(function(e){ return teamMatch(e.name, myTeam); }) : null;
   var myWkRank = myEntry ? sortedEntries.findIndex(function(e){ return e.name === myEntry.name; }) + 1 : null;
 
   // Your season movement (rank this week vs last week)
-  var mySeasonRankNow = sorted.findIndex(function(t){ return isMyTeam(t.name); });
-mySeasonRankNow = mySeasonRankNow >= 0 ? mySeasonRankNow + 1 : null;
+  var mySeasonRankNow = myTeam ? sorted.findIndex(function(t){ return teamMatch(t.name, myTeam); }) + 1 : null;
   var mySeasonRankPrev = myTeam && mySeasonRankNow ? (prevRank[sorted[mySeasonRankNow-1].name] || null) : null;
   var myMove = (mySeasonRankNow && mySeasonRankPrev) ? mySeasonRankPrev - mySeasonRankNow : null;
 
@@ -1301,8 +1259,8 @@ function renderGuillotine(){
   // Show winners card when week 18 is imported (finale complete)
   if(finaleRanking && finaleRanking.length >= 2){
     var w1 = finaleRanking[0], w2 = finaleRanking[1], w3 = finaleRanking[2];
-    var isMe1 = isMyTeam(w1.name);
-    var isMe2 = isMyTeam(w2.name);
+    var isMe1 = myTeam && teamMatch(w1.name, myTeam);
+    var isMe2 = myTeam && teamMatch(w2.name, myTeam);
     winnersHTML = '<div class="guill-section">'
       + '<div class="guill-section-hdr" style="color:var(--or)">🏆 Guillotine Winners — Week 18 Finale</div>'
       + '<div class="guill-winners-podium" style="grid-template-columns:1fr 1fr 1fr;">'
@@ -1354,7 +1312,7 @@ function renderGuillotine(){
     var elimChips = wr.eliminatedThisWeek.slice()
       .sort(function(a,b){ return a.score - b.score; })
       .map(function(e){
-        var isMe = isMyTeam(e.name);
+        var isMe = myTeam && teamMatch(e.name, myTeam);
         var noShowBadge = e.noShow ? '<span style="font-size:9px;background:rgba(255,95,160,.3);border-radius:4px;padding:1px 4px;margin-left:3px;vertical-align:middle;">NO SHOW</span>' : '';
         return '<span class="guill-chip eliminated'+(isMe?' me':'')+'" title="'+fmtScore(e.score)+' pts'+(e.noShow?' — did not submit':'')+'">'
           +e.name+noShowBadge+'<span class="guill-score">'+fmtScore(e.score)+'</span></span>';
@@ -1368,7 +1326,7 @@ function renderGuillotine(){
     if(wr.finale && wr.finaleRanked){
       var medals = ['🥇','🥈','🥉'];
       var finaleChips = wr.finaleRanked.map(function(e, i){
-        var isMe = isMyTeam(e.name);
+        var isMe = myTeam && teamMatch(e.name, myTeam);
         return '<span class="guill-chip winner'+(isMe?' me':'')+'" style="background:'+(i===0?'linear-gradient(135deg,var(--or),var(--pk))':i===1?'rgba(155,109,255,.2)':'rgba(0,229,212,.1)')+';border-color:'+(i===1?'var(--pu)':'var(--or)')+';color:'+(i===0?'#050808':i===1?'var(--pu)':'var(--or)')+';">'
           +medals[i]+' '+e.name+' · '+fmtScore(e.score)+'</span>';
       }).join('');
@@ -1815,17 +1773,6 @@ function fmtTotal(n){
 function teamMatch(a, b){
   if(!a || !b) return false;
   return a.trim().toLowerCase() === b.trim().toLowerCase();
-}
-
-// Simple helper — is this entry mine?
-function isMyTeam(name){
-  if(!name || !myTeam) return false;
-  return teamMatch(name, myTeam);
-}
-
-function findMyEntry(entries){
-  if(!entries || !myTeam) return null;
-  return entries.find(function(e){ return teamMatch(e.name, myTeam); }) || null;
 }
 // Resolves typed input to the exact stored team name
 function resolveTeamName(input){
@@ -2724,6 +2671,8 @@ function goToProfile(encodedName){
   window.location.href = 'player.html?team=' + encodedName;
 }
 
+
+
 // ── PLAYER CHART HELPERS ──────────────────────────────────────
 function getPlayerWeekData(name){
   var weeks = Object.keys(seasonData).filter(function(k){
@@ -3053,7 +3002,7 @@ function renderFinish(sorted, curEntries, prevRank){
     var prev = prevRank[e.name];
     var move = (sznRank && prev) ? prev - sznRank : null;
     var moveStr = move === null ? '—' : move > 0 ? '<span style="color:var(--grn)">+' + move + '</span>' : move < 0 ? '<span style="color:var(--red)">' + move + '</span>' : '—';
-    var isMe = isMyTeam(e.name);
+    var isMe = myTeam && e.name.toLowerCase() === myTeam.toLowerCase();
     var pct = Math.round(e.score / maxScore * 100);
     var reactId = 'react_' + e.name.replace(/[^a-z0-9]/gi,'_').toLowerCase() + '_' + currentWeek;
     var nameLink = '<a class="t-name-link" href="player.html?team=' + encodeURIComponent(e.name) + '">' + e.name + (isMe ? '<span class="my-team-badge">You</span>' : '') + '</a>';
@@ -3074,8 +3023,7 @@ function renderFinish(sorted, curEntries, prevRank){
     + '<th style="text-align:center">Season rank</th>'
     + '<th style="text-align:center">Move</th>'
     + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
-
-  // Load reactions for all rows
+  // Load reactions
   byScore.forEach(function(e){
     var reactId = 'react_' + e.name.replace(/[^a-z0-9]/gi,'_').toLowerCase() + '_' + currentWeek;
     renderReactions(reactId, e.name, currentWeek);
@@ -3561,285 +3509,7 @@ function showToast(msg, isErr){
   setTimeout(function(){ t.className = 'toast' + (isErr ? ' err' : ''); }, 3000);
 }
 
-// ── AUTH SYSTEM ──────────────────────────────────────────────
-function openSignIn(){
-  var o = document.getElementById('auth-overlay');
-  if(!o) return;
-  showAuthPanel('signin');
-  o.style.display = 'flex';
-  console.log('Auth overlay opened, size:', o.offsetWidth, 'x', o.offsetHeight);
-}
 
-function closeAuth(){
-  var o = document.getElementById('auth-overlay');
-  if(o) o.style.display = 'none';
-}
-
-function handleOverlayClick(e){
-  if(e.target === document.getElementById('auth-overlay')) closeAuth();
-}
-
-function showAuthPanel(name){
-  ['auth-signin','auth-signup','auth-profile','auth-verify'].forEach(function(id){
-    var el = document.getElementById(id);
-    if(el) el.style.display = (id === 'auth-' + name) ? 'block' : 'none';
-  });
-}
-
-function showLoginModal(){ openSignIn(); }
-function skipLogin(){ closeAuth(); }
-
-function checkLoginState(){
-  try{
-    var stored = localStorage.getItem('fr_auth_user');
-    if(stored){
-      var user = JSON.parse(stored);
-      currentUser = user;
-      myTeam = user.team2026 || '';
-      myDkTeam = user.dk2025 || '';
-      try{ localStorage.setItem('fr_myteam', myTeam); }catch(e){}
-      syncTeamBar(user);
-      updateLoginBadge(user);
-    }
-  }catch(e){}
-}
-
-function syncTeamBar(user){
-  var inp = document.getElementById('my-team-input');
-  var authDiv = document.getElementById('my-team-auth');
-  var badge = document.getElementById('my-team-name-badge');
-  if(user && user.team2026){
-    // Signed in with team — show badge, hide input
-    if(inp) inp.style.display = 'none';
-    if(authDiv){ authDiv.style.display = 'flex'; }
-    if(badge) badge.textContent = user.team2026;
-    if(inp) inp.value = user.team2026;
-  } else {
-    // Guest or no team set — show input
-    if(inp) inp.style.display = '';
-    if(authDiv) authDiv.style.display = 'none';
-    if(inp && myTeam) inp.value = myTeam;
-  }
-}
-
-function submitEmailSignIn(){
-  var email = document.getElementById('si-email').value.trim();
-  var pass  = document.getElementById('si-pass').value;
-  var err   = document.getElementById('si-err');
-  err.textContent = '';
-  if(!email || !pass){ err.textContent = 'Enter email and password'; return; }
-  err.textContent = 'Signing in…';
-  fetch('https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=' + FB_API_KEY, {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({email:email, password:pass, returnSecureToken:true})
-  }).then(function(r){ return r.json(); })
-  .then(function(d){
-    if(d.error){ err.textContent = 'Incorrect email or password'; return; }
-    fetch(FB_DB_URL + '/users2026/' + d.localId + '.json')
-      .then(function(r){ return r.json(); })
-      .then(function(profile){
-        var user = {uid:d.localId, email:d.email, idToken:d.idToken,
-          team2026: profile ? profile.team2026 : null, dk2025: profile ? profile.dk2025 : null};
-        try{ localStorage.setItem('fr_auth_user', JSON.stringify(user)); }catch(e){}
-        currentUser = user;
-        myTeam = user.team2026 || '';
-        myDkTeam = user.dk2025 || '';
-        try{ localStorage.setItem('fr_myteam', myTeam); }catch(e){}
-        var inp = document.getElementById('my-team-input');
-        if(inp) inp.value = myTeam;
-        closeAuth();
-        syncTeamBar(user);
-        updateLoginBadge(user);
-        if(!user.team2026){ openSignIn(); showAuthPanel('profile'); }
-        else{ renderAll(); showToast('Welcome back, ' + myTeam + '! 🏈'); }
-      });
-  }).catch(function(){ err.textContent = 'Sign in failed — try again'; });
-}
-
-function submitEmailSignUp(){
-  var email = document.getElementById('su-email').value.trim();
-  var pass  = document.getElementById('su-pass').value;
-  var code  = document.getElementById('su-code').value.trim().toUpperCase();
-  var err   = document.getElementById('su-err');
-  err.textContent = '';
-  if(!email){ err.textContent = 'Enter your email'; return; }
-  if(pass.length < 6){ err.textContent = 'Password must be at least 6 characters'; return; }
-  if(code !== LEAGUE_JOIN_CODE){ err.textContent = 'Incorrect join code'; return; }
-  err.textContent = 'Creating account…';
-  fetch('https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=' + FB_API_KEY, {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({email:email, password:pass, returnSecureToken:true})
-  }).then(function(r){ return r.json(); })
-  .then(function(d){
-    if(d.error){ err.textContent = d.error.message.includes('EMAIL_EXISTS') ? 'Account already exists' : d.error.message; return; }
-    currentUser = {uid:d.localId, email:d.email, idToken:d.idToken};
-    try{ localStorage.setItem('fr_auth_user', JSON.stringify(currentUser)); }catch(e){}
-    // Skip email verification — go straight to profile setup
-    showAuthPanel('profile');
-  }).catch(function(){ err.textContent = 'Sign up failed — try again'; });
-}
-
-function showForgotPassword(){
-  var email = document.getElementById('si-email').value.trim();
-  if(!email){ document.getElementById('si-err').textContent = 'Enter your email first'; return; }
-  fetch('https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=' + FB_API_KEY, {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({requestType:'PASSWORD_RESET', email:email})
-  }).then(function(){ showToast('Password reset email sent ✓'); closeAuth(); });
-}
-
-function signInWithGoogle(){
-  document.getElementById('si-err').textContent = 'Google sign-in coming soon — use email/password';
-  document.getElementById('si-err').style.color = '#00E5D4';
-}
-
-var teamNameAvail  = false;
-var selectedDkTeam = null;
-
-function checkTeamAvail(name){
-  var s = document.getElementById('prof-team-status');
-  if(!name || name.length < 2){ s.textContent = ''; teamNameAvail = false; return; }
-  s.textContent = 'Checking…'; s.style.color = '#3A8888';
-  fetch(FB_DB_URL + '/teamNames2026/' + encodeURIComponent(name.trim().toLowerCase()) + '.json')
-    .then(function(r){ return r.json(); })
-    .then(function(data){
-      var taken = data && data.uid && currentUser && data.uid !== currentUser.uid;
-      s.textContent = taken ? '✗ Taken' : '✓ Available!';
-      s.style.color = taken ? '#FF5FA0' : '#00E5D4';
-      teamNameAvail = !taken;
-    });
-}
-
-function searchDkTeams(query){
-  var el = document.getElementById('prof-dk-results');
-  if(!query || query.length < 2){ el.innerHTML = ''; return; }
-  el.innerHTML = '<div style="font-size:12px;color:#3A8888;padding:4px;">Searching teams…</div>';
-  console.log('searchDkTeams called, query:', query);
-  console.log('FB_DB_URL:', FB_DB_URL);
-
-  // Search both 2025 archive and current 2026 data
-  var allTeams = {};
-
-  // First collect any teams already in 2026 seasonData
-  Object.keys(seasonData).filter(function(k){ return !isNaN(Number(k)) && seasonData[k]; })
-    .forEach(function(w){ (seasonData[w]||[]).forEach(function(e){ if(e.name) allTeams[e.name]=1; }); });
-  console.log('2026 teams found:', Object.keys(allTeams).length);
-
-  // Then fetch 2025 week 1 for historical names
-  fetch(FB_DB_URL + '/season2025.json?shallow=true')
-    .then(function(r){ 
-      console.log('season2025 shallow response status:', r.status);
-      return r.json(); 
-    })
-    .then(function(weekKeys){
-      console.log('season2025 weekKeys:', weekKeys);
-      if(!weekKeys) return null;
-      var firstWeek = Object.keys(weekKeys).filter(function(k){ return !isNaN(Number(k)); })
-        .sort(function(a,b){ return Number(a)-Number(b); })[0];
-      console.log('fetching week:', firstWeek);
-      return firstWeek ? fetch(FB_DB_URL + '/season2025/' + firstWeek + '.json').then(function(r){ return r.json(); }) : null;
-    })
-    .then(function(entries){
-      console.log('entries returned:', entries ? entries.length : 'none');
-      if(entries && Array.isArray(entries)){
-        entries.forEach(function(e){ if(e.name) allTeams[e.name] = 1; });
-      }
-      var matches = Object.keys(allTeams)
-        .filter(function(n){ return n.toLowerCase().includes(query.toLowerCase()); })
-        .sort()
-        .slice(0, 8);
-      console.log('matches:', matches);
-      el.innerHTML = matches.map(function(name){
-        return '<div class="dk-result-item" style="padding:8px 12px;background:#142020;border-radius:8px;border:1px solid #0D3535;margin-bottom:4px;cursor:pointer;color:#F0FAFA;font-size:13px;" data-name="'+encodeURIComponent(name)+'">'+name+'</div>';
-      }).join('') || '<div style="font-size:12px;color:#3A8888;">No matches — try a different name</div>';
-      // Wire clicks via event delegation
-      el.querySelectorAll('.dk-result-item').forEach(function(div){
-        div.addEventListener('click', function(){
-          selectDkTeam(decodeURIComponent(this.getAttribute('data-name')));
-        });
-      });
-    })
-    .catch(function(err){
-      console.error('searchDkTeams error:', err);
-      el.innerHTML = '<div style="font-size:12px;color:#FF5FA0;">Could not load team data</div>';
-    });
-}
-
-function selectDkTeam(name){
-  console.log('selectDkTeam called:', name);
-  selectedDkTeam = name;
-  document.getElementById('prof-dk').value = name;
-  document.getElementById('prof-dk-results').innerHTML = '';
-  document.getElementById('prof-dk-linked').textContent = '✓ Linked: "' + name + '"';
-  console.log('selectedDkTeam set to:', selectedDkTeam);
-}
-
-function submitProfile(){
-  var teamName = document.getElementById('prof-team').value.trim();
-  var err = document.getElementById('prof-err');
-  err.textContent = '';
-  if(!teamName){ err.textContent = 'Choose a team name'; return; }
-  if(!teamNameAvail){ err.textContent = 'That name is taken'; return; }
-  if(!currentUser){ err.textContent = 'Not signed in'; return; }
-  err.textContent = 'Saving…';
-  var profile = {team2026:teamName, dk2025:selectedDkTeam||null, email:currentUser.email||null, created:Date.now()};
-  console.log('submitProfile saving:', profile);
-  Promise.all([
-    fetch(FB_DB_URL + '/users2026/' + currentUser.uid + '.json', {
-      method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(profile)
-    }),
-    fetch(FB_DB_URL + '/teamNames2026/' + encodeURIComponent(teamName.toLowerCase()) + '.json', {
-      method:'PUT', headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({uid:currentUser.uid, team:teamName})
-    })
-  ]).then(function(){
-    currentUser.team2026 = teamName;
-    try{ localStorage.setItem('fr_auth_user', JSON.stringify(currentUser)); }catch(e){}
-    myTeam = teamName;
-    myDkTeam = selectedDkTeam || '';
-    try{ localStorage.setItem('fr_myteam', teamName); }catch(e){}
-    var inp = document.getElementById('my-team-input');
-    if(inp) inp.value = teamName;
-    closeAuth();
-    syncTeamBar(currentUser);
-    updateLoginBadge(currentUser);
-    renderAll();
-    showToast('Welcome, ' + teamName + '! 🏈');
-  }).catch(function(){ err.textContent = 'Could not save — try again'; });
-}
-
-function updateLoginBadge(user){
-  var badge = document.getElementById('login-badge');
-  if(!badge) return;
-  if(user && user.team2026){ badge.textContent = '👤 ' + user.team2026; badge.onclick = showUserMenu; }
-  else if(user){ badge.textContent = '✏️ Set team'; badge.onclick = function(){ openSignIn(); showAuthPanel('profile'); }; }
-  else{ badge.textContent = '🔑 Sign In'; badge.onclick = openSignIn; }
-}
-
-function showUserMenu(){
-  if(confirm('Sign out of ' + myTeam + '?')){
-    currentUser = null; myTeam = '';
-    try{ localStorage.removeItem('fr_auth_user'); localStorage.removeItem('fr_myteam'); }catch(e){}
-    syncTeamBar(null);
-    updateLoginBadge(null);
-    var inp = document.getElementById('my-team-input');
-    if(inp) inp.value = '';
-    renderAll(); showToast('Signed out');
-  }
-}
-
-function renderUserPanel(){
-  var el = document.getElementById('user-panel');
-  if(!el) return;
-  fetch(FB_DB_URL + '/users2026.json')
-    .then(function(r){ return r.json(); })
-    .then(function(data){
-      if(!data){ el.innerHTML = '<div style="color:#3A8888;font-size:13px;">No users yet.</div>'; return; }
-      var rows = Object.entries(data).sort(function(a,b){ return (a[1].team2026||'').localeCompare(b[1].team2026||''); })
-        .map(function(kv){ var u=kv[1]; return '<tr><td style="font-size:13px;color:#00E5D4;font-weight:700;">'+(u.team2026||'—')+'</td><td style="font-size:12px;color:#7ABFBF;">'+(u.email||'Google')+'</td><td style="font-size:12px;color:#3A8888;">'+(u.dk2025||'—')+'</td></tr>'; }).join('');
-      el.innerHTML = '<table class="pc-table"><thead><tr><th>2026 Team</th><th>Email</th><th>2025 DK</th></tr></thead><tbody>'+rows+'</tbody></table>';
-    }).catch(function(){ el.innerHTML = '<div style="color:#FF5FA0;">Could not load</div>'; });
-}
 
 
 // ── SHARE CARD ────────────────────────────────────────────────
@@ -3863,34 +3533,34 @@ function openShareCard(){
   var medals = ['🥇','🥈','🥉'];
 
   // Build roster rows
-  var slotDefs = [
-    {pos:'QB',label:'QB'},{pos:'RB',label:'RB'},{pos:'RB',label:'RB'},
+  var slotDefs = [{pos:'QB',label:'QB'},{pos:'RB',label:'RB'},{pos:'RB',label:'RB'},
     {pos:'WR',label:'WR'},{pos:'WR',label:'WR'},{pos:'WR',label:'WR'},
-    {pos:'TE',label:'TE'},{pos:'FLEX',label:'FLEX'},{pos:'DST',label:'DEF'}
-  ];
+    {pos:'TE',label:'TE'},{pos:'FLEX',label:'FLEX'},{pos:'DST',label:'DEF'}];
   var players = parseLineup(myEntry.lineup || '');
   var remaining = players.slice();
   var rosterRows = slotDefs.map(function(slot){
     var idx = remaining.findIndex(function(p){ return p.pos === slot.pos; });
     var player = idx >= 0 ? remaining.splice(idx,1)[0] : null;
-    return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #0D3535;">'
-      + '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;color:#FF5FA0;min-width:36px;text-transform:uppercase;">'+slot.label+'</span>'
-      + '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:600;color:#F0FAFA;flex:1;">'+(player ? player.player : '—')+'</span>'
-      + '<span style="font-family:monospace;font-size:12px;color:#3A8888;min-width:36px;text-align:right;">—</span>'
+    return '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid #0D3535;">'
+      + '<span style="font-family:var(--fd);font-size:11px;font-weight:800;color:var(--pk);min-width:36px;text-transform:uppercase;">'+slot.label+'</span>'
+      + '<span style="font-family:var(--fd);font-size:13px;font-weight:600;color:#F0FAFA;flex:1;">'+(player?player.player:'—')+'</span>'
+      + '<span style="font-family:monospace;font-size:12px;color:#3A8888;min-width:28px;text-align:right;">—</span>'
       + '</div>';
   }).join('');
 
   document.getElementById('share-preview').innerHTML =
-    '<div class="share-card-league">Fantasy Refresh · 2026 Season</div>'
+    '<div class="share-card-inner">'
+    + '<div class="share-card-league">Fantasy Refresh · 2026 Season</div>'
     + '<div class="share-card-name">'+myEntry.name+'</div>'
     + '<div class="share-card-score">'+fmtScore(myEntry.score)+'</div>'
     + '<div class="share-card-pts">points · week '+currentWeek+'</div>'
-    + '<div class="share-card-stats" style="margin-bottom:14px;">'
-    + '<div class="share-card-stat"><div class="share-card-stat-val">'+(wkRank<=3?medals[wkRank-1]:'#'+wkRank)+'</div><div class="share-card-stat-lbl">Week finish</div></div>'
-    + '<div class="share-card-stat"><div class="share-card-stat-val">#'+sznRank+'</div><div class="share-card-stat-lbl">Season rank</div></div>'
+    + '<div class="share-card-stats" style="margin-bottom:12px;">'
+    + '<div><div class="share-card-stat-val">'+(wkRank<=3?medals[wkRank-1]:'#'+wkRank)+'</div><div class="share-card-stat-lbl">Week</div></div>'
+    + '<div><div class="share-card-stat-val">#'+sznRank+'</div><div class="share-card-stat-lbl">Season</div></div>'
     + '</div>'
-    + (players.length ? '<div style="margin-top:8px;">'+rosterRows+'</div>' : '')
-    + '<div style="font-size:10px;color:#3A8888;margin-top:10px;font-family:sans-serif;">fantasyrefresh.com</div>';
+    + (players.length ? '<div style="text-align:left;">'+rosterRows+'</div>' : '')
+    + '<div style="font-size:10px;color:#3A8888;margin-top:8px;">fantasyrefresh.com</div>'
+    + '</div>';
 
   document.getElementById('share-overlay').style.display = 'flex';
   document.getElementById('share-copy-confirm').textContent = '';
@@ -3901,27 +3571,19 @@ function copyShareText(){
   var d = shareCardData;
   var medals = ['🥇','🥈','🥉'];
   var rankEmoji = d.wkRank<=3 ? medals[d.wkRank-1] : '#'+d.wkRank;
-  // Build roster text
-  var slotDefs = [
-    {pos:'QB',label:'QB'},{pos:'RB',label:'RB'},{pos:'RB',label:'RB'},
+  var slotDefs = [{pos:'QB',label:'QB'},{pos:'RB',label:'RB'},{pos:'RB',label:'RB'},
     {pos:'WR',label:'WR'},{pos:'WR',label:'WR'},{pos:'WR',label:'WR'},
-    {pos:'TE',label:'TE'},{pos:'FLEX',label:'FLEX'},{pos:'DST',label:'DEF'}
-  ];
+    {pos:'TE',label:'TE'},{pos:'FLEX',label:'FLEX'},{pos:'DST',label:'DEF'}];
   var players = parseLineup(d.lineup || '');
   var remaining = players.slice();
   var rosterText = slotDefs.map(function(slot){
     var idx = remaining.findIndex(function(p){ return p.pos === slot.pos; });
     var player = idx >= 0 ? remaining.splice(idx,1)[0] : null;
-    return slot.label.padEnd(5) + (player ? player.player : '—');
+    return slot.label.padEnd(6) + (player ? player.player : '—');
   }).join('\n');
-  var text = '🏈 Fantasy Refresh — Week '+d.week
-    +'\n👤 '+d.name
-    +'\n📊 '+fmtScore(d.score)+' pts · '+rankEmoji+' of '+d.total+' teams'
-    +'\n📈 Season rank: #'+d.sznRank
-    +'\n\n'+rosterText
-    +'\n\n🌐 fantasyrefresh.com';
+  var text = '🏈 Fantasy Refresh — Week '+d.week+'\n👤 '+d.name+'\n📊 '+fmtScore(d.score)+' pts · '+rankEmoji+' of '+d.total+' teams'+'\n📈 Season rank: #'+d.sznRank+'\n\n'+rosterText+'\n\n🌐 fantasyrefresh.com';
   navigator.clipboard.writeText(text).then(function(){
-    document.getElementById('share-copy-confirm').textContent = '✅ Copied! Paste into your group chat.';
+    document.getElementById('share-copy-confirm').textContent = '✅ Copied!';
   }).catch(function(){ document.getElementById('share-copy-confirm').textContent = text; });
 }
 
@@ -3930,8 +3592,8 @@ function closeShare(){
 }
 
 // ── EMOJI REACTIONS ────────────────────────────────────────────
-var REACTIONS = ['🔥','💀','👑','😤','🤡'];
-var CHIP_COLORS = {'🔥':'#FF5FA0','💀':'#9B6DFF','👑':'#00E5D4','😤':'#FF9A3A','🤡':'#69BE28'};
+var REACTIONS = ['🔥','💀','👑','😤','🤡','💩'];
+var CHIP_COLORS = {'🔥':'var(--pk)','💀':'var(--pu)','👑':'var(--or)','😤':'#FF9A3A','🤡':'#69BE28','💩':'#8B9B2A'};
 
 function renderReactions(containerId, teamName, week){
   var el = document.getElementById(containerId);
@@ -3944,25 +3606,24 @@ function renderReactions(containerId, teamName, week){
     + '<div class="react-picker" id="'+pickerId+'">'
     + REACTIONS.map(function(em){
         var cp = em.codePointAt(0);
-        return '<button class="react-picker-btn" data-cp="'+cp+'" data-cid="'+containerId+'" data-name="'+encodeURIComponent(teamName)+'" data-week="'+week+'" onclick="handleReactBtn(this)">'+ em +'</button>';
+        return '<button class="react-picker-btn" data-cp="'+cp+'" data-cid="'+containerId+'" data-name="'+encodeURIComponent(teamName)+'" data-week="'+week+'" onclick="handleReactBtn(this)">'+em+'</button>';
       }).join('')+'</div>';
-  // Load counts
-  fetch(FB_DB_URL + '/reactions2026/'+week+'/'+teamName.replace(/[^a-z0-9]/gi,'_').toLowerCase()+'.json')
+  fetch(FB_DB_URL+'/reactions2026/'+week+'/'+teamName.replace(/[^a-z0-9]/gi,'_').toLowerCase()+'.json')
     .then(function(r){ return r.json(); })
     .then(function(data){
-      var existing = el.querySelectorAll('.react-chip');
-      existing.forEach(function(c){ c.remove(); });
+      el.querySelectorAll('.react-chip').forEach(function(ch){ ch.remove(); });
       REACTIONS.forEach(function(em){
         var count = (data && data[em]) ? data[em] : 0;
         if(count > 0){
-          var isMine = !!myReacted[em];
-          var col = CHIP_COLORS[em]||'#00E5D4';
+          var col = CHIP_COLORS[em]||'var(--or)';
           var chip = document.createElement('span');
-          chip.className = 'react-chip'+(isMine?' mine':'');
+          chip.className = 'react-chip';
           chip.style.cssText = 'border-color:'+col+';background:'+col+'18;color:'+col+';';
           chip.innerHTML = em+' <span class="react-chip-count">'+count+'</span>';
           var cp = em.codePointAt(0);
-          chip.onclick = function(ev){ toggleReaction(containerId, encodeURIComponent(teamName), week, cp, ev); };
+          chip.addEventListener('click', function(ev){
+            toggleReaction(containerId, encodeURIComponent(teamName), week, cp, ev);
+          });
           el.appendChild(chip);
         }
       });
@@ -4004,110 +3665,22 @@ function toggleReaction(containerId, encodedName, week, cp, ev){
   fetch(path).then(function(r){ return r.json(); }).then(function(cur){
     var count = (cur||0)+(adding?1:-1);
     if(count<0) count=0;
-    return fetch(path, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(count)});
+    return fetch(path,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(count)});
   }).then(function(){ renderReactions(containerId, teamName, week); }).catch(function(){});
 }
 
 </script>
 
-
 <!-- SHARE MODAL -->
 <div class="share-overlay" id="share-overlay" onclick="if(event.target===this)closeShare()">
   <div class="share-box">
-    <div style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;color:#00E5D4;text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px;">📤 Share Your Score</div>
-    <div class="share-card" id="share-preview"></div>
+    <div style="font-family:var(--fd);font-size:14px;font-weight:700;color:var(--or);text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px;">📤 Share Your Score</div>
+    <div id="share-preview"></div>
     <div class="share-actions">
       <button class="share-copy-btn" onclick="copyShareText()">📋 Copy to clipboard</button>
       <button class="share-close-btn" onclick="closeShare()">✕</button>
     </div>
-    <div style="font-size:10px;color:#3A8888;margin-top:8px;text-transform:uppercase;letter-spacing:.5px;" id="share-copy-confirm"></div>
-  </div>
-</div>
-
-<!-- AUTH MODAL — outside all containers -->
-<div class="auth-overlay" id="auth-overlay" onclick="handleOverlayClick(event)">
-  <div class="auth-box">
-
-    <!-- SIGN IN -->
-    <div id="auth-signin">
-      <div class="auth-logo">🏈</div>
-      <div class="auth-title">Fantasy Refresh</div>
-      <div class="auth-sub">Sign in to track your team and see your personal stats.</div>
-      <button class="google-btn" onclick="signInWithGoogle()">
-        <svg viewBox="0 0 24 24" width="18" height="18"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
-        Continue with Google
-      </button>
-      <div class="auth-divider"><span>or</span></div>
-      <div class="auth-field">
-        <label class="auth-label">Email</label>
-        <input type="email" id="si-email" class="auth-input" placeholder="your@email.com">
-      </div>
-      <div class="auth-field">
-        <label class="auth-label">Password</label>
-        <input type="password" id="si-pass" class="auth-input" placeholder="••••••••" onkeydown="if(event.key==='Enter')submitEmailSignIn()">
-      </div>
-      <div class="auth-err" id="si-err"></div>
-      <button class="auth-btn" onclick="submitEmailSignIn()">Sign In →</button>
-      <div style="display:flex;justify-content:space-between;">
-        <button class="auth-link" onclick="showAuthPanel('signup')">New? Create account</button>
-        <button class="auth-link" onclick="showForgotPassword()">Forgot password?</button>
-      </div>
-      <div style="margin-top:12px;border-top:1px solid #0D3535;padding-top:12px;">
-        <button class="auth-link" onclick="closeAuth()">Browse without signing in</button>
-      </div>
-    </div>
-
-    <!-- SIGN UP -->
-    <div id="auth-signup" style="display:none;">
-      <div class="auth-logo">🎉</div>
-      <div class="auth-title">Join the League</div>
-      <div class="auth-sub">Create your account. You'll choose your team name after signing up.</div>
-      <div class="auth-field">
-        <label class="auth-label">Email</label>
-        <input type="email" id="su-email" class="auth-input" placeholder="your@email.com">
-      </div>
-      <div class="auth-field">
-        <label class="auth-label">Password (min 6 characters)</label>
-        <input type="password" id="su-pass" class="auth-input" placeholder="••••••••">
-      </div>
-      <div class="auth-field">
-        <label class="auth-label">League Join Code</label>
-        <input type="text" id="su-code" class="auth-input" placeholder="Ask your commissioner..." style="text-transform:uppercase;letter-spacing:2px;" maxlength="10">
-      </div>
-      <div class="auth-err" id="su-err"></div>
-      <button class="auth-btn" onclick="submitEmailSignUp()">Create Account →</button>
-      <button class="auth-link" onclick="showAuthPanel('signin')">← Back to sign in</button>
-    </div>
-
-    <!-- PROFILE SETUP -->
-    <div id="auth-profile" style="display:none;">
-      <div class="auth-logo">✏️</div>
-      <div class="auth-title">Set Up Your Team</div>
-      <div class="auth-sub">Choose your 2026 team name.</div>
-      <div class="auth-field">
-        <label class="auth-label">Your 2026 Team Name</label>
-        <input type="text" id="prof-team" class="auth-input" placeholder="The Mahomies..." maxlength="40" oninput="checkTeamAvail(this.value)">
-        <div id="prof-team-status" style="font-size:11px;margin-top:4px;color:#3A8888;"></div>
-      </div>
-      <div class="auth-field" style="margin-top:16px;">
-        <label class="auth-label">Link 2025 DraftKings Team (optional)</label>
-        <input type="text" id="prof-dk" class="auth-input" placeholder="Search 2025 teams..." oninput="searchDkTeams(this.value)">
-        <div id="prof-dk-results" style="margin-top:4px;"></div>
-        <div id="prof-dk-linked" style="font-size:12px;color:#00E5D4;margin-top:4px;"></div>
-      </div>
-      <div class="auth-err" id="prof-err"></div>
-      <button class="auth-btn" onclick="submitProfile()">Save &amp; Enter →</button>
-    </div>
-
-    <!-- VERIFY EMAIL -->
-    <div id="auth-verify" style="display:none;">
-      <div class="auth-logo">📧</div>
-      <div class="auth-title">Check Your Email</div>
-      <div class="auth-sub">We sent a verification link to <strong id="verify-email-addr" style="color:#00E5D4;"></strong>. Click the link then come back.</div>
-      <button class="auth-btn" onclick="showAuthPanel('profile')">I've verified — continue →</button>
-      <button class="auth-link" onclick="closeAuth();showAuthPanel('signin')">Use a different account</button>
-    </div>
-
+    <div style="font-size:10px;color:var(--ink3);margin-top:8px;text-transform:uppercase;letter-spacing:.5px;" id="share-copy-confirm"></div>
   </div>
 </div>
 
