@@ -667,6 +667,32 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
 .react-chip{display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border-radius:20px;font-size:13px;border:1px solid;cursor:pointer;transition:all .15s;}
 .react-chip-count{font-family:var(--fd);font-size:11px;font-weight:800;}
 
+
+/* ── FR AUTH MODULE ── */
+.fr-auth-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.88);z-index:99999;display:none;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;}
+.fr-auth-overlay.open{display:flex;}
+.fr-auth-box{background:#080E0E;border:2px solid #00E5D4;border-radius:20px;padding:36px 32px;max-width:420px;width:100%;text-align:center;box-shadow:0 24px 80px rgba(0,229,212,.2);max-height:90vh;overflow-y:auto;}
+.fr-panel{display:none;}.fr-panel.active{display:block;}
+.fr-logo{font-size:44px;margin-bottom:12px;}
+.fr-title{font-family:var(--fd);font-size:26px;font-weight:800;color:#00E5D4;text-transform:uppercase;margin-bottom:6px;}
+.fr-sub{font-size:13px;color:#7ABFBF;line-height:1.6;margin-bottom:22px;}
+.fr-field{margin-bottom:12px;text-align:left;}
+.fr-label{font-family:var(--fd);font-size:10px;font-weight:700;color:#7ABFBF;text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;display:block;}
+.fr-input{width:100%;padding:11px 14px;background:#060E0E;border:1px solid #0D3535;border-radius:10px;color:#00E5D4;font-size:15px;outline:none;box-sizing:border-box;transition:border-color .15s;}
+.fr-input:focus{border-color:#00E5D4;}
+.fr-input::placeholder{color:#3A8888;}
+.fr-btn{width:100%;padding:13px;background:linear-gradient(135deg,#00E5D4,#FF5FA0);border:none;border-radius:10px;color:#050808;font-family:var(--fd);font-size:15px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;cursor:pointer;margin-bottom:10px;}
+.fr-btn:hover{opacity:.9;}
+.fr-link{background:none;border:none;color:#7ABFBF;font-family:var(--fd);font-size:12px;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;padding:4px;display:inline-block;margin:3px 6px;}
+.fr-link:hover{color:#F0FAFA;}
+.fr-err{font-size:12px;color:#FF5FA0;min-height:16px;margin-bottom:8px;text-transform:uppercase;letter-spacing:.3px;font-family:var(--fd);}
+.fr-divider{display:flex;align-items:center;gap:10px;margin:14px 0;color:#3A8888;font-size:12px;}
+.fr-divider::before,.fr-divider::after{content:'';flex:1;height:1px;background:#0D3535;}
+.fr-badge{background:rgba(0,229,212,.1);border:1px solid rgba(0,229,212,.3);color:var(--or);font-family:var(--fd);font-size:12px;font-weight:700;padding:5px 12px;border-radius:20px;cursor:pointer;transition:all .15s;letter-spacing:.3px;}
+.fr-badge:hover{background:rgba(0,229,212,.2);}
+.fr-dk-item{padding:9px 12px;background:#142020;border-radius:8px;border:1px solid #0D3535;margin-bottom:4px;cursor:pointer;color:#F0FAFA;font-size:13px;transition:border-color .15s;}
+.fr-dk-item:hover{border-color:#00E5D4;color:#00E5D4;}
+
 </style>
 </head>
 <body>
@@ -685,6 +711,7 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
   <div class="hdr-r">
     <div class="hdr-sub" id="hdr-sub">Ready to import</div>
     <div style="display:flex;gap:6px;align-items:center;justify-content:flex-end;">
+      <button class="fr-badge" id="fr-sign-btn" onclick="frAuth.openSignIn()">🔑 Sign In</button>
       <button class="comm-btn" onclick="toggleComm()" id="comm-toggle">⚙ Commissioner</button>
       <button class="comm-btn theme-toggle" onclick="toggleTheme()" id="theme-btn" title="Toggle light/dark mode">🌙</button>
     </div>
@@ -3668,6 +3695,201 @@ function toggleReaction(containerId, encodedName, week, cp, ev){
   }).then(function(){ renderReactions(containerId, teamName, week); }).catch(function(){});
 }
 
+
+// ── FR AUTH MODULE ────────────────────────────────────────────
+var FR_API_KEY  = 'AIzaSyA-2hcf2hzThk7MuEm9DAvRICK95koE9gM';
+var FR_SEASON   = '2026';
+var FR_JOIN_CODE = 'REFRESH26';
+
+function $id(id){ return document.getElementById(id); }
+function frApiPost(endpoint, body){
+  return fetch('https://identitytoolkit.googleapis.com/v1/accounts:'+endpoint+'?key='+FR_API_KEY,{
+    method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)
+  }).then(function(r){ return r.json(); });
+}
+function frDbGet(path){
+  return fetch(FB_DB_URL+path+'.json').then(function(r){ return r.json(); });
+}
+function frDbSet(path,data){
+  return fetch(FB_DB_URL+path+'.json',{
+    method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)
+  }).then(function(r){ return r.json(); });
+}
+
+var frAuth = {
+  user: null,
+  _teamAvail: false,
+  _selectedDk: null,
+
+  init: function(){
+    try{
+      var stored = localStorage.getItem('fr_user_'+FR_SEASON);
+      if(stored){
+        var u = JSON.parse(stored);
+        // Don't store idToken in memory for security — just keep identity fields
+        frAuth.user = {uid:u.uid, email:u.email, team2026:u.team2026, dk2025:u.dk2025};
+        frAuth._applyToSite(frAuth.user);
+        return;
+      }
+    }catch(e){}
+  },
+
+  openSignIn: function(){ frAuth.show('signin'); },
+  openSignUp: function(){ frAuth.show('signup'); },
+  close: function(){ $id('fr-auth-overlay').classList.remove('open'); },
+  handleOverlayClick: function(e){ if(e.target===$id('fr-auth-overlay')) frAuth.close(); },
+
+  show: function(panel){
+    ['signin','signup','profile'].forEach(function(p){
+      var el = $id('fr-'+p);
+      if(el) el.classList.toggle('active', p===panel);
+    });
+    $id('fr-auth-overlay').classList.add('open');
+  },
+
+  submitSignIn: function(){
+    var email = $id('fr-si-email').value.trim();
+    var pass  = $id('fr-si-pass').value;
+    var err   = $id('fr-si-err');
+    err.textContent = '';
+    if(!email||!pass){ err.textContent='Enter email and password'; return; }
+    err.textContent = 'Signing in…';
+    frApiPost('signInWithPassword',{email:email,password:pass,returnSecureToken:true})
+      .then(function(d){
+        if(d.error){ err.textContent='Incorrect email or password'; return; }
+        return frDbGet('/users'+FR_SEASON+'/'+d.localId)
+          .then(function(profile){
+            var user = {uid:d.localId, email:d.email,
+              team2026: profile?profile.team2026:null,
+              dk2025:   profile?profile.dk2025:null};
+            frAuth._save(user);
+            if(!user.team2026){ frAuth.show('profile'); }
+            else { frAuth.close(); frAuth._applyToSite(user); }
+          });
+      }).catch(function(){ err.textContent='Sign in failed — try again'; });
+  },
+
+  submitSignUp: function(){
+    var email = $id('fr-su-email').value.trim();
+    var pass  = $id('fr-su-pass').value;
+    var code  = $id('fr-su-code').value.trim().toUpperCase();
+    var err   = $id('fr-su-err');
+    err.textContent = '';
+    if(!email){ err.textContent='Enter your email'; return; }
+    if(pass.length<6){ err.textContent='Password must be at least 6 characters'; return; }
+    if(code!==FR_JOIN_CODE){ err.textContent='Incorrect join code'; return; }
+    err.textContent = 'Creating account…';
+    frApiPost('signUp',{email:email,password:pass,returnSecureToken:true})
+      .then(function(d){
+        if(d.error){
+          err.textContent = d.error.message.includes('EMAIL_EXISTS')
+            ?'Account already exists — sign in instead':d.error.message;
+          return;
+        }
+        frAuth._save({uid:d.localId,email:d.email,team2026:null,dk2025:null});
+        frAuth.show('profile');
+      }).catch(function(){ err.textContent='Sign up failed — try again'; });
+  },
+
+  checkTeamName: function(name){
+    var s = $id('fr-prof-status');
+    frAuth._teamAvail = false;
+    if(!name||name.trim().length<2){ s.textContent=''; return; }
+    s.textContent='Checking…'; s.style.color='#3A8888';
+    frDbGet('/teamNames'+FR_SEASON+'/'+encodeURIComponent(name.trim().toLowerCase()))
+      .then(function(data){
+        var taken = data&&data.uid&&frAuth.user&&data.uid!==frAuth.user.uid;
+        s.textContent = taken?'✗ That name is taken':'✓ Available!';
+        s.style.color  = taken?'#FF5FA0':'#00E5D4';
+        frAuth._teamAvail = !taken;
+      });
+  },
+
+  submitProfile: function(){
+    var teamName = $id('fr-prof-team').value.trim();
+    var err = $id('fr-prof-err');
+    err.textContent = '';
+    if(!teamName){ err.textContent='Choose a team name'; return; }
+    if(!frAuth._teamAvail){ err.textContent='That name is taken — try another'; return; }
+    if(!frAuth.user){ err.textContent='Not signed in'; return; }
+    err.textContent = 'Saving…';
+    var uid = frAuth.user.uid;
+    var profile = {team2026:teamName, dk2025:frAuth._selectedDk||null,
+      email:frAuth.user.email||null, created:Date.now()};
+    Promise.all([
+      frDbSet('/users'+FR_SEASON+'/'+uid, profile),
+      frDbSet('/teamNames'+FR_SEASON+'/'+encodeURIComponent(teamName.toLowerCase()),
+              {uid:uid,team:teamName})
+    ]).then(function(){
+      frAuth.user.team2026 = teamName;
+      frAuth.user.dk2025   = frAuth._selectedDk||null;
+      frAuth._save(frAuth.user);
+      frAuth.close();
+      frAuth._applyToSite(frAuth.user);
+      showToast('Welcome to Fantasy Refresh, '+teamName+'! 🏈');
+    }).catch(function(){ err.textContent='Could not save — try again'; });
+  },
+
+  forgotPassword: function(){
+    var email = $id('fr-si-email').value.trim();
+    if(!email){ $id('fr-si-err').textContent='Enter your email first'; return; }
+    frApiPost('sendOobCode',{requestType:'PASSWORD_RESET',email:email})
+      .then(function(){
+        $id('fr-si-err').textContent='✓ Reset email sent';
+        $id('fr-si-err').style.color='#00E5D4';
+      });
+  },
+
+  signOut: function(){
+    frAuth.user = null;
+    try{ localStorage.removeItem('fr_user_'+FR_SEASON); }catch(e){}
+    myTeam = '';
+    try{ localStorage.removeItem('fr_myteam'); }catch(e){}
+    var inp = $id('my-team-input');
+    if(inp){ inp.value=''; inp.style.display=''; }
+    frAuth._updateBadge(null);
+    renderAll();
+    showToast('Signed out');
+  },
+
+  _save: function(user){
+    frAuth.user = user;
+    // Save without idToken for security
+    try{ localStorage.setItem('fr_user_'+FR_SEASON, JSON.stringify({
+      uid:user.uid, email:user.email, team2026:user.team2026, dk2025:user.dk2025
+    })); }catch(e){}
+  },
+
+  _applyToSite: function(user){
+    // Connect auth to main site
+    if(user && user.team2026){
+      myTeam = user.team2026;
+      try{ localStorage.setItem('fr_myteam', myTeam); }catch(e){}
+      var inp = $id('my-team-input');
+      if(inp){ inp.value = myTeam; inp.style.display='none'; }
+    }
+    frAuth._updateBadge(user);
+    renderAll();
+  },
+
+  _updateBadge: function(user){
+    var btn = $id('fr-sign-btn');
+    if(!btn) return;
+    if(user && user.team2026){
+      btn.textContent = '👤 '+user.team2026;
+      btn.onclick = function(){
+        if(confirm('Signed in as: '+user.team2026+'\n\nSign out?')) frAuth.signOut();
+      };
+    } else {
+      btn.textContent = '🔑 Sign In';
+      btn.onclick = function(){ frAuth.openSignIn(); };
+    }
+  }
+};
+
+// Boot auth after page loads
+frAuth.init();
+
 </script>
 
 <!-- SHARE MODAL -->
@@ -3680,6 +3902,79 @@ function toggleReaction(containerId, encodedName, week, cp, ev){
       <button class="share-close-btn" onclick="closeShare()">✕</button>
     </div>
     <div style="font-size:10px;color:var(--ink3);margin-top:8px;text-transform:uppercase;letter-spacing:.5px;" id="share-copy-confirm"></div>
+  </div>
+</div>
+
+
+<!-- FR AUTH MODULE — outside all containers -->
+<div class="fr-auth-overlay" id="fr-auth-overlay" onclick="frAuth.handleOverlayClick(event)">
+  <div class="fr-auth-box">
+
+    <!-- SIGN IN -->
+    <div class="fr-panel active" id="fr-signin">
+      <div class="fr-logo">🏈</div>
+      <div class="fr-title">Fantasy Refresh</div>
+      <div class="fr-sub">Sign in to track your team and submit lineups.</div>
+      <div class="fr-field">
+        <label class="fr-label">Email</label>
+        <input type="email" id="fr-si-email" class="fr-input" placeholder="your@email.com"
+          onkeydown="if(event.key==='Enter')document.getElementById('fr-si-pass').focus()">
+      </div>
+      <div class="fr-field">
+        <label class="fr-label">Password</label>
+        <input type="password" id="fr-si-pass" class="fr-input" placeholder="••••••••"
+          onkeydown="if(event.key==='Enter')frAuth.submitSignIn()">
+      </div>
+      <div class="fr-err" id="fr-si-err"></div>
+      <button class="fr-btn" onclick="frAuth.submitSignIn()">Sign In →</button>
+      <div style="display:flex;justify-content:space-between;flex-wrap:wrap;">
+        <button class="fr-link" onclick="frAuth.show('signup')">New? Create account</button>
+        <button class="fr-link" onclick="frAuth.forgotPassword()">Forgot password?</button>
+      </div>
+      <div style="margin-top:12px;border-top:1px solid #0D3535;padding-top:12px;">
+        <button class="fr-link" onclick="frAuth.close()">Browse without signing in</button>
+      </div>
+    </div>
+
+    <!-- SIGN UP -->
+    <div class="fr-panel" id="fr-signup">
+      <div class="fr-logo">🎉</div>
+      <div class="fr-title">Join the League</div>
+      <div class="fr-sub">Create your account and choose your team name.</div>
+      <div class="fr-field">
+        <label class="fr-label">Email</label>
+        <input type="email" id="fr-su-email" class="fr-input" placeholder="your@email.com">
+      </div>
+      <div class="fr-field">
+        <label class="fr-label">Password (min 6 characters)</label>
+        <input type="password" id="fr-su-pass" class="fr-input" placeholder="••••••••">
+      </div>
+      <div class="fr-field">
+        <label class="fr-label">League Join Code</label>
+        <input type="text" id="fr-su-code" class="fr-input" placeholder="Ask your commissioner..."
+          style="text-transform:uppercase;letter-spacing:2px;" maxlength="12"
+          onkeydown="if(event.key==='Enter')frAuth.submitSignUp()">
+      </div>
+      <div class="fr-err" id="fr-su-err"></div>
+      <button class="fr-btn" onclick="frAuth.submitSignUp()">Create Account →</button>
+      <button class="fr-link" onclick="frAuth.show('signin')">← Back to sign in</button>
+    </div>
+
+    <!-- PROFILE SETUP -->
+    <div class="fr-panel" id="fr-profile">
+      <div class="fr-logo">✏️</div>
+      <div class="fr-title">Set Up Your Team</div>
+      <div class="fr-sub">Choose your 2026 team name. This is permanent for the season.</div>
+      <div class="fr-field">
+        <label class="fr-label">Your 2026 Team Name</label>
+        <input type="text" id="fr-prof-team" class="fr-input" placeholder="The Mahomies..." maxlength="40"
+          oninput="frAuth.checkTeamName(this.value)">
+        <div id="fr-prof-status" style="font-size:11px;margin-top:4px;min-height:16px;color:#3A8888;"></div>
+      </div>
+      <div class="fr-err" id="fr-prof-err"></div>
+      <button class="fr-btn" onclick="frAuth.submitProfile()">Save &amp; Enter →</button>
+    </div>
+
   </div>
 </div>
 
