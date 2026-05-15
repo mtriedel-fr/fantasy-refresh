@@ -305,22 +305,46 @@ function loadWeekAndData(){
 }
 
 function loadSalaries(){
-  fetch(FB_DB_URL + '/salaries'+FR_SEASON+'/week'+currentWeek+'.json')
+  // Preseason: try preseason salaries, fall back to flat from pool
+  var salPath = PS_MODE
+    ? FB_DB_URL + '/salariespreseason2026/week'+currentWeek+'.json'
+    : FB_DB_URL + '/salaries'+FR_SEASON+'/week'+currentWeek+'.json';
+
+  fetch(salPath)
     .then(function(r){ return r.json(); })
     .then(function(data){
-      if(!data || !data.players){
-        document.getElementById('picker-list').innerHTML =
-          '<div class="picker-empty"><div class="picker-empty-icon">⏳</div>'
-          +'<div class="picker-empty-title">Salaries Not Set</div>'
-          +'<div class="picker-empty-sub">Commissioner hasn\'t generated Week '+currentWeek+' salaries yet.</div></div>';
+      if(data && data.players && Object.keys(data.players).length){
+        allPlayers = Object.values(data.players).filter(function(p){ return p && p.name && p.pos; });
+        if(!schedule.length) buildGamesBarFromPlayers();
         return;
       }
-      allPlayers = Object.values(data.players).filter(function(p){ return p && p.name && p.pos; });
-      // If schedule hasn't loaded yet, build games from player teams
+      if(PS_MODE){ loadFlatSalariesFromPool(); return; }
+      document.getElementById('picker-list').innerHTML =
+        '<div class="picker-empty"><div class="picker-empty-icon">⏳</div>'
+        +'<div class="picker-empty-title">Salaries Not Set</div>'
+        +'<div class="picker-empty-sub">Commissioner hasn\'t generated Week '+currentWeek+' salaries yet.</div></div>';
+    })
+    .catch(function(){ if(PS_MODE) loadFlatSalariesFromPool(); });
+}
+
+function loadFlatSalariesFromPool(){
+  var FLAT = {QB:9000, RB:7200, WR:7200, TE:6500, DEF:5500};
+  fetch(FB_DB_URL + '/playerPool2026/players.json')
+    .then(function(r){ return r.json(); })
+    .then(function(players){
+      if(!players) return;
+      allPlayers = Object.values(players)
+        .filter(function(p){ return p && p.name && p.pos && p.team && FLAT[p.pos] && p.status !== 'O' && p.status !== 'IR'; })
+        .map(function(p){
+          return {id:p.id, name:p.name, pos:p.pos, team:p.team,
+                  salary:FLAT[p.pos], proj:null, status:p.status||null};
+        });
       if(!schedule.length) buildGamesBarFromPlayers();
+      renderPool();
     })
     .catch(function(){});
 }
+
 
 function loadSchedule(){
   // Use ESPN scoreboard API via Cloudflare worker (no CORS issues)
