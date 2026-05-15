@@ -139,26 +139,6 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
   body{overflow-y:auto;}
 }
 
-/* ── NEWS MODAL ── */
-.news-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;display:none;align-items:flex-end;justify-content:center;}
-.news-overlay.open{display:flex;}
-.news-sheet{background:var(--bg2);border-radius:16px 16px 0 0;border-top:2px solid var(--or);width:100%;max-width:600px;max-height:85vh;display:flex;flex-direction:column;}
-.news-sheet-hdr{padding:14px 20px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
-.news-sheet-name{font-family:var(--fd);font-size:18px;font-weight:800;color:var(--or);text-transform:uppercase;}
-.news-sheet-meta{font-family:var(--fd);font-size:11px;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-top:2px;}
-.news-sheet-close{background:none;border:1px solid var(--bdr2);color:var(--ink3);font-size:14px;width:28px;height:28px;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
-.news-sheet-close:hover{border-color:var(--pk);color:var(--pk);}
-.news-body{overflow-y:auto;flex:1;padding:0;}
-.news-item{padding:14px 20px;border-bottom:1px solid var(--bdr);}
-.news-item:last-child{border-bottom:none;}
-.news-item-title{font-family:var(--fd);font-size:14px;font-weight:700;color:var(--ink);margin-bottom:4px;line-height:1.4;}
-.news-item-body{font-size:13px;color:var(--ink2);line-height:1.6;}
-.news-item-meta{font-family:var(--fd);font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-top:6px;}
-.news-loading{padding:40px 20px;text-align:center;color:var(--ink3);font-family:var(--fd);font-size:14px;}
-.news-empty{padding:40px 20px;text-align:center;}
-.news-empty-icon{font-size:32px;opacity:.4;margin-bottom:8px;}
-.news-empty-title{font-family:var(--fd);font-size:14px;color:var(--ink2);}
-
 /* ── DRAFT BUTTON ── */
 .draft-btn{flex-shrink:0;background:rgba(0,229,212,.12);border:1px solid rgba(0,229,212,.3);color:var(--or);font-family:var(--fd);font-size:12px;font-weight:800;padding:5px 12px;border-radius:8px;cursor:pointer;text-transform:uppercase;letter-spacing:.3px;transition:all .15s;white-space:nowrap;}
 .draft-btn:hover{background:var(--or);color:#050808;border-color:var(--or);}
@@ -784,78 +764,18 @@ function showToast(msg,isErr){
 }
 
 // ── PLAYER NEWS ────────────────────────────────────────────────
-var NEWS_WORKER = 'https://fantasy-refresh-news.mtriedel.workers.dev/player';
-
 function openNews(playerId, event){
   if(event) event.stopPropagation();
   var p = allPlayers.find(function(x){ return x.id === playerId; });
   if(!p) return;
-
-  document.getElementById('news-player-name').textContent = p.name;
-  document.getElementById('news-player-meta').textContent =
-    (p.pos||'') + (p.team ? ' · ' + p.team : '') + (p.salary ? ' · $'+p.salary.toLocaleString() : '');
-  document.getElementById('news-body').innerHTML = '<div class="news-loading">Loading…</div>';
-  document.getElementById('news-overlay').classList.add('open');
-
-  fetch(NEWS_WORKER + '?name=' + encodeURIComponent(p.name) + '&pos=' + (p.pos||'') + '&team=' + (p.team||''))
-    .then(function(r){ return r.json(); })
-    .then(function(data){
-      if(data.espnId){
-        // Load ESPN player news page in iframe
-        document.getElementById('news-body').innerHTML =
-          '<iframe src="'+data.espnNews+'" style="width:100%;height:500px;border:none;background:var(--bg);" '
-          + 'sandbox="allow-scripts allow-same-origin allow-popups" '
-          + 'loading="lazy"></iframe>'
-          + '<div style="padding:8px 20px;border-top:1px solid var(--bdr);display:flex;justify-content:space-between;align-items:center;">'
-          + '<span style="font-family:var(--fd);font-size:11px;color:var(--ink3);text-transform:uppercase;">Source: ESPN</span>'
-          + '<a href="'+data.espnNews+'" target="_blank" rel="noopener" style="font-family:var(--fd);font-size:11px;color:var(--or);text-transform:uppercase;text-decoration:none;">Open in ESPN ↗</a>'
-          + '</div>';
-      } else {
-        showNewsLinks(p);
-      }
-    })
-    .catch(function(){ showNewsLinks(p); });
+  var slug = p.name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/-+$/,'');
+  window.open('https://www.rotoballer.com/player-news/'+slug+'/nfl', '_blank');
 }
 
-function showNewsLinks(p, containerId){
-  var container = document.getElementById(containerId || 'news-body');
-  var nameSlug  = p.name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/-+$/,'');
-  var nameQuery = encodeURIComponent(p.name + ' NFL');
-  var links = [
-    {label:'📰 RotoBaller', url:'https://www.rotoballer.com/player-news/'+nameSlug+'/nfl', desc:'Injury news & analysis'},
-    {label:'🏈 ESPN',       url:'https://www.espn.com/search/results?q='+nameQuery,        desc:'Stats, news & game logs'},
-    {label:'📊 PFR',        url:'https://www.pro-football-reference.com/search/search.fcgi?search='+encodeURIComponent(p.name), desc:'Career stats'}
-  ];
-  container.innerHTML =
-    '<div style="padding:12px 20px;font-size:12px;color:var(--ink3);border-bottom:1px solid var(--bdr);">Opens in a new tab:</div>'
-    + links.map(function(l){
-        return '<a href="'+l.url+'" target="_blank" rel="noopener" style="display:flex;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid var(--bdr);text-decoration:none;" onmouseover="this.style.background=\'var(--bg3)\'" onmouseout="this.style.background=\'\'">'
-          + '<div style="flex:1;"><div style="font-family:var(--fd);font-size:15px;font-weight:700;color:var(--or);">'+l.label+'</div>'
-          + '<div style="font-size:12px;color:var(--ink3);margin-top:2px;">'+l.desc+'</div></div>'
-          + '<div style="font-family:var(--fd);font-size:12px;color:var(--ink3);">→</div></a>';
-      }).join('');
-}
 
-function closeNews(){
-  document.getElementById('news-overlay').classList.remove('open');
-}
 
 </script>
 
-<!-- NEWS SHEET -->
-<div class="news-overlay" id="news-overlay" onclick="if(event.target===this)closeNews()">
-  <div class="news-sheet">
-    <div class="news-sheet-hdr">
-      <div>
-        <div class="news-sheet-name" id="news-player-name">Player News</div>
-        <div class="news-sheet-meta" id="news-player-meta"></div>
-      </div>
-      <button class="news-sheet-close" onclick="closeNews()">✕</button>
-    </div>
-    <div class="news-body" id="news-body">
-      <div class="news-loading">Loading news…</div>
-    </div>
-  </div>
 </div>
 
 </body>
