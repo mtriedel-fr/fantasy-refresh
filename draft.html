@@ -280,36 +280,17 @@ function loadSalaries(){
 }
 
 function loadSchedule(){
-  // Sleeper doesn't have a public /schedule endpoint.
-  // Use the NFL state to confirm season, then build games from player teams.
-  // Real matchup data comes from Sleeper's /v1/schedule/nfl endpoint once live.
-  fetch('https://api.sleeper.app/v1/state/nfl')
+  // Use ESPN scoreboard API via Cloudflare worker (no CORS issues)
+  // Falls back to building from player teams if unavailable
+  var espnUrl = 'https://fantasy-refresh-news.mtriedel.workers.dev/schedule?week='+currentWeek+'&season=2026';
+  fetch(espnUrl)
     .then(function(r){ return r.json(); })
-    .then(function(state){
-      // Try the correct schedule endpoint format
-      var season = state && state.season ? state.season : '2026';
-      var week   = state && state.display_week ? state.display_week : currentWeek;
-      return fetch('https://api.sleeper.app/v1/schedule/nfl/regular/'+season+'/'+week);
-    })
-    .then(function(r){
-      if(!r.ok) throw new Error('No schedule yet');
-      return r.json();
-    })
     .then(function(data){
-      if(!data || !data.length) throw new Error('Empty schedule');
-      schedule = data.map(function(g){
-        return {
-          home:  g.metadata && g.metadata.home_team ? g.metadata.home_team : (g.home_team||''),
-          away:  g.metadata && g.metadata.away_team ? g.metadata.away_team : (g.away_team||''),
-          time:  g.date || g.start_time || 0,
-          teams: [g.home_team||'', g.away_team||'']
-        };
-      }).filter(function(g){ return g.home && g.away; })
-        .sort(function(a,b){ return (a.time||0)-(b.time||0); });
+      if(!data || !data.games || !data.games.length) throw new Error('No games');
+      schedule = data.games;
       buildGamesBar(schedule);
     })
     .catch(function(){
-      // Schedule not published yet — build from player teams
       setTimeout(buildGamesBarFromPlayers, 500);
     });
 }
@@ -324,7 +305,13 @@ function buildGamesBar(games){
   }
   var html = '<button class="game-chip all active" data-game="all" onclick="setGameFilter(null,this)">All Games</button>';
   games.forEach(function(g, i){
-    html += '<button class="game-chip" data-game="'+i+'" onclick="setGameFilter('+i+',this)">'+g.away+' @ '+g.home+'</button>';
+    var timeStr = '';
+    if(g.time){
+      var d = new Date(typeof g.time === 'number' ? g.time : g.time);
+      timeStr = '<div style="font-size:9px;color:var(--ink3);margin-top:1px;">' + d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}) + ' ET</div>';
+    }
+    var label = (g.away||'?') + ' @ ' + (g.home||'?');
+    html += '<button class="game-chip" data-game="'+i+'" onclick="setGameFilter('+i+',this)" style="text-align:center;">' + label + timeStr + '</button>';
   });
   bar.innerHTML = html;
   if(pickerBar) pickerBar.innerHTML = html;
