@@ -280,30 +280,36 @@ function loadSalaries(){
 }
 
 function loadSchedule(){
-  // Fetch NFL schedule from Sleeper
-  fetch('https://api.sleeper.app/v1/schedule/nfl/regular/2026', {method:'GET'})
+  // Sleeper doesn't have a public /schedule endpoint.
+  // Use the NFL state to confirm season, then build games from player teams.
+  // Real matchup data comes from Sleeper's /v1/schedule/nfl endpoint once live.
+  fetch('https://api.sleeper.app/v1/state/nfl')
+    .then(function(r){ return r.json(); })
+    .then(function(state){
+      // Try the correct schedule endpoint format
+      var season = state && state.season ? state.season : '2026';
+      var week   = state && state.display_week ? state.display_week : currentWeek;
+      return fetch('https://api.sleeper.app/v1/schedule/nfl/regular/'+season+'/'+week);
+    })
     .then(function(r){
-      if(r.status === 404){ throw new Error('Schedule not yet available'); }
-      if(!r.ok){ throw new Error('Schedule fetch failed'); }
+      if(!r.ok) throw new Error('No schedule yet');
       return r.json();
     })
     .then(function(data){
-      if(!data) return buildGamesBar([]);
-      // Filter to current week's games
-      var weekGames = data.filter(function(g){ return g.week === currentWeek; });
-      schedule = weekGames.map(function(g){
+      if(!data || !data.length) throw new Error('Empty schedule');
+      schedule = data.map(function(g){
         return {
-          home:  g.home_team,
-          away:  g.away_team,
-          time:  g.start_time,
-          teams: [g.home_team, g.away_team]
+          home:  g.metadata && g.metadata.home_team ? g.metadata.home_team : (g.home_team||''),
+          away:  g.metadata && g.metadata.away_team ? g.metadata.away_team : (g.away_team||''),
+          time:  g.date || g.start_time || 0,
+          teams: [g.home_team||'', g.away_team||'']
         };
-      }).sort(function(a,b){ return (a.time||0)-(b.time||0); });
+      }).filter(function(g){ return g.home && g.away; })
+        .sort(function(a,b){ return (a.time||0)-(b.time||0); });
       buildGamesBar(schedule);
     })
     .catch(function(){
-      // Schedule not available — build from players once they're loaded
-      // allPlayers may not be ready yet, so defer slightly
+      // Schedule not published yet — build from player teams
       setTimeout(buildGamesBarFromPlayers, 500);
     });
 }
