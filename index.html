@@ -912,6 +912,7 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
           <div class="csect">🏈 Player Pool</div>
           <div style="font-size:12px;color:var(--ink2);margin-bottom:10px;line-height:1.5;">Fetches all active NFL players from Sleeper API and stores in Firebase. Refresh every Monday morning or after major roster moves.</div>
           <button class="pool-refresh-btn" id="pool-refresh-btn" onclick="refreshPlayerPool()">⚡ Refresh Player Pool</button>
+          <button class="pool-refresh-btn" id="pool-export-btn" onclick="exportPlayerPool()" style="background:var(--pu);margin-left:8px;">📋 Export CSV</button><!-- TEMP: remove after review -->
           <div class="pool-status" id="pool-status">Loading last sync info…</div>
         </div>
 
@@ -4055,7 +4056,32 @@ function removeUser(uid, teamName){
 }
 
 
-// ── PLAYER POOL ───────────────────────────────────────────────
+// TEMP EXPORT — remove after review
+function exportPlayerPool(){
+  var btn = document.getElementById('pool-export-btn');
+  if(btn) btn.textContent = '⏳ Loading…';
+  fetch(FB_DB_URL + '/playerPool2026/players.json')
+    .then(function(r){ return r.json(); })
+    .then(function(players){
+      if(!players){ showToast('No player pool found', true); return; }
+      var rows = [['ID','Name','Position','Team','Injury Status','Years Exp']];
+      Object.values(players)
+        .sort(function(a,b){ return (a.pos+a.name).localeCompare(b.pos+b.name); })
+        .forEach(function(p){
+          rows.push([p.id, p.name, p.pos, p.team, p.status||'', p.years_exp||0]);
+        });
+      var csv = rows.map(function(r){
+        return r.map(function(v){ return '"'+String(v).replace(/"/g,'""')+'"'; }).join(',');
+      }).join('\n');
+      var blob = new Blob([csv], {type:'text/csv'});
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = 'player_pool_2026.csv'; a.click();
+      URL.revokeObjectURL(url);
+      if(btn) btn.textContent = '📋 Export CSV';
+    }).catch(function(){ showToast('Export failed', true); if(btn) btn.textContent = '📋 Export CSV'; });
+}
+// END TEMP EXPORT
 // Positions we care about
 var POOL_POSITIONS = ['QB','RB','WR','TE','DEF'];
 
