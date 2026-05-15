@@ -305,13 +305,32 @@ function buildGamesBar(games){
   }
   var html = '<button class="game-chip all active" data-game="all" onclick="setGameFilter(null,this)">All Games</button>';
   games.forEach(function(g, i){
-    var timeStr = '';
-    if(g.time){
-      var d = new Date(typeof g.time === 'number' ? g.time : g.time);
-      timeStr = '<div style="font-size:9px;color:var(--ink3);margin-top:1px;">' + d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}) + ' ET</div>';
-    }
     var label = (g.away||'?') + ' @ ' + (g.home||'?');
-    html += '<button class="game-chip" data-game="'+i+'" onclick="setGameFilter('+i+',this)" style="text-align:center;">' + label + timeStr + '</button>';
+    var sub = '';
+    if(g.time){
+      var d = new Date(g.time);
+      var day = d.getDay(); // 0=Sun,1=Mon,2=Tue,3=Wed,4=Thu,5=Fri,6=Sat
+      var hr  = d.getHours();
+      var timeStr = d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})+' ET';
+      var dayLabel;
+      if(g.international){          dayLabel = "INT'L";
+      } else if(day===1&&hr>=18){   dayLabel = 'MNF';
+      } else if(day===0&&hr>=19){   dayLabel = 'SNF';
+      } else if(day===4&&hr>=18){   dayLabel = 'TNF';
+      } else if(day===0){           dayLabel = 'Sun';
+      } else if(day===1){           dayLabel = 'Mon';
+      } else if(day===2){           dayLabel = 'Tue';
+      } else if(day===3){           dayLabel = 'Wed';
+      } else if(day===4){           dayLabel = 'Thu';
+      } else if(day===5){           dayLabel = 'Fri';
+      } else if(day===6){           dayLabel = 'Sat';
+      } else {                      dayLabel = ''; }
+      sub = '<div style="font-size:9px;margin-top:2px;display:flex;gap:4px;justify-content:center;">'
+          + '<span style="color:var(--pk);font-weight:800;">'+dayLabel+'</span>'
+          + '<span style="color:var(--ink3);">'+timeStr+'</span>'
+          + '</div>';
+    }
+    html += '<button class="game-chip" data-game="'+i+'" onclick="setGameFilter('+i+',this)" style="text-align:center;padding:5px 12px;">'+label+sub+'</button>';
   });
   bar.innerHTML = html;
   if(pickerBar) pickerBar.innerHTML = html;
