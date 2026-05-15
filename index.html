@@ -727,6 +727,19 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
 .pool-refresh-btn:hover{opacity:.85;}
 .pool-refresh-btn:disabled{opacity:.5;cursor:not-allowed;}
 
+
+/* ── SALARY ENGINE ── */
+.salary-btn{background:var(--or);color:#050808;border:none;font-family:var(--fd);font-size:12px;font-weight:800;padding:8px 16px;border-radius:8px;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;transition:opacity .15s;margin-right:8px;}
+.salary-btn:hover{opacity:.85;}
+.salary-btn:disabled{opacity:.5;cursor:not-allowed;}
+.salary-btn.secondary{background:transparent;border:1px solid var(--or);color:var(--or);}
+.salary-status{font-family:var(--fd);font-size:12px;color:var(--ink2);margin-top:8px;min-height:16px;}
+.salary-status.ok{color:var(--or);}
+.salary-status.err{color:var(--pk);}
+.salary-lock-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:20px;font-family:var(--fd);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;}
+.salary-lock-badge.unlocked{background:rgba(0,229,212,.1);border:1px solid rgba(0,229,212,.3);color:var(--or);}
+.salary-lock-badge.locked{background:rgba(255,95,160,.1);border:1px solid rgba(255,95,160,.3);color:var(--pk);}
+
 </style>
 </head>
 <body>
@@ -913,6 +926,25 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
           <div style="font-size:12px;color:var(--ink2);margin-bottom:10px;line-height:1.5;">Fetches all active NFL players from Sleeper API and stores in Firebase. Refresh every Monday morning or after major roster moves.</div>
           <button class="pool-refresh-btn" id="pool-refresh-btn" onclick="refreshPlayerPool()">⚡ Refresh Player Pool</button>
           <div class="pool-status" id="pool-status">Loading last sync info…</div>
+        </div>
+
+        <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--bdr);">
+          <div class="csect">💰 Weekly Salaries</div>
+          <div style="font-size:12px;color:var(--ink2);margin-bottom:10px;line-height:1.5;">
+            Generates salaries for all players based on Sleeper projections for the selected week.
+            Run Monday–Wednesday. Lock Thursday night before players draft.
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
+            <select id="sal-week-sel" class="wk-select" style="width:auto;">
+              <option value="">Select week…</option>
+            </select>
+            <span id="sal-lock-badge" class="salary-lock-badge unlocked">🔓 Unlocked</span>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="salary-btn" id="sal-gen-btn" onclick="generateSalaries()">⚡ Generate Salaries</button>
+            <button class="salary-btn secondary" id="sal-lock-btn" onclick="toggleSalaryLock()">🔒 Lock Week</button>
+          </div>
+          <div class="salary-status" id="sal-status">Select a week to get started.</div>
         </div>
 
         <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--bdr);">
@@ -2671,6 +2703,7 @@ function checkCommPw(){
     renderHistory();
     renderUserPanel();
     loadPoolStatus();
+    initSalaryPanel();
   } else {
     err.classList.remove('hidden');
     document.getElementById('comm-pw-input').value = '';
@@ -2692,6 +2725,7 @@ function toggleComm(){
     renderHistory();
     renderUserPanel();
     loadPoolStatus();
+    initSalaryPanel();
   }
   // Wire up drag and drop once
   var zone = document.getElementById('drop-zone');
@@ -4162,6 +4196,234 @@ function loadPoolStatus(){
     })
     .catch(function(){
       status.textContent = 'Could not check pool status';
+    });
+}
+
+
+// ── SALARY ENGINE ─────────────────────────────────────────────
+var SAL_MULTIPLIER = 1800;  // projected_pts × this = salary
+var SAL_MIN = 3700;
+var SAL_MAX = 11300;
+var SAL_ROUND = 100;        // round to nearest $100
+
+function salRound(n){
+  return Math.round(Math.max(SAL_MIN, Math.min(SAL_MAX, n)) / SAL_ROUND) * SAL_ROUND;
+}
+
+function initSalaryPanel(){
+  // Populate week selector with weeks 1-18
+  var sel = document.getElementById('sal-week-sel');
+  if(!sel || sel.options.length > 1) return;
+  for(var w = 1; w <= 18; w++){
+    var opt = document.createElement('option');
+    opt.value = w; opt.textContent = 'Week ' + w;
+    sel.appendChild(opt);
+  }
+  // Default to current week
+  var weeks = Object.keys(seasonData).filter(function(k){ return !isNaN(Number(k)) && seasonData[k]; }).map(Number);
+  var nextWk = weeks.length ? Math.max.apply(null, weeks) + 1 : 1;
+  sel.value = Math.min(nextWk, 18);
+  loadSalaryStatus();
+  sel.addEventListener('change', loadSalaryStatus);
+}
+
+function loadSalaryStatus(){
+  var sel = document.getElementById('sal-week-sel');
+  var status = document.getElementById('sal-status');
+  var badge = document.getElementById('sal-lock-badge');
+  var lockBtn = document.getElementById('sal-lock-btn');
+  if(!sel || !sel.value) return;
+  var week = sel.value;
+
+  fetch(FB_DB_URL + '/salaries2026/week' + week + '/meta.json')
+    .then(function(r){ return r.json(); })
+    .then(function(meta){
+      if(!meta){
+        status.textContent = 'No salaries generated yet for Week ' + week + '.';
+        status.className = 'salary-status';
+        badge.textContent = '🔓 Unlocked';
+        badge.className = 'salary-lock-badge unlocked';
+        if(lockBtn) lockBtn.textContent = '🔒 Lock Week';
+        return;
+      }
+      var when = meta.generated ? new Date(meta.generated).toLocaleString() : '?';
+      var locked = !!meta.locked;
+      status.textContent = '✓ ' + (meta.count||'?') + ' players · Generated: ' + when
+        + (locked ? ' · 🔒 LOCKED' : '');
+      status.className = 'salary-status ok';
+      badge.textContent = locked ? '🔒 Locked' : '🔓 Unlocked';
+      badge.className = 'salary-lock-badge ' + (locked ? 'locked' : 'unlocked');
+      if(lockBtn) lockBtn.textContent = locked ? '🔓 Unlock Week' : '🔒 Lock Week';
+    })
+    .catch(function(){ status.textContent = 'Could not check salary status.'; });
+}
+
+function generateSalaries(){
+  var sel = document.getElementById('sal-week-sel');
+  var status = document.getElementById('sal-status');
+  var btn = document.getElementById('sal-gen-btn');
+  if(!sel || !sel.value){ showToast('Select a week first', true); return; }
+  var week = parseInt(sel.value);
+
+  // Check not locked
+  fetch(FB_DB_URL + '/salaries2026/week' + week + '/meta.json')
+    .then(function(r){ return r.json(); })
+    .then(function(meta){
+      if(meta && meta.locked){
+        showToast('Week ' + week + ' is locked — unlock first', true);
+        return;
+      }
+      btn.disabled = true;
+      btn.textContent = '⏳ Fetching projections…';
+      status.textContent = 'Fetching Sleeper projections for Week ' + week + '…';
+      status.className = 'salary-status';
+
+      // Fetch projections from Sleeper
+      fetch('https://api.sleeper.app/v1/projections/nfl/regular/2026/' + week + '?season_type=regular&position[]=QB&position[]=RB&position[]=WR&position[]=TE&position[]=DEF')
+        .then(function(r){ return r.json(); })
+        .then(function(projData){
+          status.textContent = 'Calculating salaries…';
+
+          if(!projData || Object.keys(projData).length === 0){
+            // Projections not available yet — use flat salaries by position
+            status.textContent = 'No projections available yet — using position-based flat salaries…';
+            return generateFlatSalaries(week);
+          }
+
+          // Load our player pool to get names
+          return fetch(FB_DB_URL + '/playerPool2026/players.json')
+            .then(function(r){ return r.json(); })
+            .then(function(poolPlayers){
+              var salaries = {};
+              var count = 0;
+
+              Object.keys(projData).forEach(function(playerId){
+                var proj = projData[playerId];
+                var player = poolPlayers && poolPlayers[playerId];
+                if(!player) return;
+
+                // Get projected points (DraftKings scoring)
+                var pts = calcDKProjection(proj);
+                if(pts <= 0) return;
+
+                salaries[playerId] = {
+                  id:     playerId,
+                  name:   player.name,
+                  pos:    player.pos,
+                  team:   player.team,
+                  proj:   Math.round(pts * 10) / 10,
+                  salary: salRound(pts * SAL_MULTIPLIER),
+                  status: player.status || null
+                };
+                count++;
+              });
+
+              return saveSalaries(week, salaries, count);
+            });
+        })
+        .then(function(){
+          btn.disabled = false;
+          btn.textContent = '⚡ Generate Salaries';
+          loadSalaryStatus();
+        })
+        .catch(function(err){
+          console.error('Salary gen error:', err);
+          status.textContent = '✗ Failed: ' + (err.message||'Unknown error');
+          status.className = 'salary-status err';
+          btn.disabled = false;
+          btn.textContent = '⚡ Generate Salaries';
+        });
+    });
+}
+
+function calcDKProjection(proj){
+  // DraftKings scoring formula
+  if(!proj) return 0;
+  var pts = 0;
+  pts += (proj.pass_yd  || 0) * 0.04;
+  pts += (proj.pass_td  || 0) * 4;
+  pts += (proj.pass_int || 0) * -1;
+  pts += (proj.rush_yd  || 0) * 0.1;
+  pts += (proj.rush_td  || 0) * 6;
+  pts += (proj.rec      || 0) * 1;    // PPR
+  pts += (proj.rec_yd   || 0) * 0.1;
+  pts += (proj.rec_td   || 0) * 6;
+  pts += (proj.fum_lost || 0) * -1;
+  // DEF
+  pts += (proj.pts_allow_0   || 0) * 10;
+  pts += (proj.pts_allow_1_6 || 0) * 7;
+  pts += (proj.pts_allow_7_13|| 0) * 4;
+  pts += (proj.pts_allow_14_20||0) * 1;
+  pts += (proj.pts_allow_28_34||0) * -1;
+  pts += (proj.pts_allow_35p || 0) * -4;
+  pts += (proj.def_st_td     || 0) * 6;
+  pts += (proj.sack          || 0) * 1;
+  pts += (proj.int           || 0) * 2;
+  pts += (proj.fum_rec       || 0) * 2;
+  return pts;
+}
+
+function generateFlatSalaries(week){
+  // Fallback: flat salaries by position tier when projections unavailable
+  var FLAT = {QB:9000, RB:7200, WR:7200, TE:6500, DEF:5500};
+  return fetch(FB_DB_URL + '/playerPool2026/players.json')
+    .then(function(r){ return r.json(); })
+    .then(function(players){
+      var salaries = {};
+      var count = 0;
+      Object.values(players).forEach(function(p){
+        if(!p || !p.pos || !FLAT[p.pos]) return;
+        if(p.status === 'O' || p.status === 'IR') return; // skip out players
+        salaries[p.id] = {
+          id: p.id, name: p.name, pos: p.pos, team: p.team,
+          proj: null, salary: FLAT[p.pos], status: p.status||null
+        };
+        count++;
+      });
+      return saveSalaries(week, salaries, count);
+    });
+}
+
+function saveSalaries(week, salaries, count){
+  var payload = {
+    players:   salaries,
+    meta: {
+      week:      week,
+      count:     count,
+      generated: Date.now(),
+      locked:    false,
+      cap:       60000
+    }
+  };
+  return fetch(FB_DB_URL + '/salaries2026/week' + week + '.json', {
+    method:  'PUT',
+    headers: {'Content-Type':'application/json'},
+    body:    JSON.stringify(payload)
+  }).then(function(){
+    var status = document.getElementById('sal-status');
+    if(status){
+      status.textContent = '✓ ' + count + ' player salaries saved for Week ' + week;
+      status.className = 'salary-status ok';
+    }
+    showToast('Week ' + week + ' salaries generated — ' + count + ' players ✓');
+  });
+}
+
+function toggleSalaryLock(){
+  var sel = document.getElementById('sal-week-sel');
+  if(!sel || !sel.value) return;
+  var week = sel.value;
+  fetch(FB_DB_URL + '/salaries2026/week' + week + '/meta/locked.json')
+    .then(function(r){ return r.json(); })
+    .then(function(locked){
+      var newLocked = !locked;
+      return fetch(FB_DB_URL + '/salaries2026/week' + week + '/meta/locked.json', {
+        method: 'PUT', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(newLocked)
+      }).then(function(){
+        showToast('Week ' + week + ' ' + (newLocked ? '🔒 Locked' : '🔓 Unlocked'));
+        loadSalaryStatus();
+      });
     });
 }
 
