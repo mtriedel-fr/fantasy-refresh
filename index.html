@@ -642,7 +642,8 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
 .share-btn:hover{background:rgba(0,229,212,.2);}
 
 /* ── SHARE MODAL ── */
-.share-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);z-index:99998;display:none;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;}
+.share-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);z-index:99998;display:none;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;pointer-events:none;}
+.share-overlay.open, .share-overlay[style*="flex"]{pointer-events:all;}
 .share-box{background:#080E0E;border:2px solid var(--or);border-radius:16px;padding:24px;max-width:380px;width:100%;text-align:center;color:var(--ink);}
 .share-card-inner{background:linear-gradient(135deg,#050808 0%,#0A1818 100%);border-radius:12px;padding:24px;margin-bottom:16px;border-top:3px solid var(--or);border-bottom:3px solid var(--pk);}
 .share-card-league{font-family:var(--fd);font-size:11px;font-weight:700;color:var(--pk);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;}
@@ -669,7 +670,8 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
 
 
 /* ── FR AUTH MODULE ── */
-.fr-auth-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.88);z-index:99999;display:none;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;}
+.fr-auth-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.88);z-index:99999;display:none;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;pointer-events:none;}
+.fr-auth-overlay.open{display:flex;pointer-events:all;}
 .fr-auth-overlay.open{display:flex;}
 .fr-auth-box{background:#080E0E;border:2px solid #00E5D4;border-radius:20px;padding:36px 32px;max-width:420px;width:100%;text-align:center;box-shadow:0 24px 80px rgba(0,229,212,.2);max-height:90vh;overflow-y:auto;}
 .fr-panel{display:none;}.fr-panel.active{display:block;}
