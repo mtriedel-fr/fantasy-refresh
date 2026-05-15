@@ -159,6 +159,22 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
 .draft-btn.drafted{background:rgba(255,95,160,.1);border-color:rgba(255,95,160,.3);color:var(--pk);}
 .draft-btn.drafted:hover{background:var(--pk);color:#fff;border-color:var(--pk);}
 
+
+[data-theme="light"]{
+  --hdr:#F0F8F8;--bg:#F5FAFA;--bg2:#EAFAFF;--bg3:#E0F4F4;--bg4:#D0EEEE;
+  --or:#007A70;--pk:#CC3070;--pu:#6030CC;
+  --ink:#0A1818;--ink2:#1A6060;--ink3:#3A8888;
+  --bdr:#B0DEDE;--bdr2:#80CCCC;
+}
+[data-theme="light"] .hdr{border-bottom:1px solid var(--bdr);}
+[data-theme="light"] .player-row:hover{background:var(--bg3);}
+[data-theme="light"] .draft-btn{background:rgba(0,122,112,.12);border-color:rgba(0,122,112,.3);color:var(--or);}
+[data-theme="light"] .draft-btn:hover{background:var(--or);color:#fff;}
+[data-theme="light"] .draft-btn.drafted{background:rgba(204,48,112,.1);border-color:rgba(204,48,112,.3);color:var(--pk);}
+[data-theme="light"] .picker-search{background:var(--bg3);border-color:var(--bdr2);color:var(--or);}
+[data-theme="light"] .news-sheet{background:var(--bg2);}
+[data-theme="light"] .news-overlay{background:rgba(0,0,0,.4);}
+
 </style>
 </head>
 <body>
@@ -166,7 +182,8 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
 <div class="hdr">
   <a href="index.html" class="hdr-logo">Fantasy<span>Refresh</span></a>
   <div class="hdr-week" id="hdr-week">Loading…</div>
-  <a href="index.html" class="hdr-back">← Back</a>
+  <button onclick="toggleTheme()" id="theme-btn" style="background:none;border:1px solid var(--bdr);border-radius:6px;padding:5px 10px;cursor:pointer;font-size:14px;" title="Toggle theme">🌙</button>
+  <a href="#" class="hdr-back" onclick="goBack()">← Back</a>
 </div>
 
 <div class="cap-bar">
@@ -223,6 +240,8 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
 // ── CONFIG ────────────────────────────────────────────────────
 var FB_DB_URL = 'https://fantasy-refresh-default-rtdb.firebaseio.com';
 var FR_SEASON = '2026';
+var PS_MODE   = false;
+var PS_WEEK   = 1;
 var CAP = 60000;
 var SLOT_DEFS = [
   {id:'qb1', pos:'QB',   label:'QB',   eligible:['QB']},
@@ -259,6 +278,16 @@ document.addEventListener('DOMContentLoaded', function(){
 
 // ── LOAD ──────────────────────────────────────────────────────
 function loadWeekAndData(){
+  // Preseason mode — week and season already set from URL params
+  if(PS_MODE){
+    var label = 'PS Week '+currentWeek+' Draft';
+    document.getElementById('hdr-week').textContent = label;
+    document.getElementById('week-label').textContent = 'PS Week '+currentWeek;
+    loadSalaries();
+    loadSchedule();
+    loadSubmitted();
+    return;
+  }
   fetch(FB_DB_URL + '/season'+FR_SEASON+'.json?shallow=true')
     .then(function(r){ return r.json(); })
     .then(function(keys){
@@ -296,7 +325,8 @@ function loadSalaries(){
 function loadSchedule(){
   // Use ESPN scoreboard API via Cloudflare worker (no CORS issues)
   // Falls back to building from player teams if unavailable
-  var espnUrl = 'https://fantasy-refresh-news.mtriedel.workers.dev/schedule?week='+currentWeek+'&season=2026';
+  var seasonType = PS_MODE ? 'Preseason' : 'Regular';
+  var espnUrl = 'https://fantasy-refresh-news.mtriedel.workers.dev/schedule?week='+currentWeek+'&season=2026&seasonType='+seasonType;
   fetch(espnUrl)
     .then(function(r){ return r.json(); })
     .then(function(data){
@@ -849,6 +879,47 @@ function openNews(playerId, event){
 
 
 
+
+
+// ── THEME ──────────────────────────────────────────────────────
+function toggleTheme(){
+  var html  = document.documentElement;
+  var isDark = html.getAttribute('data-theme') !== 'light';
+  html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  document.getElementById('theme-btn').textContent = isDark ? '☀️' : '🌙';
+  try{ localStorage.setItem('fr_theme', isDark ? 'light' : 'dark'); }catch(e){}
+}
+(function(){
+  try{
+    var t = localStorage.getItem('fr_theme');
+    if(t){ document.documentElement.setAttribute('data-theme', t);
+      if(t === 'light'){
+        window.addEventListener('DOMContentLoaded', function(){
+          var btn = document.getElementById('theme-btn');
+          if(btn) btn.textContent = '☀️';
+        });
+      }
+    }
+  }catch(e){}
+})();
+
+// ── PRESEASON MODE ─────────────────────────────────────────────
+// If ?mode=preseason is in the URL, switch to preseason Firebase paths
+// and preseason schedule type
+(function(){
+  var params = new URLSearchParams(window.location.search);
+  if(params.get('mode') === 'preseason'){
+    FR_SEASON   = 'preseason2026';
+    PS_MODE     = true;
+    PS_WEEK     = parseInt(params.get('week') || '1');
+    currentWeek = PS_WEEK;
+  }
+})();
+
+function goBack(){
+  if(PS_MODE) window.location.href = 'preseason.html';
+  else window.location.href = 'index.html';
+}
 
 </script>
 

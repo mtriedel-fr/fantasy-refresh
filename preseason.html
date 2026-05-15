@@ -201,7 +201,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
         <div class="card-hdr"><div class="card-title">Your Lineup</div></div>
         <div style="padding:16px;">
           <p style="font-size:13px;color:var(--ink3);margin-bottom:12px;line-height:1.6;">Draft your preseason lineup using real player salaries. Use this to get familiar with the interface before Week 1.</p>
-          <a href="draft.html" style="display:block;text-align:center;padding:12px;background:linear-gradient(135deg,var(--or),var(--pk));border-radius:10px;color:#050808;font-family:var(--fd);font-size:14px;font-weight:900;text-transform:uppercase;text-decoration:none;">🏈 Go to Draft →</a>
+          <a href="#" id="draft-link" style="display:block;text-align:center;padding:12px;background:linear-gradient(135deg,var(--or),var(--pk));border-radius:10px;color:#050808;font-family:var(--fd);font-size:14px;font-weight:900;text-transform:uppercase;text-decoration:none;">🏈 Go to Draft →</a>
         </div>
       </div>
 
@@ -338,6 +338,7 @@ function setGameFilter(gameIdx, btn){
 window.addEventListener('DOMContentLoaded', function(){
   loadPreseasonData();
   loadSchedule(currentWeek);
+  updateDraftLink();
 });
 
 function switchSeason(val){
@@ -346,6 +347,11 @@ function switchSeason(val){
 }
 
 // ── WEEK TABS ─────────────────────────────────────────────────
+function updateDraftLink(){
+  var link = document.getElementById('draft-link');
+  if(link) link.href = 'draft.html?mode=preseason&week=' + currentWeek;
+}
+
 function setWeek(w, btn){
   currentWeek = w;
   document.querySelectorAll('.week-tab').forEach(function(t){ t.classList.remove('active'); });
@@ -354,6 +360,7 @@ function setWeek(w, btn){
   document.getElementById('standings-sub').textContent = label;
   document.getElementById('lineups-sub').textContent   = label;
   loadSchedule(w);
+  updateDraftLink();
   renderStandings();
   renderLineups();
   renderSummary();
