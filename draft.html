@@ -264,6 +264,8 @@ function loadSalaries(){
         return;
       }
       allPlayers = Object.values(data.players).filter(function(p){ return p && p.name && p.pos; });
+      // If schedule hasn't loaded yet, build games from player teams
+      if(!schedule.length) buildGamesBarFromPlayers();
     })
     .catch(function(){});
 }
@@ -287,8 +289,9 @@ function loadSchedule(){
       buildGamesBar(schedule);
     })
     .catch(function(){
-      // Sleeper schedule not available — show placeholder games from player teams
-      buildGamesBarFromPlayers();
+      // Schedule not available — build from players once they're loaded
+      // allPlayers may not be ready yet, so defer slightly
+      setTimeout(buildGamesBarFromPlayers, 500);
     });
 }
 
@@ -296,6 +299,7 @@ function buildGamesBar(games){
   var bar = document.getElementById('games-bar');
   var pickerBar = document.getElementById('picker-games-bar');
   if(!games || !games.length){
+    // No games from Sleeper — build from player teams instead, don't recurse
     buildGamesBarFromPlayers();
     return;
   }
@@ -308,21 +312,29 @@ function buildGamesBar(games){
 }
 
 function buildGamesBarFromPlayers(){
-  // Build game list from player team matchups
+  // Build rough team pairings from player pool — no recursion back to buildGamesBar
+  var bar = document.getElementById('games-bar');
+  var pickerBar = document.getElementById('picker-games-bar');
   var teams = {};
-  allPlayers.forEach(function(p){ if(p.team) teams[p.team]=1; });
+  allPlayers.forEach(function(p){ if(p.team) teams[p.team] = 1; });
   var teamList = Object.keys(teams).sort();
-  // Pair teams together (rough matchup pairing — real data comes from Sleeper)
   var games = [];
-  for(var i=0; i<teamList.length; i+=2){
+  for(var i = 0; i < teamList.length; i += 2){
     if(teamList[i+1]){
-      games.push({home:teamList[i+1], away:teamList[i], teams:[teamList[i],teamList[i+1]]});
+      games.push({home:teamList[i+1], away:teamList[i], teams:[teamList[i], teamList[i+1]]});
     } else {
       games.push({home:teamList[i], away:'', teams:[teamList[i]]});
     }
   }
   schedule = games;
-  buildGamesBar(games);
+  // Build HTML directly — no call back to buildGamesBar
+  var html = '<button class="game-chip all active" data-game="all" onclick="setGameFilter(null,this)">All Games</button>';
+  games.forEach(function(g, i){
+    var label = g.away ? g.away + ' @ ' + g.home : g.home;
+    html += '<button class="game-chip" data-game="'+i+'" onclick="setGameFilter('+i+',this)">'+label+'</button>';
+  });
+  if(bar) bar.innerHTML = html;
+  if(pickerBar) pickerBar.innerHTML = html;
 }
 
 function setGameFilter(gameIdx, btn){
@@ -339,7 +351,90 @@ function setGameFilter(gameIdx, btn){
   } else {
     badge.style.display = 'none';
   }
-  if(activeSlot) renderPicker();
+
+  if(activeSlot){
+    // Slot selected — filter player list to this game
+    renderPicker();
+  } else if(activeGame){
+    // No slot selected — show game preview with both rosters
+    document.getElementById('picker-panel').classList.add('open');
+    document.getElementById('picker-slot-label').textContent = activeGame.away + ' @ ' + activeGame.home;
+    document.getElementById('picker-slot-label').style.color = 'var(--pk)';
+    document.getElementById('picker-search').value = '';
+    renderGamePreview(activeGame);
+  } else {
+    // Cleared back to All Games — close preview if no slot active
+    document.getElementById('picker-panel').classList.remove('open');
+    renderPicker();
+  }
+}
+
+function renderGamePreview(game){
+  var awayPlayers = allPlayers.filter(function(p){ return p.team === game.away; })
+    .sort(function(a,b){ return b.salary - a.salary; });
+  var homePlayers = allPlayers.filter(function(p){ return p.team === game.home; })
+    .sort(function(a,b){ return b.salary - a.salary; });
+
+  var inLineup = {};
+  Object.values(lineup).forEach(function(p){ if(p) inLineup[p.id] = true; });
+
+  function playerRow(p){
+    var isIn  = !!inLineup[p.id];
+    var isOut = p.status === 'O' || p.status === 'IR';
+    var posColor = POS_COLORS[p.pos] || 'var(--ink2)';
+    var injBadge = (p.status && p.status !== 'Active')
+      ? '<span class="p-inj inj-'+p.status+'">'+p.status+'</span>' : '';
+    var cls = 'player-row'+(isIn?' selected':'')+(isOut?' disabled':'');
+    return '<div class="'+cls+'" onclick="pickFromPreview(\''+p.id+'\')">'
+      + '<div class="p-pos" style="background:'+posColor+'18;color:'+posColor+'">'+p.pos+'</div>'
+      + '<div class="p-info">'
+      +   '<div class="p-name">'+p.name+injBadge+'</div>'
+      +   '<div class="p-meta">'+(p.proj ? p.proj+' proj' : '—')+'</div>'
+      + '</div>'
+      + '<div class="p-sal">$'+(p.salary||0).toLocaleString()+'</div>'
+      + '</div>';
+  }
+
+  var html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0;height:100%;">'
+
+    // Away team
+    + '<div style="border-right:1px solid var(--bdr);">'
+    + '<div style="padding:8px 12px;background:var(--bg2);border-bottom:1px solid var(--bdr);font-family:var(--fd);font-size:13px;font-weight:800;color:var(--ink2);text-transform:uppercase;letter-spacing:.5px;text-align:center;">'+game.away+'</div>'
+    + awayPlayers.map(playerRow).join('')
+    + '</div>'
+
+    // Home team
+    + '<div>'
+    + '<div style="padding:8px 12px;background:var(--bg2);border-bottom:1px solid var(--bdr);font-family:var(--fd);font-size:13px;font-weight:800;color:var(--ink2);text-transform:uppercase;letter-spacing:.5px;text-align:center;">'+game.home+'</div>'
+    + homePlayers.map(playerRow).join('')
+    + '</div>'
+
+    + '</div>';
+
+  document.getElementById('picker-list').innerHTML = html;
+}
+
+function pickFromPreview(playerId){
+  var p = allPlayers.find(function(x){ return x.id === playerId; });
+  if(!p) return;
+  if(p.status === 'O' || p.status === 'IR'){ showToast(p.name+' is out', true); return; }
+
+  // Find the best available slot for this player's position
+  var slot = null;
+  for(var i = 0; i < SLOT_DEFS.length; i++){
+    var s = SLOT_DEFS[i];
+    if(s.eligible.indexOf(p.pos) >= 0 && !lineup[s.id]){ slot = s; break; }
+  }
+  if(!slot){ showToast('No available slot for '+p.pos, true); return; }
+
+  // Check cap
+  if(getSpent() + p.salary > CAP){ showToast('Over cap!', true); return; }
+
+  lineup[slot.id] = p;
+  renderRoster();
+  updateCap();
+  renderGamePreview(activeGame); // refresh preview to show selection
+  showToast(p.name+' → '+slot.label+' ✓');
 }
 
 function loadSubmitted(){
@@ -501,14 +596,46 @@ function pickPlayer(playerId){
   renderRoster();
   updateCap();
 
-  // On mobile — close picker after pick
-  if(window.innerWidth <= 860){
-    closePicker();
-    showToast(p.name+' added ✓');
-  } else {
-    // On desktop — stay open, re-render picker
+  // Find next empty slot of the same position type
+  var nextSlot = findNextEmptySlot(slot);
+
+  if(nextSlot){
+    // Auto-advance to next slot of same type
+    activeSlot = nextSlot.id;
+    var color = POS_COLORS[nextSlot.pos] || 'var(--or)';
+    var label = nextSlot.label === 'FLEX' ? 'FLEX (WR/RB/TE)' : nextSlot.label;
+    document.getElementById('picker-slot-label').textContent = label;
+    document.getElementById('picker-slot-label').style.color = color;
     renderPicker();
+    renderRoster(); // re-render to show new active slot
+  } else {
+    // No more slots for this position — close on mobile
+    if(window.innerWidth <= 860){
+      closePicker();
+    } else {
+      renderPicker();
+    }
+    showToast(p.name+' added ✓');
   }
+}
+
+function findNextEmptySlot(currentSlot){
+  // Look for next empty slot that accepts the same position
+  var found = false;
+  for(var i = 0; i < SLOT_DEFS.length; i++){
+    var s = SLOT_DEFS[i];
+    if(s.id === currentSlot.id){ found = true; continue; }
+    if(!found) continue;
+    // Same position type and empty
+    if(s.eligible.indexOf(currentSlot.pos) >= 0 && !lineup[s.id]) return s;
+  }
+  // Also check FLEX if position is FLEX-eligible and we haven't found anything
+  for(var j = 0; j < SLOT_DEFS.length; j++){
+    var sf = SLOT_DEFS[j];
+    if(sf.id === currentSlot.id || sf.pos !== 'FLEX') continue;
+    if(sf.eligible.indexOf(currentSlot.pos) >= 0 && !lineup[sf.id]) return sf;
+  }
+  return null;
 }
 
 function removePlayer(slotId){
