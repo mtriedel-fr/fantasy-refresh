@@ -936,7 +936,7 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
         <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--bdr);">
           <div class="csect">💰 Weekly Salaries</div>
           <div style="font-size:12px;color:var(--ink2);margin-bottom:10px;line-height:1.5;">
-            Generates salaries for all players based on Sleeper projections for the selected week.
+            Generates salaries using Tank01 projections (updated hourly). Falls back to flat salaries offseason.
             Run Monday–Wednesday. Lock Thursday night before players draft.
           </div>
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
@@ -4267,10 +4267,16 @@ function loadSalaryStatus(){
     });
 }
 
+// ── SALARY GENERATION (Tank01 projections) ───────────────────────────────────
+var TANK01_WORKER = 'https://fantasy-refresh-news.mtriedel.workers.dev';
+var SAL_CAP = 60000;
+var SAL_MAX = 11300;
+var SAL_MIN = 3700;
+
 function generateSalaries(){
-  var sel = document.getElementById('sal-week-sel');
+  var sel    = document.getElementById('sal-week-sel');
   var status = document.getElementById('sal-status');
-  var btn = document.getElementById('sal-gen-btn');
+  var btn    = document.getElementById('sal-gen-btn');
   if(!sel || !sel.value){ showToast('Select a week first', true); return; }
   var week = parseInt(sel.value);
 
@@ -4284,51 +4290,66 @@ function generateSalaries(){
       }
       btn.disabled = true;
       btn.textContent = '⏳ Fetching projections…';
-      status.textContent = 'Fetching Sleeper projections for Week ' + week + '…';
+      status.textContent = 'Fetching Tank01 projections for Week ' + week + '…';
       status.className = 'salary-status';
 
-      // Fetch projections from Sleeper
-      fetch('https://api.sleeper.app/v1/projections/nfl/regular/2026/' + week + '?season_type=regular&position[]=QB&position[]=RB&position[]=WR&position[]=TE&position[]=DEF')
+      // Fetch projections from Tank01 via Cloudflare worker
+      fetch(TANK01_WORKER + '/projections?week=' + week + '&season=2026')
         .then(function(r){ return r.json(); })
-        .then(function(projData){
+        .then(function(data){
           status.textContent = 'Calculating salaries…';
+          var projPlayers = data.players || [];
 
-          if(!projData || Object.keys(projData).length === 0){
-            status.textContent = 'No projections available — using flat salaries…';
+          if(!projPlayers.length){
+            status.textContent = 'No projections yet — using flat salaries…';
             return generateFlatSalaries(week);
           }
 
-          // Load our player pool to get names
+          // Load our player pool for Sleeper IDs + injury status
           return fetch(FB_DB_URL + '/playerPool2026/players.json')
             .then(function(r){ return r.json(); })
             .then(function(poolPlayers){
               var salaries = {};
-              var count = 0;
+              var count    = 0;
 
-              Object.keys(projData).forEach(function(playerId){
-                var proj = projData[playerId];
-                var player = poolPlayers && poolPlayers[playerId];
-                if(!player) return;
+              // Build name lookup from pool for matching
+              var nameMap = {};
+              if(poolPlayers){
+                Object.values(poolPlayers).forEach(function(p){
+                  if(p && p.name) nameMap[p.name.toLowerCase()] = p;
+                });
+              }
 
-                // Get projected points (DraftKings scoring)
-                var pts = calcDKProjection(proj);
-                if(pts <= 0) return;
+              projPlayers.forEach(function(p){
+                if(!p.proj || p.proj <= 0) return;
+                if(!['QB','RB','WR','TE','DEF'].includes(p.pos)) return;
 
-                salaries[playerId] = {
-                  id:     playerId,
-                  name:   player.name,
-                  pos:    player.pos,
-                  team:   player.team,
-                  proj:   Math.round(pts * 10) / 10,
-                  salary: salRound(pts * SAL_MULTIPLIER),
-                  status: player.status || null
+                // Match to pool player by name for Sleeper ID
+                var poolP = nameMap[p.name.toLowerCase()];
+                var pid   = poolP ? poolP.id : ('t01_' + p.id);
+                var inj   = poolP ? (poolP.status || p.status || null) : (p.status || null);
+
+                // Skip injured out players
+                if(inj === 'O' || inj === 'IR') return;
+
+                // Calculate salary: proj pts × multiplier, clamped to min/max
+                var sal = salRound(p.proj * SAL_MULTIPLIER);
+                sal = Math.max(SAL_MIN, Math.min(SAL_MAX, sal));
+
+                salaries[pid] = {
+                  id:     pid,
+                  name:   p.name,
+                  pos:    p.pos,
+                  team:   p.team,
+                  proj:   Math.round(p.proj * 10) / 10,
+                  salary: sal,
+                  status: inj
                 };
                 count++;
               });
 
-              // If projections exist but all scored 0 — fall back to flat
               if(count === 0){
-                status.textContent = 'Projections not yet available — using flat salaries…';
+                status.textContent = 'Projections returned 0 pts — using flat salaries…';
                 return generateFlatSalaries(week);
               }
 
@@ -4342,39 +4363,15 @@ function generateSalaries(){
         })
         .catch(function(err){
           console.error('Salary gen error:', err);
-          status.textContent = '✗ Failed: ' + (err.message||'Unknown error');
+          status.textContent = '✗ Failed — falling back to flat salaries';
           status.className = 'salary-status err';
-          btn.disabled = false;
-          btn.textContent = '⚡ Generate Salaries';
+          generateFlatSalaries(week).then(function(){
+            btn.disabled = false;
+            btn.textContent = '⚡ Generate Salaries';
+            loadSalaryStatus();
+          });
         });
     });
-}
-
-function calcDKProjection(proj){
-  // DraftKings scoring formula
-  if(!proj) return 0;
-  var pts = 0;
-  pts += (proj.pass_yd  || 0) * 0.04;
-  pts += (proj.pass_td  || 0) * 4;
-  pts += (proj.pass_int || 0) * -1;
-  pts += (proj.rush_yd  || 0) * 0.1;
-  pts += (proj.rush_td  || 0) * 6;
-  pts += (proj.rec      || 0) * 1;    // PPR
-  pts += (proj.rec_yd   || 0) * 0.1;
-  pts += (proj.rec_td   || 0) * 6;
-  pts += (proj.fum_lost || 0) * -1;
-  // DEF
-  pts += (proj.pts_allow_0   || 0) * 10;
-  pts += (proj.pts_allow_1_6 || 0) * 7;
-  pts += (proj.pts_allow_7_13|| 0) * 4;
-  pts += (proj.pts_allow_14_20||0) * 1;
-  pts += (proj.pts_allow_28_34||0) * -1;
-  pts += (proj.pts_allow_35p || 0) * -4;
-  pts += (proj.def_st_td     || 0) * 6;
-  pts += (proj.sack          || 0) * 1;
-  pts += (proj.int           || 0) * 2;
-  pts += (proj.fum_rec       || 0) * 2;
-  return pts;
 }
 
 function generateFlatSalaries(week){
