@@ -167,7 +167,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
       <div class="card" id="standings-card">
         <div class="card-hdr">
           <div class="card-title">Standings</div>
-          <div class="card-sub" id="standings-sub">PS Week 1</div>
+          <div class="card-sub" id="standings-sub">HOF Game</div>
         </div>
         <div id="standings-body">
           <div class="empty">
@@ -182,7 +182,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
       <div class="card" style="margin-top:16px;">
         <div class="card-hdr">
           <div class="card-title">Lineups</div>
-          <div class="card-sub" id="lineups-sub">PS Week 1</div>
+          <div class="card-sub" id="lineups-sub">HOF Game</div>
         </div>
         <div id="lineups-body" style="padding:16px;">
           <div class="empty">
@@ -286,7 +286,7 @@ var FB_DB_URL     = 'https://fantasy-refresh-default-rtdb.firebaseio.com';
 var WORKER        = 'https://fantasy-refresh-news.mtriedel.workers.dev';
 var COMM_PW       = 'refresh2025';
 var FR_SEASON     = 'preseason2026'; // Firebase path prefix
-var currentWeek   = 1;
+var currentWeek   = 0;
 var preseasonData = {};  // {1:{teams:[{name,score,lineup}]}, 2:{...}, 3:{...}}
 var commUnlocked  = false;
 
@@ -337,7 +337,7 @@ function setGameFilter(gameIdx, btn){
 
 window.addEventListener('DOMContentLoaded', function(){
   loadPreseasonData();
-  loadSchedule(currentWeek);
+  loadSchedule(0);
   updateDraftLink();
 });
 
