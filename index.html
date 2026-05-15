@@ -4238,7 +4238,8 @@ function loadSalaryStatus(){
   fetch(FB_DB_URL + '/salaries2026/week' + week + '/meta.json')
     .then(function(r){ return r.json(); })
     .then(function(meta){
-      if(!meta){
+      console.log('salary meta for week', week, ':', meta);
+      if(!meta || meta === null){
         status.textContent = 'No salaries generated yet for Week ' + week + '.';
         status.className = 'salary-status';
         badge.textContent = '🔓 Unlocked';
@@ -4248,7 +4249,8 @@ function loadSalaryStatus(){
       }
       var when = meta.generated ? new Date(meta.generated).toLocaleString() : '?';
       var locked = !!meta.locked;
-      var count = meta.count || '?';
+      var count = meta.count !== undefined ? meta.count : '?';
+      console.log('count:', count, 'generated:', when, 'locked:', locked);
       status.textContent = '✓ ' + count + ' players · Generated: ' + when
         + (locked ? ' · 🔒 LOCKED' : '');
       status.className = 'salary-status ok';
@@ -4256,7 +4258,10 @@ function loadSalaryStatus(){
       badge.className = 'salary-lock-badge ' + (locked ? 'locked' : 'unlocked');
       if(lockBtn) lockBtn.textContent = locked ? '🔓 Unlock Week' : '🔒 Lock Week';
     })
-    .catch(function(){ status.textContent = 'Could not check salary status.'; });
+    .catch(function(err){ 
+      console.error('loadSalaryStatus error:', err);
+      status.textContent = 'Could not check salary status.'; 
+    });
 }
 
 function generateSalaries(){
@@ -4374,13 +4379,16 @@ function generateFlatSalaries(week){
       var count = 0;
       Object.values(players).forEach(function(p){
         if(!p || !p.pos || !FLAT[p.pos]) return;
-        if(p.status === 'O' || p.status === 'IR') return; // skip out players
+        if(!p.team) return;                              // must be on a team
+        if(!p.name) return;                              // must have a name
+        if(p.status === 'O' || p.status === 'IR') return; // skip injured out
         salaries[p.id] = {
           id: p.id, name: p.name, pos: p.pos, team: p.team,
           proj: null, salary: FLAT[p.pos], status: p.status||null
         };
         count++;
       });
+      console.log('Flat salaries generated:', count, 'players');
       return saveSalaries(week, salaries, count);
     });
 }
