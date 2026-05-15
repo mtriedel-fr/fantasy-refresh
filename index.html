@@ -4238,7 +4238,6 @@ function loadSalaryStatus(){
   fetch(FB_DB_URL + '/salaries2026/week' + week + '/meta.json')
     .then(function(r){ return r.json(); })
     .then(function(meta){
-      console.log('salary meta for week', week, ':', meta);
       if(!meta || meta === null){
         status.textContent = 'No salaries generated yet for Week ' + week + '.';
         status.className = 'salary-status';
@@ -4250,7 +4249,6 @@ function loadSalaryStatus(){
       var when = meta.generated ? new Date(meta.generated).toLocaleString() : '?';
       var locked = !!meta.locked;
       var count = meta.count !== undefined ? meta.count : '?';
-      console.log('count:', count, 'generated:', when, 'locked:', locked);
       status.textContent = '✓ ' + count + ' players · Generated: ' + when
         + (locked ? ' · 🔒 LOCKED' : '');
       status.className = 'salary-status ok';
@@ -4289,7 +4287,6 @@ function generateSalaries(){
         .then(function(r){ return r.json(); })
         .then(function(projData){
           status.textContent = 'Calculating salaries…';
-          console.log('Sleeper projections keys:', projData ? Object.keys(projData).length : 0);
 
           if(!projData || Object.keys(projData).length === 0){
             status.textContent = 'No projections available — using flat salaries…';
@@ -4323,8 +4320,6 @@ function generateSalaries(){
                 };
                 count++;
               });
-
-              console.log('Projection-based salaries count:', count);
 
               // If projections exist but all scored 0 — fall back to flat
               if(count === 0){
@@ -4383,10 +4378,7 @@ function generateFlatSalaries(week){
   return fetch(FB_DB_URL + '/playerPool2026/players.json')
     .then(function(r){ return r.json(); })
     .then(function(players){
-      console.log('Player pool type:', typeof players, 'null?', players === null);
-      console.log('Player pool keys sample:', players ? Object.keys(players).slice(0,3) : 'none');
       var firstKey = players ? Object.keys(players)[0] : null;
-      console.log('First player:', firstKey, players && firstKey ? players[firstKey] : 'none');
       var salaries = {};
       var count = 0;
       Object.values(players).forEach(function(p){
@@ -4400,7 +4392,6 @@ function generateFlatSalaries(week){
         };
         count++;
       });
-      console.log('Flat salaries generated:', count, 'players');
       return saveSalaries(week, salaries, count);
     });
 }
