@@ -252,13 +252,33 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
                 <button class="btn btn-outline" id="save-manual-btn" onclick="saveManualScores()" style="display:none;">💾 Save Scores</button>
               </div>
 
-              <!-- Generate salaries -->
+              <!-- Refresh player pool -->
               <div class="comm-row">
                 <div>
-                  <div class="comm-label">Generate Salaries</div>
-                  <div class="comm-sub">Use flat preseason salaries (projections not available)</div>
+                  <div class="comm-label">🏈 Player Pool</div>
+                  <div class="comm-sub" id="pool-status">Loads from Sleeper — all active rostered players</div>
                 </div>
-                <button class="btn btn-outline" onclick="generatePreseasonSalaries()">⚡ Generate</button>
+                <button class="btn btn-outline" onclick="refreshPlayerPool()">⚡ Refresh</button>
+              </div>
+
+              <!-- Generate salaries -->
+              <div class="comm-row" style="flex-direction:column;align-items:flex-start;gap:8px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;width:100%;">
+                  <div>
+                    <div class="comm-label">💰 Generate Salaries</div>
+                    <div class="comm-sub">Flat salaries for selected PS week. Saves to Firebase for all players.</div>
+                  </div>
+                  <div style="display:flex;gap:8px;align-items:center;">
+                    <select id="ps-week-sel" style="background:var(--bg3);border:1px solid var(--bdr2);color:var(--ink2);font-family:var(--fd);font-size:12px;padding:5px 8px;border-radius:6px;outline:none;">
+                      <option value="0">HOF</option>
+                      <option value="1" selected>PS Week 1</option>
+                      <option value="2">PS Week 2</option>
+                      <option value="3">PS Week 3</option>
+                    </select>
+                    <button class="btn btn-ps" id="sal-gen-btn" onclick="generatePreseasonSalaries()">⚡ Generate</button>
+                  </div>
+                </div>
+                <div id="sal-status" style="font-family:var(--fd);font-size:11px;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;"></div>
               </div>
 
               <!-- Wipe preseason -->
@@ -623,25 +643,99 @@ function saveManualScores(){
   });
 }
 
-// ── GENERATE FLAT SALARIES ────────────────────────────────────
+// ── REFRESH PLAYER POOL ───────────────────────────────────────
+function refreshPlayerPool(){
+  var statusEl = document.getElementById('pool-status');
+  statusEl.textContent = 'Fetching from Sleeper…';
+  fetch('https://api.sleeper.app/v1/players/nfl')
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      var POSITIONS = ['QB','RB','WR','TE','DEF'];
+      var players   = {};
+      var count     = 0;
+      Object.values(data).forEach(function(p){
+        if(!p || !p.player_id) return;
+        if(!POSITIONS.includes(p.position)) return;
+        if(!p.team) return;
+        if(p.active === false) return;
+        var id = p.player_id;
+        players[id] = {
+          id:     id,
+          name:   (p.first_name||'') + ' ' + (p.last_name||''),
+          pos:    p.position,
+          team:   p.team,
+          status: p.injury_status || null,
+          number: p.number || null
+        };
+        count++;
+      });
+      var payload = { players:players, count:count, updated:Date.now() };
+      return fetch(FB_DB_URL+'/playerPool2026.json',{
+        method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)
+      }).then(function(){
+        statusEl.textContent = '✓ ' + count + ' players synced · ' + new Date().toLocaleTimeString();
+        showToast('Player pool refreshed: '+count+' players ✓');
+      });
+    })
+    .catch(function(e){
+      statusEl.textContent = '✗ Failed: ' + e.message;
+      showToast('Pool refresh failed', true);
+    });
+}
+
+// ── GENERATE PRESEASON SALARIES ───────────────────────────────
 function generatePreseasonSalaries(){
-  var FLAT = {QB:9000, RB:7200, WR:7200, TE:6500, DEF:5500};
+  var weekSel = document.getElementById('ps-week-sel');
+  var week    = weekSel ? parseInt(weekSel.value) : currentWeek;
+  var btn     = document.getElementById('sal-gen-btn');
+  var status  = document.getElementById('sal-status');
+  var FLAT    = {QB:9000, RB:7200, WR:7200, TE:6500, DEF:5500};
+
+  btn.disabled = true;
+  btn.textContent = '⏳';
+  status.textContent = 'Loading player pool…';
+
   fetch(FB_DB_URL + '/playerPool2026/players.json')
     .then(function(r){ return r.json(); })
     .then(function(players){
+      if(!players) throw new Error('No player pool — refresh pool first');
       var salaries = {};
-      Object.values(players||{}).forEach(function(p){
-        if(!p||!p.pos||!FLAT[p.pos]||!p.team||!p.name) return;
-        if(p.status==='O'||p.status==='IR') return;
-        salaries[p.id] = {id:p.id,name:p.name,pos:p.pos,team:p.team,proj:null,salary:FLAT[p.pos],status:p.status||null};
+      var count    = 0;
+      Object.values(players).forEach(function(p){
+        if(!p||!p.pos||!p.name||!p.team) return;
+        if(!FLAT[p.pos]) return;
+        if(p.status === 'O' || p.status === 'IR') return;
+        salaries[p.id] = {
+          id:     p.id,
+          name:   p.name,
+          pos:    p.pos,
+          team:   p.team,
+          salary: FLAT[p.pos],
+          proj:   null,
+          status: p.status || null
+        };
+        count++;
       });
-      var payload = {players:salaries,meta:{week:'PS',count:Object.keys(salaries).length,generated:Date.now(),locked:false,cap:60000}};
-      return fetch(FB_DB_URL + '/salaries' + FR_SEASON + '/weekPS.json',{
-        method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)
+      if(!count) throw new Error('No eligible players found');
+      var payload = {
+        players: salaries,
+        meta:    { week:week, count:count, generated:Date.now(), locked:false, cap:60000, flat:true }
+      };
+      return fetch(FB_DB_URL+'/salariespreseason2026/week'+week+'.json',{
+        method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)
+      }).then(function(){
+        status.textContent = '✓ ' + count + ' players · PS Week ' + week + ' salaries saved';
+        showToast('PS Week '+week+' salaries generated: '+count+' players ✓');
+        btn.disabled    = false;
+        btn.textContent = '⚡ Generate';
       });
     })
-    .then(function(){ showToast('Preseason salaries generated ✓'); })
-    .catch(function(){ showToast('Failed to generate salaries', true); });
+    .catch(function(e){
+      status.textContent = '✗ ' + e.message;
+      showToast('Failed: '+e.message, true);
+      btn.disabled    = false;
+      btn.textContent = '⚡ Generate';
+    });
 }
 
 // ── WIPE PRESEASON ────────────────────────────────────────────
