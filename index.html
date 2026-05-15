@@ -4375,6 +4375,10 @@ function generateFlatSalaries(week){
   return fetch(FB_DB_URL + '/playerPool2026/players.json')
     .then(function(r){ return r.json(); })
     .then(function(players){
+      console.log('Player pool type:', typeof players, 'null?', players === null);
+      console.log('Player pool keys sample:', players ? Object.keys(players).slice(0,3) : 'none');
+      var firstKey = players ? Object.keys(players)[0] : null;
+      console.log('First player:', firstKey, players && firstKey ? players[firstKey] : 'none');
       var salaries = {};
       var count = 0;
       Object.values(players).forEach(function(p){
