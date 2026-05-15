@@ -126,6 +126,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
 
 /* ── MOBILE ── */
 @media(max-width:860px){
+  #picker-games-bar{display:flex !important;}
   html,body{overflow:auto;}
   .main{flex-direction:column;overflow:visible;}
   .roster-panel{width:100%;border-right:none;border-bottom:1px solid var(--bdr);overflow:visible;}
@@ -204,8 +205,8 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
       <div class="picker-game-filter" id="picker-game-filter" style="display:none;"></div>
       <button class="picker-clear-btn" onclick="closePicker()">✕ Close</button>
     </div>
-    <!-- Games bar repeated inside picker for mobile -->
-    <div class="games-bar" id="picker-games-bar" style="border-bottom:1px solid var(--bdr);border-top:1px solid var(--bdr);"></div>
+    <!-- Games bar inside picker — mobile only -->
+    <div class="games-bar" id="picker-games-bar" style="border-bottom:1px solid var(--bdr);border-top:1px solid var(--bdr);display:none;"></div>
     <div class="picker-search-bar">
       <svg class="picker-search-ico" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
       <input type="text" class="picker-search" id="picker-search" placeholder="Search players…" oninput="renderPicker()">
@@ -406,8 +407,12 @@ function renderGamePreview(game){
     return b.salary - a.salary; // within same position, sort by salary
   }
 
-  var awayPlayers = allPlayers.filter(function(p){ return p.team === game.away; }).sort(sortByPos);
-  var homePlayers = allPlayers.filter(function(p){ return p.team === game.home; }).sort(sortByPos);
+  // Hide players already drafted into other slots
+  var draftedInPreview = {};
+  Object.keys(lineup).forEach(function(sid){ if(lineup[sid]) draftedInPreview[lineup[sid].id] = true; });
+
+  var awayPlayers = allPlayers.filter(function(p){ return p.team === game.away && !draftedInPreview[p.id]; }).sort(sortByPos);
+  var homePlayers = allPlayers.filter(function(p){ return p.team === game.home && !draftedInPreview[p.id]; }).sort(sortByPos);
 
   var inLineup = {};
   Object.values(lineup).forEach(function(p){ if(p) inLineup[p.id] = true; });
@@ -418,14 +423,18 @@ function renderGamePreview(game){
     var posColor = POS_COLORS[p.pos] || 'var(--ink2)';
     var injBadge = (p.status && p.status !== 'Active')
       ? '<span class="p-inj inj-'+p.status+'">'+p.status+'</span>' : '';
-    var cls = 'player-row'+(isIn?' selected':'')+(isOut?' disabled':'');
-    return '<div class="'+cls+'" onclick="pickFromPreview(\''+p.id+'\')">'
+    var isIn2 = !!inLineup[p.id];
+    var cls = 'player-row'+(isIn2?' selected':'')+(isOut?' disabled':'');
+    var draftLbl2 = isIn2 ? '✓' : '+';
+    var draftCls2 = 'draft-btn' + (isIn2 ? ' drafted' : '');
+    return '<div class="'+cls+'">'
       + '<div class="p-pos" style="background:'+posColor+'18;color:'+posColor+'">'+p.pos+'</div>'
-      + '<div class="p-info">'
+      + '<div class="p-info" onclick="openNews(\''+p.id+'\',event)" style="cursor:pointer;">'
       +   '<div class="p-name">'+p.name+injBadge+'</div>'
       +   '<div class="p-meta">'+(p.proj ? p.proj+' proj' : '—')+'</div>'
       + '</div>'
-      + '<div class="p-sal">$'+(p.salary||0).toLocaleString()+'</div>'
+      + '<div class="p-sal" style="font-size:12px;">$'+(p.salary||0).toLocaleString()+'</div>'
+      + '<button class="'+draftCls2+'" onclick="pickFromPreview(\''+p.id+'\')">' + draftLbl2 + '</button>'
       + '</div>';
   }
 
@@ -556,6 +565,12 @@ function renderPicker(){
   var inLineup= {};
   Object.keys(lineup).forEach(function(sid){ if(lineup[sid]) inLineup[lineup[sid].id]=sid; });
 
+  // Players already in OTHER slots (not current active slot)
+  var draftedIds = {};
+  Object.keys(lineup).forEach(function(sid){
+    if(sid !== activeSlot && lineup[sid]) draftedIds[lineup[sid].id] = true;
+  });
+
   var players = allPlayers.filter(function(p){
     // Position filter
     if(slot.eligible.indexOf(p.pos) < 0) return false;
@@ -563,6 +578,8 @@ function renderPicker(){
     if(activeGame && (!p.team || activeGame.teams.indexOf(p.team) < 0)) return false;
     // Search
     if(query && p.name.toLowerCase().indexOf(query)<0 && (p.team||'').toLowerCase().indexOf(query)<0) return false;
+    // Hide players already drafted into other slots
+    if(draftedIds[p.id]) return false;
     return true;
   }).sort(function(a,b){ return b.salary - a.salary; });
 
@@ -585,14 +602,17 @@ function renderPicker(){
     var injBadge   = (p.status && p.status !== 'Active')
       ? '<span class="p-inj inj-'+p.status+'">'+p.status+'</span>' : '';
     var posColor   = POS_COLORS[p.pos] || 'var(--ink2)';
+    var draftLabel = isSelected ? '✓ Drafted' : '+ Draft';
+    var draftCls   = 'draft-btn' + (isSelected ? ' drafted' : '');
     var rowCls     = 'player-row'+(isSelected?' selected':'')+(disabled?' disabled':'');
-    html += '<div class="'+rowCls+'" onclick="pickPlayer(\''+p.id+'\')">'
+    html += '<div class="'+rowCls+'">'
       + '<div class="p-pos" style="background:'+posColor+'18;color:'+posColor+'">'+p.pos+'</div>'
-      + '<div class="p-info">'
+      + '<div class="p-info" onclick="openNews(\''+p.id+'\',event)" style="cursor:pointer;">'
       +   '<div class="p-name">'+p.name+injBadge+(isElsewhere?' <span style="font-size:10px;color:var(--ink3)">(in lineup)</span>':'')+'</div>'
       +   '<div class="p-meta">'+(p.team||'')+(p.proj?' · '+p.proj+' proj':'')+'</div>'
       + '</div>'
       + '<div class="p-sal">$'+(p.salary||0).toLocaleString()+'</div>'
+      + '<button class="'+draftCls+'" onclick="pickPlayer(\''+p.id+'\')">' + draftLabel + '</button>'
       + '</div>';
   });
   document.getElementById('picker-list').innerHTML = html;
