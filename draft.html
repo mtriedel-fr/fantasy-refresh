@@ -132,6 +132,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
   .roster-slots{overflow:visible;padding:10px 12px;}
   .picker-panel{display:none;position:fixed;inset:0;z-index:200;background:var(--bg);}
   .picker-panel.open{display:flex;flex-direction:column;}
+  .picker-panel .picker-games-mobile{display:block;}
   .picker-list{flex:1;overflow-y:auto;}
   body{overflow-y:auto;}
 }
@@ -176,6 +177,8 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
       <div class="picker-game-filter" id="picker-game-filter" style="display:none;"></div>
       <button class="picker-clear-btn" onclick="closePicker()">✕ Close</button>
     </div>
+    <!-- Games bar repeated inside picker for mobile -->
+    <div class="games-bar" id="picker-games-bar" style="border-bottom:1px solid var(--bdr);border-top:1px solid var(--bdr);"></div>
     <div class="picker-search-bar">
       <svg class="picker-search-ico" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
       <input type="text" class="picker-search" id="picker-search" placeholder="Search players…" oninput="renderPicker()">
@@ -291,6 +294,7 @@ function loadSchedule(){
 
 function buildGamesBar(games){
   var bar = document.getElementById('games-bar');
+  var pickerBar = document.getElementById('picker-games-bar');
   if(!games || !games.length){
     buildGamesBarFromPlayers();
     return;
@@ -300,6 +304,7 @@ function buildGamesBar(games){
     html += '<button class="game-chip" data-game="'+i+'" onclick="setGameFilter('+i+',this)">'+g.away+' @ '+g.home+'</button>';
   });
   bar.innerHTML = html;
+  if(pickerBar) pickerBar.innerHTML = html;
 }
 
 function buildGamesBarFromPlayers(){
@@ -321,14 +326,12 @@ function buildGamesBarFromPlayers(){
 }
 
 function setGameFilter(gameIdx, btn){
-  document.querySelectorAll('.game-chip').forEach(function(b){ b.classList.remove('active'); });
-  btn.classList.add('active');
-  if(gameIdx === null){
-    activeGame = null;
-  } else {
-    activeGame = schedule[gameIdx] || null;
-  }
-  // Update game filter badge in picker
+  // Sync active state across both game bars
+  var key = gameIdx === null ? 'all' : String(gameIdx);
+  document.querySelectorAll('.game-chip').forEach(function(b){
+    b.classList.toggle('active', b.getAttribute('data-game') === key);
+  });
+  activeGame = gameIdx === null ? null : (schedule[gameIdx] || null);
   var badge = document.getElementById('picker-game-filter');
   if(activeGame){
     badge.textContent = activeGame.away + ' @ ' + activeGame.home;
