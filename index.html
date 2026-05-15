@@ -4289,10 +4289,10 @@ function generateSalaries(){
         .then(function(r){ return r.json(); })
         .then(function(projData){
           status.textContent = 'Calculating salaries…';
+          console.log('Sleeper projections keys:', projData ? Object.keys(projData).length : 0);
 
           if(!projData || Object.keys(projData).length === 0){
-            // Projections not available yet — use flat salaries by position
-            status.textContent = 'No projections available yet — using position-based flat salaries…';
+            status.textContent = 'No projections available — using flat salaries…';
             return generateFlatSalaries(week);
           }
 
@@ -4323,6 +4323,14 @@ function generateSalaries(){
                 };
                 count++;
               });
+
+              console.log('Projection-based salaries count:', count);
+
+              // If projections exist but all scored 0 — fall back to flat
+              if(count === 0){
+                status.textContent = 'Projections not yet available — using flat salaries…';
+                return generateFlatSalaries(week);
+              }
 
               return saveSalaries(week, salaries, count);
             });
