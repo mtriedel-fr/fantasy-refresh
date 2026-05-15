@@ -693,6 +693,28 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
 .fr-dk-item{padding:9px 12px;background:#142020;border-radius:8px;border:1px solid #0D3535;margin-bottom:4px;cursor:pointer;color:#F0FAFA;font-size:13px;transition:border-color .15s;}
 .fr-dk-item:hover{border-color:#00E5D4;color:#00E5D4;}
 
+
+/* ── COMMISSIONER USER PANEL ── */
+.user-table{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px;}
+.user-table th{padding:7px 10px;font-family:var(--fd);font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--ink2);border-bottom:1px solid var(--bdr);text-align:left;background:var(--bg2);}
+.user-table td{padding:9px 10px;border-bottom:1px solid var(--bdr);color:var(--ink);vertical-align:middle;}
+.user-table tr:last-child td{border-bottom:none;}
+.user-table tr:hover td{background:rgba(0,229,212,.04);}
+.user-team-name{font-family:var(--fd);font-size:13px;font-weight:700;color:var(--or);}
+.user-no-team{font-family:var(--fd);font-size:12px;color:var(--ink3);font-style:italic;}
+.user-email{font-size:12px;color:var(--ink2);}
+.user-date{font-size:11px;color:var(--ink3);}
+.user-badge{font-family:var(--fd);font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;text-transform:uppercase;letter-spacing:.5px;}
+.user-badge.pending{background:rgba(255,95,160,.1);border:1px solid rgba(255,95,160,.3);color:var(--pk);}
+.user-badge.active{background:rgba(0,229,212,.1);border:1px solid rgba(0,229,212,.3);color:var(--or);}
+.comm-join-code{font-family:monospace;font-size:22px;font-weight:700;color:var(--or);letter-spacing:4px;background:var(--bg4);padding:10px 16px;border-radius:8px;display:inline-block;margin-top:6px;border:1px solid var(--bdr);}
+.comm-stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;}
+.comm-stat{background:var(--bg4);border-radius:8px;padding:12px;text-align:center;border:1px solid var(--bdr);}
+.comm-stat-val{font-family:var(--fd);font-size:24px;font-weight:800;color:var(--or);}
+.comm-stat-lbl{font-family:var(--fd);font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;margin-top:3px;}
+.user-refresh-btn{background:none;border:1px solid var(--bdr2);color:var(--ink3);font-family:var(--fd);font-size:11px;padding:4px 10px;border-radius:6px;cursor:pointer;float:right;}
+.user-refresh-btn:hover{border-color:var(--or);color:var(--or);}
+
 </style>
 </head>
 <body>
@@ -852,8 +874,34 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
         <button class="import-btn" id="imp-btn" onclick="confirmImport()">↑ Import Week Scores</button>
       </div>
       <div>
-        <div class="csect">Season history</div>
-        <div id="hist-list"></div>
+
+        <!-- REGISTERED USERS -->
+        <div class="csect" style="display:flex;justify-content:space-between;align-items:center;">
+          <span>👥 Registered Players</span>
+          <button class="user-refresh-btn" onclick="renderUserPanel()">↻ Refresh</button>
+        </div>
+        <div class="comm-stat-row" id="user-stats">
+          <div class="comm-stat"><div class="comm-stat-val" id="stat-total">—</div><div class="comm-stat-lbl">Registered</div></div>
+          <div class="comm-stat"><div class="comm-stat-val" id="stat-active">—</div><div class="comm-stat-lbl">Team set</div></div>
+          <div class="comm-stat"><div class="comm-stat-val" id="stat-pending">—</div><div class="comm-stat-lbl">Pending</div></div>
+        </div>
+        <div id="user-panel"><div style="color:var(--ink3);font-size:13px;">Open commissioner tools to load.</div></div>
+
+        <!-- JOIN CODE -->
+        <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--bdr);">
+          <div class="csect">League Join Code</div>
+          <div style="font-size:12px;color:var(--ink2);margin-bottom:8px;">Share this with new players so they can create an account.</div>
+          <div class="comm-join-code" id="join-code-display">REFRESH26</div>
+          <div style="font-size:11px;color:var(--ink3);margin-top:6px;">Change by editing <code>FR_JOIN_CODE</code> in the file.</div>
+        </div>
+
+        <!-- SEASON HISTORY -->
+        <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--bdr);">
+          <div class="csect">Season history</div>
+          <div id="hist-list"></div>
+        </div>
+
+        <!-- DANGER ZONE -->
         <div style="margin-top:20px;padding-top:16px;border-top:1px solid #060E0E;">
           <div class="csect">Danger zone</div>
           <button class="del-btn" style="width:100%;padding:9px;" onclick="resetAll()">Clear entire season</button>
@@ -2602,6 +2650,7 @@ function checkCommPw(){
     err.classList.add('hidden');
     try{ sessionStorage.setItem('fr_comm','1'); }catch(e){}
     renderHistory();
+    renderUserPanel();
   } else {
     err.classList.remove('hidden');
     document.getElementById('comm-pw-input').value = '';
@@ -2621,6 +2670,7 @@ function toggleComm(){
     document.getElementById('comm-gate').classList.add('hidden');
     document.getElementById('comm-tools').classList.remove('hidden');
     renderHistory();
+    renderUserPanel();
   }
   // Wire up drag and drop once
   var zone = document.getElementById('drop-zone');
@@ -3889,6 +3939,98 @@ var frAuth = {
 
 // Boot auth after page loads
 frAuth.init();
+
+
+// ── COMMISSIONER USER PANEL ───────────────────────────────────
+function renderUserPanel(){
+  var el = document.getElementById('user-panel');
+  if(!el) return;
+  el.innerHTML = '<div style="color:var(--ink3);font-size:13px;padding:8px 0;">Loading…</div>';
+
+  fetch(FB_DB_URL + '/users2026.json')
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      if(!data){
+        el.innerHTML = '<div style="color:var(--ink3);font-size:13px;padding:8px 0;">No registered players yet.<br><span style="font-size:11px;">Share the join code below to get started.</span></div>';
+        updateUserStats(0, 0, 0);
+        return;
+      }
+
+      var users = Object.entries(data).map(function(kv){
+        return Object.assign({uid: kv[0]}, kv[1]);
+      }).sort(function(a,b){
+        // Sort: team set first, then by team name
+        if(a.team2026 && !b.team2026) return -1;
+        if(!a.team2026 && b.team2026) return 1;
+        return (a.team2026||a.email||'').localeCompare(b.team2026||b.email||'');
+      });
+
+      var total   = users.length;
+      var active  = users.filter(function(u){ return !!u.team2026; }).length;
+      var pending = total - active;
+      updateUserStats(total, active, pending);
+
+      var rows = users.map(function(u){
+        var created = u.created ? new Date(u.created).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '—';
+        var badge = u.team2026
+          ? '<span class="user-badge active">✓ Set</span>'
+          : '<span class="user-badge pending">Pending</span>';
+        return '<tr>'
+          + '<td>'+(u.team2026
+              ? '<span class="user-team-name">'+u.team2026+'</span>'
+              : '<span class="user-no-team">No team yet</span>')+'</td>'
+          + '<td><span class="user-email">'+(u.email||'—')+'</span></td>'
+          + '<td>'+badge+'</td>'
+          + '<td><span class="user-date">'+created+'</span></td>'
+          + '<td><button class="user-refresh-btn" style="color:var(--pk);border-color:rgba(255,95,160,.3);" data-uid="'+u.uid+'" data-team="'+encodeURIComponent(u.team2026||'')+'" onclick="handleRemoveUser(this)">✕</button></td>'
+          + '</tr>';
+      }).join('');
+
+      el.innerHTML = '<div style="overflow-x:auto;max-height:280px;overflow-y:auto;">'
+        + '<table class="user-table"><thead><tr>'
+        + '<th>2026 Team</th><th>Email</th><th>Status</th><th>Joined</th><th></th>'
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+    })
+    .catch(function(){
+      el.innerHTML = '<div style="color:var(--pk);font-size:13px;">Could not load — check Firebase connection</div>';
+    });
+}
+
+function updateUserStats(total, active, pending){
+  var t = document.getElementById('stat-total');
+  var a = document.getElementById('stat-active');
+  var p = document.getElementById('stat-pending');
+  if(t) t.textContent = total;
+  if(a) a.textContent = active;
+  if(p){ p.textContent = pending; p.style.color = pending > 0 ? 'var(--pk)' : 'var(--or)'; }
+}
+
+function handleRemoveUser(btn){
+  var uid = btn.getAttribute('data-uid');
+  var teamName = decodeURIComponent(btn.getAttribute('data-team')||'');
+  removeUser(uid, teamName);
+}
+
+function removeUser(uid, teamName){
+  var msg = teamName
+    ? 'Remove ' + teamName + ' from the league?\n\nThis will delete their account data but NOT their Firebase login.'
+    : 'Remove this pending account?';
+  if(!confirm(msg)) return;
+
+  var promises = [
+    fetch(FB_DB_URL + '/users2026/' + uid + '.json', {method:'DELETE'})
+  ];
+  // Also unclaim their team name if set
+  if(teamName){
+    promises.push(fetch(FB_DB_URL + '/teamNames2026/' + encodeURIComponent(teamName.toLowerCase()) + '.json', {method:'DELETE'}));
+  }
+  Promise.all(promises).then(function(){
+    showToast((teamName||'Account') + ' removed');
+    renderUserPanel();
+  }).catch(function(){
+    showToast('Could not remove — try again', true);
+  });
+}
 
 </script>
 
