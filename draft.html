@@ -301,9 +301,10 @@ function loadSalaries(){
 
 function loadSchedule(){
   // Fetch NFL schedule from Sleeper
-  fetch('https://api.sleeper.app/v1/schedule/nfl/regular/2026')
+  fetch('https://api.sleeper.app/v1/schedule/nfl/regular/2026', {method:'GET'})
     .then(function(r){
-      if(!r.ok) throw new Error('Schedule not available yet');
+      if(r.status === 404){ throw new Error('Schedule not yet available'); }
+      if(!r.ok){ throw new Error('Schedule fetch failed'); }
       return r.json();
     })
     .then(function(data){
@@ -791,41 +792,8 @@ function openNews(playerId, event){
   document.getElementById('news-player-name').textContent = p.name;
   document.getElementById('news-player-meta').textContent =
     (p.pos||'') + (p.team ? ' · ' + p.team : '') + (p.salary ? ' · $'+p.salary.toLocaleString() : '');
-  document.getElementById('news-body').innerHTML = '<div class="news-loading">Loading news…</div>';
   document.getElementById('news-overlay').classList.add('open');
-
-  // Step 1: Search ESPN for player ID by name
-  fetch('https://site.api.espn.com/apis/site/v2/sports/football/nfl/athletes?search='+encodeURIComponent(p.name)+'&limit=3')
-    .then(function(r){ if(!r.ok) throw new Error('ESPN search failed'); return r.json(); })
-    .then(function(data){
-      var athletes = data && data.athletes;
-      if(!athletes || !athletes.length) throw new Error('Player not found');
-      // Find best match — same name
-      var match = athletes.find(function(a){
-        return a.fullName && a.fullName.toLowerCase() === p.name.toLowerCase();
-      }) || athletes[0];
-      if(!match || !match.id) throw new Error('No match');
-      return fetch('https://site.api.espn.com/apis/site/v2/sports/football/nfl/athletes/'+match.id+'/news?limit=5');
-    })
-    .then(function(r){ if(!r.ok) throw new Error('News fetch failed'); return r.json(); })
-    .then(function(data){
-      var articles = data && data.articles;
-      if(!articles || !articles.length) throw new Error('No news');
-      var html = articles.map(function(a){
-        var date = a.published ? new Date(a.published).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '';
-        var desc = a.description || a.headline || '';
-        return '<div class="news-item">'
-          + '<div class="news-item-title">'+(a.headline||'')+'</div>'
-          + (desc && desc !== a.headline ? '<div class="news-item-body">'+desc+'</div>' : '')
-          + '<div class="news-item-meta">'+(date?date+' · ':'')+(a.source||'ESPN')+'</div>'
-          + '</div>';
-      }).join('');
-      document.getElementById('news-body').innerHTML = html;
-    })
-    .catch(function(){
-      // Fallback to link list if ESPN doesn't work
-      showNewsLinks(p);
-    });
+  showNewsLinks(p);
 }
 
 function showNewsLinks(p){
