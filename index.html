@@ -4248,7 +4248,8 @@ function loadSalaryStatus(){
       }
       var when = meta.generated ? new Date(meta.generated).toLocaleString() : '?';
       var locked = !!meta.locked;
-      status.textContent = '✓ ' + (meta.count||'?') + ' players · Generated: ' + when
+      var count = meta.count || '?';
+      status.textContent = '✓ ' + count + ' players · Generated: ' + when
         + (locked ? ' · 🔒 LOCKED' : '');
       status.className = 'salary-status ok';
       badge.textContent = locked ? '🔒 Locked' : '🔓 Unlocked';
@@ -4402,9 +4403,12 @@ function saveSalaries(week, salaries, count){
   }).then(function(){
     var status = document.getElementById('sal-status');
     if(status){
-      status.textContent = '✓ ' + count + ' player salaries saved for Week ' + week;
+      status.textContent = '✓ ' + count + ' player salaries saved for Week ' + week + ' · ' + new Date().toLocaleString();
       status.className = 'salary-status ok';
     }
+    // Update badge
+    var badge = document.getElementById('sal-lock-badge');
+    if(badge){ badge.textContent = '🔓 Unlocked'; badge.className = 'salary-lock-badge unlocked'; }
     showToast('Week ' + week + ' salaries generated — ' + count + ' players ✓');
   });
 }
