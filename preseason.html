@@ -110,7 +110,16 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
 .comm-pw-inp:focus{border-color:var(--or);}
 .comm-locked{display:none;}
 
-/* ── TOAST ── */
+/* ── GAMES BAR ── */
+.games-bar{scrollbar-width:none;}
+.games-bar::-webkit-scrollbar{display:none;}
+.game-chip{flex-shrink:0;padding:5px 12px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:20px;font-family:var(--fd);font-size:12px;font-weight:700;color:var(--ink2);cursor:pointer;transition:all .15s;white-space:nowrap;text-align:center;}
+.game-chip:hover{border-color:var(--ps);color:var(--ps);}
+.game-chip.active{background:rgba(255,154,58,.15);border-color:var(--ps);color:var(--ps);}
+.game-chip.all{border-color:var(--bdr2);color:var(--ink3);}
+.game-chip.all.active{background:rgba(0,229,212,.1);border-color:var(--or);color:var(--or);}
+
+
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--bg2);border:1px solid var(--or);border-radius:10px;padding:10px 20px;font-family:var(--fd);font-size:14px;font-weight:700;color:var(--or);z-index:9999;pointer-events:none;opacity:0;transition:opacity .2s;white-space:nowrap;}
 .toast.show{opacity:1;}
 .toast.err{border-color:var(--pk);color:var(--pk);}
@@ -139,9 +148,15 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
 </div>
 
 <div class="week-bar" id="week-bar">
-  <div class="week-tab active" data-week="1" onclick="setWeek(1,this)">PS Week 1</div>
+  <div class="week-tab active" data-week="0" onclick="setWeek(0,this)">HOF</div>
+  <div class="week-tab" data-week="1" onclick="setWeek(1,this)">PS Week 1</div>
   <div class="week-tab" data-week="2" onclick="setWeek(2,this)">PS Week 2</div>
   <div class="week-tab" data-week="3" onclick="setWeek(3,this)">PS Week 3</div>
+</div>
+
+<!-- GAMES BAR -->
+<div class="games-bar" id="games-bar" style="background:var(--hdr);border-bottom:2px solid var(--ps);padding:8px 16px;overflow-x:auto;display:flex;gap:8px;scrollbar-width:none;">
+  <div style="font-family:var(--fd);font-size:12px;color:var(--ink3);padding:6px 0;">Loading schedule…</div>
 </div>
 
 <div class="main">
@@ -275,9 +290,54 @@ var currentWeek   = 1;
 var preseasonData = {};  // {1:{teams:[{name,score,lineup}]}, 2:{...}, 3:{...}}
 var commUnlocked  = false;
 
-// ── BOOT ──────────────────────────────────────────────────────
+var psSchedule  = [];
+var activeGame  = null;
+
+function loadSchedule(week){
+  document.getElementById('games-bar').innerHTML =
+    '<div style="font-family:var(--fd);font-size:12px;color:var(--ink3);padding:6px 0;">Loading schedule…</div>';
+
+  fetch(WORKER + '/schedule?week=' + week + '&season=2026&seasonType=Preseason')
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      psSchedule = data.games || [];
+      buildGamesBar(psSchedule);
+    })
+    .catch(function(){ buildGamesBar([]); });
+}
+
+function buildGamesBar(games){
+  var bar  = document.getElementById('games-bar');
+  if(!games.length){ bar.innerHTML = '<div style="font-family:var(--fd);font-size:12px;color:var(--ink3);padding:6px 0;">Schedule TBD</div>'; return; }
+  var html = '<button class="game-chip all active" data-game="all" onclick="setGameFilter(null,this)">All Games</button>';
+  games.forEach(function(g, i){
+    var label = (g.away||'?') + ' @ ' + (g.home||'?');
+    var sub   = '';
+    if(g.time){
+      var d    = new Date(g.time);
+      var days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+      var timeStr = d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})+' ET';
+      sub = '<div style="font-size:9px;margin-top:2px;display:flex;gap:4px;justify-content:center;">'
+          + '<span style="color:var(--ps);font-weight:800;">'+days[d.getDay()]+'</span>'
+          + '<span style="color:var(--ink3);">'+timeStr+'</span>'
+          + '</div>';
+    }
+    html += '<button class="game-chip" data-game="'+i+'" onclick="setGameFilter('+i+',this)" style="text-align:center;padding:5px 12px;">'+label+sub+'</button>';
+  });
+  bar.innerHTML = html;
+}
+
+function setGameFilter(gameIdx, btn){
+  document.querySelectorAll('.game-chip').forEach(function(b){
+    b.classList.toggle('active', b.getAttribute('data-game') === (gameIdx===null?'all':String(gameIdx)));
+  });
+  activeGame = gameIdx === null ? null : (psSchedule[gameIdx] || null);
+}
+
+
 window.addEventListener('DOMContentLoaded', function(){
   loadPreseasonData();
+  loadSchedule(currentWeek);
 });
 
 function switchSeason(val){
@@ -290,8 +350,10 @@ function setWeek(w, btn){
   currentWeek = w;
   document.querySelectorAll('.week-tab').forEach(function(t){ t.classList.remove('active'); });
   btn.classList.add('active');
-  document.getElementById('standings-sub').textContent = 'PS Week ' + w;
-  document.getElementById('lineups-sub').textContent   = 'PS Week ' + w;
+  var label = w === 0 ? 'HOF Game' : 'PS Week ' + w;
+  document.getElementById('standings-sub').textContent = label;
+  document.getElementById('lineups-sub').textContent   = label;
+  loadSchedule(w);
   renderStandings();
   renderLineups();
   renderSummary();
