@@ -791,52 +791,59 @@ function openNews(playerId, event){
   document.getElementById('news-player-name').textContent = p.name;
   document.getElementById('news-player-meta').textContent =
     (p.pos||'') + (p.team ? ' · ' + p.team : '') + (p.salary ? ' · $'+p.salary.toLocaleString() : '');
+  document.getElementById('news-body').innerHTML = '<div class="news-loading">Loading news…</div>';
   document.getElementById('news-overlay').classList.add('open');
 
-  // Build search links from player name
-  var nameParts   = p.name.trim().split(' ');
-  var firstName   = nameParts[0] || '';
-  var lastName    = nameParts.slice(1).join(' ') || '';
-  var nameSlug    = p.name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/-+$/,'');
-  var nameQuery   = encodeURIComponent(p.name + ' NFL');
-
-  var links = [
-    {
-      label: '📰 RotoBaller',
-      url:   'https://www.rotoballer.com/player-news/'+nameSlug+'/nfl',
-      desc:  'Latest news, injury updates & analysis'
-    },
-    {
-      label: '🏈 ESPN',
-      url:   'https://www.espn.com/search/results?q='+nameQuery,
-      desc:  'Stats, news & game logs'
-    },
-    {
-      label: '📊 Pro Football Reference',
-      url:   'https://www.pro-football-reference.com/search/search.fcgi?search='+encodeURIComponent(p.name),
-      desc:  'Career stats & advanced metrics'
-    },
-    {
-      label: '🎯 Sleeper',
-      url:   'https://sleeper.com/players/nfl/'+playerId,
-      desc:  'Projections & ownership data'
-    }
-  ];
-
-  var html = '<div style="padding:16px 20px 8px;font-size:13px;color:var(--ink3);line-height:1.6;border-bottom:1px solid var(--bdr);">'
-    + 'Tap any source below to open player news in a new tab.'
-    + '</div>'
-    + links.map(function(l){
-        return '<a href="'+l.url+'" target="_blank" rel="noopener" style="display:flex;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid var(--bdr);text-decoration:none;transition:background .1s;" onmouseover="this.style.background=\'var(--bg3)\'" onmouseout="this.style.background=\'\'">'
-          + '<div style="flex:1;">'
-          +   '<div style="font-family:var(--fd);font-size:15px;font-weight:700;color:var(--or);">'+l.label+'</div>'
-          +   '<div style="font-size:12px;color:var(--ink3);margin-top:2px;">'+l.desc+'</div>'
-          + '</div>'
-          + '<div style="font-family:var(--fd);font-size:12px;color:var(--ink3);">→</div>'
-          + '</a>';
+  // Step 1: Search ESPN for player ID by name
+  fetch('https://site.api.espn.com/apis/site/v2/sports/football/nfl/athletes?search='+encodeURIComponent(p.name)+'&limit=3')
+    .then(function(r){ if(!r.ok) throw new Error('ESPN search failed'); return r.json(); })
+    .then(function(data){
+      var athletes = data && data.athletes;
+      if(!athletes || !athletes.length) throw new Error('Player not found');
+      // Find best match — same name
+      var match = athletes.find(function(a){
+        return a.fullName && a.fullName.toLowerCase() === p.name.toLowerCase();
+      }) || athletes[0];
+      if(!match || !match.id) throw new Error('No match');
+      return fetch('https://site.api.espn.com/apis/site/v2/sports/football/nfl/athletes/'+match.id+'/news?limit=5');
+    })
+    .then(function(r){ if(!r.ok) throw new Error('News fetch failed'); return r.json(); })
+    .then(function(data){
+      var articles = data && data.articles;
+      if(!articles || !articles.length) throw new Error('No news');
+      var html = articles.map(function(a){
+        var date = a.published ? new Date(a.published).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '';
+        var desc = a.description || a.headline || '';
+        return '<div class="news-item">'
+          + '<div class="news-item-title">'+(a.headline||'')+'</div>'
+          + (desc && desc !== a.headline ? '<div class="news-item-body">'+desc+'</div>' : '')
+          + '<div class="news-item-meta">'+(date?date+' · ':'')+(a.source||'ESPN')+'</div>'
+          + '</div>';
       }).join('');
+      document.getElementById('news-body').innerHTML = html;
+    })
+    .catch(function(){
+      // Fallback to link list if ESPN doesn't work
+      showNewsLinks(p);
+    });
+}
 
-  document.getElementById('news-body').innerHTML = html;
+function showNewsLinks(p){
+  var nameSlug  = p.name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/-+$/,'');
+  var nameQuery = encodeURIComponent(p.name + ' NFL');
+  var links = [
+    {label:'📰 RotoBaller', url:'https://www.rotoballer.com/player-news/'+nameSlug+'/nfl', desc:'Injury news & analysis'},
+    {label:'🏈 ESPN',       url:'https://www.espn.com/search/results?q='+nameQuery,        desc:'Stats, news & game logs'},
+    {label:'📊 PFR',        url:'https://www.pro-football-reference.com/search/search.fcgi?search='+encodeURIComponent(p.name), desc:'Career stats'}
+  ];
+  document.getElementById('news-body').innerHTML =
+    '<div style="padding:12px 20px;font-size:12px;color:var(--ink3);border-bottom:1px solid var(--bdr);">No inline news available — open in new tab:</div>'
+    + links.map(function(l){
+        return '<a href="'+l.url+'" target="_blank" rel="noopener" style="display:flex;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid var(--bdr);text-decoration:none;" onmouseover="this.style.background=\'var(--bg3)\'" onmouseout="this.style.background=\'\'">'
+          + '<div style="flex:1;"><div style="font-family:var(--fd);font-size:15px;font-weight:700;color:var(--or);">'+l.label+'</div>'
+          + '<div style="font-size:12px;color:var(--ink3);margin-top:2px;">'+l.desc+'</div></div>'
+          + '<div style="font-family:var(--fd);font-size:12px;color:var(--ink3);">→</div></a>';
+      }).join('');
 }
 
 function closeNews(){
