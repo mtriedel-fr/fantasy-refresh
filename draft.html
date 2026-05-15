@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Fantasy Refresh — Draft</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏈</text></svg>">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -301,7 +302,10 @@ function loadSalaries(){
 function loadSchedule(){
   // Fetch NFL schedule from Sleeper
   fetch('https://api.sleeper.app/v1/schedule/nfl/regular/2026')
-    .then(function(r){ return r.json(); })
+    .then(function(r){
+      if(!r.ok) throw new Error('Schedule not available yet');
+      return r.json();
+    })
     .then(function(data){
       if(!data) return buildGamesBar([]);
       // Filter to current week's games
@@ -783,36 +787,56 @@ function openNews(playerId, event){
   if(event) event.stopPropagation();
   var p = allPlayers.find(function(x){ return x.id === playerId; });
   if(!p) return;
+
   document.getElementById('news-player-name').textContent = p.name;
-  document.getElementById('news-player-meta').textContent = (p.pos||'') + (p.team ? ' · ' + p.team : '') + (p.salary ? ' · $'+p.salary.toLocaleString() : '');
-  document.getElementById('news-body').innerHTML = '<div class="news-loading">Loading news…</div>';
+  document.getElementById('news-player-meta').textContent =
+    (p.pos||'') + (p.team ? ' · ' + p.team : '') + (p.salary ? ' · $'+p.salary.toLocaleString() : '');
   document.getElementById('news-overlay').classList.add('open');
 
-  fetch('https://api.sleeper.app/v1/players/nfl/'+playerId+'/news')
-    .then(function(r){ return r.json(); })
-    .then(function(items){
-      if(!items || !items.length){
-        document.getElementById('news-body').innerHTML =
-          '<div class="news-empty"><div class="news-empty-icon">📰</div>'
-          +'<div class="news-empty-title">No recent news for '+p.name+'</div></div>';
-        return;
-      }
-      var html = items.slice(0,6).map(function(item){
-        var date = item.published ? new Date(item.published).toLocaleDateString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
-        var source = item.source || '';
-        return '<div class="news-item">'
-          + '<div class="news-item-title">'+(item.title||'')+'</div>'
-          + (item.analysis ? '<div class="news-item-body">'+item.analysis+'</div>' : '')
-          + '<div class="news-item-meta">'+(date?date+' · ':'')+source+'</div>'
-          + '</div>';
+  // Build search links from player name
+  var nameParts   = p.name.trim().split(' ');
+  var firstName   = nameParts[0] || '';
+  var lastName    = nameParts.slice(1).join(' ') || '';
+  var nameSlug    = p.name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/-+$/,'');
+  var nameQuery   = encodeURIComponent(p.name + ' NFL');
+
+  var links = [
+    {
+      label: '📰 RotoBaller',
+      url:   'https://www.rotoballer.com/player-news/'+nameSlug+'/nfl',
+      desc:  'Latest news, injury updates & analysis'
+    },
+    {
+      label: '🏈 ESPN',
+      url:   'https://www.espn.com/search/results?q='+nameQuery,
+      desc:  'Stats, news & game logs'
+    },
+    {
+      label: '📊 Pro Football Reference',
+      url:   'https://www.pro-football-reference.com/search/search.fcgi?search='+encodeURIComponent(p.name),
+      desc:  'Career stats & advanced metrics'
+    },
+    {
+      label: '🎯 Sleeper',
+      url:   'https://sleeper.com/players/nfl/'+playerId,
+      desc:  'Projections & ownership data'
+    }
+  ];
+
+  var html = '<div style="padding:16px 20px 8px;font-size:13px;color:var(--ink3);line-height:1.6;border-bottom:1px solid var(--bdr);">'
+    + 'Tap any source below to open player news in a new tab.'
+    + '</div>'
+    + links.map(function(l){
+        return '<a href="'+l.url+'" target="_blank" rel="noopener" style="display:flex;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid var(--bdr);text-decoration:none;transition:background .1s;" onmouseover="this.style.background=\'var(--bg3)\'" onmouseout="this.style.background=\'\'">'
+          + '<div style="flex:1;">'
+          +   '<div style="font-family:var(--fd);font-size:15px;font-weight:700;color:var(--or);">'+l.label+'</div>'
+          +   '<div style="font-size:12px;color:var(--ink3);margin-top:2px;">'+l.desc+'</div>'
+          + '</div>'
+          + '<div style="font-family:var(--fd);font-size:12px;color:var(--ink3);">→</div>'
+          + '</a>';
       }).join('');
-      document.getElementById('news-body').innerHTML = html;
-    })
-    .catch(function(){
-      document.getElementById('news-body').innerHTML =
-        '<div class="news-empty"><div class="news-empty-icon">⚠️</div>'
-        +'<div class="news-empty-title">Could not load news</div></div>';
-    });
+
+  document.getElementById('news-body').innerHTML = html;
 }
 
 function closeNews(){
