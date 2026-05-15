@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fantasy Refresh — Preseason 2026</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏈</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --hdr:#050808;--bg:#0A0F0F;--bg2:#0D1515;--bg3:#101C1C;--bg4:#142020;
+  --or:#00E5D4;--pk:#FF5FA0;--pu:#9B6DFF;
+  --ink:#F0FAFA;--ink2:#6ABFBF;--ink3:#3A8888;
+  --bdr:#0D3535;--bdr2:#104040;
+  --ps:#FF9A3A;  /* preseason orange accent */
+  --fd:'Barlow Condensed',sans-serif;--fb:'Barlow',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100vh;}
+
+/* ── HEADER ── */
+.hdr{background:var(--hdr);border-top:3px solid var(--ps);border-bottom:1px solid var(--bdr);padding:12px 20px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:100;}
+.hdr-logo{font-family:var(--fd);font-size:22px;font-weight:900;color:var(--or);text-decoration:none;}
+.hdr-logo span{color:var(--pk);}
+.hdr-ps-badge{font-family:var(--fd);font-size:11px;font-weight:800;color:var(--ps);background:rgba(255,154,58,.1);border:1px solid rgba(255,154,58,.3);padding:3px 10px;border-radius:12px;text-transform:uppercase;letter-spacing:.8px;}
+.hdr-right{margin-left:auto;display:flex;align-items:center;gap:10px;}
+.season-select{background:var(--bg2);border:1px solid var(--bdr2);color:var(--ink2);font-family:var(--fd);font-size:12px;font-weight:700;padding:5px 24px 5px 10px;border-radius:7px;cursor:pointer;outline:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2300E5D4' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;}
+
+/* ── PRESEASON BANNER ── */
+.ps-banner{background:linear-gradient(135deg,rgba(255,154,58,.15),rgba(255,154,58,.05));border-bottom:1px solid rgba(255,154,58,.3);padding:12px 20px;display:flex;align-items:center;gap:12px;}
+.ps-banner-icon{font-size:20px;}
+.ps-banner-text{font-family:var(--fd);font-size:13px;color:var(--ps);font-weight:700;text-transform:uppercase;letter-spacing:.5px;}
+.ps-banner-sub{font-size:12px;color:var(--ink3);margin-top:2px;}
+
+/* ── WEEK TABS ── */
+.week-bar{background:var(--bg2);border-bottom:2px solid var(--ps);padding:0 20px;display:flex;gap:0;overflow-x:auto;scrollbar-width:none;}
+.week-bar::-webkit-scrollbar{display:none;}
+.week-tab{font-family:var(--fd);font-size:13px;font-weight:700;padding:11px 20px;color:var(--ink3);cursor:pointer;border-bottom:3px solid transparent;transition:all .15s;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;flex-shrink:0;}
+.week-tab:hover{color:var(--ps);}
+.week-tab.active{color:var(--ps);border-bottom-color:var(--ps);}
+
+/* ── MAIN GRID ── */
+.main{max-width:1100px;margin:0 auto;padding:20px;}
+.two-col{display:grid;grid-template-columns:1fr 360px;gap:20px;}
+@media(max-width:860px){.two-col{grid-template-columns:1fr;}}
+
+/* ── CARDS ── */
+.card{background:var(--bg2);border-radius:14px;border:1px solid var(--bdr);overflow:hidden;}
+.card-hdr{padding:14px 20px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;}
+.card-title{font-family:var(--fd);font-size:14px;font-weight:800;color:var(--or);text-transform:uppercase;letter-spacing:.5px;}
+.card-sub{font-family:var(--fd);font-size:11px;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;}
+
+/* ── STANDINGS TABLE ── */
+.standings-table{width:100%;border-collapse:collapse;}
+.standings-table th{font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;padding:8px 16px;border-bottom:1px solid var(--bdr);text-align:left;}
+.standings-table th:not(:first-child){text-align:right;}
+.standings-table td{padding:10px 16px;border-bottom:1px solid var(--bdr);font-size:14px;}
+.standings-table tr:last-child td{border-bottom:none;}
+.standings-table tr:hover td{background:var(--bg3);}
+.s-rank{font-family:var(--fd);font-size:11px;color:var(--ink3);width:28px;}
+.s-name{font-family:var(--fd);font-size:15px;font-weight:700;color:var(--ink);}
+.s-score{font-family:var(--fd);font-size:15px;font-weight:800;color:var(--or);text-align:right;}
+.s-badge{font-family:var(--fd);font-size:9px;font-weight:800;padding:2px 6px;border-radius:4px;margin-left:6px;text-transform:uppercase;}
+.badge-1{background:rgba(255,215,0,.15);color:#FFD700;}
+.badge-last{background:rgba(255,95,160,.15);color:var(--pk);}
+
+/* ── SCORE ENTRY ── */
+.score-entry-table{width:100%;border-collapse:collapse;}
+.score-entry-table td{padding:8px 16px;border-bottom:1px solid var(--bdr);}
+.score-entry-table tr:last-child td{border-bottom:none;}
+.entry-name{font-family:var(--fd);font-size:14px;font-weight:700;color:var(--ink);}
+.entry-score-inp{width:80px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:6px;color:var(--or);font-family:var(--fd);font-size:14px;font-weight:700;padding:5px 8px;outline:none;text-align:center;}
+.entry-score-inp:focus{border-color:var(--or);}
+
+/* ── LINEUP VIEW ── */
+.lineup-card{background:var(--bg3);border-radius:10px;padding:14px;margin-bottom:10px;border:1px solid var(--bdr);}
+.lineup-team{font-family:var(--fd);font-size:14px;font-weight:800;color:var(--or);margin-bottom:8px;}
+.lineup-slot{display:flex;gap:8px;padding:4px 0;border-bottom:1px solid var(--bdr);font-size:13px;}
+.lineup-slot:last-child{border-bottom:none;}
+.lineup-pos{font-family:var(--fd);font-size:11px;font-weight:700;color:var(--ink3);width:36px;}
+.lineup-player{color:var(--ink);flex:1;}
+.lineup-pts{font-family:var(--fd);font-size:13px;font-weight:700;color:var(--or);min-width:40px;text-align:right;}
+
+/* ── BUTTONS ── */
+.btn{font-family:var(--fd);font-size:13px;font-weight:800;padding:8px 18px;border-radius:8px;border:none;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;transition:all .15s;}
+.btn-ps{background:var(--ps);color:#050808;}
+.btn-ps:hover{opacity:.85;}
+.btn-outline{background:transparent;border:1px solid var(--bdr2);color:var(--ink3);}
+.btn-outline:hover{border-color:var(--or);color:var(--or);}
+.btn-danger{background:rgba(255,50,50,.1);border:1px solid rgba(255,50,50,.3);color:#FF5555;}
+.btn-danger:hover{background:rgba(255,50,50,.2);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+
+/* ── EMPTY STATE ── */
+.empty{padding:48px 20px;text-align:center;}
+.empty-icon{font-size:36px;opacity:.4;margin-bottom:10px;}
+.empty-title{font-family:var(--fd);font-size:16px;font-weight:700;color:var(--ink2);text-transform:uppercase;margin-bottom:4px;}
+.empty-sub{font-size:13px;color:var(--ink3);line-height:1.6;}
+
+/* ── COMMISSIONER ── */
+.comm-section{margin-top:24px;}
+.comm-section .card-hdr{background:rgba(255,154,58,.05);}
+.comm-panel-inner{padding:16px 20px;}
+.comm-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--bdr);}
+.comm-row:last-child{border-bottom:none;}
+.comm-label{font-family:var(--fd);font-size:13px;font-weight:700;color:var(--ink2);text-transform:uppercase;letter-spacing:.3px;}
+.comm-sub{font-size:12px;color:var(--ink3);margin-top:2px;}
+.comm-pw{display:flex;align-items:center;gap:8px;margin-bottom:12px;}
+.comm-pw-inp{background:var(--bg3);border:1px solid var(--bdr2);border-radius:8px;color:var(--or);font-family:var(--fd);font-size:14px;padding:7px 12px;outline:none;width:180px;}
+.comm-pw-inp:focus{border-color:var(--or);}
+.comm-locked{display:none;}
+
+/* ── TOAST ── */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--bg2);border:1px solid var(--or);border-radius:10px;padding:10px 20px;font-family:var(--fd);font-size:14px;font-weight:700;color:var(--or);z-index:9999;pointer-events:none;opacity:0;transition:opacity .2s;white-space:nowrap;}
+.toast.show{opacity:1;}
+.toast.err{border-color:var(--pk);color:var(--pk);}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <a href="index.html" class="hdr-logo">Fantasy<span>Refresh</span></a>
+  <div class="hdr-ps-badge">⚡ Preseason</div>
+  <div class="hdr-right">
+    <select class="season-select" onchange="switchSeason(this.value)">
+      <option value="2026">2026</option>
+      <option value="PS26" selected>PS'26</option>
+      <option value="2025">2025</option>
+    </select>
+  </div>
+</div>
+
+<div class="ps-banner">
+  <div class="ps-banner-icon">🏕️</div>
+  <div>
+    <div class="ps-banner-text">Preseason 2026 — Testing Mode</div>
+    <div class="ps-banner-sub">3 weeks of practice before the real season. Scores are real NFL preseason games. Nothing here counts.</div>
+  </div>
+</div>
+
+<div class="week-bar" id="week-bar">
+  <div class="week-tab active" data-week="1" onclick="setWeek(1,this)">PS Week 1</div>
+  <div class="week-tab" data-week="2" onclick="setWeek(2,this)">PS Week 2</div>
+  <div class="week-tab" data-week="3" onclick="setWeek(3,this)">PS Week 3</div>
+</div>
+
+<div class="main">
+  <div class="two-col">
+
+    <!-- STANDINGS -->
+    <div>
+      <div class="card" id="standings-card">
+        <div class="card-hdr">
+          <div class="card-title">Standings</div>
+          <div class="card-sub" id="standings-sub">PS Week 1</div>
+        </div>
+        <div id="standings-body">
+          <div class="empty">
+            <div class="empty-icon">📋</div>
+            <div class="empty-title">No scores yet</div>
+            <div class="empty-sub">Scores will appear once the commissioner imports results for this week.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LINEUPS -->
+      <div class="card" style="margin-top:16px;">
+        <div class="card-hdr">
+          <div class="card-title">Lineups</div>
+          <div class="card-sub" id="lineups-sub">PS Week 1</div>
+        </div>
+        <div id="lineups-body" style="padding:16px;">
+          <div class="empty">
+            <div class="empty-icon">🗂️</div>
+            <div class="empty-title">No lineups submitted</div>
+            <div class="empty-sub">Go to the <a href="draft.html" style="color:var(--or);">Draft page</a> to submit your lineup.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT COLUMN -->
+    <div>
+      <!-- DRAFT LINK -->
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-hdr"><div class="card-title">Your Lineup</div></div>
+        <div style="padding:16px;">
+          <p style="font-size:13px;color:var(--ink3);margin-bottom:12px;line-height:1.6;">Draft your preseason lineup using real player salaries. Use this to get familiar with the interface before Week 1.</p>
+          <a href="draft.html" style="display:block;text-align:center;padding:12px;background:linear-gradient(135deg,var(--or),var(--pk));border-radius:10px;color:#050808;font-family:var(--fd);font-size:14px;font-weight:900;text-transform:uppercase;text-decoration:none;">🏈 Go to Draft →</a>
+        </div>
+      </div>
+
+      <!-- WEEK SUMMARY -->
+      <div class="card" id="summary-card">
+        <div class="card-hdr"><div class="card-title">Week Summary</div></div>
+        <div id="summary-body" style="padding:16px;">
+          <div class="empty" style="padding:24px 0;">
+            <div class="empty-icon" style="font-size:24px;">📊</div>
+            <div class="empty-sub">No data yet</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- COMMISSIONER PANEL -->
+      <div class="comm-section">
+        <div class="card">
+          <div class="card-hdr"><div class="card-title">⚙️ Commissioner</div></div>
+          <div class="comm-panel-inner">
+            <!-- Password gate -->
+            <div id="comm-gate">
+              <div class="comm-pw">
+                <input type="password" class="comm-pw-inp" id="comm-pw-inp" placeholder="Password" onkeydown="if(event.key==='Enter')checkCommPw()">
+                <button class="btn btn-outline" onclick="checkCommPw()">Unlock</button>
+              </div>
+            </div>
+            <!-- Locked panel -->
+            <div id="comm-panel" class="comm-locked">
+
+              <!-- Import scores -->
+              <div class="comm-row">
+                <div>
+                  <div class="comm-label">Import Week Scores</div>
+                  <div class="comm-sub">Pull real preseason scores from Tank01</div>
+                </div>
+                <button class="btn btn-ps" id="import-btn" onclick="importScores()">⬇ Import</button>
+              </div>
+
+              <!-- Manual score entry -->
+              <div class="comm-row" style="flex-direction:column;align-items:flex-start;gap:10px;">
+                <div>
+                  <div class="comm-label">Manual Score Entry</div>
+                  <div class="comm-sub">Override or enter scores manually</div>
+                </div>
+                <div id="manual-entry-area">
+                  <div class="empty-sub">Load lineups first to see teams</div>
+                </div>
+                <button class="btn btn-outline" id="save-manual-btn" onclick="saveManualScores()" style="display:none;">💾 Save Scores</button>
+              </div>
+
+              <!-- Generate salaries -->
+              <div class="comm-row">
+                <div>
+                  <div class="comm-label">Generate Salaries</div>
+                  <div class="comm-sub">Use flat preseason salaries (projections not available)</div>
+                </div>
+                <button class="btn btn-outline" onclick="generatePreseasonSalaries()">⚡ Generate</button>
+              </div>
+
+              <!-- Wipe preseason -->
+              <div class="comm-row">
+                <div>
+                  <div class="comm-label">Wipe Preseason Data</div>
+                  <div class="comm-sub">Remove ALL preseason data before season starts</div>
+                </div>
+                <button class="btn btn-danger" onclick="wipePreseason()">🗑 Wipe All</button>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+var FB_DB_URL     = 'https://fantasy-refresh-default-rtdb.firebaseio.com';
+var WORKER        = 'https://fantasy-refresh-news.mtriedel.workers.dev';
+var COMM_PW       = 'refresh2025';
+var FR_SEASON     = 'preseason2026'; // Firebase path prefix
+var currentWeek   = 1;
+var preseasonData = {};  // {1:{teams:[{name,score,lineup}]}, 2:{...}, 3:{...}}
+var commUnlocked  = false;
+
+// ── BOOT ──────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', function(){
+  loadPreseasonData();
+});
+
+function switchSeason(val){
+  if(val === '2026')      window.location.href = 'index.html';
+  else if(val === '2025') window.location.href = 'archive2025.html';
+}
+
+// ── WEEK TABS ─────────────────────────────────────────────────
+function setWeek(w, btn){
+  currentWeek = w;
+  document.querySelectorAll('.week-tab').forEach(function(t){ t.classList.remove('active'); });
+  btn.classList.add('active');
+  document.getElementById('standings-sub').textContent = 'PS Week ' + w;
+  document.getElementById('lineups-sub').textContent   = 'PS Week ' + w;
+  renderStandings();
+  renderLineups();
+  renderSummary();
+  if(commUnlocked) renderManualEntry();
+}
+
+// ── LOAD DATA ─────────────────────────────────────────────────
+function loadPreseasonData(){
+  fetch(FB_DB_URL + '/' + FR_SEASON + '.json')
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      preseasonData = d || {};
+      renderStandings();
+      renderLineups();
+      renderSummary();
+      loadLineups();
+    })
+    .catch(function(){ boot(); });
+}
+
+function loadLineups(){
+  // Load submitted lineups for current week from Firebase
+  fetch(FB_DB_URL + '/lineups' + FR_SEASON + '/week' + currentWeek + '.json')
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if(!d) return;
+      // Merge lineups into preseasonData
+      if(!preseasonData[currentWeek]) preseasonData[currentWeek] = {};
+      preseasonData[currentWeek].lineups = d;
+      renderLineups();
+      if(commUnlocked) renderManualEntry();
+    })
+    .catch(function(){});
+}
+
+// ── STANDINGS ─────────────────────────────────────────────────
+function renderStandings(){
+  var weekData = preseasonData[currentWeek];
+  var scores   = weekData && weekData.scores;
+  var el       = document.getElementById('standings-body');
+
+  if(!scores || !Object.keys(scores).length){
+    el.innerHTML = '<div class="empty"><div class="empty-icon">📋</div>'
+      + '<div class="empty-title">No scores yet</div>'
+      + '<div class="empty-sub">Scores will appear once the commissioner imports results.</div></div>';
+    return;
+  }
+
+  var entries = Object.values(scores).sort(function(a,b){ return b.score - a.score; });
+  var html    = '<table class="standings-table"><thead><tr>'
+    + '<th>#</th><th>Team</th><th>Score</th></tr></thead><tbody>';
+  entries.forEach(function(e, i){
+    var badge = i === 0 ? '<span class="s-badge badge-1">👑 1st</span>'
+              : i === entries.length-1 ? '<span class="s-badge badge-last">💀 Last</span>' : '';
+    html += '<tr><td class="s-rank">'+(i+1)+'</td>'
+      + '<td class="s-name">'+e.team+badge+'</td>'
+      + '<td class="s-score">'+(e.score||0).toFixed(2)+'</td></tr>';
+  });
+  html += '</tbody></table>';
+  el.innerHTML = html;
+}
+
+// ── LINEUPS ───────────────────────────────────────────────────
+function renderLineups(){
+  var weekData = preseasonData[currentWeek];
+  var lineups  = weekData && weekData.lineups;
+  var el       = document.getElementById('lineups-body');
+
+  if(!lineups || !Object.keys(lineups).length){
+    el.innerHTML = '<div class="empty" style="padding:24px 0;">'
+      + '<div class="empty-icon">🗂️</div>'
+      + '<div class="empty-title">No lineups yet</div>'
+      + '<div class="empty-sub">Submit a lineup from the <a href="draft.html" style="color:var(--or);">Draft page</a>.</div></div>';
+    return;
+  }
+
+  var SLOTS = ['qb1','rb1','rb2','wr1','wr2','wr3','te1','fx1','df1'];
+  var LABELS= {qb1:'QB',rb1:'RB',rb2:'RB',wr1:'WR',wr2:'WR',wr3:'WR',te1:'TE',fx1:'FLEX',df1:'DEF'};
+  var scores = (weekData && weekData.scores) || {};
+  var html   = '';
+
+  Object.values(lineups).forEach(function(lineup){
+    if(!lineup || !lineup.slots) return;
+    var teamScore = scores[lineup.uid] ? scores[lineup.uid].score : null;
+    html += '<div class="lineup-card">';
+    html += '<div class="lineup-team">'+( lineup.team||'Unknown')
+      + (teamScore !== null ? ' <span style="color:var(--or);float:right;">'+teamScore.toFixed(2)+'</span>' : '')
+      + '</div>';
+    SLOTS.forEach(function(slotId){
+      var p = lineup.slots[slotId];
+      if(!p) return;
+      html += '<div class="lineup-slot">'
+        + '<span class="lineup-pos">'+LABELS[slotId]+'</span>'
+        + '<span class="lineup-player">'+p.name+' <span style="font-size:11px;color:var(--ink3);">'+(p.team||'')+'</span></span>'
+        + '<span class="lineup-pts">'+(p.pts !== undefined ? p.pts : '$'+(p.salary||0).toLocaleString())+'</span>'
+        + '</div>';
+    });
+    html += '</div>';
+  });
+
+  el.innerHTML = html || '<div class="empty-sub" style="padding:16px;">No lineups found</div>';
+}
+
+// ── SUMMARY ───────────────────────────────────────────────────
+function renderSummary(){
+  var weekData = preseasonData[currentWeek];
+  var scores   = weekData && weekData.scores;
+  var el       = document.getElementById('summary-body');
+  if(!scores || !Object.keys(scores).length){
+    el.innerHTML = '<div class="empty" style="padding:24px 0;"><div class="empty-icon" style="font-size:24px;">📊</div><div class="empty-sub">No data yet</div></div>';
+    return;
+  }
+  var vals  = Object.values(scores).map(function(e){ return e.score||0; });
+  var high  = Math.max.apply(null,vals);
+  var low   = Math.min.apply(null,vals);
+  var avg   = vals.reduce(function(s,v){ return s+v; },0) / vals.length;
+  var highT = Object.values(scores).find(function(e){ return e.score===high; });
+  var lowT  = Object.values(scores).find(function(e){ return e.score===low; });
+
+  el.innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">'
+    + statBox('High Score', high.toFixed(2), highT?highT.team:'', 'var(--or)')
+    + statBox('Low Score',  low.toFixed(2),  lowT?lowT.team:'',  'var(--pk)')
+    + statBox('Average',    avg.toFixed(2),  vals.length+' teams', 'var(--ink2)')
+    + statBox('Teams',      vals.length,     'submitted', 'var(--ink2)')
+    + '</div>';
+}
+
+function statBox(label, val, sub, color){
+  return '<div style="background:var(--bg3);border-radius:8px;padding:12px;border:1px solid var(--bdr);">'
+    + '<div style="font-family:var(--fd);font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;">'+label+'</div>'
+    + '<div style="font-family:var(--fd);font-size:22px;font-weight:900;color:'+color+';margin:2px 0;">'+val+'</div>'
+    + '<div style="font-size:11px;color:var(--ink3);">'+sub+'</div>'
+    + '</div>';
+}
+
+// ── COMMISSIONER ──────────────────────────────────────────────
+function checkCommPw(){
+  var pw = document.getElementById('comm-pw-inp').value;
+  if(pw === COMM_PW){
+    commUnlocked = true;
+    document.getElementById('comm-gate').style.display = 'none';
+    document.getElementById('comm-panel').style.display = 'block';
+    renderManualEntry();
+    showToast('Commissioner unlocked ✓');
+  } else {
+    showToast('Wrong password', true);
+  }
+}
+
+// ── IMPORT SCORES FROM TANK01 ─────────────────────────────────
+function importScores(){
+  var btn = document.getElementById('import-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Loading…';
+  showToast('Fetching preseason scores from Tank01…');
+
+  // Tank01 uses seasonType=Preseason
+  fetch(WORKER + '/scores?week=' + currentWeek + '&season=2026&seasonType=Preseason')
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      var games = data.games || [];
+      if(!games.length){
+        showToast('No preseason scores available yet', true);
+        btn.disabled = false;
+        btn.textContent = '⬇ Import';
+        return;
+      }
+
+      // Load lineups, calculate scores per team
+      return fetch(FB_DB_URL + '/lineups' + FR_SEASON + '/week' + currentWeek + '.json')
+        .then(function(r){ return r.json(); })
+        .then(function(lineups){
+          if(!lineups){ showToast('No lineups found for this week', true); return; }
+
+          // Build team→game score map from Tank01
+          var teamScores = {};
+          games.forEach(function(g){
+            if(g.homeScore !== null) teamScores[g.home] = { pts: g.homeScore, opp: g.away, oppScore: g.awayScore };
+            if(g.awayScore !== null) teamScores[g.away] = { pts: g.awayScore, opp: g.home, oppScore: g.homeScore };
+          });
+
+          // Score each lineup based on their players' NFL teams
+          var scores = {};
+          Object.values(lineups).forEach(function(lineup){
+            if(!lineup || !lineup.slots) return;
+            var total = 0;
+            Object.values(lineup.slots).forEach(function(p){
+              if(!p || !p.team) return;
+              // Use player salary as proxy score until live scoring available
+              // Real scoring uses Tank01 box score per player
+              total += (p.proj || 0);
+            });
+            scores[lineup.uid] = {
+              uid:   lineup.uid,
+              team:  lineup.team || lineup.uid,
+              score: Math.round(total * 100) / 100,
+              week:  currentWeek
+            };
+          });
+
+          // Save to Firebase
+          if(!preseasonData[currentWeek]) preseasonData[currentWeek] = {};
+          preseasonData[currentWeek].scores = scores;
+          return savePreseasonData().then(function(){
+            renderStandings();
+            renderSummary();
+            showToast('Scores imported ✓');
+            btn.disabled = false;
+            btn.textContent = '⬇ Import';
+          });
+        });
+    })
+    .catch(function(e){
+      showToast('Import failed: ' + e.message, true);
+      btn.disabled = false;
+      btn.textContent = '⬇ Import';
+    });
+}
+
+// ── MANUAL SCORE ENTRY ────────────────────────────────────────
+function renderManualEntry(){
+  var weekData = preseasonData[currentWeek];
+  var lineups  = weekData && weekData.lineups;
+  var scores   = weekData && weekData.scores;
+  var el       = document.getElementById('manual-entry-area');
+  var saveBtn  = document.getElementById('save-manual-btn');
+
+  if(!lineups || !Object.keys(lineups).length){
+    el.innerHTML = '<div style="font-size:12px;color:var(--ink3);">No lineups submitted yet for this week.</div>';
+    saveBtn.style.display = 'none';
+    return;
+  }
+
+  var html = '<table class="score-entry-table" style="width:100%;">';
+  Object.values(lineups).forEach(function(lineup){
+    if(!lineup) return;
+    var cur = scores && scores[lineup.uid] ? scores[lineup.uid].score : '';
+    html += '<tr><td class="entry-name">'+(lineup.team||lineup.uid)+'</td>'
+      + '<td><input type="number" class="entry-score-inp" data-uid="'+lineup.uid+'" data-team="'+(lineup.team||lineup.uid)+'" value="'+cur+'" step="0.01" min="0" placeholder="0.00"></td></tr>';
+  });
+  html += '</table>';
+  el.innerHTML = html;
+  saveBtn.style.display = 'block';
+}
+
+function saveManualScores(){
+  var inputs = document.querySelectorAll('.entry-score-inp');
+  if(!preseasonData[currentWeek]) preseasonData[currentWeek] = {};
+  if(!preseasonData[currentWeek].scores) preseasonData[currentWeek].scores = {};
+  inputs.forEach(function(inp){
+    var uid  = inp.getAttribute('data-uid');
+    var team = inp.getAttribute('data-team');
+    var val  = parseFloat(inp.value) || 0;
+    preseasonData[currentWeek].scores[uid] = { uid:uid, team:team, score:val, week:currentWeek };
+  });
+  savePreseasonData().then(function(){
+    renderStandings();
+    renderSummary();
+    showToast('Scores saved ✓');
+  });
+}
+
+// ── GENERATE FLAT SALARIES ────────────────────────────────────
+function generatePreseasonSalaries(){
+  var FLAT = {QB:9000, RB:7200, WR:7200, TE:6500, DEF:5500};
+  fetch(FB_DB_URL + '/playerPool2026/players.json')
+    .then(function(r){ return r.json(); })
+    .then(function(players){
+      var salaries = {};
+      Object.values(players||{}).forEach(function(p){
+        if(!p||!p.pos||!FLAT[p.pos]||!p.team||!p.name) return;
+        if(p.status==='O'||p.status==='IR') return;
+        salaries[p.id] = {id:p.id,name:p.name,pos:p.pos,team:p.team,proj:null,salary:FLAT[p.pos],status:p.status||null};
+      });
+      var payload = {players:salaries,meta:{week:'PS',count:Object.keys(salaries).length,generated:Date.now(),locked:false,cap:60000}};
+      return fetch(FB_DB_URL + '/salaries' + FR_SEASON + '/weekPS.json',{
+        method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)
+      });
+    })
+    .then(function(){ showToast('Preseason salaries generated ✓'); })
+    .catch(function(){ showToast('Failed to generate salaries', true); });
+}
+
+// ── WIPE PRESEASON ────────────────────────────────────────────
+function wipePreseason(){
+  if(!confirm('Wipe ALL preseason 2026 data? This cannot be undone.')) return;
+  var paths = [
+    '/' + FR_SEASON + '.json',
+    '/lineups' + FR_SEASON + '.json',
+    '/salaries' + FR_SEASON + '.json'
+  ];
+  Promise.all(paths.map(function(p){
+    return fetch(FB_DB_URL + p, { method:'DELETE' });
+  })).then(function(){
+    preseasonData = {};
+    renderStandings();
+    renderLineups();
+    renderSummary();
+    showToast('Preseason data wiped ✓');
+  }).catch(function(){ showToast('Wipe failed', true); });
+}
+
+// ── SAVE ──────────────────────────────────────────────────────
+function savePreseasonData(){
+  return fetch(FB_DB_URL + '/' + FR_SEASON + '.json', {
+    method:'PUT',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(preseasonData)
+  }).then(function(r){ return r.json(); });
+}
+
+// ── TOAST ─────────────────────────────────────────────────────
+function showToast(msg, isErr){
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast' + (isErr?' err':'') + ' show';
+  setTimeout(function(){ t.className = 'toast'+(isErr?' err':''); }, 2500);
+}
+</script>
+</body>
+</html>

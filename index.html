@@ -774,6 +774,7 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
   </select>
   <select class="season-select" id="season-select" onchange="switchSeason(this.value)" title="Switch season" style="margin-left:auto;">
     <option value="2026" selected>2026</option>
+    <option value="PS26">PS'26</option>
     <option value="2025">2025</option>
   </select>
 </div>
@@ -3397,6 +3398,8 @@ function skipFirstRun(){
 function switchSeason(val){
   if(val === '2025'){
     window.location.href = 'archive2025.html';
+  } else if(val === 'PS26'){
+    window.location.href = 'preseason.html';
   } else {
     var sel = document.getElementById('season-select');
     if(sel) sel.value = '2026';
