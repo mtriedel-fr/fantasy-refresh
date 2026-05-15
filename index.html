@@ -718,6 +718,15 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
 .user-refresh-btn{background:none;border:1px solid var(--bdr2);color:var(--ink3);font-family:var(--fd);font-size:11px;padding:4px 10px;border-radius:6px;cursor:pointer;float:right;}
 .user-refresh-btn:hover{border-color:var(--or);color:var(--or);}
 
+
+/* ── PLAYER POOL ── */
+.pool-status{font-family:var(--fd);font-size:12px;color:var(--ink2);margin-top:8px;min-height:16px;}
+.pool-status.ok{color:var(--or);}
+.pool-status.err{color:var(--pk);}
+.pool-refresh-btn{background:var(--or);color:#050808;border:none;font-family:var(--fd);font-size:12px;font-weight:800;padding:8px 16px;border-radius:8px;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;transition:opacity .15s;}
+.pool-refresh-btn:hover{opacity:.85;}
+.pool-refresh-btn:disabled{opacity:.5;cursor:not-allowed;}
+
 </style>
 </head>
 <body>
@@ -899,6 +908,13 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
         </div>
 
         <!-- SEASON HISTORY -->
+        <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--bdr);">
+          <div class="csect">🏈 Player Pool</div>
+          <div style="font-size:12px;color:var(--ink2);margin-bottom:10px;line-height:1.5;">Fetches all active NFL players from Sleeper API and stores in Firebase. Refresh every Monday morning or after major roster moves.</div>
+          <button class="pool-refresh-btn" id="pool-refresh-btn" onclick="refreshPlayerPool()">⚡ Refresh Player Pool</button>
+          <div class="pool-status" id="pool-status">Loading last sync info…</div>
+        </div>
+
         <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--bdr);">
           <div class="csect">Season history</div>
           <div id="hist-list"></div>
@@ -2654,6 +2670,7 @@ function checkCommPw(){
     try{ sessionStorage.setItem('fr_comm','1'); }catch(e){}
     renderHistory();
     renderUserPanel();
+    loadPoolStatus();
   } else {
     err.classList.remove('hidden');
     document.getElementById('comm-pw-input').value = '';
@@ -2674,6 +2691,7 @@ function toggleComm(){
     document.getElementById('comm-tools').classList.remove('hidden');
     renderHistory();
     renderUserPanel();
+    loadPoolStatus();
   }
   // Wire up drag and drop once
   var zone = document.getElementById('drop-zone');
@@ -4034,6 +4052,117 @@ function removeUser(uid, teamName){
   }).catch(function(){
     showToast('Could not remove — try again', true);
   });
+}
+
+
+// ── PLAYER POOL ───────────────────────────────────────────────
+// Positions we care about
+var POOL_POSITIONS = ['QB','RB','WR','TE','DEF'];
+
+function refreshPlayerPool(){
+  var btn = document.getElementById('pool-refresh-btn');
+  var status = document.getElementById('pool-status');
+  if(!btn || !status) return;
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Fetching from Sleeper…';
+  status.textContent = 'Connecting to Sleeper API…';
+  status.className = 'pool-status';
+
+  // Step 1: Fetch all NFL players from Sleeper
+  fetch('https://api.sleeper.app/v1/players/nfl')
+    .then(function(r){
+      if(!r.ok) throw new Error('Sleeper API returned ' + r.status);
+      status.textContent = 'Parsing player data…';
+      return r.json();
+    })
+    .then(function(allPlayers){
+      // Step 2: Filter to relevant positions, active players only
+      var pool = {};
+      var count = 0;
+
+      Object.keys(allPlayers).forEach(function(id){
+        var p = allPlayers[id];
+        if(!p || !p.active) return;
+        if(!p.position || POOL_POSITIONS.indexOf(p.position) < 0) return;
+        if(!p.full_name && p.position !== 'DEF') return;
+
+        // Build clean player record
+        var record = {
+          id:        id,
+          name:      p.position === 'DEF'
+                       ? (p.full_name || p.team + ' Defense')
+                       : p.full_name,
+          pos:       p.position,
+          team:      p.team || '',
+          status:    p.injury_status || null,  // null = healthy, 'Q'/'D'/'O'/'IR' = injured
+          number:    p.number || '',
+          years_exp: p.years_exp || 0
+        };
+
+        pool[id] = record;
+        count++;
+      });
+
+      status.textContent = 'Saving ' + count + ' players to Firebase…';
+
+      // Step 3: Save to Firebase with timestamp
+      var payload = {
+        players:   pool,
+        count:     count,
+        updated:   Date.now(),
+        updatedBy: 'commissioner'
+      };
+
+      return fetch(FB_DB_URL + '/playerPool2026.json', {
+        method:  'PUT',
+        headers: {'Content-Type':'application/json'},
+        body:    JSON.stringify(payload)
+      }).then(function(r){ return r.json(); })
+        .then(function(){
+          status.textContent = '✓ ' + count + ' players saved · ' + new Date().toLocaleString();
+          status.className = 'pool-status ok';
+          btn.disabled = false;
+          btn.textContent = '⚡ Refresh Player Pool';
+          showToast('Player pool updated — ' + count + ' players ✓');
+        });
+    })
+    .catch(function(err){
+      console.error('Player pool error:', err);
+      status.textContent = '✗ Failed: ' + (err.message || 'Unknown error');
+      status.className = 'pool-status err';
+      btn.disabled = false;
+      btn.textContent = '⚡ Refresh Player Pool';
+      showToast('Player pool refresh failed', true);
+    });
+}
+
+function loadPoolStatus(){
+  var status = document.getElementById('pool-status');
+  if(!status) return;
+  fetch(FB_DB_URL + '/playerPool2026.json?shallow=true')
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      if(!data){
+        status.textContent = 'No player pool yet — click Refresh to fetch from Sleeper.';
+        return;
+      }
+      // Fetch just the metadata fields
+      return fetch(FB_DB_URL + '/playerPool2026/count.json')
+        .then(function(r){ return r.json(); })
+        .then(function(count){
+          return fetch(FB_DB_URL + '/playerPool2026/updated.json')
+            .then(function(r){ return r.json(); })
+            .then(function(updated){
+              var when = updated ? new Date(updated).toLocaleString() : 'unknown';
+              status.textContent = '✓ ' + (count||'?') + ' players · Last sync: ' + when;
+              status.className = 'pool-status ok';
+            });
+        });
+    })
+    .catch(function(){
+      status.textContent = 'Could not check pool status';
+    });
 }
 
 </script>
