@@ -213,7 +213,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
   <!-- PICKER -->
   <div class="picker-panel" id="picker-panel">
     <div class="picker-header">
-      <div class="picker-slot-label" id="picker-slot-label" style="color:var(--or)">Select Slot</div>
+      <div class="picker-slot-label" id="picker-slot-label" style="color:var(--ink2)">All Players</div>
       <div class="picker-game-filter" id="picker-game-filter" style="display:none;"></div>
       <button class="picker-clear-btn" onclick="closePicker()">✕ Close</button>
     </div>
@@ -328,7 +328,7 @@ function loadSalaries(){
 }
 
 function loadFlatSalariesFromPool(){
-  var FLAT = {QB:9000, RB:7200, WR:7200, TE:6500, DEF:5500};
+  var FLAT = {QB:8500, RB:6500, WR:6000, TE:5500, DEF:5000};
   fetch(FB_DB_URL + '/playerPool2026/players.json')
     .then(function(r){ return r.json(); })
     .then(function(players){
@@ -346,17 +346,43 @@ function loadFlatSalariesFromPool(){
 }
 
 
+var gameOdds = {}; // {gameId: {overUnder, spread}}
+
 function loadSchedule(){
-  // Use ESPN scoreboard API via Cloudflare worker (no CORS issues)
-  // Falls back to building from player teams if unavailable
   var seasonType = PS_MODE ? 'Preseason' : 'Regular';
-  var espnUrl = 'https://fantasy-refresh-news.mtriedel.workers.dev/schedule?week='+currentWeek+'&season=2026&seasonType='+seasonType;
-  fetch(espnUrl)
+  var WORKER = 'https://fantasy-refresh-news.mtriedel.workers.dev';
+  fetch(WORKER + '/schedule?week='+currentWeek+'&season=2026&seasonType='+seasonType)
     .then(function(r){ return r.json(); })
     .then(function(data){
       if(!data || !data.games || !data.games.length) throw new Error('No games');
       schedule = data.games;
-      buildGamesBar(schedule);
+      buildGamesBar(schedule); // render immediately without odds
+
+      // Fetch odds in background — group games by date to minimize API calls
+      if(!PS_MODE){
+        var dates = {};
+        schedule.forEach(function(g){
+          if(g.time){
+            var d = new Date(g.time);
+            var dateStr = d.getFullYear()
+              + String(d.getMonth()+1).padStart(2,'0')
+              + String(d.getDate()).padStart(2,'0');
+            dates[dateStr] = true;
+          }
+        });
+        // Fetch odds for each unique game date
+        Object.keys(dates).forEach(function(dateStr){
+          fetch(WORKER + '/odds?gameDate=' + dateStr)
+            .then(function(r){ return r.json(); })
+            .then(function(data){
+              if(data && data.odds){
+                Object.assign(gameOdds, data.odds);
+                buildGamesBar(schedule); // re-render with O/U
+              }
+            })
+            .catch(function(){});
+        });
+      }
     })
     .catch(function(){
       setTimeout(buildGamesBarFromPlayers, 500);
@@ -367,32 +393,36 @@ function buildGamesBar(games){
   var bar = document.getElementById('games-bar');
   var pickerBar = document.getElementById('picker-games-bar');
   if(!games || !games.length){
-    // No games from Sleeper — build from player teams instead, don't recurse
     buildGamesBarFromPlayers();
     return;
   }
   var html = '<button class="game-chip all active" data-game="all" onclick="setGameFilter(null,this)">All Games</button>';
   games.forEach(function(g, i){
     var label = (g.away||'?') + ' @ ' + (g.home||'?');
-    var sub = '';
+    var sub   = '';
     if(g.time){
-      var d = new Date(g.time);
-      var day = d.getDay(); // 0=Sun,1=Mon,2=Tue,3=Wed,4=Thu,5=Fri,6=Sat
-      var hr  = d.getHours();
-      var timeStr = d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})+' ET';
-      var days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+      var d        = new Date(g.time);
+      var day      = d.getDay();
+      var hr       = d.getHours();
+      var timeStr  = d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})+' ET';
+      var days     = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
       var dayLabel;
-      if(day===1&&hr>=18){      dayLabel = 'MNF';
+      if(day===1&&hr>=18){       dayLabel = 'MNF';
       } else if(day===0&&hr>=19){ dayLabel = 'SNF';
       } else if(day===4&&hr>=18){ dayLabel = 'TNF';
       } else {                    dayLabel = days[day]; }
       var intlBadge = g.international
         ? '<div style="font-size:9px;font-weight:800;color:#FF9A3A;margin-top:1px;">INT&#39;L</div>' : '';
+      // O/U badge — look up by gameId
+      var ouBadge = '';
+      if(g.gameId && gameOdds[g.gameId] && gameOdds[g.gameId].overUnder){
+        ouBadge = '<div style="font-size:9px;font-weight:800;color:#9B6DFF;margin-top:1px;">O/U '+gameOdds[g.gameId].overUnder+'</div>';
+      }
       sub = '<div style="font-size:9px;margin-top:2px;display:flex;gap:4px;justify-content:center;">'
           + '<span style="color:var(--pk);font-weight:800;">'+dayLabel+'</span>'
           + '<span style="color:var(--ink3);">'+timeStr+'</span>'
           + '</div>'
-          + intlBadge;
+          + intlBadge + ouBadge;
     }
     html += '<button class="game-chip" data-game="'+i+'" onclick="setGameFilter('+i+',this)" style="text-align:center;padding:5px 12px;">'+label+sub+'</button>';
   });
@@ -593,13 +623,12 @@ function renderRoster(){
 // ── SLOT SELECTION ─────────────────────────────────────────────
 function selectSlot(slotId){
   activeSlot = slotId;
-  var slot = SLOT_DEFS.find(function(s){ return s.id === slotId; });
+  var slot  = SLOT_DEFS.find(function(s){ return s.id === slotId; });
   var color = POS_COLORS[slot.pos] || 'var(--or)';
   var label = slot.label === 'FLEX' ? 'FLEX (WR/RB/TE)' : slot.label;
   document.getElementById('picker-slot-label').textContent = label;
   document.getElementById('picker-slot-label').style.color = color;
   document.getElementById('picker-search').value = '';
-  // Open picker on mobile
   document.getElementById('picker-panel').classList.add('open');
   renderRoster();
   renderPicker();
@@ -607,34 +636,30 @@ function selectSlot(slotId){
 
 function closePicker(){
   activeSlot = null;
+  document.getElementById('picker-slot-label').textContent = 'All Players';
+  document.getElementById('picker-slot-label').style.color = 'var(--ink2)';
   document.getElementById('picker-panel').classList.remove('open');
   renderRoster();
+  renderPicker();
 }
 
 // ── PICKER RENDER ──────────────────────────────────────────────
 function renderPicker(){
-  if(!activeSlot){
-    document.getElementById('picker-list').innerHTML =
-      '<div class="pick-prompt"><div class="pick-prompt-icon">👆</div>'
-      +'<div class="pick-prompt-title">Tap a slot to pick</div>'
-      +'<div class="pick-prompt-sub">Select a position slot on your roster.</div></div>';
-    return;
-  }
-
-  var slot    = SLOT_DEFS.find(function(s){ return s.id === activeSlot; });
   var query   = (document.getElementById('picker-search').value||'').toLowerCase().trim();
   var inLineup= {};
   Object.keys(lineup).forEach(function(sid){ if(lineup[sid]) inLineup[lineup[sid].id]=sid; });
 
-  // Players already in OTHER slots (not current active slot)
   var draftedIds = {};
   Object.keys(lineup).forEach(function(sid){
     if(sid !== activeSlot && lineup[sid]) draftedIds[lineup[sid].id] = true;
   });
 
+  // Filter by active slot position if one is selected, otherwise show all
+  var slot = activeSlot ? SLOT_DEFS.find(function(s){ return s.id === activeSlot; }) : null;
+
   var players = allPlayers.filter(function(p){
-    // Position filter
-    if(slot.eligible.indexOf(p.pos) < 0) return false;
+    // Position filter — only apply when a slot is active
+    if(slot && slot.eligible.indexOf(p.pos) < 0) return false;
     // Game filter
     if(activeGame && (!p.team || activeGame.teams.indexOf(p.team) < 0)) return false;
     // Search
@@ -643,6 +668,14 @@ function renderPicker(){
     if(draftedIds[p.id]) return false;
     return true;
   }).sort(function(a,b){ return b.salary - a.salary; });
+
+  if(!allPlayers.length){
+    document.getElementById('picker-list').innerHTML =
+      '<div class="picker-empty"><div class="picker-empty-icon">⏳</div>'
+      +'<div class="picker-empty-title">Loading Players…</div>'
+      +'<div class="picker-empty-sub">Fetching this week\'s salaries.</div></div>';
+    return;
+  }
 
   if(!players.length){
     document.getElementById('picker-list').innerHTML =
