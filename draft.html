@@ -765,7 +765,7 @@ function showToast(msg,isErr){
 
 // ── PLAYER NEWS ────────────────────────────────────────────────
 var NEWS_WORKER = 'https://fantasy-refresh-news.mtriedel.workers.dev/player';
-var espnIdCache = {}; // cache lookups so we don't re-fetch same player
+var espnIdCache = {};
 
 function openNews(playerId, event){
   if(event) event.stopPropagation();
@@ -778,23 +778,17 @@ function openNews(playerId, event){
     return;
   }
 
-  // Look up ESPN ID via worker
+  // Try NBC Sports Rotoworld first — no lookup needed, just name slug
+  var slug = p.name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/-+$/,'');
+  var nbcUrl = 'https://www.nbcsports.com/fantasy/football/player-news/'+slug;
+
+  // Also look up ESPN ID in background for future taps
   fetch(NEWS_WORKER + '?name=' + encodeURIComponent(p.name) + '&pos=' + (p.pos||'') + '&team=' + (p.team||''))
     .then(function(r){ return r.json(); })
-    .then(function(data){
-      if(data.espnId){
-        espnIdCache[playerId] = data.espnId;
-        window.open('https://www.espn.com/nfl/player/news/_/id/'+data.espnId, '_blank');
-      } else {
-        // Fallback to RotoBaller if ESPN ID not found
-        var slug = p.name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/-+$/,'');
-        window.open('https://www.rotoballer.com/player-news/'+slug+'/nfl', '_blank');
-      }
-    })
-    .catch(function(){
-      var slug = p.name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/-+$/,'');
-      window.open('https://www.rotoballer.com/player-news/'+slug+'/nfl', '_blank');
-    });
+    .then(function(data){ if(data.espnId) espnIdCache[playerId] = data.espnId; })
+    .catch(function(){});
+
+  window.open(nbcUrl, '_blank');
 }
 
 
