@@ -183,8 +183,8 @@ tr.my-team:hover td{background:rgba(155,109,255,.18) !important;}
 
 /* COMPARISON MODAL */
 .cmp-modal{position:fixed;inset:0;z-index:9000;display:flex;align-items:center;justify-content:center;padding:16px;}
-.cmp-modal.hidden{display:none;}
-.cmp-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(4px);}
+.cmp-modal.hidden{display:none;pointer-events:none;}
+.cmp-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(4px);pointer-events:none;}
 .cmp-box{position:relative;z-index:1;background:#080E0E;border:1px solid var(--pu);border-radius:16px;width:100%;max-width:900px;max-height:90vh;overflow-y:auto;box-shadow:0 24px 80px rgba(155,109,255,.25);}
 .cmp-hdr{padding:18px 24px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:12px;position:sticky;top:0;background:#080E0E;z-index:2;}
 .cmp-title{font-family:var(--fd);font-size:22px;font-weight:800;color:var(--pu);text-transform:uppercase;letter-spacing:.5px;flex:1;}
@@ -224,7 +224,7 @@ tr.my-team:hover td{background:rgba(155,109,255,.18) !important;}
 .wk-grid-row:nth-child(odd){background:rgba(155,109,255,.03);}
 /* COMPARE MODAL */
 .cmp-modal{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px;}
-.cmp-modal.hidden{display:none;}
+.cmp-modal.hidden{display:none;pointer-events:none;}
 .cmp-overlay{position:absolute;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(4px);}
 .cmp-box{position:relative;background:#0A0F0F;border:1px solid var(--bdr2);border-top:3px solid var(--or);border-bottom:3px solid var(--pk);border-radius:16px;width:100%;max-width:900px;max-height:90vh;overflow-y:auto;box-shadow:0 24px 80px rgba(0,229,212,.1);}
 .cmp-hdr{padding:18px 22px 12px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;border-bottom:1px solid var(--bdr);}
@@ -554,9 +554,9 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
 .theme-toggle{font-size:15px;padding:4px 8px;}
 
 /* ── FIX 2: FIRST RUN MODAL ── */
-.firstrun-modal{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;}
-.firstrun-modal.hidden{display:none;}
-.firstrun-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(6px);}
+.firstrun-modal{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;pointer-events:none;}
+.firstrun-modal.hidden{display:none;pointer-events:none;}
+.firstrun-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(6px);pointer-events:none;}
 .firstrun-box{position:relative;z-index:1;background:#080E0E;border:1px solid var(--or);border-radius:20px;padding:36px 32px;max-width:400px;width:100%;text-align:center;box-shadow:0 24px 80px rgba(0,229,212,.15);}
 .firstrun-logo{font-size:48px;margin-bottom:16px;}
 .firstrun-title{font-family:var(--fd);font-size:26px;font-weight:800;color:var(--or);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;}
@@ -3307,6 +3307,7 @@ function renderNumbers(curEntries){
 
 // ── FIRST RUN PROMPT ──────────────────────────────────────────
 function checkFirstRun(){
+  return; // Disabled — auth system handles new user flow
   try{
     var seen = localStorage.getItem('fr_seen');
     var savedTeam = localStorage.getItem('fr_myteam');
