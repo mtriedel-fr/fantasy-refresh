@@ -801,7 +801,19 @@ function openNews(playerId, event){
     .then(function(r){ return r.json(); })
     .then(function(data){
       if(!data.items || !data.items.length){
-        showNewsLinks(p);
+        if(data.offseason){
+          // Offseason — no news yet, show message + links
+          document.getElementById('news-body').innerHTML =
+            '<div style="padding:16px 20px;background:rgba(0,229,212,.06);border-bottom:1px solid var(--bdr);text-align:center;">'
+            + '<div style="font-size:24px;margin-bottom:6px;">🏕️</div>'
+            + '<div style="font-family:var(--fd);font-size:13px;font-weight:700;color:var(--or);">Training Camp Hasn\'t Started</div>'
+            + '<div style="font-size:12px;color:var(--ink3);margin-top:4px;">News will populate once the season gets underway. Check back in August.</div>'
+            + '</div>'
+            + '<div id="news-links-fallback"></div>';
+          showNewsLinks(p, 'news-links-fallback');
+        } else {
+          showNewsLinks(p);
+        }
         return;
       }
       var html = data.items.map(function(item){
@@ -822,7 +834,8 @@ function openNews(playerId, event){
     });
 }
 
-function showNewsLinks(p){
+function showNewsLinks(p, containerId){
+  var container = document.getElementById(containerId || 'news-body');
   var nameSlug  = p.name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/-+$/,'');
   var nameQuery = encodeURIComponent(p.name + ' NFL');
   var links = [
@@ -830,8 +843,8 @@ function showNewsLinks(p){
     {label:'🏈 ESPN',       url:'https://www.espn.com/search/results?q='+nameQuery,        desc:'Stats, news & game logs'},
     {label:'📊 PFR',        url:'https://www.pro-football-reference.com/search/search.fcgi?search='+encodeURIComponent(p.name), desc:'Career stats'}
   ];
-  document.getElementById('news-body').innerHTML =
-    '<div style="padding:12px 20px;font-size:12px;color:var(--ink3);border-bottom:1px solid var(--bdr);">No inline news available — open in new tab:</div>'
+  container.innerHTML =
+    '<div style="padding:12px 20px;font-size:12px;color:var(--ink3);border-bottom:1px solid var(--bdr);">Opens in a new tab:</div>'
     + links.map(function(l){
         return '<a href="'+l.url+'" target="_blank" rel="noopener" style="display:flex;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid var(--bdr);text-decoration:none;" onmouseover="this.style.background=\'var(--bg3)\'" onmouseout="this.style.background=\'\'">'
           + '<div style="flex:1;"><div style="font-family:var(--fd);font-size:15px;font-weight:700;color:var(--or);">'+l.label+'</div>'
