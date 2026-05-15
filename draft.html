@@ -784,6 +784,8 @@ function showToast(msg,isErr){
 }
 
 // ── PLAYER NEWS ────────────────────────────────────────────────
+var NEWS_WORKER = 'https://fantasy-refresh-news.mtriedel.workers.dev/player';
+
 function openNews(playerId, event){
   if(event) event.stopPropagation();
   var p = allPlayers.find(function(x){ return x.id === playerId; });
@@ -792,8 +794,32 @@ function openNews(playerId, event){
   document.getElementById('news-player-name').textContent = p.name;
   document.getElementById('news-player-meta').textContent =
     (p.pos||'') + (p.team ? ' · ' + p.team : '') + (p.salary ? ' · $'+p.salary.toLocaleString() : '');
+  document.getElementById('news-body').innerHTML = '<div class="news-loading">Loading news…</div>';
   document.getElementById('news-overlay').classList.add('open');
-  showNewsLinks(p);
+
+  fetch(NEWS_WORKER + '?name=' + encodeURIComponent(p.name) + '&pos=' + (p.pos||'') + '&team=' + (p.team||''))
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      if(!data.items || !data.items.length){
+        showNewsLinks(p);
+        return;
+      }
+      var html = data.items.map(function(item){
+        return '<div class="news-item">'
+          + (item.title ? '<div class="news-item-title">'+item.title+'</div>' : '')
+          + (item.body  ? '<div class="news-item-body">'+item.body+'</div>'   : '')
+          + (item.analysis ? '<div class="news-item-body" style="color:var(--ink3);margin-top:4px;font-style:italic;">'+item.analysis+'</div>' : '')
+          + '<div class="news-item-meta">'+(item.date?item.date+' · ':'')+( data.source||'RotoBaller')+'</div>'
+          + '</div>';
+      }).join('');
+      // Add "more" link at bottom
+      var nameSlug = p.name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/-+$/,'');
+      html += '<a href="https://www.rotoballer.com/player-news/'+nameSlug+'/nfl" target="_blank" rel="noopener" style="display:block;padding:12px 20px;font-family:var(--fd);font-size:12px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;text-align:center;border-top:1px solid var(--bdr);">More on RotoBaller ↗</a>';
+      document.getElementById('news-body').innerHTML = html;
+    })
+    .catch(function(){
+      showNewsLinks(p);
+    });
 }
 
 function showNewsLinks(p){
