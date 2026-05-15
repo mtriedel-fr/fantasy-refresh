@@ -778,17 +778,10 @@ function openNews(playerId, event){
     return;
   }
 
-  // Try NBC Sports Rotoworld first — no lookup needed, just name slug
+  // FantasyPros player profile — reliable name slug, no ID needed
   var slug = p.name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/-+$/,'');
-  var nbcUrl = 'https://www.nbcsports.com/fantasy/football/player-news/'+slug;
-
-  // Also look up ESPN ID in background for future taps
-  fetch(NEWS_WORKER + '?name=' + encodeURIComponent(p.name) + '&pos=' + (p.pos||'') + '&team=' + (p.team||''))
-    .then(function(r){ return r.json(); })
-    .then(function(data){ if(data.espnId) espnIdCache[playerId] = data.espnId; })
-    .catch(function(){});
-
-  window.open(nbcUrl, '_blank');
+  var fpUrl = 'https://www.fantasypros.com/nfl/players/'+slug+'.php';
+  window.open(fpUrl, '_blank');
 }
 
 
