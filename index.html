@@ -1059,7 +1059,7 @@ function loadFromCloud(){
   })
   .then(function(data){
     if(data && typeof data === 'object' && !data.error){
-      seasonData = data;
+      seasonData = normalizeSeasonData(data);
       setLoading(false);
       boot();
     } else if(data === null){
@@ -1075,6 +1075,71 @@ function loadFromCloud(){
     showToast('Cloud error: ' + (err && err.message ? err.message : 'unknown') , true);
     boot();
   });
+}
+
+
+// ── NORMALIZE SEASON DATA ──────────────────────────────────────
+// Handles both legacy array format [{name,score}] and
+// auto-scorer object format {uid: {team, score, status, slotPts}}
+function normalizeSeasonData(data){
+  if(!data || typeof data !== 'object') return {};
+  var normalized = {};
+  Object.keys(data).forEach(function(week){
+    if(week === 'meta') return; // skip meta key
+    var weekData = data[week];
+    if(!weekData) return;
+    // Already array format (legacy/manual import)
+    if(Array.isArray(weekData)){
+      normalized[week] = weekData;
+      return;
+    }
+    // Object format from auto-scorer — convert to array
+    if(typeof weekData === 'object'){
+      var entries = [];
+      Object.values(weekData).forEach(function(entry){
+        if(!entry || typeof entry !== 'object') return;
+        if(entry.team || entry.uid){
+          entries.push({
+            name:      entry.team || entry.uid,
+            score:     entry.score || 0,
+            uid:       entry.uid  || '',
+            status:    entry.status || 'final',
+            locked:    entry.locked || false,
+            slotPts:   entry.slotPts || {},
+            updatedAt: entry.updatedAt || 0
+          });
+        }
+      });
+      if(entries.length) normalized[week] = entries;
+    }
+  });
+  return normalized;
+}
+
+// ── LIVE SCORE POLLING ─────────────────────────────────────────
+var liveScoreTimer = null;
+
+function startLivePolling(week){
+  if(liveScoreTimer) clearInterval(liveScoreTimer);
+  liveScoreTimer = setInterval(function(){
+    fetch(FB_DB_URL + '/season2026/' + week + '.json')
+      .then(function(r){ return r.json(); })
+      .then(function(data){
+        if(!data) return;
+        var entries = normalizeSeasonData({[week]: data})[week];
+        if(!entries || !entries.length) return;
+        // Check if any score changed
+        var existing = seasonData[week] || [];
+        var changed = entries.some(function(e, i){
+          return !existing[i] || existing[i].score !== e.score;
+        });
+        if(changed){
+          seasonData[week] = entries;
+          boot(); // re-render standings
+          showToast('Scores updated 📡');
+        }
+      }).catch(function(){});
+  }, 60000); // poll every 60 seconds
 }
 
 function setLoading(on){
@@ -1233,6 +1298,10 @@ function renderAll(){
   if(el('hdr-sub')) el('hdr-sub').textContent = 'Week ' + currentWeek + ' of ' + WEEKS + ' · ' + sorted.length + ' teams';
 
   renderStandings(sorted, prevRank, curMap, wkHighName);
+  // Start live polling if current week has live scores
+  var hasLive = (seasonData[curKey]||[]).some(function(e){ return e.status==='live'; });
+  if(hasLive) startLivePolling(curKey);
+  else if(liveScoreTimer){ clearInterval(liveScoreTimer); liveScoreTimer=null; }
   renderMovement(sorted, prevRank, curMap);
   renderMyTeam(sorted, curEntries, prevRank, curMap);
   renderFinish(sorted, curEntries, prevRank);
@@ -2006,6 +2075,13 @@ function renderStandings(sorted, prevRank, curMap, wkHighName){
     var isHigh = t.name === wkHighName && wk !== undefined;
     var tip = ''; // roster tooltip only shown in weekly view
     var tierBadge = (locked && tier) ? '<span class="tier-label ' + tierColors[tier] + '">' + tierLabels[tier] + '</span>' : '';
+    // Live / Final score badge from auto-scorer
+    var scoreBadge = '';
+    if(entry && entry.status === 'live'){
+      scoreBadge = '<span style="font-family:var(--fd);font-size:9px;font-weight:800;color:#FF9A3A;background:rgba(255,154,58,.15);border:1px solid rgba(255,154,58,.3);padding:1px 6px;border-radius:8px;margin-left:4px;text-transform:uppercase;vertical-align:middle;">📡 Live</span>';
+    } else if(entry && entry.locked){
+      scoreBadge = '<span style="font-family:var(--fd);font-size:9px;color:var(--ink3);background:var(--bg3);border:1px solid var(--bdr);padding:1px 6px;border-radius:8px;margin-left:4px;text-transform:uppercase;vertical-align:middle;">🔒</span>';
+    }
 
     // Add divider row at tier boundaries
     var divider = locked && (r === tiers.eliteEnd + 1 || r === tiers.midEnd + 1) ? ' tier-divider' : '';
@@ -2025,6 +2101,7 @@ function renderStandings(sorted, prevRank, curMap, wkHighName){
       + (isHigh ? '<span class="bdg">🔥 Wk High</span>' : '')
       + streakBadge
       + tierBadge
+      + scoreBadge
       + tip + '</div></td>'
       + '<td class="tp" style="text-align:right">' + fmtTotal(t.total) + '</td>'
       + '<td class="ws" style="text-align:right">' + (wk !== undefined ? fmtScore(wk) : '—') + '</td>'
