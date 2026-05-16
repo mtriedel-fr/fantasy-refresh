@@ -1,0 +1,318 @@
+name: Auto Scoring
+
+on:
+  schedule:
+    # Every 5 min Thursday night (TNF)
+    - cron: '*/5 23 * * 4'
+    - cron: '*/5 0-4 * * 5'
+    # Every 5 min Sunday (all day games + SNF)
+    - cron: '*/5 17-23 * * 0'
+    - cron: '*/5 0-5 * * 1'
+    # Every 5 min Monday night (MNF)
+    - cron: '*/5 23 * * 1'
+    - cron: '*/5 0-5 * * 2'
+    # International games Fri/Sat
+    - cron: '*/5 12-20 * * 5'
+    - cron: '*/5 12-20 * * 6'
+    # Tuesday 9am ET (13:00 UTC) — lock final scores
+    - cron: '0 13 * * 2'
+  workflow_dispatch:
+    inputs:
+      week:
+        description: 'Week number (leave blank for auto-detect)'
+        required: false
+      lock_scores:
+        description: 'Set to "true" to lock scores immediately'
+        required: false
+        default: 'false'
+
+jobs:
+  score-lineups:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Calculate and write fantasy scores
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          TANK01_KEY: ${{ secrets.TANK01_KEY }}
+          FR_SEASON: "2026"
+          MANUAL_WEEK: ${{ inputs.week }}
+          LOCK_SCORES: ${{ inputs.lock_scores }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+
+          const FB_URL   = process.env.FIREBASE_DB_URL;
+          const T01_KEY  = process.env.TANK01_KEY;
+          const SEASON   = process.env.FR_SEASON || '2026';
+          const T01_HOST = 'tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com';
+          const IS_LOCK_RUN = process.env.LOCK_SCORES === 'true' ||
+                              new Date().getUTCDay() === 2; // Tuesday
+
+          // ── DraftKings Scoring ─────────────────────────────────
+          function calcDKPoints(p, pos) {
+            if (!p) return 0;
+            let pts = 0;
+            // Passing
+            pts += (parseFloat(p.passYds)  || 0) * 0.04;
+            pts += (parseFloat(p.passTD)   || 0) * 4;
+            pts += (parseFloat(p.passInt)  || 0) * -1;
+            pts += (parseFloat(p.pass300)  || 0) * 3;  // 300+ yd bonus
+            // Rushing
+            pts += (parseFloat(p.rushYds)  || 0) * 0.1;
+            pts += (parseFloat(p.rushTD)   || 0) * 6;
+            pts += (parseFloat(p.rush100)  || 0) * 3;  // 100+ yd bonus
+            // Receiving
+            pts += (parseFloat(p.rec)      || 0) * 1;  // PPR
+            pts += (parseFloat(p.recYds)   || 0) * 0.1;
+            pts += (parseFloat(p.recTD)    || 0) * 6;
+            pts += (parseFloat(p.rec100)   || 0) * 3;  // 100+ yd bonus
+            // Misc
+            pts += (parseFloat(p.fumbLost) || 0) * -1;
+            pts += (parseFloat(p.twoPt)    || 0) * 2;
+            // Defense
+            if (pos === 'DEF') {
+              pts += (parseFloat(p.sacks)   || 0) * 1;
+              pts += (parseFloat(p.defInt)  || 0) * 2;
+              pts += (parseFloat(p.fumbRec) || 0) * 2;
+              pts += (parseFloat(p.defTD)   || 0) * 6;
+              pts += (parseFloat(p.safety)  || 0) * 2;
+              pts += (parseFloat(p.blkKick) || 0) * 2;
+              const pa = parseFloat(p.ptsAllowed || p.pointsAllowed) || null;
+              if (pa !== null) {
+                if      (pa === 0)       pts += 10;
+                else if (pa <= 6)        pts += 7;
+                else if (pa <= 13)       pts += 4;
+                else if (pa <= 20)       pts += 1;
+                else if (pa <= 27)       pts += 0;
+                else if (pa <= 34)       pts -= 1;
+                else                     pts -= 4;
+              }
+            }
+            return Math.round(pts * 100) / 100;
+          }
+
+          // ── HTTP helpers ───────────────────────────────────────
+          function fetchJson(url, headers) {
+            return new Promise((resolve, reject) => {
+              const u = new URL(url);
+              https.get({ hostname: u.hostname, path: u.pathname + u.search, headers: headers || {} }, res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+
+          function firebasePut(path, payload) {
+            return new Promise((resolve, reject) => {
+              const body = JSON.stringify(payload);
+              const u = new URL(FB_URL + path);
+              const req = https.request({
+                hostname: u.hostname, path: u.pathname + u.search, method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+              }, res => { let d=''; res.on('data',c=>d+=c); res.on('end',()=>resolve(d)); });
+              req.on('error', reject);
+              req.write(body); req.end();
+            });
+          }
+
+          function firebasePatch(path, payload) {
+            return new Promise((resolve, reject) => {
+              const body = JSON.stringify(payload);
+              const u = new URL(FB_URL + path);
+              const req = https.request({
+                hostname: u.hostname, path: u.pathname + u.search, method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+              }, res => { let d=''; res.on('data',c=>d+=c); res.on('end',()=>resolve(d)); });
+              req.on('error', reject);
+              req.write(body); req.end();
+            });
+          }
+
+          function firebaseGet(path) {
+            return fetchJson(FB_URL + path, {});
+          }
+
+          function t01(path) {
+            return fetchJson(`https://${T01_HOST}${path}`, {
+              'X-RapidAPI-Key': T01_KEY, 'X-RapidAPI-Host': T01_HOST
+            });
+          }
+
+          // ── Get current week ───────────────────────────────────
+          async function getCurrentWeek() {
+            if (process.env.MANUAL_WEEK) return parseInt(process.env.MANUAL_WEEK);
+            try {
+              const d = await t01('/getNFLCurrentWeek');
+              return d.body ? parseInt(d.body.week) : 1;
+            } catch(e) { return 1; }
+          }
+
+          // ── LOCK RUN — Tuesday 9am ─────────────────────────────
+          async function lockScores(week) {
+            console.log(`Locking scores for Week ${week}...`);
+            const scores = await firebaseGet(`/season${SEASON}/${week}.json`).catch(() => null);
+            if (!scores) { console.log('No scores to lock.'); return; }
+
+            const updates = {};
+            Object.entries(scores).forEach(([uid, entry]) => {
+              if (entry && entry.score !== undefined && !entry.locked) {
+                updates[uid] = { ...entry, locked: true, lockedAt: Date.now() };
+              }
+            });
+
+            if (Object.keys(updates).length) {
+              await firebasePatch(`/season${SEASON}/${week}.json`, updates);
+              console.log(`✅ Locked ${Object.keys(updates).length} scores for Week ${week}`);
+            } else {
+              console.log('All scores already locked.');
+            }
+          }
+
+          // ── MAIN SCORING RUN ───────────────────────────────────
+          async function main() {
+            const week = await getCurrentWeek();
+            console.log(`\n=== Auto-Scoring Week ${week} | ${new Date().toISOString()} ===`);
+
+            // Lock run (Tuesday 9am)
+            if (IS_LOCK_RUN) {
+              await lockScores(week);
+              return;
+            }
+
+            // Get this week's games
+            const gamesData = await t01(`/getNFLGamesForWeek?week=${week}&seasonType=Regular&season=${SEASON}`);
+            const games = Array.isArray(gamesData.body)
+              ? gamesData.body : Object.values(gamesData.body || {});
+
+            // Filter to games in progress or final
+            const activeGames = games.filter(g => {
+              const s = (g.gameStatus || g.status || '').toLowerCase();
+              return s.includes('progress') || s.includes('final') ||
+                     s.includes('completed') || s === 'live';
+            });
+
+            if (!activeGames.length) {
+              console.log('No active games right now — nothing to score.');
+              return;
+            }
+
+            console.log(`Found ${activeGames.length} active/final game(s)`);
+
+            // Check if all games are final
+            const allFinal = games.every(g => {
+              const s = (g.gameStatus || g.status || '').toLowerCase();
+              return s.includes('final') || s.includes('completed');
+            });
+
+            // Fetch box scores for active games
+            const boxScores = {};
+            for (const game of activeGames) {
+              const gameId = game.gameID || game.gameId || '';
+              if (!gameId) continue;
+              try {
+                const bs = await t01(`/getNFLBoxScore?gameID=${gameId}&fantasyPoints=true&PPRScoring=true`);
+                if (bs.body) {
+                  boxScores[gameId] = bs.body;
+                  const playerCount = Object.keys(bs.body.playerStats || {}).length;
+                  console.log(`  📊 ${gameId}: ${playerCount} player stats`);
+                }
+              } catch(e) {
+                console.error(`  ❌ Failed box score ${gameId}:`, e.message);
+              }
+            }
+
+            // Build player stats lookup by player ID and name
+            const playerStats = {};
+            Object.values(boxScores).forEach(bs => {
+              Object.entries(bs.playerStats || {}).forEach(([pid, stats]) => {
+                playerStats[pid] = stats;
+                // Also index by name for matching
+                const name = (stats.longName || stats.playerName || '').toLowerCase();
+                if (name) playerStats[name] = stats;
+              });
+            });
+
+            // Load all submitted lineups for this week
+            const lineups = await firebaseGet(`/lineups${SEASON}/week${week}.json`).catch(() => null);
+            if (!lineups) { console.log('No lineups submitted yet.'); return; }
+
+            console.log(`\nScoring ${Object.keys(lineups).length} lineup(s)...`);
+
+            // Load existing scores to preserve locked ones
+            const existingScores = await firebaseGet(`/season${SEASON}/${week}.json`).catch(() => ({}));
+
+            const scoreUpdates = {};
+
+            for (const [uid, lineup] of Object.entries(lineups)) {
+              if (!lineup || !lineup.slots) continue;
+
+              // Skip if already locked
+              const existing = existingScores && existingScores[uid];
+              if (existing && existing.locked) {
+                console.log(`  ⏭️  ${lineup.team || uid}: score locked, skipping`);
+                continue;
+              }
+
+              let totalPts  = 0;
+              const slotPts = {};
+
+              for (const [slotId, player] of Object.entries(lineup.slots)) {
+                if (!player) continue;
+
+                // Find player stats — try by ID first, then name
+                let stats = playerStats[player.id]
+                  || playerStats[(player.name || '').toLowerCase()];
+
+                let pts = 0;
+                if (stats) {
+                  // Use Tank01's pre-calculated fantasy points if available
+                  pts = parseFloat(stats.fantasyPoints || stats.fantasy_points || 0);
+                  // Fall back to manual calculation
+                  if (!pts) pts = calcDKPoints(stats, player.pos);
+                } else {
+                  // Player's game hasn't started or no stats yet → 0
+                  pts = 0;
+                }
+
+                slotPts[slotId] = Math.round(pts * 100) / 100;
+                totalPts += pts;
+              }
+
+              totalPts = Math.round(totalPts * 100) / 100;
+
+              scoreUpdates[uid] = {
+                uid,
+                team:      lineup.team || uid,
+                week,
+                score:     totalPts,
+                slotPts,
+                status:    allFinal ? 'final' : 'live',
+                updatedAt: Date.now(),
+                locked:    false
+              };
+
+              console.log(`  ${allFinal ? '✅' : '📡'} ${lineup.team || uid}: ${totalPts} pts ${allFinal ? '(FINAL)' : '(live)'}`);
+            }
+
+            // Write all scores in one PATCH
+            if (Object.keys(scoreUpdates).length) {
+              await firebasePatch(`/season${SEASON}/${week}.json`, scoreUpdates);
+              console.log(`\n✅ Wrote ${Object.keys(scoreUpdates).length} scores to Firebase`);
+            }
+
+            // Update week meta
+            await firebasePut(`/season${SEASON}/meta.json`, {
+              week,
+              lastScored:  Date.now(),
+              allFinal,
+              gamesActive: activeGames.length,
+              gamesTotal:  games.length
+            });
+          }
+
+          main().catch(e => {
+            console.error('Scoring job failed:', e);
+            process.exit(1);
+          });
+          SCRIPT
