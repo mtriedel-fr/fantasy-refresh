@@ -690,6 +690,11 @@ function closePicker(){
 
 // ── PICKER RENDER ──────────────────────────────────────────────
 function renderPicker(){
+  // If a game is selected, always show side-by-side view
+  if(activeGame){
+    renderGamePreview(activeGame);
+    return;
+  }
   var query   = (document.getElementById('picker-search').value||'').toLowerCase().trim();
   var inLineup= {};
   Object.keys(lineup).forEach(function(sid){ if(lineup[sid]) inLineup[lineup[sid].id]=sid; });
@@ -957,7 +962,7 @@ function loadLocks(){
           if(!d) return;
           var changed = JSON.stringify(d) !== JSON.stringify(teamLocks);
           teamLocks = d;
-          if(changed){ renderRoster(); renderPicker(); }
+          if(changed){ renderRoster(); if(activeGame) renderGamePreview(activeGame); else renderPicker(); }
         }).catch(function(){});
       }, 60000);
     })
