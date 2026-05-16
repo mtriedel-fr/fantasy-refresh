@@ -1,0 +1,174 @@
+name: Kickoff Locks
+
+on:
+  schedule:
+    # Every 5 minutes Thursday through Monday during NFL season (ET = UTC-4 in Sept)
+    # Thu 7pm-11pm ET = Thu 23:00-03:00 UTC
+    - cron: '*/5 23-23 * 9-1 4'   # Thu night
+    - cron: '*/5 0-3 * 9-1 5'     # Thu night into Fri
+    # Sun 12:55pm-11:30pm ET = Sun 16:55-03:30 UTC
+    - cron: '*/5 16-23 * 9-1 0'   # Sunday
+    - cron: '*/5 0-4 * 9-1 1'     # Sunday night into Monday
+    # Mon 7:55pm-11:30pm ET = Mon 23:55-03:30 UTC
+    - cron: '*/5 23 * 9-1 1'      # Monday night
+    - cron: '*/5 0-4 * 9-1 2'     # Monday into Tuesday
+    # International games (Fri/Sat) — run Fri/Sat 8am-4pm ET
+    - cron: '*/5 12-20 * 9-1 5'   # Friday
+    - cron: '*/5 12-20 * 9-1 6'   # Saturday
+  workflow_dispatch:  # Allow manual trigger for testing
+
+jobs:
+  check-kickoffs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check game statuses and write locks
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          TANK01_KEY: ${{ secrets.TANK01_KEY }}
+          FR_SEASON: "2026"
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+
+          const FB_URL   = process.env.FIREBASE_DB_URL;
+          const T01_KEY  = process.env.TANK01_KEY;
+          const SEASON   = process.env.FR_SEASON || '2026';
+          const T01_HOST = 'tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com';
+
+          // ── Helper: fetch with promise ──────────────────────────────
+          function fetchJson(url, headers) {
+            return new Promise((resolve, reject) => {
+              const opts = new URL(url);
+              const options = {
+                hostname: opts.hostname,
+                path: opts.pathname + opts.search,
+                headers: headers || {}
+              };
+              https.get(options, res => {
+                let data = '';
+                res.on('data', chunk => data += chunk);
+                res.on('end', () => {
+                  try { resolve(JSON.parse(data)); }
+                  catch(e) { reject(e); }
+                });
+              }).on('error', reject);
+            });
+          }
+
+          function firebasePut(path, payload) {
+            return new Promise((resolve, reject) => {
+              const body = JSON.stringify(payload);
+              const opts = new URL(FB_URL + path);
+              const options = {
+                hostname: opts.hostname,
+                path: opts.pathname + opts.search,
+                method: 'PUT',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Content-Length': Buffer.byteLength(body)
+                }
+              };
+              const req = https.request(options, res => {
+                let data = '';
+                res.on('data', chunk => data += chunk);
+                res.on('end', () => resolve(data));
+              });
+              req.on('error', reject);
+              req.write(body);
+              req.end();
+            });
+          }
+
+          function firebaseGet(path) {
+            return fetchJson(FB_URL + path, {});
+          }
+
+          // ── Get current NFL week from Tank01 ───────────────────────
+          async function getCurrentWeek() {
+            try {
+              const data = await fetchJson(
+                `https://${T01_HOST}/getNFLCurrentWeek`,
+                { 'X-RapidAPI-Key': T01_KEY, 'X-RapidAPI-Host': T01_HOST }
+              );
+              return data.body ? parseInt(data.body.week) : 1;
+            } catch(e) {
+              console.error('Could not get current week:', e.message);
+              return 1;
+            }
+          }
+
+          // ── Main ───────────────────────────────────────────────────
+          async function main() {
+            const week = await getCurrentWeek();
+            console.log(`Checking locks for Week ${week}...`);
+
+            // Get current game statuses from Tank01
+            const gamesData = await fetchJson(
+              `https://${T01_HOST}/getNFLGamesForWeek?week=${week}&seasonType=Regular&season=${SEASON}`,
+              { 'X-RapidAPI-Key': T01_KEY, 'X-RapidAPI-Host': T01_HOST }
+            );
+
+            const games = Array.isArray(gamesData.body)
+              ? gamesData.body
+              : Object.values(gamesData.body || {});
+
+            // Get existing locks from Firebase
+            const existingLocks = await firebaseGet(
+              `/locks${SEASON}/week${week}.json`
+            ).catch(() => ({}));
+
+            const locks = existingLocks || {};
+            let newLocks = 0;
+
+            // Check each game — lock teams whose game has started
+            for (const game of games) {
+              const status   = (game.gameStatus || game.status || '').toLowerCase();
+              const homeTeam = game.homeTeamAbbr || game.homeTeam || '';
+              const awayTeam = game.awayTeamAbbr || game.awayTeam || '';
+              const gameId   = game.gameID || '';
+
+              // Lock when game is in progress or final
+              const isLocked = status.includes('in progress') ||
+                               status.includes('inprogress') ||
+                               status.includes('final') ||
+                               status === 'completed' ||
+                               status === 'live';
+
+              if (isLocked) {
+                const lockTime = Date.now();
+                let changed = false;
+
+                if (!locks[homeTeam]) {
+                  locks[homeTeam] = { lockedAt: lockTime, gameId, opponent: awayTeam };
+                  changed = true;
+                  newLocks++;
+                  console.log(`🔒 Locked: ${homeTeam} (game: ${gameId})`);
+                }
+                if (!locks[awayTeam]) {
+                  locks[awayTeam] = { lockedAt: lockTime, gameId, opponent: homeTeam };
+                  changed = true;
+                  newLocks++;
+                  console.log(`🔒 Locked: ${awayTeam} (game: ${gameId})`);
+                }
+              }
+            }
+
+            if (newLocks > 0) {
+              await firebasePut(`/locks${SEASON}/week${week}.json`, locks);
+              console.log(`✅ Wrote ${newLocks} new locks to Firebase`);
+            } else {
+              console.log('No new locks this run.');
+            }
+
+            // Also write a meta record so the draft page knows last check time
+            await firebasePut(`/locks${SEASON}/meta.json`, {
+              lastChecked: Date.now(),
+              week
+            });
+          }
+
+          main().catch(e => {
+            console.error('Lock job failed:', e);
+            process.exit(1);
+          });
+          SCRIPT
