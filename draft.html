@@ -182,6 +182,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
 <div class="hdr">
   <a href="index.html" class="hdr-logo">Fantasy<span>Refresh</span></a>
   <div class="hdr-week" id="hdr-week">Loading…</div>
+  <div id="test-banner" style="display:none;background:rgba(155,109,255,.15);border:1px solid var(--pu);color:var(--pu);font-family:var(--fd);font-size:10px;font-weight:800;padding:3px 10px;border-radius:10px;text-transform:uppercase;letter-spacing:.5px;">🧪 Test Mode</div>
   <button onclick="toggleTheme()" id="theme-btn" style="background:none;border:1px solid var(--bdr);border-radius:6px;padding:5px 10px;cursor:pointer;font-size:14px;" title="Toggle theme">🌙</button>
   <a href="#" class="hdr-back" onclick="goBack()">← Back</a>
 </div>
@@ -242,6 +243,7 @@ var FB_DB_URL = 'https://fantasy-refresh-default-rtdb.firebaseio.com';
 var FR_SEASON = '2026';
 var PS_MODE   = false;
 var PS_WEEK   = 1;
+var TEST_MODE = false; // ?testMode=hof swaps all data to mock endpoints
 var CAP = 60000;
 var SLOT_DEFS = [
   {id:'qb1', pos:'QB',   label:'QB',   eligible:['QB']},
@@ -278,6 +280,15 @@ document.addEventListener('DOMContentLoaded', function(){
 
 // ── LOAD ──────────────────────────────────────────────────────
 function loadWeekAndData(){
+  // Test mode — use mock HOF data
+  if(TEST_MODE){
+    document.getElementById('hdr-week').textContent = 'HOF Test — CAR @ ARI';
+    document.getElementById('week-label').textContent = 'HOF Game (Test)';
+    loadSalaries();
+    loadSchedule();
+    loadLocks();
+    return;
+  }
   // Preseason mode — week and season already set from URL params
   if(PS_MODE){
     var label = 'PS Week '+currentWeek+' Draft';
@@ -308,6 +319,17 @@ function loadWeekAndData(){
 }
 
 function loadSalaries(){
+  // Test mode — use mock HOF salaries from worker
+  if(TEST_MODE){
+    fetch('https://fantasy-refresh-news.mtriedel.workers.dev/test?endpoint=salaries')
+      .then(function(r){ return r.json(); })
+      .then(function(data){
+        allPlayers = Object.values(data.players||{}).filter(function(p){ return p && p.name && p.pos; });
+        renderPool();
+      })
+      .catch(function(e){ console.error('Test salary load failed:', e); });
+    return;
+  }
   // Preseason: try preseason salaries, fall back to flat from pool
   var salPath = PS_MODE
     ? FB_DB_URL + '/salariespreseason2026/week'+currentWeek+'.json'
@@ -369,6 +391,22 @@ var teamLocks   = {}; // {teamAbbr: {lockedAt, gameId}} — written by GitHub Ac
 var lockPollTimer = null;
 
 function loadSchedule(){
+  if(TEST_MODE){
+    fetch('https://fantasy-refresh-news.mtriedel.workers.dev/test?endpoint=schedule')
+      .then(function(r){ return r.json(); })
+      .then(function(data){
+        schedule = data.games || [];
+        buildGamesBar(schedule);
+        // Also fetch mock odds
+        fetch('https://fantasy-refresh-news.mtriedel.workers.dev/test?endpoint=odds')
+          .then(function(r){ return r.json(); })
+          .then(function(od){
+            if(od && od.odds){ Object.assign(gameOdds, od.odds); buildGamesBar(schedule); }
+          }).catch(function(){});
+      })
+      .catch(function(e){ console.error('Test schedule load failed:', e); });
+    return;
+  }
   var seasonType = PS_MODE ? 'Preseason' : 'Regular';
   var WORKER = 'https://fantasy-refresh-news.mtriedel.workers.dev';
   fetch(WORKER + '/schedule?week='+currentWeek+'&season=2026&seasonType='+seasonType)
@@ -948,6 +986,20 @@ var teamLocks    = {}; // {teamAbbr: {lockedAt, gameId}}
 var lockPollTimer = null;
 
 function loadLocks(){
+  if(TEST_MODE){
+    // Start with no locks — use URL param ?locks=live to simulate kickoff
+    var params = new URLSearchParams(window.location.search);
+    var locksEndpoint = params.get('locks') === 'live' ? 'locks_live' : 'schedule'; // schedule returns no locks
+    if(params.get('locks') === 'live'){
+      fetch('https://fantasy-refresh-news.mtriedel.workers.dev/test?endpoint=locks_live')
+        .then(function(r){ return r.json(); })
+        .then(function(d){ teamLocks = d || {}; renderRoster(); renderPicker(); })
+        .catch(function(){});
+    } else {
+      teamLocks = {}; // no locks pre-kickoff
+    }
+    return;
+  }
   var path = FB_DB_URL + '/locks'+FR_SEASON+'/week'+currentWeek+'.json';
   fetch(path)
     .then(function(r){ return r.json(); })
@@ -1049,9 +1101,7 @@ function toggleTheme(){
   }catch(e){}
 })();
 
-// ── PRESEASON MODE ─────────────────────────────────────────────
-// If ?mode=preseason is in the URL, switch to preseason Firebase paths
-// and preseason schedule type
+// ── PRESEASON + TEST MODE ──────────────────────────────────────
 (function(){
   var params = new URLSearchParams(window.location.search);
   if(params.get('mode') === 'preseason'){
@@ -1059,6 +1109,13 @@ function toggleTheme(){
     PS_MODE     = true;
     PS_WEEK     = parseInt(params.get('week') || '1');
     currentWeek = PS_WEEK;
+  }
+  if(params.get('testMode') === 'hof'){
+    TEST_MODE   = true;
+    window.addEventListener('DOMContentLoaded', function(){ var b=document.getElementById('test-banner'); if(b) b.style.display='inline-flex'; });
+    PS_MODE     = true;
+    FR_SEASON   = 'preseason2026';
+    currentWeek = 0;
   }
 })();
 
