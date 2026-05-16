@@ -286,6 +286,7 @@ function loadWeekAndData(){
     loadSalaries();
     loadSchedule();
     loadSubmitted();
+    loadLocks();
     return;
   }
   fetch(FB_DB_URL + '/season'+FR_SEASON+'.json?shallow=true')
@@ -300,6 +301,8 @@ function loadWeekAndData(){
       loadSalaries();
       loadSchedule();
       loadSubmitted();
+      loadLocks();
+      loadLocks();
     })
     .catch(function(){ currentWeek=1; loadSalaries(); loadSchedule(); });
 }
@@ -361,7 +364,9 @@ function filterPlayersToSchedule(){
 }
 
 
-var gameOdds = {}; // {gameId: {overUnder, spread}}
+var gameOdds    = {}; // {gameId: {overUnder, spread}}
+var teamLocks   = {}; // {teamAbbr: {lockedAt, gameId}} — written by GitHub Actions
+var lockPollTimer = null;
 
 function loadSchedule(){
   var seasonType = PS_MODE ? 'Preseason' : 'Regular';
@@ -552,8 +557,9 @@ function renderGamePreview(game){
       ? '<span class="p-inj inj-'+p.status+'">'+p.status+'</span>' : '';
     var isIn2 = !!inLineup[p.id];
     var cls = 'player-row'+(isIn2?' selected':'')+(isOut?' disabled':'');
-    var draftLbl2 = isIn2 ? '✓' : '+';
-    var draftCls2 = 'draft-btn' + (isIn2 ? ' drafted' : '');
+    var locked2   = isPlayerLocked(p);
+    var draftLbl2 = isIn2 ? '✓' : locked2 ? '🔒' : '+';
+    var draftCls2 = 'draft-btn' + (isIn2 ? ' drafted' : locked2 ? ' drafted' : '');
     return '<div class="'+cls+'">'
       + '<div class="p-pos" style="background:'+posColor+'18;color:'+posColor+'">'+p.pos+'</div>'
       + '<div class="p-info" onclick="openNews(\''+p.id+'\',event)" style="cursor:pointer;">'
@@ -588,6 +594,7 @@ function pickFromPreview(playerId){
   var p = allPlayers.find(function(x){ return x.id === playerId; });
   if(!p) return;
   if(p.status === 'O' || p.status === 'IR'){ showToast(p.name+' is out', true); return; }
+  if(isPlayerLocked(p)){ showToast(p.name+' is locked 🔒', true); return; }
 
   // Find the best available slot for this player's position
   var slot = null;
@@ -636,7 +643,9 @@ function renderRoster(){
     html += '<span class="slot-pos-tag" style="color:'+color+'">'+s.label+'</span>';
     if(p){
       html += '<span class="slot-player-name" style="font-family:var(--fd);font-size:15px;font-weight:700;flex:1;">'+p.name+'</span>';
-      html += '<button class="slot-remove-btn" onclick="event.stopPropagation();removePlayer(\''+s.id+'\')">✕</button>';
+      html += isPlayerLocked(p)
+        ? '<span style="font-size:14px;margin-left:auto;">🔒</span>'
+        : '<button class="slot-remove-btn" onclick="event.stopPropagation();removePlayer(\''+s.id+'\')">✕</button>';
     } else {
       html += '<span class="slot-empty-lbl">— empty —</span>';
       html += '<span class="slot-tap-hint">tap to pick</span>';
@@ -728,12 +737,13 @@ function renderPicker(){
     var isOut      = p.status === 'O' || p.status === 'IR';
     var spent      = getSpent();
     var wouldOvr   = !isSelected && (spent + p.salary > CAP);
-    var disabled   = isOut || (wouldOvr && !isSelected);
+    var locked     = isPlayerLocked(p);
+    var disabled   = isOut || locked || (wouldOvr && !isSelected);
     var injBadge   = (p.status && p.status !== 'Active')
       ? '<span class="p-inj inj-'+p.status+'">'+p.status+'</span>' : '';
     var posColor   = POS_COLORS[p.pos] || 'var(--ink2)';
-    var draftLabel = isSelected ? '✓ Drafted' : '+ Draft';
-    var draftCls   = 'draft-btn' + (isSelected ? ' drafted' : '');
+    var draftLabel = isSelected ? '✓ Drafted' : locked ? '🔒 Locked' : '+ Draft';
+    var draftCls   = 'draft-btn' + (isSelected ? ' drafted' : locked ? ' drafted' : '');
     var rowCls     = 'player-row'+(isSelected?' selected':'')+(disabled?' disabled':'');
     html += '<div class="'+rowCls+'">'
       + '<div class="p-pos" style="background:'+posColor+'18;color:'+posColor+'">'+p.pos+'</div>'
@@ -754,6 +764,7 @@ function pickPlayer(playerId){
   var p = allPlayers.find(function(x){ return x.id === playerId; });
   if(!p) return;
   if(p.status === 'O' || p.status === 'IR'){ showToast(p.name+' is out', true); return; }
+  if(isPlayerLocked(p)){ showToast(p.name+' is locked 🔒', true); return; }
 
   var slot = SLOT_DEFS.find(function(s){ return s.id === activeSlot; });
 
@@ -823,6 +834,8 @@ function findNextEmptySlot(currentSlot){
 }
 
 function removePlayer(slotId){
+  var p = lineup[slotId];
+  if(p && isPlayerLocked(p)){ showToast(p.name+' is locked — cannot remove 🔒', true); return; }
   lineup[slotId] = null;
   if(activeSlot === slotId){
     activeSlot = null;
@@ -923,6 +936,41 @@ function showNewsLinks(p){
       }).join('');
 }
 
+
+
+// ── KICKOFF LOCKS ──────────────────────────────────────────────
+var teamLocks    = {}; // {teamAbbr: {lockedAt, gameId}}
+var lockPollTimer = null;
+
+function loadLocks(){
+  var path = FB_DB_URL + '/locks'+FR_SEASON+'/week'+currentWeek+'.json';
+  fetch(path)
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      teamLocks = data || {};
+      renderRoster();
+      renderPicker();
+      // Poll every 60 seconds to pick up new locks during game days
+      if(lockPollTimer) clearInterval(lockPollTimer);
+      lockPollTimer = setInterval(function(){
+        fetch(path).then(function(r){ return r.json(); }).then(function(d){
+          if(!d) return;
+          var changed = JSON.stringify(d) !== JSON.stringify(teamLocks);
+          teamLocks = d;
+          if(changed){ renderRoster(); renderPicker(); }
+        }).catch(function(){});
+      }, 60000);
+    })
+    .catch(function(){ teamLocks = {}; });
+}
+
+function isPlayerLocked(player){
+  return !!(player && player.team && teamLocks[player.team]);
+}
+
+function isTeamLocked(team){
+  return !!(team && teamLocks[team]);
+}
 
 function showToast(msg,isErr){
   var t=document.getElementById('toast');
