@@ -478,7 +478,6 @@ function buildGamesBarFromPlayers(){
 }
 
 function setGameFilter(gameIdx, btn){
-  // Sync active state across both game bars
   var key = gameIdx === null ? 'all' : String(gameIdx);
   document.querySelectorAll('.game-chip').forEach(function(b){
     b.classList.toggle('active', b.getAttribute('data-game') === key);
@@ -492,18 +491,21 @@ function setGameFilter(gameIdx, btn){
     badge.style.display = 'none';
   }
 
-  if(activeSlot){
-    // Slot selected — filter player list to this game
-    renderPicker();
-  } else if(activeGame){
-    // No slot selected — show game preview with both rosters
+  if(activeGame){
+    // Game selected — always show side-by-side regardless of slot state
     document.getElementById('picker-panel').classList.add('open');
     document.getElementById('picker-slot-label').textContent = activeGame.away + ' @ ' + activeGame.home;
     document.getElementById('picker-slot-label').style.color = 'var(--pk)';
     document.getElementById('picker-search').value = '';
     renderGamePreview(activeGame);
   } else {
-    // Cleared back to All Games — close preview if no slot active
+    // All Games cleared
+    document.getElementById('picker-slot-label').textContent = activeSlot
+      ? SLOT_DEFS.find(function(s){ return s.id===activeSlot; }).label
+      : 'All Players';
+    document.getElementById('picker-slot-label').style.color = activeSlot
+      ? (POS_COLORS[SLOT_DEFS.find(function(s){ return s.id===activeSlot; }).pos] || 'var(--or)')
+      : 'var(--ink2)';
     document.getElementById('picker-panel').classList.remove('open');
     renderPicker();
   }
@@ -519,12 +521,25 @@ function renderGamePreview(game){
     return b.salary - a.salary; // within same position, sort by salary
   }
 
-  // Hide players already drafted into other slots
   var draftedInPreview = {};
   Object.keys(lineup).forEach(function(sid){ if(lineup[sid]) draftedInPreview[lineup[sid].id] = true; });
 
-  var awayPlayers = allPlayers.filter(function(p){ return p.team === game.away && !draftedInPreview[p.id]; }).sort(sortByPos);
-  var homePlayers = allPlayers.filter(function(p){ return p.team === game.home && !draftedInPreview[p.id]; }).sort(sortByPos);
+  // If a slot is active, only show eligible positions for that slot
+  var slot = activeSlot ? SLOT_DEFS.find(function(s){ return s.id === activeSlot; }) : null;
+
+  var awayPlayers = allPlayers.filter(function(p){
+    if(p.team !== game.away) return false;
+    if(draftedInPreview[p.id]) return false;
+    if(slot && slot.eligible.indexOf(p.pos) < 0) return false;
+    return true;
+  }).sort(sortByPos);
+
+  var homePlayers = allPlayers.filter(function(p){
+    if(p.team !== game.home) return false;
+    if(draftedInPreview[p.id]) return false;
+    if(slot && slot.eligible.indexOf(p.pos) < 0) return false;
+    return true;
+  }).sort(sortByPos);
 
   var inLineup = {};
   Object.values(lineup).forEach(function(p){ if(p) inLineup[p.id] = true; });
