@@ -339,10 +339,25 @@ function loadFlatSalariesFromPool(){
           return {id:p.id, name:p.name, pos:p.pos, team:p.team,
                   salary:FLAT[p.pos], proj:null, status:p.status||null};
         });
-      if(!schedule.length) buildGamesBarFromPlayers();
+      // In preseason mode — filter to only teams playing this week
+      if(PS_MODE && schedule.length){
+        filterPlayersToSchedule();
+      } else if(!schedule.length){
+        buildGamesBarFromPlayers();
+      }
       renderPool();
     })
     .catch(function(){});
+}
+
+function filterPlayersToSchedule(){
+  // Build set of teams playing this week from schedule
+  var playingTeams = {};
+  schedule.forEach(function(g){
+    if(g.teams) g.teams.forEach(function(t){ playingTeams[t] = true; });
+  });
+  if(!Object.keys(playingTeams).length) return;
+  allPlayers = allPlayers.filter(function(p){ return playingTeams[p.team]; });
 }
 
 
@@ -356,7 +371,13 @@ function loadSchedule(){
     .then(function(data){
       if(!data || !data.games || !data.games.length) throw new Error('No games');
       schedule = data.games;
-      buildGamesBar(schedule); // render immediately without odds
+      buildGamesBar(schedule);
+
+      // In preseason: re-filter player pool to only teams playing this week
+      if(PS_MODE && allPlayers.length){
+        filterPlayersToSchedule();
+        renderPool();
+      }
 
       // Fetch odds in background — group games by date to minimize API calls
       if(!PS_MODE){
