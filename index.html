@@ -830,6 +830,10 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
     <svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
     <span>Playoffs</span>
   </div>
+  <div class="nav-tab" id="navtab-league" onclick="handleNav('league')">
+    <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+    <span>League</span>
+  </div>
   <div class="nav-tab" id="navtab-draft" onclick="window.location.href='draft.html'">
     <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/><circle cx="12" cy="12" r="3"/></svg>
     <span>Draft</span>
@@ -895,7 +899,7 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
         <div class="drop-zone" id="drop-zone">
           <input type="file" accept=".csv" id="csv-inp" onchange="handleFile(this.files[0])">
           <div class="dz-icon"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
-          <div class="dz-title">Drop DraftKings CSV here</div>
+          <div class="dz-title">Drop weekly scores CSV here</div>
           <div class="dz-sub">My Contests → find contest → <strong>Export Results</strong></div>
         </div>
         <div class="preview-box" id="prev-box">
@@ -1946,7 +1950,7 @@ function renderSeasonWrap(){
 
 
 function showEmpty(){
-  var html = '<div class="empty"><div class="empty-icon">🏈</div><div class="empty-title">No data yet</div><div class="empty-sub">Click <strong>Commissioner</strong> above<br>and import your first DraftKings CSV.</div></div>';
+  var html = '<div class="empty"><div class="empty-icon">🏈</div><div class="empty-title">No data yet</div><div class="empty-sub">Click <strong>Commissioner</strong> above<br>and import your first week&#39;s scores.</div></div>';
   ['sw','mw','wt','wf','wn','my-season-wrap'].forEach(function(id){
     var el = document.getElementById(id);
     if(el) el.innerHTML = html;
@@ -3613,6 +3617,7 @@ function showSubTab(el, id, section){
 }
 
 function handleNav(val){
+  if(val === 'league'){ document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); }); document.getElementById('tab-league').classList.remove('hidden'); document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); }); document.getElementById('navtab-league').classList.add('active'); return; }
   if(val === 'playoffs'){ window.location.href = 'playoffs.html'; return; }
   if(val === 'guillotine'){ document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); }); document.getElementById('tab-guillotine').classList.remove('hidden'); document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); }); document.getElementById('navtab-guillotine').classList.add('active'); return; }
   // Hide all content
