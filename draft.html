@@ -69,8 +69,8 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
 .slot-player-meta{display:flex;align-items:center;gap:8px;margin-top:2px;}
 .slot-player-team{font-family:var(--fd);font-size:11px;color:var(--ink3);text-transform:uppercase;}
 .slot-player-sal{font-family:var(--fd);font-size:13px;font-weight:700;color:var(--or);}
-.slot-remove-btn{background:none;border:none;color:var(--ink3);font-size:14px;cursor:pointer;padding:2px 6px;border-radius:4px;margin-left:auto;}
-.slot-remove-btn:hover{color:var(--pk);}
+.slot-remove-btn{background:rgba(255,95,160,.1);border:1px solid rgba(255,95,160,.3);color:var(--pk);font-family:var(--fd);font-size:11px;font-weight:800;cursor:pointer;padding:4px 10px;border-radius:6px;margin-left:auto;text-transform:uppercase;letter-spacing:.3px;transition:all .15s;}
+.slot-remove-btn:hover{background:var(--pk);color:#fff;border-color:var(--pk);}
 
 /* ── SUBMIT ── */
 .submit-area{padding:12px 14px;border-top:1px solid var(--bdr);background:var(--bg2);flex-shrink:0;}
@@ -319,16 +319,19 @@ function loadWeekAndData(){
     .catch(function(){ currentWeek=1; loadSalaries(); loadSchedule(); });
 }
 
+
+// ── TEST / LIVE DATA HELPER ──────────────────────────────────
+function workerFetch(endpoint, params){
+  var base = WORKER + (TEST_MODE ? '/test?endpoint=' + endpoint : '/' + endpoint + (params ? '?' + params : ''));
+  return fetch(base).then(function(r){ return r.json(); });
+}
 function loadSalaries(){
   // Test mode — use mock HOF salaries from worker
   if(TEST_MODE){
-    fetch('https://fantasy-refresh-news.mtriedel.workers.dev/test?endpoint=salaries')
-      .then(function(r){ return r.json(); })
-      .then(function(data){
-        allPlayers = Object.values(data.players||{}).filter(function(p){ return p && p.name && p.pos; });
-        renderPool();
-      })
-      .catch(function(e){ console.error('Test salary load failed:', e); });
+    workerFetch('salaries').then(function(data){
+      allPlayers = Object.values(data.players||{}).filter(function(p){ return p && p.name && p.pos; });
+      renderPool();
+    }).catch(function(){});
     return;
   }
   // Preseason: try preseason salaries, fall back to flat from pool
@@ -387,30 +390,24 @@ function filterPlayersToSchedule(){
 }
 
 
-var gameOdds    = {}; // {gameId: {overUnder, spread}}
-var teamLocks   = {}; // {teamAbbr: {lockedAt, gameId}} — written by GitHub Actions
+var WORKER       = WORKER;
+var gameOdds    = {};
+var teamLocks   = {};
 var lockPollTimer = null;
 
 function loadSchedule(){
   if(TEST_MODE){
-    fetch('https://fantasy-refresh-news.mtriedel.workers.dev/test?endpoint=schedule')
-      .then(function(r){ return r.json(); })
-      .then(function(data){
-        schedule = data.games || [];
-        buildGamesBar(schedule);
-        // Also fetch mock odds
-        fetch('https://fantasy-refresh-news.mtriedel.workers.dev/test?endpoint=odds')
-          .then(function(r){ return r.json(); })
-          .then(function(od){
-            if(od && od.odds){ Object.assign(gameOdds, od.odds); buildGamesBar(schedule); }
-          }).catch(function(){});
-      })
-      .catch(function(e){ console.error('Test schedule load failed:', e); });
+    workerFetch('schedule').then(function(data){
+      schedule = data.games || [];
+      buildGamesBar(schedule);
+      workerFetch('odds').then(function(od){
+        if(od && od.odds){ Object.assign(gameOdds, od.odds); buildGamesBar(schedule); }
+      }).catch(function(){});
+    }).catch(function(){});
     return;
   }
   var seasonType = PS_MODE ? 'Preseason' : 'Regular';
-  var WORKER = 'https://fantasy-refresh-news.mtriedel.workers.dev';
-  fetch(WORKER + '/schedule?week='+currentWeek+'&season=2026&seasonType='+seasonType)
+    fetch(WORKER + '/schedule?week='+currentWeek+'&season=2026&seasonType='+seasonType)
     .then(function(r){ return r.json(); })
     .then(function(data){
       if(!data || !data.games || !data.games.length) throw new Error('No games');
@@ -684,7 +681,7 @@ function renderRoster(){
       html += '<span class="slot-player-name" style="font-family:var(--fd);font-size:15px;font-weight:700;flex:1;">'+p.name+'</span>';
       html += isPlayerLocked(p)
         ? '<span style="font-size:14px;margin-left:auto;">🔒</span>'
-        : '<button class="slot-remove-btn" onclick="event.stopPropagation();removePlayer(\''+s.id+'\')">✕</button>';
+        : '<button class="slot-remove-btn" onclick="event.stopPropagation();removePlayer(\''+s.id+'\')">Remove</button>';
     } else {
       html += '<span class="slot-empty-lbl">— empty —</span>';
       html += '<span class="slot-tap-hint">tap to pick</span>';
@@ -1009,12 +1006,9 @@ function loadLocks(){
     var params = new URLSearchParams(window.location.search);
     var locksEndpoint = params.get('locks') === 'live' ? 'locks_live' : 'schedule'; // schedule returns no locks
     if(params.get('locks') === 'live'){
-      fetch('https://fantasy-refresh-news.mtriedel.workers.dev/test?endpoint=locks_live')
-        .then(function(r){ return r.json(); })
-        .then(function(d){ teamLocks = d || {}; renderRoster(); renderPicker(); })
-        .catch(function(){});
+      workerFetch('locks_live').then(function(d){ teamLocks = d || {}; renderRoster(); renderPicker(); }).catch(function(){});
     } else {
-      teamLocks = {}; // no locks pre-kickoff
+      teamLocks = {};
     }
     return;
   }
@@ -1055,7 +1049,7 @@ function showToast(msg,isErr){
 }
 
 // ── PLAYER NEWS ────────────────────────────────────────────────
-var NEWS_WORKER = 'https://fantasy-refresh-news.mtriedel.workers.dev';
+
 var espnIdCache = {};
 
 function openNews(playerId, event){
@@ -1069,7 +1063,7 @@ function openNews(playerId, event){
   document.getElementById('news-body').innerHTML = '<div class="news-loading">Loading news…</div>';
   document.getElementById('news-overlay').classList.add('open');
 
-  fetch(NEWS_WORKER+'/news?name='+encodeURIComponent(p.name))
+  fetch(WORKER+'/news?name='+encodeURIComponent(p.name))
     .then(function(r){ return r.json(); })
     .then(function(data){
       if(data.items && data.items.length){

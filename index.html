@@ -2296,60 +2296,15 @@ var COLORS = ['#00E5D4','#FF5FA0','#9B6DFF','#FFE620','#69BE28'];
 var MAX_COMPARE = 5;
 var cmpSelectedWeek = null;
 
-function addToCompare(name, btn){
-  var idx = compareTeams.indexOf(name);
-  if(idx >= 0){
-    compareTeams.splice(idx, 1);
-    btn.textContent = '+';
-    btn.classList.remove('added');
-  } else {
-    if(compareTeams.length >= MAX_COMPARE){
-      showToast('Max 5 teams — remove one first', true);
-      return;
-    }
-    compareTeams.push(name);
-    btn.textContent = '✓';
-    btn.classList.add('added');
-  }
-  if(compareTeams.length >= 2){
-    openCompare();
-  } else if(compareTeams.length === 0){
-    document.getElementById('cmp-modal').classList.add('hidden');
-  } else {
-    renderCompareChips();
-  }
-}
 
-function openCompare(){
-  document.getElementById('cmp-modal').classList.remove('hidden');
-  renderCompare();
-}
 
-function closeCompare(){
-  document.getElementById('cmp-modal').classList.add('hidden');
-}
 
-function clearCompare(){
-  compareTeams = [];
-  document.querySelectorAll('.cmp-btn').forEach(function(b){
-    b.textContent = '+';
-    b.classList.remove('added');
-  });
-  document.getElementById('cmp-modal').classList.add('hidden');
-}
 
-function removeFromCompare(name){
-  compareTeams = compareTeams.filter(function(t){ return t !== name; });
-  document.querySelectorAll('.cmp-btn').forEach(function(b){
-    var oc = b.getAttribute('onclick') || '';
-    if(oc.indexOf(name.replace(/'/g,"\\'")) >= 0){
-      b.textContent = '+'; b.classList.remove('added');
-    }
-  });
-  if(compareTeams.length < 2){
-    document.getElementById('cmp-modal').classList.add('hidden');
-  } else { renderCompare(); }
-}
+
+
+
+
+
 
 function renderCompareChips(){
   var chips = document.getElementById('cmp-chips');
@@ -2618,8 +2573,8 @@ function buildCompareScoreChart(teamStats, weeks){
   if(!allScores.length) return '';
   var minV = Math.min.apply(null,allScores)*0.95, maxV = Math.max.apply(null,allScores)*1.03;
 
-  function xp(i){ return PAD.l+(i/(weeks.length-1||1))*iW; }
-  function yp(v){ return PAD.t+iH-((v-minV)/(maxV-minV||1))*iH; }
+  
+  
 
   var grid = '';
   [minV, (minV+maxV)/2, maxV].forEach(function(v){
@@ -2666,8 +2621,8 @@ function buildCompareRankChart(teamStats, weeks){
   })());
 
   var maxRank = allNames.length || 68;
-  function xp(i){ return PAD.l+(i/(weeks.length-1||1))*iW; }
-  function yp(r){ return PAD.t+iH-((maxRank-r)/(maxRank-1||1))*iH; }
+  
+  
 
   var grid = '';
   [1, Math.round(maxRank/3), Math.round(maxRank*2/3), maxRank].forEach(function(r){
@@ -2917,8 +2872,8 @@ function buildScoreChartInline(weekData){
   var iW=W-PAD.l-PAD.r, iH=H-PAD.t-PAD.b;
   var scores=weekData.map(function(d){return d.score;}), avgs=weekData.map(function(d){return d.avg;});
   var minV=Math.min.apply(null,scores.concat(avgs))*0.92, maxV=Math.max.apply(null,scores.concat(avgs))*1.05;
-  function xp(i){return PAD.l+(i/(weekData.length-1||1))*iW;}
-  function yp(v){return PAD.t+iH-((v-minV)/(maxV-minV))*iH;}
+  
+  
   var sp=weekData.map(function(d,i){return(i?'L':'M')+xp(i).toFixed(1)+' '+yp(d.score).toFixed(1);}).join(' ');
   var ap=weekData.map(function(d,i){return(i?'L':'M')+xp(i).toFixed(1)+' '+yp(d.avg).toFixed(1);}).join(' ');
   var area=sp+' L'+xp(weekData.length-1).toFixed(1)+' '+(PAD.t+iH)+' L'+PAD.l+' '+(PAD.t+iH)+' Z';
