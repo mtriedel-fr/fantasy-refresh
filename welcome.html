@@ -14,6 +14,15 @@
   --bdr:#0D3535;--bdr2:#104040;
   --fd:'Barlow Condensed',sans-serif;--fb:'Barlow',sans-serif;
 }
+[data-theme="light"]{
+  --hdr:#F0F8F8;--bg:#F5FAFA;--bg2:#E8F5F5;--bg3:#DCF0F0;--bg4:#D0EEEE;
+  --or:#007A70;--pk:#CC3070;--pu:#6030CC;
+  --ink:#0A1818;--ink2:#1A6060;--ink3:#3A8888;
+  --bdr:#B0DEDE;--bdr2:#80CCCC;
+}
+[data-theme="light"] .nav{background:rgba(240,248,248,.95);}
+[data-theme="light"] .preview-screen{box-shadow:0 40px 80px rgba(0,0,0,.15),0 0 0 1px rgba(0,122,112,.15);}
+[data-theme="light"] .hero-bg{background:radial-gradient(ellipse 80% 60% at 50% 0%, rgba(0,122,112,.06) 0%, transparent 70%);}
 *{box-sizing:border-box;margin:0;padding:0;}
 body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100vh;overflow-x:hidden;}
 
@@ -166,6 +175,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
 <nav class="nav">
   <div class="nav-logo">Fantasy<span>Refresh</span></div>
   <div>
+    <button id="theme-toggle" onclick="toggleTheme()" style="background:none;border:1px solid var(--bdr2);border-radius:8px;padding:7px 10px;cursor:pointer;font-size:16px;transition:all .15s;margin-right:4px;" title="Toggle light/dark mode">🌙</button>
     <button class="nav-btn nav-signin" onclick="openSignIn()">Sign In</button>
     <button class="nav-btn nav-join" onclick="scrollToSignup()">Join League →</button>
   </div>
@@ -488,6 +498,32 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
 </div>
 
 <script>
+
+// ── THEME ──────────────────────────────────────────────────────
+function toggleTheme(){
+  var html  = document.documentElement;
+  var light = html.getAttribute('data-theme') !== 'light';
+  html.setAttribute('data-theme', light ? 'light' : 'dark');
+  document.getElementById('theme-toggle').textContent = light ? '☀️' : '🌙';
+  try{ localStorage.setItem('fr_theme', light ? 'light' : 'dark'); }catch(e){}
+}
+
+// Apply saved theme immediately
+(function(){
+  try{
+    var t = localStorage.getItem('fr_theme');
+    if(!t){
+      // Auto-detect system preference on first visit
+      t = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    }
+    document.documentElement.setAttribute('data-theme', t);
+    window.addEventListener('DOMContentLoaded', function(){
+      var btn = document.getElementById('theme-toggle');
+      if(btn) btn.textContent = t === 'light' ? '☀️' : '🌙';
+    });
+  }catch(e){}
+})();
+
 var FB_API_KEY  = 'AIzaSyA-2hcf2hzThk7MuEm9DAvRICK95koE9gM';
 var FB_DB_URL   = 'https://fantasy-refresh-default-rtdb.firebaseio.com';
 var FR_JOIN_CODE = 'REFRESH26';
