@@ -314,7 +314,6 @@ function loadWeekAndData(){
       loadSchedule();
       loadSubmitted();
       loadLocks();
-      loadLocks();
     })
     .catch(function(){ currentWeek=1; loadSalaries(); loadSchedule(); });
 }
@@ -390,7 +389,7 @@ function filterPlayersToSchedule(){
 }
 
 
-var WORKER       = WORKER;
+var WORKER      = 'https://fantasy-refresh-news.mtriedel.workers.dev';
 var gameOdds    = {};
 var teamLocks   = {};
 var lockPollTimer = null;
