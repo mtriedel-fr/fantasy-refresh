@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fantasy Refresh — Season-Long DFS Football</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏈</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --hdr:#050808;--bg:#0A0F0F;--bg2:#0D1515;--bg3:#101C1C;--bg4:#142020;
+  --or:#00E5D4;--pk:#FF5FA0;--pu:#9B6DFF;
+  --ink:#F0FAFA;--ink2:#6ABFBF;--ink3:#3A8888;
+  --bdr:#0D3535;--bdr2:#104040;
+  --fd:'Barlow Condensed',sans-serif;--fb:'Barlow',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100vh;overflow-x:hidden;}
+
+/* ── NAV ── */
+.nav{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(5,8,8,.9);backdrop-filter:blur(12px);border-bottom:1px solid var(--bdr);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;}
+.nav-logo{font-family:var(--fd);font-size:24px;font-weight:900;color:var(--or);letter-spacing:.5px;}
+.nav-logo span{color:var(--pk);}
+.nav-btn{font-family:var(--fd);font-size:13px;font-weight:800;padding:8px 20px;border-radius:8px;border:none;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;transition:all .15s;}
+.nav-signin{background:transparent;border:1px solid var(--bdr2);color:var(--ink2);}
+.nav-signin:hover{border-color:var(--or);color:var(--or);}
+.nav-join{background:var(--or);color:#050808;margin-left:8px;}
+.nav-join:hover{opacity:.85;}
+
+/* ── HERO ── */
+.hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:100px 24px 60px;text-align:center;position:relative;overflow:hidden;}
+.hero-bg{position:absolute;inset:0;background:radial-gradient(ellipse 80% 60% at 50% 0%, rgba(0,229,212,.08) 0%, transparent 70%),radial-gradient(ellipse 60% 40% at 80% 80%, rgba(255,95,160,.06) 0%, transparent 60%);pointer-events:none;}
+.hero-tag{font-family:var(--fd);font-size:12px;font-weight:800;color:var(--pk);text-transform:uppercase;letter-spacing:2px;margin-bottom:16px;display:inline-flex;align-items:center;gap:8px;}
+.hero-tag::before,.hero-tag::after{content:'';width:24px;height:1px;background:var(--pk);opacity:.5;}
+.hero-title{font-family:var(--fd);font-size:clamp(48px,10vw,96px);font-weight:900;line-height:.95;color:var(--ink);text-transform:uppercase;letter-spacing:-1px;margin-bottom:20px;}
+.hero-title .or{color:var(--or);}
+.hero-title .pk{color:var(--pk);}
+.hero-sub{font-size:clamp(16px,2.5vw,20px);color:var(--ink2);max-width:540px;line-height:1.6;margin-bottom:40px;}
+.hero-btns{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:60px;}
+.btn-primary{font-family:var(--fd);font-size:16px;font-weight:900;padding:14px 36px;background:linear-gradient(135deg,var(--or),var(--pk));border:none;border-radius:12px;color:#050808;cursor:pointer;text-transform:uppercase;letter-spacing:.8px;transition:opacity .15s;}
+.btn-primary:hover{opacity:.85;}
+.btn-secondary{font-family:var(--fd);font-size:16px;font-weight:800;padding:14px 36px;background:transparent;border:1px solid var(--bdr2);border-radius:12px;color:var(--ink2);cursor:pointer;text-transform:uppercase;letter-spacing:.5px;transition:all .15s;}
+.btn-secondary:hover{border-color:var(--or);color:var(--or);}
+
+/* ── ANIMATED DRAFT PREVIEW ── */
+.preview-wrap{width:100%;max-width:900px;margin:0 auto;position:relative;}
+.preview-label{font-family:var(--fd);font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:12px;}
+.preview-screen{background:var(--bg2);border-radius:16px;border:1px solid var(--bdr2);overflow:hidden;box-shadow:0 40px 80px rgba(0,0,0,.6),0 0 0 1px rgba(0,229,212,.1);position:relative;}
+.preview-bar{background:var(--hdr);border-bottom:3px solid var(--or);padding:10px 16px;display:flex;align-items:center;gap:10px;}
+.preview-logo{font-family:var(--fd);font-size:16px;font-weight:900;color:var(--or);}
+.preview-logo span{color:var(--pk);}
+.preview-week{font-family:var(--fd);font-size:11px;color:var(--ink2);text-transform:uppercase;letter-spacing:.8px;margin-left:auto;}
+.preview-cap{background:var(--bg2);border-bottom:1px solid var(--bdr);padding:10px 16px;display:flex;align-items:center;justify-content:space-between;}
+.preview-cap-label{font-family:var(--fd);font-size:9px;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;}
+.preview-cap-val{font-family:var(--fd);font-size:22px;font-weight:900;color:var(--or);}
+.preview-cap-avg{font-family:var(--fd);font-size:13px;font-weight:700;color:var(--ink2);}
+.preview-games{background:var(--hdr);border-bottom:2px solid var(--pk);padding:8px 12px;display:flex;gap:8px;overflow:hidden;}
+.preview-game{flex-shrink:0;padding:5px 10px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:16px;font-family:var(--fd);font-size:11px;font-weight:700;color:var(--ink2);text-align:center;}
+.preview-game.active{background:rgba(255,95,160,.15);border-color:var(--pk);color:var(--pk);}
+.preview-game-sub{font-size:9px;color:var(--ink3);margin-top:1px;}
+.preview-main{display:grid;grid-template-columns:200px 1fr;height:340px;}
+.preview-roster{border-right:1px solid var(--bdr);padding:10px;}
+.preview-slot{background:var(--bg3);border-radius:8px;margin-bottom:6px;border:1px solid var(--bdr);padding:8px 10px;display:flex;align-items:center;gap:6px;}
+.preview-slot.filled{border-color:var(--bdr2);}
+.preview-slot-pos{font-family:var(--fd);font-size:10px;font-weight:800;min-width:30px;}
+.preview-slot-name{font-family:var(--fd);font-size:12px;font-weight:700;color:var(--ink);flex:1;}
+.preview-slot-sal{font-family:var(--fd);font-size:11px;font-weight:800;color:var(--or);}
+.preview-slot-empty{font-family:var(--fd);font-size:11px;color:var(--ink3);flex:1;}
+.preview-players{padding:0;overflow:hidden;}
+.preview-teams{display:grid;grid-template-columns:1fr 1fr;height:100%;}
+.preview-team-hdr{background:var(--bg2);padding:6px 12px;font-family:var(--fd);font-size:12px;font-weight:800;color:var(--ink2);text-align:center;border-bottom:1px solid var(--bdr);}
+.preview-player-row{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--bdr);}
+.preview-player-pos{font-family:var(--fd);font-size:10px;font-weight:800;width:26px;text-align:center;padding:2px 0;border-radius:4px;}
+.preview-player-name{font-family:var(--fd);font-size:12px;font-weight:700;flex:1;color:var(--ink);}
+.preview-player-sal{font-family:var(--fd);font-size:11px;font-weight:800;color:var(--ink2);}
+.preview-draft-btn{font-family:var(--fd);font-size:10px;font-weight:800;padding:3px 8px;border-radius:5px;border:1px solid rgba(0,229,212,.3);background:rgba(0,229,212,.1);color:var(--or);cursor:pointer;}
+/* Animations */
+@keyframes highlight{0%,100%{background:transparent}50%{background:rgba(0,229,212,.12)}}
+@keyframes fadeSlot{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.anim-highlight{animation:highlight 1.5s ease-in-out;}
+.anim-fade{animation:fadeSlot .4s ease-out;}
+.anim-pulse{animation:pulse 2s ease-in-out infinite;}
+.pos-QB{background:rgba(0,229,212,.15);color:var(--or);}
+.pos-RB{background:rgba(255,95,160,.15);color:var(--pk);}
+.pos-WR{background:rgba(155,109,255,.15);color:var(--pu);}
+.pos-TE{background:rgba(255,154,58,.15);color:#FF9A3A;}
+.pos-DEF{background:rgba(105,190,40,.15);color:#69BE28;}
+.live-dot{width:6px;height:6px;border-radius:50%;background:#FF9A3A;display:inline-block;margin-right:4px;animation:pulse 1s ease-in-out infinite;}
+
+/* ── HOW IT WORKS ── */
+.section{padding:80px 24px;max-width:1100px;margin:0 auto;}
+.section-title{font-family:var(--fd);font-size:clamp(32px,5vw,52px);font-weight:900;color:var(--ink);text-transform:uppercase;text-align:center;margin-bottom:8px;}
+.section-sub{font-size:16px;color:var(--ink3);text-align:center;margin-bottom:48px;line-height:1.6;}
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:20px;}
+.step{background:var(--bg2);border-radius:14px;border:1px solid var(--bdr);padding:28px 24px;position:relative;overflow:hidden;}
+.step::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;}
+.step:nth-child(1)::before{background:var(--or);}
+.step:nth-child(2)::before{background:var(--pk);}
+.step:nth-child(3)::before{background:var(--pu);}
+.step:nth-child(4)::before{background:#FF9A3A;}
+.step-n{font-family:var(--fd);font-size:48px;font-weight:900;color:var(--bdr2);margin-bottom:12px;line-height:1;}
+.step-title{font-family:var(--fd);font-size:18px;font-weight:800;color:var(--ink);text-transform:uppercase;margin-bottom:8px;}
+.step-desc{font-size:14px;color:var(--ink3);line-height:1.7;}
+
+/* ── FEATURES ── */
+.features{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-top:48px;}
+.feature{background:var(--bg2);border-radius:12px;border:1px solid var(--bdr);padding:24px;display:flex;gap:16px;align-items:flex-start;}
+.feature-icon{font-size:28px;flex-shrink:0;}
+.feature-title{font-family:var(--fd);font-size:15px;font-weight:800;color:var(--ink);text-transform:uppercase;margin-bottom:4px;}
+.feature-desc{font-size:13px;color:var(--ink3);line-height:1.6;}
+
+/* ── SCORING PREVIEW ── */
+.scoring-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-top:24px;}
+.scoring-card{background:var(--bg3);border-radius:10px;border:1px solid var(--bdr);padding:16px;text-align:center;}
+.scoring-pts{font-family:var(--fd);font-size:28px;font-weight:900;color:var(--or);line-height:1;}
+.scoring-label{font-family:var(--fd);font-size:11px;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;margin-top:4px;}
+
+/* ── SIGN UP ── */
+.signup-wrap{background:linear-gradient(135deg,var(--bg2),var(--bg3));border-radius:20px;border:1px solid var(--bdr2);border-top:3px solid var(--or);border-bottom:3px solid var(--pk);padding:48px 40px;max-width:520px;margin:0 auto;text-align:center;}
+.signup-title{font-family:var(--fd);font-size:32px;font-weight:900;color:var(--or);text-transform:uppercase;margin-bottom:6px;}
+.signup-sub{font-size:14px;color:var(--ink3);margin-bottom:28px;line-height:1.6;}
+.signup-form{display:flex;flex-direction:column;gap:12px;text-align:left;}
+.form-group{display:flex;flex-direction:column;gap:6px;}
+.form-label{font-family:var(--fd);font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;}
+.form-input{padding:11px 14px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:10px;color:var(--or);font-family:var(--fb);font-size:14px;outline:none;transition:border-color .15s;}
+.form-input:focus{border-color:var(--or);}
+.form-input::placeholder{color:var(--ink3);}
+.form-error{font-size:12px;color:var(--pk);margin-top:2px;display:none;}
+.form-error.show{display:block;}
+.signup-btn{width:100%;padding:14px;background:linear-gradient(135deg,var(--or),var(--pk));border:none;border-radius:12px;color:#050808;font-family:var(--fd);font-size:16px;font-weight:900;text-transform:uppercase;letter-spacing:.8px;cursor:pointer;transition:opacity .15s;margin-top:4px;}
+.signup-btn:hover{opacity:.9;}
+.signup-btn:disabled{opacity:.4;cursor:not-allowed;}
+.signup-status{font-family:var(--fd);font-size:12px;text-align:center;margin-top:8px;min-height:16px;text-transform:uppercase;letter-spacing:.5px;}
+.signup-status.ok{color:var(--or);}
+.signup-status.err{color:var(--pk);}
+.signin-link{margin-top:16px;font-size:13px;color:var(--ink3);}
+.signin-link a{color:var(--or);text-decoration:none;font-weight:600;}
+.signin-link a:hover{text-decoration:underline;}
+
+/* ── FOOTER ── */
+.footer{border-top:1px solid var(--bdr);padding:32px 24px;text-align:center;}
+.footer-logo{font-family:var(--fd);font-size:20px;font-weight:900;color:var(--or);margin-bottom:8px;}
+.footer-logo span{color:var(--pk);}
+.footer-text{font-size:13px;color:var(--ink3);}
+
+/* ── SIGNIN MODAL ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;display:none;align-items:center;justify-content:center;padding:20px;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--bg2);border-radius:16px;border-top:3px solid var(--or);width:100%;max-width:420px;padding:32px;}
+.modal-title{font-family:var(--fd);font-size:24px;font-weight:900;color:var(--or);text-transform:uppercase;margin-bottom:4px;}
+.modal-sub{font-size:13px;color:var(--ink3);margin-bottom:24px;}
+.modal-close{float:right;background:none;border:none;color:var(--ink3);font-size:20px;cursor:pointer;margin-top:-4px;}
+.modal-close:hover{color:var(--pk);}
+
+@media(max-width:600px){
+  .preview-main{grid-template-columns:1fr;height:auto;}
+  .preview-roster{border-right:none;border-bottom:1px solid var(--bdr);max-height:240px;overflow:hidden;}
+  .signup-wrap{padding:32px 24px;}
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav">
+  <div class="nav-logo">Fantasy<span>Refresh</span></div>
+  <div>
+    <button class="nav-btn nav-signin" onclick="openSignIn()">Sign In</button>
+    <button class="nav-btn nav-join" onclick="scrollToSignup()">Join League →</button>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-bg"></div>
+  <div class="hero-tag">2026 NFL Season</div>
+  <h1 class="hero-title">
+    Draft<br>
+    <span class="or">Smarter.</span><br>
+    Win <span class="pk">Bigger.</span>
+  </h1>
+  <p class="hero-sub">Season-long DFS fantasy football. $60,000 salary cap. New lineup every week. The freshest way to play.</p>
+  <div class="hero-btns">
+    <button class="btn-primary" onclick="scrollToSignup()">Join the League →</button>
+    <button class="btn-secondary" onclick="scrollToHow()">How It Works</button>
+  </div>
+
+  <!-- ANIMATED DRAFT PREVIEW -->
+  <div class="preview-wrap">
+    <div class="preview-label">Live Draft Interface Preview</div>
+    <div class="preview-screen">
+      <!-- Header -->
+      <div class="preview-bar">
+        <div class="preview-logo">Fantasy<span>Refresh</span></div>
+        <div style="font-family:var(--fd);font-size:11px;font-weight:700;color:var(--pk);background:rgba(255,95,160,.1);border:1px solid rgba(255,95,160,.3);padding:2px 10px;border-radius:10px;margin-left:8px;">WEEK 3 DRAFT</div>
+        <div class="preview-week" style="display:flex;align-items:center;gap:6px;"><span class="live-dot"></span>Live</div>
+      </div>
+      <!-- Cap bar -->
+      <div class="preview-cap">
+        <div><div class="preview-cap-label">Cap Remaining</div><div class="preview-cap-val" id="prev-cap">$38,500</div></div>
+        <div style="text-align:center;"><div class="preview-cap-label">Avg / Slot</div><div class="preview-cap-avg" id="prev-avg">$5,500</div></div>
+        <div style="text-align:right;"><div class="preview-cap-label">Roster</div><div class="preview-cap-avg"><span id="prev-slots">2</span>/9</div></div>
+      </div>
+      <!-- Games bar -->
+      <div class="preview-games">
+        <div class="preview-game all">All Games</div>
+        <div class="preview-game active">
+          KC @ BUF
+          <div class="preview-game-sub">SNF · 8:20 ET</div>
+        </div>
+        <div class="preview-game">
+          LAR @ SF
+          <div class="preview-game-sub">Sun · 4:25 ET</div>
+        </div>
+        <div class="preview-game">
+          DEN @ MIA
+          <div class="preview-game-sub">Sun · 1:00 ET</div>
+        </div>
+        <div class="preview-game">
+          DAL @ NYG
+          <div class="preview-game-sub">MNF · 8:15 ET</div>
+        </div>
+      </div>
+      <!-- Main -->
+      <div class="preview-main">
+        <!-- Roster -->
+        <div class="preview-roster">
+          <div id="prev-slot-qb1" class="preview-slot filled anim-fade">
+            <span class="preview-slot-pos pos-QB">QB</span>
+            <span class="preview-slot-name">P. Mahomes</span>
+            <span class="preview-slot-sal">$11,200</span>
+          </div>
+          <div id="prev-slot-rb1" class="preview-slot filled">
+            <span class="preview-slot-pos pos-RB">RB</span>
+            <span class="preview-slot-name">D. Henry</span>
+            <span class="preview-slot-sal">$10,300</span>
+          </div>
+          <div id="prev-slot-rb2" class="preview-slot">
+            <span class="preview-slot-pos pos-RB" style="color:var(--pk);">RB</span>
+            <span class="preview-slot-empty">— empty —</span>
+          </div>
+          <div id="prev-slot-wr1" class="preview-slot">
+            <span class="preview-slot-pos pos-WR" style="color:var(--pu);">WR</span>
+            <span class="preview-slot-empty">— empty —</span>
+          </div>
+          <div class="preview-slot">
+            <span class="preview-slot-pos pos-WR" style="color:var(--pu);">WR</span>
+            <span class="preview-slot-empty">— empty —</span>
+          </div>
+          <div class="preview-slot">
+            <span class="preview-slot-pos pos-WR" style="color:var(--pu);">WR</span>
+            <span class="preview-slot-empty">— empty —</span>
+          </div>
+          <div class="preview-slot">
+            <span class="preview-slot-pos pos-TE" style="color:#FF9A3A;">TE</span>
+            <span class="preview-slot-empty">— empty —</span>
+          </div>
+          <div class="preview-slot">
+            <span class="preview-slot-pos pos-WR" style="color:var(--pu);">FLEX</span>
+            <span class="preview-slot-empty">— empty —</span>
+          </div>
+          <div class="preview-slot">
+            <span class="preview-slot-pos pos-DEF" style="color:#69BE28;">DEF</span>
+            <span class="preview-slot-empty">— empty —</span>
+          </div>
+        </div>
+        <!-- Side-by-side game preview -->
+        <div class="preview-players">
+          <div class="preview-teams">
+            <!-- KC -->
+            <div style="border-right:1px solid var(--bdr);overflow:hidden;">
+              <div class="preview-team-hdr">KC</div>
+              <div class="preview-player-row" id="prev-p1">
+                <span class="preview-player-pos pos-QB">QB</span>
+                <span class="preview-player-name">P. Mahomes</span>
+                <span style="font-family:var(--fd);font-size:10px;color:var(--or);margin-right:4px;">✓</span>
+              </div>
+              <div class="preview-player-row" id="prev-p2">
+                <span class="preview-player-pos pos-RB">RB</span>
+                <span class="preview-player-name">I. Pacheco</span>
+                <span class="preview-player-sal">$7,800</span>
+                <button class="preview-draft-btn">+ Draft</button>
+              </div>
+              <div class="preview-player-row anim-highlight" id="prev-p3">
+                <span class="preview-player-pos pos-WR">WR</span>
+                <span class="preview-player-name">T. Hill</span>
+                <span class="preview-player-sal">$9,200</span>
+                <button class="preview-draft-btn">+ Draft</button>
+              </div>
+              <div class="preview-player-row">
+                <span class="preview-player-pos pos-WR">WR</span>
+                <span class="preview-player-name">J. Watson</span>
+                <span class="preview-player-sal">$5,400</span>
+                <button class="preview-draft-btn">+ Draft</button>
+              </div>
+              <div class="preview-player-row">
+                <span class="preview-player-pos pos-TE">TE</span>
+                <span class="preview-player-name">T. Kelce</span>
+                <span class="preview-player-sal">$8,600</span>
+                <button class="preview-draft-btn">+ Draft</button>
+              </div>
+            </div>
+            <!-- BUF -->
+            <div style="overflow:hidden;">
+              <div class="preview-team-hdr">BUF</div>
+              <div class="preview-player-row">
+                <span class="preview-player-pos pos-QB">QB</span>
+                <span class="preview-player-name">J. Allen</span>
+                <span class="preview-player-sal">$10,800</span>
+                <button class="preview-draft-btn">+ Draft</button>
+              </div>
+              <div class="preview-player-row">
+                <span class="preview-player-pos pos-RB">RB</span>
+                <span class="preview-player-name">J. Cook</span>
+                <span class="preview-player-sal">$8,100</span>
+                <button class="preview-draft-btn">+ Draft</button>
+              </div>
+              <div class="preview-player-row">
+                <span class="preview-player-pos pos-WR">WR</span>
+                <span class="preview-player-name">S. Diggs</span>
+                <span class="preview-player-sal">$7,900</span>
+                <button class="preview-draft-btn">+ Draft</button>
+              </div>
+              <div class="preview-player-row">
+                <span class="preview-player-pos pos-WR">WR</span>
+                <span class="preview-player-name">G. Davis</span>
+                <span class="preview-player-sal">$5,100</span>
+                <button class="preview-draft-btn">+ Draft</button>
+              </div>
+              <div class="preview-player-row">
+                <span class="preview-player-pos pos-DEF">DEF</span>
+                <span class="preview-player-name">BUF</span>
+                <span class="preview-player-sal">$4,800</span>
+                <button class="preview-draft-btn">+ Draft</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="section" id="how-it-works">
+  <h2 class="section-title">How It Works</h2>
+  <p class="section-sub">Simple concept. Serious strategy.</p>
+  <div class="steps">
+    <div class="step">
+      <div class="step-n">01</div>
+      <div class="step-title">Get Your Cap</div>
+      <div class="step-desc">Every week you get $60,000 in salary cap. Player salaries are set based on projected fantasy points — the better the player, the higher the cost.</div>
+    </div>
+    <div class="step">
+      <div class="step-n">02</div>
+      <div class="step-title">Build Your Lineup</div>
+      <div class="step-desc">Draft 9 players: 1 QB, 2 RBs, 3 WRs, 1 TE, 1 FLEX, 1 DEF. Mix stars and value plays to stay under cap. Submit before kickoff.</div>
+    </div>
+    <div class="step">
+      <div class="step-n">03</div>
+      <div class="step-title">Players Lock</div>
+      <div class="step-desc">Players lock individually when their game kicks off. Pick late-game players strategically — you can still swap in unlocked players as the day unfolds.</div>
+    </div>
+    <div class="step">
+      <div class="step-n">04</div>
+      <div class="step-title">Scores Update Live</div>
+      <div class="step-desc">Fantasy points calculate in real time using DraftKings scoring. Standings update automatically. Final scores lock Tuesday morning.</div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section style="padding:0 24px 80px;max-width:1100px;margin:0 auto;">
+  <div class="features">
+    <div class="feature">
+      <div class="feature-icon">🏈</div>
+      <div>
+        <div class="feature-title">New Lineup Every Week</div>
+        <div class="feature-desc">No season-long commitments to players. Bad week? Fresh start next Sunday.</div>
+      </div>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">💰</div>
+      <div>
+        <div class="feature-title">Salary Cap Strategy</div>
+        <div class="feature-desc">$60,000 cap forces real decisions. You can't roster everyone — build smarter.</div>
+      </div>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">🔒</div>
+      <div>
+        <div class="feature-title">Player-Level Locks</div>
+        <div class="feature-desc">Players lock at kickoff, not all at once. Sunday 1pm locks are different from MNF locks.</div>
+      </div>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">📡</div>
+      <div>
+        <div class="feature-title">Live Scoring</div>
+        <div class="feature-desc">Scores update in real time during games. Watch the leaderboard shift play by play.</div>
+      </div>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">📊</div>
+      <div>
+        <div class="feature-title">Season-Long Standings</div>
+        <div class="feature-desc">Cumulative scores tracked all season. Weekly high scores, streaks, and a playoff bracket.</div>
+      </div>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">🏆</div>
+      <div>
+        <div class="feature-title">Playoff Bracket</div>
+        <div class="feature-desc">Top performers make the playoffs. Season culminates in a champion crowned Week 18.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SCORING -->
+<section style="padding:0 24px 80px;max-width:900px;margin:0 auto;">
+  <h2 class="section-title" style="font-size:clamp(24px,4vw,40px);">DraftKings Scoring</h2>
+  <p class="section-sub">Standard DK format — no surprises.</p>
+  <div class="scoring-grid">
+    <div class="scoring-card"><div class="scoring-pts">0.04</div><div class="scoring-label">pts per passing yard</div></div>
+    <div class="scoring-card"><div class="scoring-pts">4</div><div class="scoring-label">pts per passing TD</div></div>
+    <div class="scoring-card"><div class="scoring-pts">0.1</div><div class="scoring-label">pts per rushing/rec yard</div></div>
+    <div class="scoring-card"><div class="scoring-pts">6</div><div class="scoring-label">pts per rush/rec TD</div></div>
+    <div class="scoring-card"><div class="scoring-pts">1</div><div class="scoring-label">pt per reception (PPR)</div></div>
+    <div class="scoring-card"><div class="scoring-pts">-1</div><div class="scoring-label">pt per INT/fumble lost</div></div>
+  </div>
+</section>
+
+<!-- SIGN UP -->
+<section style="padding:0 24px 80px;" id="signup">
+  <div class="signup-wrap">
+    <div class="signup-title">Join the League</div>
+    <p class="signup-sub">You need a join code from your commissioner to sign up. Once you're in, you're in for the season.</p>
+
+    <div class="signup-form" id="signup-form">
+      <div class="form-group">
+        <label class="form-label">First Name</label>
+        <input type="text" class="form-input" id="su-name" placeholder="Your first name" autocomplete="given-name">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email Address</label>
+        <input type="email" class="form-input" id="su-email" placeholder="you@example.com" autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input type="password" class="form-input" id="su-password" placeholder="At least 6 characters" autocomplete="new-password">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Join Code</label>
+        <input type="text" class="form-input" id="su-code" placeholder="Enter your league join code" autocomplete="off" style="text-transform:uppercase;">
+        <div class="form-error" id="su-code-err">Invalid join code. Contact your commissioner.</div>
+      </div>
+      <button class="signup-btn" id="su-btn" onclick="handleSignup()">Create Account →</button>
+      <div class="signup-status" id="su-status"></div>
+    </div>
+
+    <!-- Success state -->
+    <div id="signup-success" style="display:none;text-align:center;padding:20px 0;">
+      <div style="font-size:48px;margin-bottom:16px;">🎉</div>
+      <div style="font-family:var(--fd);font-size:24px;font-weight:900;color:var(--or);text-transform:uppercase;margin-bottom:8px;">You're In!</div>
+      <div style="font-size:14px;color:var(--ink3);margin-bottom:24px;">Welcome to Fantasy Refresh. Head to the app to set your team name and get ready to draft.</div>
+      <a href="index.html" style="display:inline-block;padding:14px 36px;background:linear-gradient(135deg,var(--or),var(--pk));border-radius:12px;color:#050808;font-family:var(--fd);font-size:15px;font-weight:900;text-transform:uppercase;text-decoration:none;">Go to the App →</a>
+    </div>
+
+    <div class="signin-link">Already have an account? <a href="#" onclick="openSignIn();return false;">Sign in here</a></div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <div class="footer-logo">Fantasy<span>Refresh</span></div>
+  <div class="footer-text">Season-long DFS football · 2026 NFL Season · <a href="index.html" style="color:var(--ink3);">Enter App</a></div>
+</footer>
+
+<!-- SIGN IN MODAL -->
+<div class="modal-overlay" id="signin-modal" onclick="if(event.target===this)closeSignIn()">
+  <div class="modal">
+    <button class="modal-close" onclick="closeSignIn()">✕</button>
+    <div class="modal-title">Sign In</div>
+    <div class="modal-sub">Welcome back. Enter your credentials to continue.</div>
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input type="email" class="form-input" id="si-email" placeholder="you@example.com" autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input type="password" class="form-input" id="si-password" placeholder="Your password" autocomplete="current-password" onkeydown="if(event.key==='Enter')handleSignIn()">
+      </div>
+      <button class="signup-btn" id="si-btn" onclick="handleSignIn()">Sign In →</button>
+      <div class="signup-status" id="si-status"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+var FB_API_KEY  = 'AIzaSyA-2hcf2hzThk7MuEm9DAvRICK95koE9gM';
+var FB_DB_URL   = 'https://fantasy-refresh-default-rtdb.firebaseio.com';
+var FR_JOIN_CODE = 'REFRESH26';
+var FR_SEASON   = '2026';
+
+// ── CHECK IF ALREADY SIGNED IN ────────────────────────────────
+window.addEventListener('DOMContentLoaded', function(){
+  try{
+    var u = localStorage.getItem('fr_user_'+FR_SEASON);
+    if(u){ window.location.href = 'index.html'; return; }
+  }catch(e){}
+  startDraftAnimation();
+});
+
+// ── NAVIGATION ────────────────────────────────────────────────
+function scrollToSignup(){
+  document.getElementById('signup').scrollIntoView({behavior:'smooth'});
+}
+function scrollToHow(){
+  document.getElementById('how-it-works').scrollIntoView({behavior:'smooth'});
+}
+function openSignIn(){
+  document.getElementById('signin-modal').classList.add('open');
+  setTimeout(function(){ document.getElementById('si-email').focus(); }, 100);
+}
+function closeSignIn(){
+  document.getElementById('signin-modal').classList.remove('open');
+}
+
+// ── SIGN UP ───────────────────────────────────────────────────
+function handleSignup(){
+  var name     = document.getElementById('su-name').value.trim();
+  var email    = document.getElementById('su-email').value.trim();
+  var password = document.getElementById('su-password').value;
+  var code     = document.getElementById('su-code').value.trim().toUpperCase();
+  var btn      = document.getElementById('su-btn');
+  var status   = document.getElementById('su-status');
+  var codeErr  = document.getElementById('su-code-err');
+
+  // Validate
+  codeErr.classList.remove('show');
+  if(!name){ status.textContent='Enter your first name'; status.className='signup-status err'; return; }
+  if(!email || !email.includes('@')){ status.textContent='Enter a valid email'; status.className='signup-status err'; return; }
+  if(password.length < 6){ status.textContent='Password must be at least 6 characters'; status.className='signup-status err'; return; }
+  if(code !== FR_JOIN_CODE){ codeErr.classList.add('show'); return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Creating account…';
+  status.textContent = '';
+  status.className = 'signup-status';
+
+  // Create Firebase account
+  fetch('https://identitytoolkit.googleapis.com/v1/accounts:signUp?key='+FB_API_KEY, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ email, password, returnSecureToken:true })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(data){
+    if(data.error) throw new Error(data.error.message);
+    var uid = data.localId;
+    var token = data.idToken;
+    // Save user profile to Firebase
+    return fetch(FB_DB_URL+'/users'+FR_SEASON+'/'+uid+'.json?auth='+token, {
+      method:'PUT', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ email, name, uid, created:Date.now() })
+    }).then(function(){
+      // Store session
+      var user = { uid, email, name, token, created:Date.now() };
+      localStorage.setItem('fr_user_'+FR_SEASON, JSON.stringify(user));
+      // Show success
+      document.getElementById('signup-form').style.display = 'none';
+      document.getElementById('signup-success').style.display = 'block';
+      document.querySelector('.signin-link').style.display = 'none';
+    });
+  })
+  .catch(function(e){
+    var msg = e.message || 'Sign up failed';
+    if(msg.includes('EMAIL_EXISTS')) msg = 'That email is already registered. Sign in instead.';
+    if(msg.includes('WEAK_PASSWORD')) msg = 'Password must be at least 6 characters.';
+    status.textContent = msg;
+    status.className = 'signup-status err';
+    btn.disabled = false;
+    btn.textContent = 'Create Account →';
+  });
+}
+
+// ── SIGN IN ───────────────────────────────────────────────────
+function handleSignIn(){
+  var email    = document.getElementById('si-email').value.trim();
+  var password = document.getElementById('si-password').value;
+  var btn      = document.getElementById('si-btn');
+  var status   = document.getElementById('si-status');
+
+  if(!email || !password){ status.textContent='Enter email and password'; status.className='signup-status err'; return; }
+  btn.disabled = true; btn.textContent = 'Signing in…';
+  status.textContent = ''; status.className = 'signup-status';
+
+  fetch('https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key='+FB_API_KEY, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ email, password, returnSecureToken:true })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(data){
+    if(data.error) throw new Error(data.error.message);
+    // Load user profile
+    return fetch(FB_DB_URL+'/users'+FR_SEASON+'/'+data.localId+'.json')
+      .then(function(r){ return r.json(); })
+      .then(function(profile){
+        var user = {
+          uid:      data.localId,
+          email:    data.email,
+          name:     (profile && profile.name) || '',
+          team2026: (profile && profile.team2026) || '',
+          token:    data.idToken
+        };
+        localStorage.setItem('fr_user_'+FR_SEASON, JSON.stringify(user));
+        window.location.href = 'index.html';
+      });
+  })
+  .catch(function(e){
+    var msg = e.message || 'Sign in failed';
+    if(msg.includes('INVALID_LOGIN_CREDENTIALS') || msg.includes('INVALID_PASSWORD')) msg = 'Wrong email or password.';
+    if(msg.includes('TOO_MANY_ATTEMPTS')) msg = 'Too many attempts. Try again later.';
+    status.textContent = msg;
+    status.className = 'signup-status err';
+    btn.disabled = false; btn.textContent = 'Sign In →';
+  });
+}
+
+// ── DRAFT ANIMATION ───────────────────────────────────────────
+function startDraftAnimation(){
+  var steps = [
+    // Step 1: RB2 gets drafted
+    function(){
+      var slot = document.getElementById('prev-slot-rb2');
+      slot.classList.add('filled','anim-fade');
+      slot.innerHTML = '<span class="preview-slot-pos pos-RB">RB</span>'
+        + '<span class="preview-slot-name">I. Pacheco</span>'
+        + '<span class="preview-slot-sal">$7,800</span>';
+      document.getElementById('prev-cap').textContent = '$30,700';
+      document.getElementById('prev-avg').textContent = '$4,386';
+      document.getElementById('prev-slots').textContent = '3';
+    },
+    // Step 2: WR1 gets drafted
+    function(){
+      var slot = document.getElementById('prev-slot-wr1');
+      slot.classList.add('filled','anim-fade');
+      slot.innerHTML = '<span class="preview-slot-pos pos-WR">WR</span>'
+        + '<span class="preview-slot-name">T. Hill</span>'
+        + '<span class="preview-slot-sal">$9,200</span>';
+      document.getElementById('prev-cap').textContent = '$21,500';
+      document.getElementById('prev-avg').textContent = '$3,583';
+      document.getElementById('prev-slots').textContent = '4';
+      // Highlight Hill row
+      document.getElementById('prev-p3').classList.add('anim-highlight');
+    },
+    // Step 3: reset animation
+    function(){
+      // Reset to initial state after a pause
+      setTimeout(function(){
+        ['prev-slot-rb2','prev-slot-wr1'].forEach(function(id){
+          var slot = document.getElementById(id);
+          slot.classList.remove('filled','anim-fade');
+          slot.innerHTML = id === 'prev-slot-rb2'
+            ? '<span class="preview-slot-pos pos-RB" style="color:var(--pk);">RB</span><span class="preview-slot-empty">— empty —</span>'
+            : '<span class="preview-slot-pos pos-WR" style="color:var(--pu);">WR</span><span class="preview-slot-empty">— empty —</span>';
+        });
+        document.getElementById('prev-cap').textContent = '$38,500';
+        document.getElementById('prev-avg').textContent = '$5,500';
+        document.getElementById('prev-slots').textContent = '2';
+        document.getElementById('prev-p3').classList.remove('anim-highlight');
+      }, 2000);
+    }
+  ];
+
+  var i = 0;
+  function runStep(){
+    steps[i % steps.length]();
+    i++;
+    setTimeout(runStep, i % steps.length === 0 ? 5000 : 2500);
+  }
+  setTimeout(runStep, 2000);
+}
+</script>
+</body>
+</html>

@@ -3398,15 +3398,10 @@ function renderNumbers(curEntries){
 
 // ── FIRST RUN PROMPT ──────────────────────────────────────────
 function checkFirstRun(){
-  return; // Disabled — auth system handles new user flow
+  // Redirect to welcome page if not signed in
   try{
-    var seen = localStorage.getItem('fr_seen');
-    var savedTeam = localStorage.getItem('fr_myteam');
-    if(!seen && !savedTeam){
-      document.getElementById('firstrun-modal').classList.remove('hidden');
-      setTimeout(function(){ document.getElementById('firstrun-input').focus(); }, 300);
-    }
-    localStorage.setItem('fr_seen','1');
+    var u = localStorage.getItem('fr_user_'+FR_SEASON);
+    if(!u){ window.location.href = 'welcome.html'; return; }
   }catch(e){}
 }
 
