@@ -3403,10 +3403,26 @@ function renderNumbers(curEntries){
 
 // ── FIRST RUN PROMPT ──────────────────────────────────────────
 function checkFirstRun(){
-  // Redirect to welcome page if not signed in
   try{
     var u = localStorage.getItem('fr_user_'+FR_SEASON);
     if(!u){ window.location.href = 'welcome.html'; return; }
+    // Check if league context is set
+    var ctx = localStorage.getItem('fr_league_ctx');
+    if(!ctx){
+      // Try to load from user's leagues
+      var user = JSON.parse(u);
+      fetch(FR.FB_DB_URL + '/users/'+user.uid+'.json')
+        .then(function(r){ return r.json(); })
+        .then(function(profile){
+          if(profile && profile.leagues && Object.keys(profile.leagues).length > 0){
+            // Auto-select first league
+            var firstId = Object.keys(profile.leagues)[0];
+            FR.switchLeague(firstId).catch(function(){});
+          } else {
+            window.location.href = 'league-setup.html';
+          }
+        }).catch(function(){});
+    }
   }catch(e){}
 }
 
