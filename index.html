@@ -796,9 +796,23 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
 </div>
 
 <!-- YOUR TEAM — directly below week bar -->
-<div class="my-team-bar">
+<div class="my-team-bar" id="my-team-bar">
   <span class="my-team-lbl">Your team:</span>
-  <input type="text" id="my-team-input" placeholder="Type your team name to highlight your row..." oninput="setMyTeam(this.value)">
+  <!-- Display mode -->
+  <div id="my-team-display" style="display:flex;align-items:center;gap:8px;flex:1;">
+    <span id="my-team-name-shown" style="font-family:var(--fd);font-size:15px;font-weight:700;color:var(--or);">—</span>
+    <button onclick="editTeamName()" style="background:none;border:1px solid var(--bdr2);border-radius:6px;padding:2px 10px;font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink3);cursor:pointer;text-transform:uppercase;letter-spacing:.5px;transition:all .15s;" onmouseover="this.style.borderColor='var(--or)';this.style.color='var(--or)'" onmouseout="this.style.borderColor='var(--bdr2)';this.style.color='var(--ink3)'">Edit</button>
+  </div>
+  <!-- Edit mode (hidden by default) -->
+  <div id="my-team-edit" style="display:none;flex:1;align-items:center;gap:6px;">
+    <input type="text" id="my-team-input" placeholder="Your team name..." maxlength="30"
+      style="flex:1;max-width:240px;"
+      oninput="setMyTeam(this.value)"
+      onkeydown="if(event.key==='Enter')confirmTeamName();if(event.key==='Escape')cancelTeamEdit()">
+    <button onclick="confirmTeamName()" style="background:var(--or);border:none;border-radius:6px;padding:4px 12px;font-family:var(--fd);font-size:11px;font-weight:800;color:#050808;cursor:pointer;text-transform:uppercase;">Save</button>
+    <button onclick="cancelTeamEdit()" style="background:none;border:1px solid var(--bdr2);border-radius:6px;padding:4px 10px;font-family:var(--fd);font-size:11px;color:var(--ink3);cursor:pointer;text-transform:uppercase;">✕</button>
+  </div>
+  <span id="my-team-league-ctx" style="font-family:var(--fd);font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-left:auto;"></span>
 </div>
 
 <!-- CONTEXT-AWARE STATS BAR -->
@@ -3988,8 +4002,17 @@ function loadTeamName(){
 function applyTeamName(name){
   myTeam = name;
   try{ localStorage.setItem('fr_myteam', name); }catch(e){}
+  // Update display bar
+  var shown = document.getElementById('my-team-name-shown');
+  if(shown) shown.textContent = name || '— Not set —';
   var inp = document.getElementById('my-team-input');
-  if(inp && !inp.value) inp.value = name;
+  if(inp) inp.value = name || '';
+  // Show league context label
+  var ctxLabel = document.getElementById('my-team-league-ctx');
+  if(ctxLabel){
+    var ctx = FR.ctx();
+    ctxLabel.textContent = ctx.leagueName ? ctx.leagueName : '';
+  }
   // Update auth badge if showing team name
   var badge = document.getElementById('fr-sign-btn');
   if(badge && badge.textContent.includes('👤')){
@@ -3998,6 +4021,10 @@ function applyTeamName(name){
 }
 
 function promptTeamName(leagueName){
+  // Try inline edit first (less disruptive)
+  var shown = document.getElementById('my-team-name-shown');
+  if(shown) shown.textContent = '— tap Edit to set your name —';
+  // Also show modal for new users
   var modal = document.getElementById('team-name-modal');
   if(!modal) return;
   var label = document.getElementById('team-name-league-label');
@@ -4007,6 +4034,33 @@ function promptTeamName(leagueName){
     var inp = document.getElementById('team-name-inp');
     if(inp) inp.focus();
   }, 100);
+}
+
+
+function editTeamName(){
+  document.getElementById('my-team-display').style.display = 'none';
+  var editDiv = document.getElementById('my-team-edit');
+  editDiv.style.display = 'flex';
+  var inp = document.getElementById('my-team-input');
+  if(inp){ inp.value = myTeam || ''; inp.focus(); inp.select(); }
+}
+
+function cancelTeamEdit(){
+  document.getElementById('my-team-display').style.display = 'flex';
+  document.getElementById('my-team-edit').style.display = 'none';
+  var inp = document.getElementById('my-team-input');
+  if(inp) inp.value = myTeam || '';
+}
+
+function confirmTeamName(){
+  var inp = document.getElementById('my-team-input');
+  var name = inp ? inp.value.trim() : '';
+  if(!name) return;
+  setMyTeam(name);
+  applyTeamName(name);
+  document.getElementById('my-team-display').style.display = 'flex';
+  document.getElementById('my-team-edit').style.display = 'none';
+  showToast('Team name updated ✓');
 }
 
 function saveTeamName(){
