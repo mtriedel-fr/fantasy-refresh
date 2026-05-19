@@ -108,7 +108,7 @@ jobs:
               : Object.values(gamesData.body || {});
 
             const existingLocks = await firebaseGet(
-              `/locks${SEASON}/week${week}.json`
+              `/leagues/fr_refresh26/locks/${SEASON}/week${week}.json`
             ).catch(() => ({}));
 
             const locks = existingLocks || {};
@@ -142,13 +142,13 @@ jobs:
             }
 
             if (newLocks > 0) {
-              await firebasePut(`/locks${SEASON}/week${week}.json`, locks);
+              await firebasePut(`/leagues/fr_refresh26/locks/${SEASON}/week${week}.json`, locks);
               console.log(`Wrote ${newLocks} new locks to Firebase`);
             } else {
               console.log('No new locks this run.');
             }
 
-            await firebasePut(`/locks${SEASON}/meta.json`, {
+            await firebasePut(`/leagues/fr_refresh26/locks/${SEASON}/meta.json`, {
               lastChecked: Date.now(),
               week
             });
