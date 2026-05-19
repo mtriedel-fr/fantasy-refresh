@@ -1,0 +1,235 @@
+# Fantasy Refresh — Product Roadmap & Vision
+*Bookmarked from planning session — May 2026*
+
+---
+
+## Product Vision
+
+Season-long DFS fantasy football with salary cap, individual kickoff locks, and concurrent game formats. Differentiated from existing platforms by:
+- **Individual player kickoff locks** (not whole-week locks)
+- **Concurrent guillotine** alongside cumulative or H2H formats
+- **Salary cap drafting** every week (not season-long roster management)
+- **Multi-format per league** — commissioner chooses format at creation
+
+Target: Public launch July-August 2027. Acquisition target by 2029.
+
+---
+
+## Phase Plan
+
+### Phase 1 — NOW (May-July 2026)
+**Goal:** Foundation for multi-league, commissioner runbook, H2H architecture
+
+- [ ] Commissioner Runbook (HTML page at runbook.html)
+- [ ] Multi-league Firebase data architecture design
+- [ ] "Create a League" flow (basic — name, format, join code)
+- [ ] League format options: Cumulative | Head to Head | Guillotine flag
+- [ ] Multi-commissioner role support
+- [ ] League switcher in UI (user can be in multiple leagues)
+
+### Phase 2 — August 2026 (Pre-season)
+**Goal:** H2H format working, test leagues running
+
+- [ ] Head to head matchup generation (weekly pairings)
+- [ ] Optional divisions within H2H leagues
+- [ ] Concurrent guillotine flag (runs alongside H2H or cumulative)
+- [ ] League creation public flow
+- [ ] Assign additional commissioners
+- [ ] Test with 2-3 small external leagues during preseason
+
+### Phase 3 — September-January 2026-27 (Live Season)
+**Goal:** Run 68-player league + test H2H leagues concurrently
+
+- [ ] 68-player cumulative league (main league)
+- [ ] 1-2 small H2H test leagues with trusted users
+- [ ] Auto-scoring validated with live Tank01 data
+- [ ] Kickoff locks validated in production
+- [ ] Salary generation with real Tank01 projections
+- [ ] Collect feedback on format, UX, bugs
+
+### Phase 4 — February-June 2027 (Off-season Build)
+**Goal:** Public launch ready
+
+- [ ] Full multi-league with all format options
+- [ ] Public "Create a League" landing flow
+- [ ] Payment layer (Stripe — commissioner fee $99-149/season)
+- [ ] Entry fee + prize pool rake option
+- [ ] Email marketing (Mailchimp or similar)
+- [ ] SEO optimization
+- [ ] ProductHunt launch preparation
+
+### Phase 5 — July-August 2027 (PUBLIC LAUNCH)
+**Goal:** 20-80 leagues, 500-2,000 users
+
+- [ ] ProductHunt launch
+- [ ] Reddit r/fantasyfootball post
+- [ ] Outreach to 10 fantasy content creators (free commissioner accounts)
+- [ ] Referral/discount code system for commissioners
+
+---
+
+## League Format Options (2027)
+
+### Cumulative (current)
+- Weekly scores sum all season
+- Season-long standings
+- Playoffs Weeks 15-18
+
+### Head to Head
+- Weekly matchups (random or division-based)
+- W/L record tracked
+- Optional divisions (2-4 divisions per league)
+- Playoffs by record + points tiebreaker
+
+### Guillotine (concurrent flag)
+- Lowest scorer eliminated each week
+- Runs alongside either Cumulative or H2H
+- Commissioner sets start week (typically Week 3+)
+- Last survivor wins guillotine prize
+
+### Format Combinations
+- Cumulative + Guillotine ✅
+- H2H + Guillotine ✅
+- H2H + Divisions ✅
+- H2H + Divisions + Guillotine ✅
+
+---
+
+## Multi-League Architecture (Firebase)
+
+### Current paths (single league):
+```
+/season2026/{week}/{uid}
+/lineups2026/week{N}/{uid}
+/salaries2026/week{N}
+/locks2026/week{N}
+/playerPool2026
+/users2026/{uid}
+/teamNames2026/{slug}
+```
+
+### Target paths (multi-league):
+```
+/leagues/{leagueId}/season/{year}/{week}/{uid}
+/leagues/{leagueId}/lineups/{year}/week{N}/{uid}
+/leagues/{leagueId}/salaries/{year}/week{N}
+/leagues/{leagueId}/locks/{year}/week{N}
+/leagues/{leagueId}/settings
+/leagues/{leagueId}/members/{uid}
+/leagues/{leagueId}/commissioners: [uid1, uid2]
+/users/{uid}/leagues: [leagueId1, leagueId2]
+/playerPool/{year}  ← shared across all leagues
+```
+
+### League settings object:
+```json
+{
+  "leagueId": "abc123",
+  "name": "My Fantasy League",
+  "season": 2027,
+  "format": "headtohead",
+  "guillotine": true,
+  "guillotineStartWeek": 3,
+  "divisions": false,
+  "divisionCount": 0,
+  "cap": 60000,
+  "joinCode": "MYLEAGUE27",
+  "commissioners": ["uid1"],
+  "members": 12,
+  "created": 1234567890,
+  "paymentRequired": false,
+  "entryFee": 0,
+  "prizePool": 0
+}
+```
+
+---
+
+## Monetization Strategy
+
+### 2027 (Launch)
+- Commissioner fee: $99/league/season
+- Projected: 20-80 leagues → $2k-8k
+
+### 2028 (Growth)
+- Commissioner fee: $99/season + entry fee rake (10%)
+- Projected: 200 leagues + rake → $25k gross, ~$10k net
+
+### 2029 (Scale/Sell Decision)
+- SaaS: $19/month per commissioner OR $149/season
+- 500 commissioners → $114k ARR
+- Acquisition range at this point: $500k-2M (5-20x ARR)
+
+### Growth channels (no paid ads until Year 2)
+1. Reddit r/fantasyfootball (2M members)
+2. ProductHunt launch
+3. Fantasy content creators (free accounts for 10 YouTubers/podcasters)
+4. SEO — "season long DFS" "salary cap fantasy football" underserved
+5. Referral codes for commissioners
+
+### Acquisition targets (if it takes off)
+- DraftKings / FanDuel — acquiring fantasy tools actively
+- Sleeper — building "everything fantasy" ecosystem
+- Private equity — sports tech very active
+
+---
+
+## Commissioner Runbook (Weekly Workflow)
+
+### Tuesday
+- Scores lock automatically at 9am ET (GitHub Actions)
+- Review any anomalies in commissioner panel
+- Scores finalize — standings update
+
+### Wednesday
+- Generate salaries for upcoming week (commissioner panel → 💰 Weekly Salaries → Generate)
+- Review player pool — refresh if needed (⚡ Refresh button)
+
+### Thursday
+- Unlock the week in commissioner panel (lock toggle)
+- Draft opens — players can start building lineups
+- TNF locks at kickoff automatically
+
+### Friday-Saturday
+- International games lock at kickoff automatically
+- Monitor commissioner panel for any issues
+
+### Sunday
+- 1pm ET games lock automatically
+- Scores update live every 5 minutes (GitHub Actions)
+- 4:25pm ET games lock
+- SNF locks at 8:20pm ET
+
+### Monday
+- MNF locks at ~8:15pm ET
+- Final scores by midnight ET
+
+### Tuesday 9am ET
+- GitHub Actions locks all scores
+- Standings finalize
+- Cycle repeats
+
+---
+
+## What Makes This Acquirable
+
+1. **Retention** — season-long format = 18 weeks of engagement vs 1 week for DFS
+2. **Unique format** — individual kickoff locks + concurrent guillotine not available elsewhere
+3. **Salary cap weekly** — nobody owns this format at scale
+4. **Clean tech** — Firebase + Cloudflare Workers + GitHub Actions, no technical debt
+5. **Email list** — every signup is a valuation data point
+
+---
+
+## Key Decisions Already Made
+
+- Scoring: PPR, 4pt passing TD, standard yardage rates
+- Cap: $60,000 | Max: $11,300 | Min: $3,700
+- Roster: QB/RB/RB/WR/WR/WR/TE/FLEX/DEF (9 players)
+- Lock: Individual player at game kickoff
+- Score lock: Tuesday 9am ET
+- Data: Tank01 (projections, scoring, schedule) + Sleeper (player pool)
+- Hosting: GitHub Pages + Cloudflare Workers + Firebase
+
+---
+*Last updated: May 2026*
