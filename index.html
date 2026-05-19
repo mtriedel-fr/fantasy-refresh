@@ -742,6 +742,15 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
 .salary-lock-badge.unlocked{background:rgba(0,229,212,.1);border:1px solid rgba(0,229,212,.3);color:var(--or);}
 .salary-lock-badge.locked{background:rgba(255,95,160,.1);border:1px solid rgba(255,95,160,.3);color:var(--pk);}
 
+
+/* ── LEAGUE SWITCHER ── */
+.league-switcher{display:flex;align-items:center;gap:6px;margin-left:auto;}
+.league-select{background:#060E0E;border:1px solid var(--or);color:var(--or);font-family:var(--fd);font-size:12px;font-weight:700;letter-spacing:.3px;padding:5px 28px 5px 10px;border-radius:8px;cursor:pointer;outline:none;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2300E5D4' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.league-select:focus{border-color:var(--or);}
+[data-theme="light"] .league-select{background:#F5FAFA;color:var(--or);}
+.league-new-btn{font-family:var(--fd);font-size:11px;font-weight:800;padding:5px 10px;border-radius:8px;border:1px solid var(--bdr2);background:transparent;color:var(--ink3);cursor:pointer;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap;transition:all .15s;}
+.league-new-btn:hover{border-color:var(--or);color:var(--or);}
+
 </style>
 </head>
 <body>
@@ -773,11 +782,17 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
   </div>
   <select class="wk-select" id="wk-select" onchange="setWeekFromSelect(this.value)">
   </select>
-  <select class="season-select" id="season-select" onchange="switchSeason(this.value)" title="Switch season" style="margin-left:auto;">
-    <option value="2026" selected>2026</option>
-    <option value="PS26">PS'26</option>
-    <option value="2025">2025</option>
-  </select>
+  <div class="league-switcher">
+    <select class="league-select" id="league-select" onchange="handleLeagueSwitch(this.value)" title="Switch league">
+      <option value="fr_refresh26">FR 2026</option>
+    </select>
+    <button class="league-new-btn" onclick="window.location.href='league-setup.html'" title="Create or join a league">+ League</button>
+    <select class="season-select" id="season-select" onchange="switchSeason(this.value)" title="Switch season">
+      <option value="2026" selected>2026</option>
+      <option value="PS26">PS'26</option>
+      <option value="2025">2025</option>
+    </select>
+  </div>
 </div>
 
 <!-- YOUR TEAM — directly below week bar -->
@@ -3879,6 +3894,40 @@ function frDbSet(path,data){
   }).then(function(r){ return r.json(); });
 }
 
+
+// ── LEAGUE SWITCHER ────────────────────────────────────────────
+function initLeagueSwitcher(){
+  var user = null;
+  try{ user = JSON.parse(localStorage.getItem('fr_user_'+FR_SEASON)); }catch(e){}
+  if(!user) return;
+
+  FR.getUserLeagues(user.uid).then(function(leagues){
+    if(!leagues || leagues.length <= 1) return; // only show if multiple leagues
+    var sel = document.getElementById('league-select');
+    if(!sel) return;
+    sel.innerHTML = '';
+    var ctx = FR.ctx();
+    leagues.forEach(function(l){
+      var opt = document.createElement('option');
+      opt.value = l.leagueId;
+      opt.textContent = (l.leagueName || l.leagueId).substring(0,20);
+      if(l.leagueId === ctx.leagueId) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    sel.parentElement.style.display = 'flex'; // show switcher
+  }).catch(function(){});
+}
+
+function handleLeagueSwitch(leagueId){
+  if(!leagueId || leagueId === FR.ctx().leagueId) return;
+  FR.switchLeague(leagueId).then(function(){
+    showToast('Switched league ✓');
+    setTimeout(function(){ window.location.reload(); }, 500);
+  }).catch(function(){
+    showToast('Could not switch league', true);
+  });
+}
+
 var frAuth = {
   user: null,
   _teamAvail: false,
@@ -4052,6 +4101,7 @@ var frAuth = {
 
 // Boot auth after page loads
 frAuth.init();
+initLeagueSwitcher();
 
 
 // ── COMMISSIONER USER PANEL ───────────────────────────────────
