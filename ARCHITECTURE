@@ -1,0 +1,317 @@
+# Fantasy Refresh — Multi-League Data Architecture
+*Designed May 2026*
+
+---
+
+## Design Principles
+
+1. **League isolation** — all game data scoped under /leagues/{leagueId}/
+2. **Shared globals** — player pool, user profiles live outside leagues
+3. **Backward compatible** — 2026 legacy paths migrated cleanly
+4. **Scalable** — same structure works for 1 league or 10,000
+5. **Simple Firebase rules** — leagueId in path enables clean security rules
+
+---
+
+## ID Strategy
+
+| Entity | Format | Example | Notes |
+|---|---|---|---|
+| League | `fr_` + 8 random alphanum | `fr_a8x3k2p9` | Auto-generated at creation |
+| User | Firebase Auth UID | `abc123xyz` | Already in use |
+| Season | 4-digit year | `2026` | |
+| Week | Integer | `1`-`18` | |
+| Game | Tank01 format | `20260909_NE@SEA` | |
+
+---
+
+## Complete Firebase Path Structure
+
+```
+/
+├── leagues/
+│   └── {leagueId}/                          ← e.g. fr_a8x3k2p9
+│       ├── settings/                         ← league config
+│       │   ├── leagueId: "fr_a8x3k2p9"
+│       │   ├── name: "Monday Night Ballers"
+│       │   ├── season: 2026
+│       │   ├── format: "cumulative"          ← cumulative|headtohead
+│       │   ├── guillotine: false             ← concurrent guillotine flag
+│       │   ├── guillotineStartWeek: 3
+│       │   ├── divisions: false
+│       │   ├── divisionCount: 0
+│       │   ├── divisionNames: {}
+│       │   ├── cap: 60000
+│       │   ├── maxSalary: 11300
+│       │   ├── minSalary: 3700
+│       │   ├── joinCode: "BALLERS27"         ← commissioner sets this
+│       │   ├── visibility: "private"         ← public|private
+│       │   ├── commissioners: ["uid1","uid2"]
+│       │   ├── created: 1234567890
+│       │   ├── createdBy: "uid1"
+│       │   ├── maxMembers: 20
+│       │   ├── entryFee: 0
+│       │   └── active: true
+│       │
+│       ├── members/                          ← who's in this league
+│       │   └── {uid}/
+│       │       ├── uid: "abc123"
+│       │       ├── teamName: "Mahomes Alone"
+│       │       ├── division: null            ← division name if enabled
+│       │       ├── joined: 1234567890
+│       │       ├── active: true
+│       │       └── eliminated: false         ← guillotine flag
+│       │
+│       ├── season/
+│       │   └── {year}/                       ← e.g. 2026
+│       │       ├── meta/
+│       │       │   ├── currentWeek: 3
+│       │       │   ├── lastScored: 1234567890
+│       │       │   ├── allFinal: false
+│       │       │   └── guillotineEliminated: ["uid3"] ← running list
+│       │       │
+│       │       └── {week}/                   ← e.g. 1
+│       │           └── {uid}/
+│       │               ├── uid: "abc123"
+│       │               ├── team: "Mahomes Alone"
+│       │               ├── score: 142.8
+│       │               ├── slotPts: {}
+│       │               ├── status: "final"
+│       │               ├── locked: false
+│       │               ├── matchupUid: "def456"  ← H2H opponent uid
+│       │               ├── matchupResult: "W"    ← W|L|T (H2H only)
+│       │               └── updatedAt: 1234567890
+│       │
+│       ├── lineups/
+│       │   └── {year}/
+│       │       └── week{N}/
+│       │           └── {uid}/
+│       │               ├── uid, team, week
+│       │               ├── slots: {qb1:{...}, rb1:{...}...}
+│       │               ├── totalSal: 58400
+│       │               └── submitted: 1234567890
+│       │
+│       ├── salaries/
+│       │   └── {year}/
+│       │       └── week{N}/
+│       │           ├── meta: {week, count, generated, locked, cap}
+│       │           └── players: {pid: {id,name,pos,team,salary,proj}}
+│       │
+│       ├── locks/
+│       │   └── {year}/
+│       │       ├── meta: {lastChecked, week}
+│       │       └── week{N}/
+│       │           └── {teamAbbr}: {lockedAt, gameId, opponent}
+│       │
+│       ├── matchups/                         ← H2H only
+│       │   └── {year}/
+│       │       └── week{N}/
+│       │           └── {matchupId}/
+│       │               ├── matchupId: "abc123_def456"
+│       │               ├── week: 3
+│       │               ├── home: "uid1"
+│       │               ├── away: "uid2"
+│       │               ├── homeScore: 142.8
+│       │               ├── awayScore: 118.2
+│       │               └── result: "home"   ← home|away|tie
+│       │
+│       └── reactions/                        ← emoji reactions on standings
+│           └── {year}/
+│               └── week{N}/
+│                   └── {teamSlug}/
+│                       └── {emoji}: count
+│
+├── users/                                    ← global user profiles
+│   └── {uid}/
+│       ├── uid: "abc123"
+│       ├── email: "user@example.com"
+│       ├── name: "Mike"
+│       ├── created: 1234567890
+│       └── leagues: {                        ← leagues this user is in
+│               "fr_a8x3k2p9": {
+│                   teamName: "Mahomes Alone",
+│                   joined: 1234567890,
+│                   role: "member"            ← member|commissioner
+│               },
+│               "fr_b9y4l3q1": {
+│                   teamName: "GOAT Squad",
+│                   joined: 1234567890,
+│                   role: "commissioner"
+│               }
+│           }
+│
+├── leagueIndex/                              ← public league discovery
+│   └── {leagueId}/
+│       ├── name: "Monday Night Ballers"
+│       ├── season: 2026
+│       ├── format: "cumulative"
+│       ├── members: 12
+│       ├── maxMembers: 20
+│       └── visibility: "public"             ← only public leagues here
+│
+└── playerPool/                              ← shared across ALL leagues
+    └── {year}/
+        ├── players: {pid: {id,name,pos,team,status}}
+        ├── count: 995
+        └── updated: 1234567890
+```
+
+---
+
+## 2026 Legacy Migration Map
+
+Current path → New path:
+
+| Current | New |
+|---|---|
+| `/season2026/` | `/leagues/fr_refresh26/season/2026/` |
+| `/lineups2026/` | `/leagues/fr_refresh26/lineups/2026/` |
+| `/salaries2026/` | `/leagues/fr_refresh26/salaries/2026/` |
+| `/locks2026/` | `/leagues/fr_refresh26/locks/2026/` |
+| `/users2026/` | `/users/` (merged) |
+| `/teamNames2026/` | `/leagues/fr_refresh26/members/` |
+| `/playerPool2026/` | `/playerPool/2026/` |
+| `/reactions2026/` | `/leagues/fr_refresh26/reactions/2026/` |
+| `/preseason2026/` | `/leagues/fr_refresh26/season/preseason/` |
+
+**2026 league fixed ID:** `fr_refresh26`
+- Hardcoded — no auto-generation needed for existing league
+- Commissioners: [your uid]
+- Format: cumulative
+- JoinCode: REFRESH26
+
+---
+
+## Head to Head — Matchup Generation
+
+Matchups generated by commissioner (or auto) at season start:
+
+```javascript
+// Weekly matchup generation algorithm
+function generateMatchups(members, week) {
+  // Round-robin scheduling
+  // Ensures each team plays every other team once before repeating
+  // With divisions: division games weighted (play division 2x, others 1x)
+  const schedule = roundRobin(members, week);
+  return schedule.map(([home, away]) => ({
+    matchupId: `${home}_${away}`,
+    week, home, away,
+    homeScore: 0, awayScore: 0, result: null
+  }));
+}
+```
+
+Matchup results auto-written by GitHub Actions auto-scorer alongside scores.
+
+---
+
+## Concurrent Guillotine Logic
+
+When `guillotine: true` on a league:
+
+1. After each week scores finalize (Tuesday 9am):
+   - Find lowest scorer among non-eliminated members
+   - Write their uid to `/leagues/{id}/season/{year}/meta/guillotineEliminated`
+   - Set `/leagues/{id}/members/{uid}/eliminated: true`
+2. Eliminated players:
+   - Can still submit lineups (for fun / side bets)
+   - Scores shown with ☠️ badge
+   - Not counted in guillotine standings
+3. Last survivor wins guillotine prize (separate from main format winner)
+
+---
+
+## Firebase Security Rules (sketch)
+
+```javascript
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // League data — members can read, commissioners can write settings
+    match /leagues/{leagueId}/{document=**} {
+      allow read: if request.auth != null
+        && exists(/databases/$(database)/documents/leagues/$(leagueId)/members/$(request.auth.uid));
+      allow write: if request.auth != null
+        && request.auth.uid in get(/databases/$(database)/documents/leagues/$(leagueId)/settings).data.commissioners;
+    }
+
+    // Lineups — member can write their own
+    match /leagues/{leagueId}/lineups/{year}/week{week}/{uid} {
+      allow write: if request.auth.uid == uid;
+    }
+
+    // Users — own profile only
+    match /users/{uid} {
+      allow read, write: if request.auth.uid == uid;
+    }
+
+    // Player pool — read only for all authenticated users
+    match /playerPool/{year} {
+      allow read: if request.auth != null;
+      allow write: if false; // commissioner panel handles this via admin
+    }
+
+    // League index — public leagues readable by all
+    match /leagueIndex/{leagueId} {
+      allow read: if true;
+    }
+  }
+}
+```
+
+---
+
+## Client-Side League Context
+
+Every page that loads needs to know which league it's operating in:
+
+```javascript
+// Stored in localStorage after login / league selection
+const leagueContext = {
+  leagueId:   'fr_refresh26',
+  leagueName: 'Fantasy Refresh 2026',
+  season:     2026,
+  format:     'cumulative',
+  guillotine: false,
+  role:       'commissioner',   // member | commissioner
+  teamName:   'My Team Name'
+};
+
+// All Firebase paths built from context
+const LEAGUE_PATH = `/leagues/${leagueContext.leagueId}`;
+const SEASON_PATH = `${LEAGUE_PATH}/season/${leagueContext.season}`;
+const LINEUP_PATH = `${LEAGUE_PATH}/lineups/${leagueContext.season}`;
+```
+
+---
+
+## Migration Script (runs once)
+
+Copies existing 2026 data to new paths without deleting old paths.
+Old paths stay as backup until end of season.
+
+Steps:
+1. Create `/leagues/fr_refresh26/settings`
+2. Copy `/playerPool2026` → `/playerPool/2026`
+3. Copy `/users2026/{uid}` → `/users/{uid}` (merge)
+4. Copy `/season2026` → `/leagues/fr_refresh26/season/2026`
+5. Copy `/lineups2026` → `/leagues/fr_refresh26/lineups/2026`
+6. Copy `/salaries2026` → `/leagues/fr_refresh26/salaries/2026`
+7. Copy `/locks2026` → `/leagues/fr_refresh26/locks/2026`
+8. Copy `/teamNames2026` → `/leagues/fr_refresh26/members`
+9. Copy `/reactions2026` → `/leagues/fr_refresh26/reactions/2026`
+10. Update app to read from new paths
+11. Verify — keep old paths until Week 1
+
+---
+
+## Build Order
+
+1. **Migration script** — move existing data, no user impact
+2. **League context system** — localStorage, path builder
+3. **Update all existing pages** to use league context paths
+4. **"Create a League" flow** — new league creation UI
+5. **League switcher** — dropdown in nav for multi-league users
+6. **H2H matchup generation** — commissioner tool
+7. **Guillotine logic** — auto-elimination in scoring job
