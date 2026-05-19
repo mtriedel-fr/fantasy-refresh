@@ -533,7 +533,16 @@ var FR_SEASON   = '2026';
 window.addEventListener('DOMContentLoaded', function(){
   try{
     var u = localStorage.getItem('fr_user_'+FR_SEASON);
-    if(u){ window.location.href = 'index.html'; return; }
+    if(u){
+      var parsed = JSON.parse(u);
+      fetch('https://fantasy-refresh-default-rtdb.firebaseio.com/users/'+parsed.uid+'.json')
+        .then(function(r){ return r.json(); })
+        .then(function(profile){
+          var hasLeagues = profile && profile.leagues && Object.keys(profile.leagues).length > 0;
+          window.location.href = hasLeagues ? 'index.html' : 'league-setup.html';
+        }).catch(function(){ window.location.href = 'index.html'; });
+      return;
+    }
   }catch(e){}
   startDraftAnimation();
 });
@@ -640,7 +649,13 @@ function handleSignIn(){
           token:    data.idToken
         };
         localStorage.setItem('fr_user_'+FR_SEASON, JSON.stringify(user));
-        window.location.href = 'index.html';
+        // Check if user has leagues
+        fetch('https://fantasy-refresh-default-rtdb.firebaseio.com/users/'+data.localId+'.json')
+          .then(function(r){ return r.json(); })
+          .then(function(profile){
+            var hasLeagues = profile && profile.leagues && Object.keys(profile.leagues).length > 0;
+            window.location.href = hasLeagues ? 'index.html' : 'league-setup.html';
+          }).catch(function(){ window.location.href = 'league-setup.html'; });
       });
   })
   .catch(function(e){
