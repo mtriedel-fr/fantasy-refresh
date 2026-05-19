@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Fantasy Refresh — Draft</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏈</text></svg>">
+<script src="league-context.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -301,7 +302,7 @@ function loadWeekAndData(){
     loadLocks();
     return;
   }
-  fetch(FB_DB_URL + '/season'+FR_SEASON+'.json?shallow=true')
+  fetch(FR.paths.url(FR.paths.season()) + '?shallow=true')
     .then(function(r){ return r.json(); })
     .then(function(keys){
       if(keys && typeof keys === 'object'){
@@ -335,8 +336,8 @@ function loadSalaries(){
   }
   // Preseason: try preseason salaries, fall back to flat from pool
   var salPath = PS_MODE
-    ? FB_DB_URL + '/salariespreseason2026/week'+currentWeek+'.json'
-    : FB_DB_URL + '/salaries'+FR_SEASON+'/week'+currentWeek+'.json';
+    ? FR.paths.url(FR.paths.preSeasonSal(currentWeek))
+    : FR.paths.url(FR.paths.weekSalaries(currentWeek));
 
   fetch(salPath)
     .then(function(r){ return r.json(); })
@@ -357,7 +358,7 @@ function loadSalaries(){
 
 function loadFlatSalariesFromPool(){
   var FLAT = {QB:8500, RB:6500, WR:6000, TE:5500, DEF:5000};
-  fetch(FB_DB_URL + '/playerPool2026/players.json')
+  fetch(FR.paths.url(FR.paths.players()))
     .then(function(r){ return r.json(); })
     .then(function(players){
       if(!players) return;
@@ -651,7 +652,7 @@ function pickFromPreview(playerId){
 
 function loadSubmitted(){
   if(!currentUser) return;
-  fetch(FB_DB_URL + '/lineups'+FR_SEASON+'/week'+currentWeek+'/'+currentUser.uid+'.json')
+  fetch(FR.paths.url(FR.paths.myLineup(currentWeek, currentUser.uid)))
     .then(function(r){ return r.json(); })
     .then(function(data){
       if(!data || !data.slots) return;
@@ -1011,7 +1012,7 @@ function loadLocks(){
     }
     return;
   }
-  var path = FB_DB_URL + '/locks'+FR_SEASON+'/week'+currentWeek+'.json';
+  var path = FR.paths.url(FR.paths.weekLocks(currentWeek));
   fetch(path)
     .then(function(r){ return r.json(); })
     .then(function(data){

@@ -11,6 +11,7 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏈</text></svg>">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='50' fill='%23050808'/><!-- top arc teal with arrowhead --><path d='M80 50 C80 28 66 14 50 14 C34 14 20 28 20 50' fill='none' stroke='%2300E5D4' stroke-width='7' stroke-linecap='round'/><!-- teal arrowhead at top tip --><line x1='50' y1='14' x2='42' y2='24' stroke='%2300E5D4' stroke-width='7' stroke-linecap='round'/><line x1='50' y1='14' x2='58' y2='24' stroke='%2300E5D4' stroke-width='7' stroke-linecap='round'/><!-- bottom arc pink with arrowhead --><path d='M20 50 C20 72 34 86 50 86 C66 86 80 72 80 50' fill='none' stroke='%23FF5FA0' stroke-width='7' stroke-linecap='round'/><!-- pink arrowhead at bottom tip --><line x1='50' y1='86' x2='42' y2='76' stroke='%23FF5FA0' stroke-width='7' stroke-linecap='round'/><line x1='50' y1='86' x2='58' y2='76' stroke='%23FF5FA0' stroke-width='7' stroke-linecap='round'/><!-- lace seam --><line x1='35' y1='50' x2='65' y2='50' stroke='%23F0FAFA' stroke-width='2' stroke-linecap='round'/><!-- lace stitches --><line x1='46' y1='44' x2='46' y2='56' stroke='%23F0FAFA' stroke-width='2' stroke-linecap='round'/><line x1='54' y1='44' x2='54' y2='56' stroke='%23F0FAFA' stroke-width='2' stroke-linecap='round'/></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<script src="league-context.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@400;500&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -1041,7 +1042,7 @@ var FB_DB_URL = 'https://fantasy-refresh-default-rtdb.firebaseio.com';
 // ── STORAGE ────────────────────────────────────────────────────
 function save(){
   try{ localStorage.setItem('fr_2026_backup', JSON.stringify(seasonData)); }catch(e){}
-  fetch(FB_DB_URL + '/season2026.json', {
+  fetch(FR.paths.url(FR.paths.season()), {
     method: 'PUT',
     headers: {'Content-Type':'application/json'},
     body: JSON.stringify(seasonData)
@@ -1056,7 +1057,7 @@ function save(){
 
 function loadFromCloud(){
   setLoading(true);
-  fetch(FB_DB_URL + '/season2026.json')
+  fetch(FR.paths.url(FR.paths.season()))
   .then(function(r){
     if(!r.ok){ throw new Error('HTTP ' + r.status + ' ' + r.statusText); }
     return r.json();
@@ -1126,7 +1127,7 @@ var liveScoreTimer = null;
 function startLivePolling(week){
   if(liveScoreTimer) clearInterval(liveScoreTimer);
   liveScoreTimer = setInterval(function(){
-    fetch(FB_DB_URL + '/season2026/' + week + '.json')
+    fetch(FR.paths.url(FR.paths.week(week)))
       .then(function(r){ return r.json(); })
       .then(function(data){
         if(!data) return;
@@ -3780,7 +3781,7 @@ function renderReactions(containerId, teamName, week){
         var cp = em.codePointAt(0);
         return '<button class="react-picker-btn" data-cp="'+cp+'" data-cid="'+containerId+'" data-name="'+encodeURIComponent(teamName)+'" data-week="'+week+'" onclick="handleReactBtn(this)">'+em+'</button>';
       }).join('')+'</div>';
-  fetch(FB_DB_URL+'/reactions2026/'+week+'/'+teamName.replace(/[^a-z0-9]/gi,'_').toLowerCase()+'.json')
+  fetch(FR.FB_DB_URL+FR.paths.weekReactions(week)+'/'+teamName.replace(/[^a-z0-9]/gi,'_').toLowerCase()+'.json')
     .then(function(r){ return r.json(); })
     .then(function(data){
       el.querySelectorAll('.react-chip').forEach(function(ch){ ch.remove(); });
@@ -3833,7 +3834,7 @@ function toggleReaction(containerId, encodedName, week, cp, ev){
   try{ localStorage.setItem(myKey, JSON.stringify(myReacted)); }catch(e){}
   document.querySelectorAll('.react-picker.open').forEach(function(p){ p.classList.remove('open'); });
   var slug = teamName.replace(/[^a-z0-9]/gi,'_').toLowerCase();
-  var path = FB_DB_URL+'/reactions2026/'+week+'/'+slug+'/'+encodeURIComponent(emoji)+'.json';
+  var path = FR.FB_DB_URL+FR.paths.weekReactions(week)+'/'+slug+'/'+encodeURIComponent(emoji)+'.json';
   fetch(path).then(function(r){ return r.json(); }).then(function(cur){
     var count = (cur||0)+(adding?1:-1);
     if(count<0) count=0;
@@ -4043,7 +4044,7 @@ function renderUserPanel(){
   if(!el) return;
   el.innerHTML = '<div style="color:var(--ink3);font-size:13px;padding:8px 0;">Loading…</div>';
 
-  fetch(FB_DB_URL + '/users2026.json')
+  fetch(FR.paths.url(FR.paths.members()))
     .then(function(r){ return r.json(); })
     .then(function(data){
       if(!data){
@@ -4114,11 +4115,11 @@ function removeUser(uid, teamName){
   if(!confirm(msg)) return;
 
   var promises = [
-    fetch(FB_DB_URL + '/users2026/' + uid + '.json', {method:'DELETE'})
+    fetch(FR.FB_DB_URL + '/users/' + uid + '.json', {method:'DELETE'})
   ];
   // Also unclaim their team name if set
   if(teamName){
-    promises.push(fetch(FB_DB_URL + '/teamNames2026/' + encodeURIComponent(teamName.toLowerCase()) + '.json', {method:'DELETE'}));
+    promises.push(fetch(FR.FB_DB_URL + FR.paths.members() + '/' + encodeURIComponent(teamName.toLowerCase()) + '.json', {method:'DELETE'}));
   }
   Promise.all(promises).then(function(){
     showToast((teamName||'Account') + ' removed');
@@ -4188,7 +4189,7 @@ function refreshPlayerPool(){
         updatedBy: 'commissioner'
       };
 
-      return fetch(FB_DB_URL + '/playerPool2026.json', {
+      return fetch(FR.paths.url(FR.paths.playerPool()), {
         method:  'PUT',
         headers: {'Content-Type':'application/json'},
         body:    JSON.stringify(payload)
@@ -4214,7 +4215,7 @@ function refreshPlayerPool(){
 function loadPoolStatus(){
   var status = document.getElementById('pool-status');
   if(!status) return;
-  fetch(FB_DB_URL + '/playerPool2026.json?shallow=true')
+  fetch(FR.paths.url(FR.paths.playerPool()) + '?shallow=true')
     .then(function(r){ return r.json(); })
     .then(function(data){
       if(!data){
@@ -4222,10 +4223,10 @@ function loadPoolStatus(){
         return;
       }
       // Fetch just the metadata fields
-      return fetch(FB_DB_URL + '/playerPool2026/count.json')
+      return fetch(FR.FB_DB_URL + FR.paths.playerPool() + '/count.json')
         .then(function(r){ return r.json(); })
         .then(function(count){
-          return fetch(FB_DB_URL + '/playerPool2026/updated.json')
+          return fetch(FR.FB_DB_URL + FR.paths.playerPool() + '/updated.json')
             .then(function(r){ return r.json(); })
             .then(function(updated){
               var when = updated ? new Date(updated).toLocaleString() : 'unknown';
@@ -4275,7 +4276,7 @@ function loadSalaryStatus(){
   if(!sel || !sel.value) return;
   var week = sel.value;
 
-  fetch(FB_DB_URL + '/salaries2026/week' + week + '/meta.json')
+  fetch(FR.paths.url(FR.paths.salaries()) + '/week' + week + '/meta.json')
     .then(function(r){ return r.json(); })
     .then(function(meta){
       if(!meta || meta === null){
@@ -4316,7 +4317,7 @@ function generateSalaries(){
   var week = parseInt(sel.value);
 
   // Check not locked
-  fetch(FB_DB_URL + '/salaries2026/week' + week + '/meta.json')
+  fetch(FR.paths.url(FR.paths.salaries()) + '/week' + week + '/meta.json')
     .then(function(r){ return r.json(); })
     .then(function(meta){
       if(meta && meta.locked){
@@ -4341,7 +4342,7 @@ function generateSalaries(){
           }
 
           // Load our player pool for Sleeper IDs + injury status
-          return fetch(FB_DB_URL + '/playerPool2026/players.json')
+          return fetch(FR.paths.url(FR.paths.players()))
             .then(function(r){ return r.json(); })
             .then(function(poolPlayers){
               var salaries = {};
@@ -4412,7 +4413,7 @@ function generateSalaries(){
 function generateFlatSalaries(week){
   // Fallback: flat salaries by position tier when projections unavailable
   var FLAT = {QB:8500, RB:6500, WR:6000, TE:5500, DEF:5000};
-  return fetch(FB_DB_URL + '/playerPool2026/players.json')
+  return fetch(FR.paths.url(FR.paths.players()))
     .then(function(r){ return r.json(); })
     .then(function(players){
       var firstKey = players ? Object.keys(players)[0] : null;
@@ -4444,7 +4445,7 @@ function saveSalaries(week, salaries, count){
       cap:       60000
     }
   };
-  return fetch(FB_DB_URL + '/salaries2026/week' + week + '.json', {
+  return fetch(FR.paths.url(FR.paths.salaries()) + '/week' + week + '.json', {
     method:  'PUT',
     headers: {'Content-Type':'application/json'},
     body:    JSON.stringify(payload)
@@ -4465,11 +4466,11 @@ function toggleSalaryLock(){
   var sel = document.getElementById('sal-week-sel');
   if(!sel || !sel.value) return;
   var week = sel.value;
-  fetch(FB_DB_URL + '/salaries2026/week' + week + '/meta/locked.json')
+  fetch(FR.paths.url(FR.paths.salaries()) + '/week' + week + '/meta/locked.json')
     .then(function(r){ return r.json(); })
     .then(function(locked){
       var newLocked = !locked;
-      return fetch(FB_DB_URL + '/salaries2026/week' + week + '/meta/locked.json', {
+      return fetch(FR.paths.url(FR.paths.salaries()) + '/week' + week + '/meta/locked.json', {
         method: 'PUT', headers:{'Content-Type':'application/json'},
         body: JSON.stringify(newLocked)
       }).then(function(){

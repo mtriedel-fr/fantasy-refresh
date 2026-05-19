@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Fantasy Refresh — Preseason 2026</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏈</text></svg>">
+<script src="league-context.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -389,7 +390,7 @@ function setWeek(w, btn){
 
 // ── LOAD DATA ─────────────────────────────────────────────────
 function loadPreseasonData(){
-  fetch(FB_DB_URL + '/' + FR_SEASON + '.json')
+  fetch(FR.paths.url(FR.paths.preseason()))
     .then(function(r){ return r.json(); })
     .then(function(d){
       preseasonData = d || {};
@@ -403,7 +404,7 @@ function loadPreseasonData(){
 
 function loadLineups(){
   // Load submitted lineups for current week from Firebase
-  fetch(FB_DB_URL + '/lineups' + FR_SEASON + '/week' + currentWeek + '.json')
+  fetch(FR.FB_DB_URL + FR.paths.lineups() + '/week' + currentWeek + '.json')
     .then(function(r){ return r.json(); })
     .then(function(d){
       if(!d) return;
@@ -550,7 +551,7 @@ function importScores(){
       }
 
       // Load lineups, calculate scores per team
-      return fetch(FB_DB_URL + '/lineups' + FR_SEASON + '/week' + currentWeek + '.json')
+      return fetch(FR.FB_DB_URL + FR.paths.lineups() + '/week' + currentWeek + '.json')
         .then(function(r){ return r.json(); })
         .then(function(lineups){
           if(!lineups){ showToast('No lineups found for this week', true); return; }
@@ -670,7 +671,7 @@ function refreshPlayerPool(){
         count++;
       });
       var payload = { players:players, count:count, updated:Date.now() };
-      return fetch(FB_DB_URL+'/playerPool2026.json',{
+      return fetch(FR.paths.url(FR.paths.playerPool()),{
         method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)
       }).then(function(){
         statusEl.textContent = '✓ ' + count + ' players synced · ' + new Date().toLocaleTimeString();
@@ -695,7 +696,7 @@ function generatePreseasonSalaries(){
   btn.textContent = '⏳';
   status.textContent = 'Loading player pool…';
 
-  fetch(FB_DB_URL + '/playerPool2026/players.json')
+  fetch(FR.paths.url(FR.paths.players()))
     .then(function(r){ return r.json(); })
     .then(function(players){
       if(!players) throw new Error('No player pool — refresh pool first');
@@ -759,7 +760,7 @@ function wipePreseason(){
 
 // ── SAVE ──────────────────────────────────────────────────────
 function savePreseasonData(){
-  return fetch(FB_DB_URL + '/' + FR_SEASON + '.json', {
+  return fetch(FR.paths.url(FR.paths.preseason()), {
     method:'PUT',
     headers:{'Content-Type':'application/json'},
     body: JSON.stringify(preseasonData)
