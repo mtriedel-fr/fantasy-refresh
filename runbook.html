@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fantasy Refresh — Commissioner Runbook</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --hdr:#050808;--bg:#0A0F0F;--bg2:#0D1515;--bg3:#101C1C;--bg4:#142020;
+  --or:#00E5D4;--pk:#FF5FA0;--pu:#9B6DFF;
+  --ink:#F0FAFA;--ink2:#6ABFBF;--ink3:#3A8888;
+  --bdr:#0D3535;--bdr2:#104040;
+  --fd:'Barlow Condensed',sans-serif;--fb:'Barlow',sans-serif;
+}
+[data-theme="light"]{
+  --hdr:#F0F8F8;--bg:#F5FAFA;--bg2:#E8F5F5;--bg3:#DCF0F0;--bg4:#D0EEEE;
+  --or:#007A70;--pk:#CC3070;--pu:#6030CC;
+  --ink:#0A1818;--ink2:#1A6060;--ink3:#3A8888;
+  --bdr:#B0DEDE;--bdr2:#80CCCC;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100vh;}
+
+/* ── NAV ── */
+.nav{background:var(--hdr);border-bottom:3px solid var(--or);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
+.nav-logo{font-family:var(--fd);font-size:22px;font-weight:900;color:var(--or);text-decoration:none;}
+.nav-logo span{color:var(--pk);}
+.nav-right{display:flex;align-items:center;gap:10px;}
+.nav-link{font-family:var(--fd);font-size:12px;font-weight:700;color:var(--ink3);text-decoration:none;text-transform:uppercase;letter-spacing:.5px;padding:5px 10px;border:1px solid var(--bdr);border-radius:6px;transition:all .15s;}
+.nav-link:hover{color:var(--or);border-color:var(--or);}
+.theme-btn{background:none;border:1px solid var(--bdr);border-radius:6px;padding:5px 8px;cursor:pointer;font-size:14px;}
+
+/* ── HERO ── */
+.hero{background:linear-gradient(135deg,var(--bg2),var(--bg3));border-bottom:1px solid var(--bdr);padding:48px 24px 40px;text-align:center;}
+.hero-tag{font-family:var(--fd);font-size:11px;font-weight:800;color:var(--pk);text-transform:uppercase;letter-spacing:2px;margin-bottom:12px;}
+.hero-title{font-family:var(--fd);font-size:clamp(36px,6vw,64px);font-weight:900;color:var(--ink);text-transform:uppercase;line-height:.95;margin-bottom:12px;}
+.hero-title .or{color:var(--or);}
+.hero-sub{font-size:15px;color:var(--ink3);max-width:560px;margin:0 auto;line-height:1.7;}
+
+/* ── LAYOUT ── */
+.wrap{max-width:900px;margin:0 auto;padding:32px 24px;}
+
+/* ── QUICK NAV ── */
+.quick-nav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:32px;}
+.qn-btn{font-family:var(--fd);font-size:12px;font-weight:700;padding:6px 14px;border-radius:20px;border:1px solid var(--bdr2);background:transparent;color:var(--ink3);cursor:pointer;text-transform:uppercase;letter-spacing:.3px;transition:all .15s;text-decoration:none;}
+.qn-btn:hover{border-color:var(--or);color:var(--or);}
+
+/* ── SECTION ── */
+.section{margin-bottom:32px;}
+.section-hdr{display:flex;align-items:center;gap:12px;padding:14px 20px;background:var(--bg2);border-radius:12px 12px 0 0;border:1px solid var(--bdr);border-bottom:none;}
+.section-icon{font-size:20px;}
+.section-title{font-family:var(--fd);font-size:18px;font-weight:800;color:var(--or);text-transform:uppercase;letter-spacing:.5px;}
+.section-day{font-family:var(--fd);font-size:12px;font-weight:700;color:var(--pk);text-transform:uppercase;letter-spacing:.8px;margin-left:auto;background:rgba(255,95,160,.1);border:1px solid rgba(255,95,160,.3);padding:3px 10px;border-radius:10px;}
+.section-body{background:var(--bg2);border:1px solid var(--bdr);border-radius:0 0 12px 12px;overflow:hidden;}
+
+/* ── STEPS ── */
+.step{display:flex;gap:16px;padding:16px 20px;border-bottom:1px solid var(--bdr);}
+.step:last-child{border-bottom:none;}
+.step-num{font-family:var(--fd);font-size:20px;font-weight:900;color:var(--bdr2);flex-shrink:0;width:28px;text-align:right;line-height:1.4;}
+.step-content{flex:1;}
+.step-title{font-family:var(--fd);font-size:15px;font-weight:800;color:var(--ink);text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px;}
+.step-desc{font-size:13px;color:var(--ink3);line-height:1.7;}
+.step-desc strong{color:var(--ink2);}
+.step-auto{display:inline-flex;align-items:center;gap:4px;font-family:var(--fd);font-size:10px;font-weight:800;color:var(--or);background:rgba(0,229,212,.1);border:1px solid rgba(0,229,212,.2);padding:2px 8px;border-radius:8px;text-transform:uppercase;letter-spacing:.5px;margin-left:8px;vertical-align:middle;}
+.step-manual{display:inline-flex;align-items:center;gap:4px;font-family:var(--fd);font-size:10px;font-weight:800;color:#FF9A3A;background:rgba(255,154,58,.1);border:1px solid rgba(255,154,58,.2);padding:2px 8px;border-radius:8px;text-transform:uppercase;letter-spacing:.5px;margin-left:8px;vertical-align:middle;}
+.step-path{font-family:var(--fd);font-size:12px;color:var(--ink3);background:var(--bg3);border:1px solid var(--bdr);padding:4px 10px;border-radius:6px;margin-top:6px;display:inline-block;}
+
+/* ── INFO BOXES ── */
+.info-box{margin:8px 0;padding:10px 14px;border-radius:8px;font-size:13px;line-height:1.6;}
+.info-tip{background:rgba(0,229,212,.06);border-left:3px solid var(--or);color:var(--ink2);}
+.info-warn{background:rgba(255,154,58,.06);border-left:3px solid #FF9A3A;color:var(--ink2);}
+.info-critical{background:rgba(255,95,160,.06);border-left:3px solid var(--pk);color:var(--ink2);}
+
+/* ── TIMELINE ── */
+.timeline{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:32px;}
+.tl-day{background:var(--bg2);border:1px solid var(--bdr);border-radius:8px;padding:10px 8px;text-align:center;}
+.tl-day.active{border-color:var(--or);background:rgba(0,229,212,.06);}
+.tl-day.game-day{border-color:var(--pk);background:rgba(255,95,160,.05);}
+.tl-day-name{font-family:var(--fd);font-size:11px;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;}
+.tl-day.active .tl-day-name{color:var(--or);}
+.tl-day.game-day .tl-day-name{color:var(--pk);}
+.tl-task{font-size:10px;color:var(--ink3);line-height:1.5;margin-top:3px;}
+.tl-badge{font-family:var(--fd);font-size:9px;font-weight:800;padding:1px 6px;border-radius:8px;display:inline-block;margin-top:3px;}
+.badge-auto{background:rgba(0,229,212,.15);color:var(--or);}
+.badge-manual{background:rgba(255,154,58,.15);color:#FF9A3A;}
+.badge-game{background:rgba(255,95,160,.15);color:var(--pk);}
+
+/* ── REFERENCE TABLE ── */
+.ref-table{width:100%;border-collapse:collapse;}
+.ref-table th{font-family:var(--fd);font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;padding:10px 16px;border-bottom:1px solid var(--bdr);text-align:left;background:var(--bg3);}
+.ref-table td{padding:10px 16px;border-bottom:1px solid var(--bdr);font-size:13px;color:var(--ink2);}
+.ref-table tr:last-child td{border-bottom:none;}
+.ref-table td:first-child{font-family:var(--fd);font-weight:700;color:var(--ink);}
+
+/* ── CHECKLIST ── */
+.checklist{padding:16px 20px;}
+.check-item{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--bdr);}
+.check-item:last-child{border-bottom:none;}
+.check-box{width:18px;height:18px;border:2px solid var(--bdr2);border-radius:4px;flex-shrink:0;cursor:pointer;margin-top:1px;transition:all .15s;display:flex;align-items:center;justify-content:center;}
+.check-box.done{background:var(--or);border-color:var(--or);}
+.check-box.done::after{content:'✓';color:#050808;font-size:11px;font-weight:900;}
+.check-text{font-size:13px;color:var(--ink2);line-height:1.5;}
+.check-text.done-text{color:var(--ink3);text-decoration:line-through;}
+
+/* ── ACCORDION ── */
+.accordion{border:1px solid var(--bdr);border-radius:10px;overflow:hidden;margin-bottom:12px;}
+.accordion-hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--bg3);cursor:pointer;user-select:none;}
+.accordion-hdr:hover{background:var(--bg4);}
+.accordion-title{font-family:var(--fd);font-size:14px;font-weight:800;color:var(--ink);text-transform:uppercase;letter-spacing:.3px;}
+.accordion-arrow{font-size:12px;color:var(--ink3);transition:transform .2s;}
+.accordion-body{display:none;padding:16px;border-top:1px solid var(--bdr);font-size:13px;color:var(--ink3);line-height:1.8;}
+.accordion-body.open{display:block;}
+.accordion-arrow.open{transform:rotate(180deg);}
+
+@media(max-width:600px){
+  .timeline{grid-template-columns:repeat(4,1fr);}
+  .hero{padding:32px 16px;}
+  .wrap{padding:20px 16px;}
+}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="index.html" class="nav-logo">Fantasy<span>Refresh</span></a>
+  <div class="nav-right">
+    <a href="index.html" class="nav-link">← App</a>
+    <button class="theme-btn" onclick="toggleTheme()" id="theme-btn">🌙</button>
+  </div>
+</nav>
+
+<div class="hero">
+  <div class="hero-tag">Commissioner Reference</div>
+  <h1 class="hero-title">The <span class="or">Runbook</span></h1>
+  <p class="hero-sub">Everything you need to run a smooth Fantasy Refresh season. Weekly workflow, emergency fixes, and quick reference all in one place.</p>
+</div>
+
+<div class="wrap">
+
+  <!-- Quick Nav -->
+  <div class="quick-nav">
+    <a href="#weekly" class="qn-btn">📅 Weekly Flow</a>
+    <a href="#preseason" class="qn-btn">🏕️ Preseason</a>
+    <a href="#week1" class="qn-btn">🏈 Week 1 Setup</a>
+    <a href="#salaries" class="qn-btn">💰 Salaries</a>
+    <a href="#scoring" class="qn-btn">📊 Scoring</a>
+    <a href="#emergencies" class="qn-btn">🚨 Emergencies</a>
+    <a href="#reference" class="qn-btn">📋 Reference</a>
+    <a href="#checklist" class="qn-btn">✅ Season Checklist</a>
+  </div>
+
+  <!-- WEEKLY TIMELINE -->
+  <div class="timeline" id="weekly">
+    <div class="tl-day active">
+      <div class="tl-day-name">Tue</div>
+      <div class="tl-task">Scores lock 9am ET</div>
+      <span class="tl-badge badge-auto">Auto</span>
+      <div class="tl-task" style="margin-top:4px;">Review standings</div>
+      <span class="tl-badge badge-manual">Manual</span>
+    </div>
+    <div class="tl-day active">
+      <div class="tl-day-name">Wed</div>
+      <div class="tl-task">Generate salaries</div>
+      <span class="tl-badge badge-manual">Manual</span>
+      <div class="tl-task" style="margin-top:4px;">Open draft</div>
+      <span class="tl-badge badge-manual">Manual</span>
+    </div>
+    <div class="tl-day">
+      <div class="tl-day-name">Thu</div>
+      <div class="tl-task">TNF locks at kickoff</div>
+      <span class="tl-badge badge-auto">Auto</span>
+    </div>
+    <div class="tl-day">
+      <div class="tl-day-name">Fri</div>
+      <div class="tl-task">Intl games may kick</div>
+      <span class="tl-badge badge-auto">Auto</span>
+    </div>
+    <div class="tl-day">
+      <div class="tl-day-name">Sat</div>
+      <div class="tl-task">Intl games may kick</div>
+      <span class="tl-badge badge-auto">Auto</span>
+    </div>
+    <div class="tl-day game-day">
+      <div class="tl-day-name">Sun</div>
+      <div class="tl-task">Games + live scoring</div>
+      <span class="tl-badge badge-auto">Auto</span>
+      <div class="tl-task" style="margin-top:4px;">SNF locks 8:20pm</div>
+      <span class="tl-badge badge-auto">Auto</span>
+    </div>
+    <div class="tl-day game-day">
+      <div class="tl-day-name">Mon</div>
+      <div class="tl-task">MNF locks ~8:15pm</div>
+      <span class="tl-badge badge-auto">Auto</span>
+    </div>
+  </div>
+
+  <!-- WEEKLY WORKFLOW -->
+  <div class="section">
+    <div class="section-hdr">
+      <span class="section-icon">📅</span>
+      <span class="section-title">Weekly Workflow</span>
+    </div>
+    <div class="section-body">
+
+      <!-- Tuesday -->
+      <div style="padding:10px 20px 4px;background:var(--bg3);border-bottom:1px solid var(--bdr);">
+        <span style="font-family:var(--fd);font-size:12px;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;">Tuesday</span>
+      </div>
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <div class="step-title">Scores Lock Automatically <span class="step-auto">⚡ Auto</span></div>
+          <div class="step-desc">GitHub Actions locks all final scores at <strong>9am ET</strong>. Nothing to do — just verify standings look correct in the app.</div>
+          <div class="info-tip" style="margin-top:8px;">💡 If a score looks wrong, you have until Tuesday 9am to manually correct it in the commissioner panel before it locks.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <div class="step-title">Review Standings <span class="step-manual">👤 Manual</span></div>
+          <div class="step-desc">Open the app and verify weekly scores look right. Check for any players who scored 0 but submitted a lineup — this usually means a Tank01 stat issue. If found, use manual score entry in the commissioner panel.</div>
+        </div>
+      </div>
+
+      <!-- Wednesday -->
+      <div style="padding:10px 20px 4px;background:var(--bg3);border-bottom:1px solid var(--bdr);border-top:1px solid var(--bdr);">
+        <span style="font-family:var(--fd);font-size:12px;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;">Wednesday</span>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <div class="step-title">Refresh Player Pool <span class="step-manual">👤 Manual</span></div>
+          <div class="step-desc">In the commissioner panel, click <strong>⚡ Refresh</strong> under Player Pool. This syncs the latest roster moves from Sleeper — trades, signings, IR designations. Takes about 30 seconds.</div>
+          <div class="step-path">Commissioner Panel → 🏈 Player Pool → ⚡ Refresh</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <div class="step-title">Generate Salaries <span class="step-manual">👤 Manual</span></div>
+          <div class="step-desc">Select the upcoming week number, then click <strong>⚡ Generate Salaries</strong>. This pulls Tank01 projections and calculates player salaries. Review the top and bottom salaries to make sure nothing looks wildly off.</div>
+          <div class="step-path">Commissioner Panel → 💰 Weekly Salaries → Select week → ⚡ Generate</div>
+          <div class="info-warn" style="margin-top:8px;">⚠️ Don't unlock the week yet — wait until Thursday so TNF players aren't available for Sunday drafters to exploit.</div>
+        </div>
+      </div>
+
+      <!-- Thursday -->
+      <div style="padding:10px 20px 4px;background:var(--bg3);border-bottom:1px solid var(--bdr);border-top:1px solid var(--bdr);">
+        <span style="font-family:var(--fd);font-size:12px;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;">Thursday</span>
+      </div>
+      <div class="step">
+        <div class="step-num">5</div>
+        <div class="step-content">
+          <div class="step-title">Unlock the Week <span class="step-manual">👤 Manual</span></div>
+          <div class="step-desc">Around <strong>noon ET Thursday</strong>, unlock the week so players can start drafting. Players will see the salaries and games bar immediately.</div>
+          <div class="step-path">Commissioner Panel → 💰 Weekly Salaries → Week N → 🔓 Unlock</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">6</div>
+        <div class="step-content">
+          <div class="step-title">TNF Players Lock at Kickoff <span class="step-auto">⚡ Auto</span></div>
+          <div class="step-desc">GitHub Actions monitors game statuses every 5 minutes. When the Thursday game goes live, both TNF teams lock automatically. Players who haven't drafted those players yet cannot add them.</div>
+        </div>
+      </div>
+
+      <!-- Sunday -->
+      <div style="padding:10px 20px 4px;background:var(--bg3);border-bottom:1px solid var(--bdr);border-top:1px solid var(--bdr);">
+        <span style="font-family:var(--fd);font-size:12px;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;">Sunday – Monday</span>
+      </div>
+      <div class="step">
+        <div class="step-num">7</div>
+        <div class="step-content">
+          <div class="step-title">Games Play, Scores Update Live <span class="step-auto">⚡ Auto</span></div>
+          <div class="step-desc">Everything is automatic. GitHub Actions polls Tank01 box scores every 5 minutes and writes fantasy scores to Firebase. Standings update in real time. Player locks fire at individual game kickoffs throughout the day.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">8</div>
+        <div class="step-content">
+          <div class="step-title">Monitor for Issues <span class="step-manual">👤 Optional</span></div>
+          <div class="step-desc">Check the app around halftime of SNF to make sure scores are updating. If standings are frozen, check GitHub Actions → auto-scoring for errors. Most common cause: Tank01 API rate limit — check your usage at rapidapi.com.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- PRESEASON SETUP -->
+  <div class="section" id="preseason">
+    <div class="section-hdr">
+      <span class="section-icon">🏕️</span>
+      <span class="section-title">Preseason Setup</span>
+      <span class="section-day">July–August</span>
+    </div>
+    <div class="section-body">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <div class="step-title">Upgrade Tank01 to Pro</div>
+          <div class="step-desc">The free Basic plan (1,000 calls/month) is enough for testing but won't cover a full season. Upgrade to <strong>Pro ($10/month)</strong> by September 1 at rapidapi.com.</div>
+          <div class="step-path">rapidapi.com → Tank01 NFL API → Subscribe → Pro Plan</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <div class="step-title">Refresh Player Pool</div>
+          <div class="step-desc">Run a fresh player pool sync in late July/early August after the draft. This captures rookie additions, free agent signings, and depth chart changes.</div>
+          <div class="step-path">Commissioner Panel → 🏈 Player Pool → ⚡ Refresh</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <div class="step-title">Run Preseason Test Weeks</div>
+          <div class="step-desc">Use the Preseason section (PS'26 in the season switcher) to run 3 test weeks with real NFL preseason games. This gets players familiar with the draft interface before the real season starts.</div>
+          <div class="step-path">Season switcher → PS'26 → Commissioner Panel → Generate Salaries</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <div class="step-title">Wipe Preseason Data Before Week 1</div>
+          <div class="step-desc">After the preseason, wipe all test data so the real season starts clean. This removes preseason lineups and scores — it does NOT affect player pool or real season data.</div>
+          <div class="step-path">Preseason → Commissioner Panel → 🗑 Wipe All</div>
+          <div class="info-critical" style="margin-top:8px;">🚨 Do this BEFORE generating Week 1 salaries. Can't be undone.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- WEEK 1 SETUP -->
+  <div class="section" id="week1">
+    <div class="section-hdr">
+      <span class="section-icon">🏈</span>
+      <span class="section-title">Week 1 Setup</span>
+      <span class="section-day">First Week of September</span>
+    </div>
+    <div class="section-body">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <div class="step-title">Confirm All Players Are Registered</div>
+          <div class="step-desc">Check the Registered Players section in the commissioner panel. Every player should have a team name set. Anyone missing a team name hasn't finished onboarding — send them the link to set it.</div>
+          <div class="step-path">Commissioner Panel → 👥 Registered Players</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <div class="step-title">Refresh Player Pool (Final Pre-Season Sync)</div>
+          <div class="step-desc">Run one final player pool refresh the Tuesday before Week 1 kicks off to capture all final roster cuts and injuries from the preseason finale.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <div class="step-title">Generate Week 1 Salaries</div>
+          <div class="step-desc">Tank01 will have real projections by Week 1. Generate salaries Wednesday morning — these will use actual projected fantasy points rather than flat values. Review the salary distribution before unlocking.</div>
+          <div class="info-tip" style="margin-top:8px;">💡 Week 1 salary tip: Check that QB salaries range from ~$7,500–$11,300 and DEF salaries from ~$3,700–$6,000. If everything is flat, Tank01 projections may not be loaded yet — try again Thursday morning.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <div class="step-title">Send "Draft Is Open" Message to Players</div>
+          <div class="step-desc">Once salaries are generated and the week is unlocked Thursday, notify your players. Include: the draft link, the salary cap reminder ($60,000), and the deadline (before first game kickoff).</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SALARY GENERATION DEEP DIVE -->
+  <div class="section" id="salaries">
+    <div class="section-hdr">
+      <span class="section-icon">💰</span>
+      <span class="section-title">Salary Generation Guide</span>
+    </div>
+    <div class="section-body">
+      <div class="step">
+        <div class="step-num">—</div>
+        <div class="step-content">
+          <div class="step-title">How Salaries Are Calculated</div>
+          <div class="step-desc">Salaries = Tank01 projected fantasy points × $1,800 multiplier, rounded to nearest $100, clamped between $3,700 (min) and $11,300 (max). If Tank01 returns no projections (offseason), flat salaries are used: QB $8,500 · RB $6,500 · WR $6,000 · TE $5,500 · DEF $5,000.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">—</div>
+        <div class="step-content">
+          <div class="step-title">What to Check After Generating</div>
+          <div class="step-desc">
+            1. <strong>Count</strong> — should be 800–1,000 players. Less than 500 means projections didn't load.<br>
+            2. <strong>Top QB salary</strong> — should be $10,000–$11,300 for top starters.<br>
+            3. <strong>Injury flags</strong> — OUT/IR players are excluded automatically. Q players are included but flagged.<br>
+            4. <strong>DEF salaries</strong> — should vary, not all flat. Top defenses ~$5,500–$7,000.
+          </div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">—</div>
+        <div class="step-content">
+          <div class="step-title">Locking Salaries</div>
+          <div class="step-desc">Lock the salary week once you're happy with it. This prevents accidental regeneration. Players can still draft after it's locked — locking just freezes the salary values.</div>
+          <div class="info-warn" style="margin-top:8px;">⚠️ Don't regenerate after players have submitted lineups — their $60k cap math is based on the salaries at submission time.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCORING -->
+  <div class="section" id="scoring">
+    <div class="section-hdr">
+      <span class="section-icon">📊</span>
+      <span class="section-title">Scoring Reference</span>
+    </div>
+    <div class="section-body" style="padding:0;">
+      <table class="ref-table">
+        <thead>
+          <tr><th>Action</th><th>Points</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Passing yard</td><td style="color:var(--or);font-family:var(--fd);font-weight:800;">+0.04</td><td>25 yds = 1 pt</td></tr>
+          <tr><td>Passing TD</td><td style="color:var(--or);font-family:var(--fd);font-weight:800;">+4</td><td></td></tr>
+          <tr><td>Interception (thrown)</td><td style="color:var(--pk);font-family:var(--fd);font-weight:800;">-1</td><td></td></tr>
+          <tr><td>300+ passing yards bonus</td><td style="color:var(--or);font-family:var(--fd);font-weight:800;">+3</td><td>One-time bonus</td></tr>
+          <tr><td>Rush/Rec yard</td><td style="color:var(--or);font-family:var(--fd);font-weight:800;">+0.1</td><td>10 yds = 1 pt</td></tr>
+          <tr><td>Rush/Rec TD</td><td style="color:var(--or);font-family:var(--fd);font-weight:800;">+6</td><td></td></tr>
+          <tr><td>Reception</td><td style="color:var(--or);font-family:var(--fd);font-weight:800;">+1</td><td>PPR format</td></tr>
+          <tr><td>100+ rush/rec yards bonus</td><td style="color:var(--or);font-family:var(--fd);font-weight:800;">+3</td><td>One-time bonus</td></tr>
+          <tr><td>Fumble lost</td><td style="color:var(--pk);font-family:var(--fd);font-weight:800;">-1</td><td></td></tr>
+          <tr><td>2-point conversion</td><td style="color:var(--or);font-family:var(--fd);font-weight:800;">+2</td><td></td></tr>
+          <tr><td colspan="3" style="background:var(--bg3);font-family:var(--fd);font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;">Defense / Special Teams</td></tr>
+          <tr><td>Sack</td><td style="color:var(--or);font-family:var(--fd);font-weight:800;">+1</td><td></td></tr>
+          <tr><td>Interception (defensive)</td><td style="color:var(--or);font-family:var(--fd);font-weight:800;">+2</td><td></td></tr>
+          <tr><td>Fumble recovery</td><td style="color:var(--or);font-family:var(--fd);font-weight:800;">+2</td><td></td></tr>
+          <tr><td>Defensive TD</td><td style="color:var(--or);font-family:var(--fd);font-weight:800;">+6</td><td></td></tr>
+          <tr><td>Safety</td><td style="color:var(--or);font-family:var(--fd);font-weight:800;">+2</td><td></td></tr>
+          <tr><td>Blocked kick</td><td style="color:var(--or);font-family:var(--fd);font-weight:800;">+2</td><td></td></tr>
+          <tr><td>Points allowed: 0</td><td style="color:var(--or);font-family:var(--fd);font-weight:800;">+10</td><td></td></tr>
+          <tr><td>Points allowed: 1–6</td><td style="color:var(--or);font-family:var(--fd);font-weight:800;">+7</td><td></td></tr>
+          <tr><td>Points allowed: 7–13</td><td style="color:var(--or);font-family:var(--fd);font-weight:800;">+4</td><td></td></tr>
+          <tr><td>Points allowed: 14–20</td><td style="color:var(--or);font-family:var(--fd);font-weight:800;">+1</td><td></td></tr>
+          <tr><td>Points allowed: 21–27</td><td style="color:var(--ink3);font-family:var(--fd);font-weight:800;">0</td><td></td></tr>
+          <tr><td>Points allowed: 28–34</td><td style="color:var(--pk);font-family:var(--fd);font-weight:800;">-1</td><td></td></tr>
+          <tr><td>Points allowed: 35+</td><td style="color:var(--pk);font-family:var(--fd);font-weight:800;">-4</td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- EMERGENCIES -->
+  <div class="section" id="emergencies">
+    <div class="section-hdr">
+      <span class="section-icon">🚨</span>
+      <span class="section-title">Emergency Fixes</span>
+    </div>
+    <div class="section-body" style="padding:16px 20px;display:flex;flex-direction:column;gap:10px;">
+
+      <div class="accordion">
+        <div class="accordion-hdr" onclick="toggleAccordion(this)">
+          <span class="accordion-title">Scores aren't updating during games</span>
+          <span class="accordion-arrow">▼</span>
+        </div>
+        <div class="accordion-body">
+          <strong>1.</strong> Go to GitHub → Actions → auto-scoring → check the latest run for errors.<br>
+          <strong>2.</strong> Most common cause: Tank01 API rate limit. Check your monthly usage at rapidapi.com — if near 1,000 on Basic plan, upgrade to Pro immediately.<br>
+          <strong>3.</strong> Manual trigger: Actions → auto-scoring → Run workflow → enter the week number.<br>
+          <strong>4.</strong> If Tank01 is down (rare): scores will resume automatically when it recovers. Final scores can be manually entered in the commissioner panel after the games.
+        </div>
+      </div>
+
+      <div class="accordion">
+        <div class="accordion-hdr" onclick="toggleAccordion(this)">
+          <span class="accordion-title">A player's score looks wrong</span>
+          <span class="accordion-arrow">▼</span>
+        </div>
+        <div class="accordion-body">
+          <strong>Before Tuesday 9am:</strong> Go to Commissioner Panel → Import Week Scores → use manual score entry to override the individual team's score.<br>
+          <strong>After Tuesday 9am (locked):</strong> Scores are locked by GitHub Actions. To override, go to Commissioner Panel → the week entry → unlock the score manually, edit, re-lock.<br>
+          <strong>Root cause check:</strong> Compare Tank01's box score for the player's game against the expected fantasy total. Common issues: DEF points-allowed calculation or 100-yard bonuses not triggering.
+        </div>
+      </div>
+
+      <div class="accordion">
+        <div class="accordion-hdr" onclick="toggleAccordion(this)">
+          <span class="accordion-title">A player wasn't locked when their game started</span>
+          <span class="accordion-arrow">▼</span>
+        </div>
+        <div class="accordion-body">
+          <strong>Check:</strong> GitHub → Actions → kickoff-locks → latest run. If it errored, trigger it manually.<br>
+          <strong>Manual lock:</strong> The lock data lives in Firebase at <code>/leagues/fr_refresh26/locks/2026/week{N}/{TEAM}</code>. You can add the team abbreviation manually in the Firebase console.<br>
+          <strong>Policy:</strong> If a player slipped in after kickoff due to a lock failure, commissioner discretion. Generally: if the game had started and they picked someone in the active game, the lineup should be voided for that slot and scored 0 for that player.
+        </div>
+      </div>
+
+      <div class="accordion">
+        <div class="accordion-hdr" onclick="toggleAccordion(this)">
+          <span class="accordion-title">A player submitted no lineup</span>
+          <span class="accordion-arrow">▼</span>
+        </div>
+        <div class="accordion-body">
+          <strong>Policy:</strong> No lineup = 0 points for the week. This is by design — the deadline is first kickoff.<br>
+          <strong>Exception rule (optional):</strong> Some commissioners allow one "emergency" late submission per season for documented technical issues. If you allow this, set the policy before the season and document it.<br>
+          <strong>What not to do:</strong> Don't submit a lineup on a player's behalf — it creates disputes about who chose what.
+        </div>
+      </div>
+
+      <div class="accordion">
+        <div class="accordion-hdr" onclick="toggleAccordion(this)">
+          <span class="accordion-title">Salary generation returned flat/zero salaries</span>
+          <span class="accordion-arrow">▼</span>
+        </div>
+        <div class="accordion-body">
+          <strong>Cause:</strong> Tank01 projections not yet available for the week (common early in the week or during bye weeks).<br>
+          <strong>Fix:</strong> Try regenerating Thursday morning — projections are usually updated by then. If still flat on Thursday, the flat salary fallback (QB $8,500, etc.) is fair to use and announce to players.<br>
+          <strong>Tank01 check:</strong> Test the projections endpoint directly: <code>fantasy-refresh-news.mtriedel.workers.dev/projections?week=N&season=2026</code>
+        </div>
+      </div>
+
+      <div class="accordion">
+        <div class="accordion-hdr" onclick="toggleAccordion(this)">
+          <span class="accordion-title">GitHub Actions isn't running</span>
+          <span class="accordion-arrow">▼</span>
+        </div>
+        <div class="accordion-body">
+          <strong>Check 1:</strong> GitHub → Settings → Actions → General → make sure Actions are enabled for the repo.<br>
+          <strong>Check 2:</strong> GitHub free plan gives 2,000 Action minutes/month. At 5-min intervals, the season uses ~1,200 minutes. Should be fine on free plan.<br>
+          <strong>Check 3:</strong> Verify both secrets are still set: FIREBASE_DB_URL and TANK01_KEY. Go to Settings → Secrets → Actions.<br>
+          <strong>Manual trigger:</strong> Any workflow can be manually triggered from the Actions tab → Run workflow button.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- REFERENCE -->
+  <div class="section" id="reference">
+    <div class="section-hdr">
+      <span class="section-icon">📋</span>
+      <span class="section-title">Quick Reference</span>
+    </div>
+    <div class="section-body" style="padding:0;">
+      <table class="ref-table">
+        <thead><tr><th>Item</th><th>Value / Location</th></tr></thead>
+        <tbody>
+          <tr><td>Salary Cap</td><td>$60,000 per week</td></tr>
+          <tr><td>Max player salary</td><td>$11,300</td></tr>
+          <tr><td>Min player salary</td><td>$3,700</td></tr>
+          <tr><td>Roster</td><td>QB · RB · RB · WR · WR · WR · TE · FLEX · DEF</td></tr>
+          <tr><td>FLEX eligible</td><td>WR / RB / TE</td></tr>
+          <tr><td>Score lock day</td><td>Tuesday 9am ET (auto)</td></tr>
+          <tr><td>Join code (2026)</td><td>REFRESH26</td></tr>
+          <tr><td>League ID</td><td>fr_refresh26</td></tr>
+          <tr><td>Firebase DB</td><td>fantasy-refresh-default-rtdb.firebaseio.com</td></tr>
+          <tr><td>Cloudflare Worker</td><td>fantasy-refresh-news.mtriedel.workers.dev</td></tr>
+          <tr><td>Tank01 plan</td><td>Basic (free) → upgrade to Pro Sept 1</td></tr>
+          <tr><td>GitHub repo</td><td>github.com/mtriedel-fr/fantasy-refresh</td></tr>
+          <tr><td>Live site</td><td>fantasyrefresh.com</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- SEASON CHECKLIST -->
+  <div class="section" id="checklist">
+    <div class="section-hdr">
+      <span class="section-icon">✅</span>
+      <span class="section-title">Season Checklist</span>
+    </div>
+    <div class="section-body">
+      <div class="checklist" id="checklist-items">
+        <!-- Pre-Season -->
+        <div style="padding:8px 0 4px;font-family:var(--fd);font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;">Pre-Season</div>
+        <div class="check-item" onclick="toggleCheck(this)">
+          <div class="check-box"></div>
+          <div class="check-text">Upgrade Tank01 to Pro plan ($10/month) by September 1</div>
+        </div>
+        <div class="check-item" onclick="toggleCheck(this)">
+          <div class="check-box"></div>
+          <div class="check-text">All 68 players signed up and have team names set</div>
+        </div>
+        <div class="check-item" onclick="toggleCheck(this)">
+          <div class="check-box"></div>
+          <div class="check-text">Run preseason test weeks (HOF + PS Weeks 1-3)</div>
+        </div>
+        <div class="check-item" onclick="toggleCheck(this)">
+          <div class="check-box"></div>
+          <div class="check-text">Verify auto-scoring works with live preseason data</div>
+        </div>
+        <div class="check-item" onclick="toggleCheck(this)">
+          <div class="check-box"></div>
+          <div class="check-text">Verify kickoff locks fire correctly</div>
+        </div>
+        <div class="check-item" onclick="toggleCheck(this)">
+          <div class="check-box"></div>
+          <div class="check-text">Wipe preseason data before Week 1</div>
+        </div>
+        <div class="check-item" onclick="toggleCheck(this)">
+          <div class="check-box"></div>
+          <div class="check-text">Final player pool refresh after final preseason cuts</div>
+        </div>
+        <!-- Week 1 -->
+        <div style="padding:8px 0 4px;margin-top:8px;font-family:var(--fd);font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;">Week 1</div>
+        <div class="check-item" onclick="toggleCheck(this)">
+          <div class="check-box"></div>
+          <div class="check-text">Generate Week 1 salaries (Wednesday morning)</div>
+        </div>
+        <div class="check-item" onclick="toggleCheck(this)">
+          <div class="check-box"></div>
+          <div class="check-text">Verify salary distribution looks reasonable (not all flat)</div>
+        </div>
+        <div class="check-item" onclick="toggleCheck(this)">
+          <div class="check-box"></div>
+          <div class="check-text">Unlock Week 1 (Thursday noon ET)</div>
+        </div>
+        <div class="check-item" onclick="toggleCheck(this)">
+          <div class="check-box"></div>
+          <div class="check-text">Notify players draft is open</div>
+        </div>
+        <div class="check-item" onclick="toggleCheck(this)">
+          <div class="check-box"></div>
+          <div class="check-text">Monitor scores Sunday — verify live updates working</div>
+        </div>
+        <!-- Ongoing -->
+        <div style="padding:8px 0 4px;margin-top:8px;font-family:var(--fd);font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;">Every Week</div>
+        <div class="check-item" onclick="toggleCheck(this)">
+          <div class="check-box"></div>
+          <div class="check-text">Tuesday: Review locked scores for anomalies</div>
+        </div>
+        <div class="check-item" onclick="toggleCheck(this)">
+          <div class="check-box"></div>
+          <div class="check-text">Wednesday: Refresh player pool + generate salaries</div>
+        </div>
+        <div class="check-item" onclick="toggleCheck(this)">
+          <div class="check-box"></div>
+          <div class="check-text">Thursday: Unlock the week</div>
+        </div>
+      </div>
+      <div style="padding:12px 20px;border-top:1px solid var(--bdr);">
+        <button onclick="resetChecklist()" style="background:none;border:1px solid var(--bdr2);border-radius:6px;padding:5px 12px;font-family:var(--fd);font-size:11px;color:var(--ink3);cursor:pointer;text-transform:uppercase;letter-spacing:.5px;">Reset Checklist</button>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /wrap -->
+
+<script>
+// ── THEME ──────────────────────────────────────────────────────
+function toggleTheme(){
+  var html = document.documentElement;
+  var light = html.getAttribute('data-theme') !== 'light';
+  html.setAttribute('data-theme', light ? 'light' : 'dark');
+  document.getElementById('theme-btn').textContent = light ? '☀️' : '🌙';
+  try{ localStorage.setItem('fr_theme', light ? 'light' : 'dark'); }catch(e){}
+}
+(function(){
+  try{
+    var t = localStorage.getItem('fr_theme');
+    if(t){
+      document.documentElement.setAttribute('data-theme', t);
+      window.addEventListener('DOMContentLoaded', function(){
+        var btn = document.getElementById('theme-btn');
+        if(btn) btn.textContent = t === 'light' ? '☀️' : '🌙';
+      });
+    }
+  }catch(e){}
+})();
+
+// ── ACCORDION ─────────────────────────────────────────────────
+function toggleAccordion(hdr){
+  var body = hdr.nextElementSibling;
+  var arrow = hdr.querySelector('.accordion-arrow');
+  var isOpen = body.classList.contains('open');
+  body.classList.toggle('open', !isOpen);
+  arrow.classList.toggle('open', !isOpen);
+}
+
+// ── CHECKLIST ─────────────────────────────────────────────────
+function toggleCheck(item){
+  var box  = item.querySelector('.check-box');
+  var text = item.querySelector('.check-text');
+  var done = box.classList.toggle('done');
+  text.classList.toggle('done-text', done);
+  saveChecklist();
+}
+
+function saveChecklist(){
+  var items = document.querySelectorAll('.check-item');
+  var state = Array.from(items).map(function(i){
+    return i.querySelector('.check-box').classList.contains('done');
+  });
+  try{ localStorage.setItem('fr_runbook_checks', JSON.stringify(state)); }catch(e){}
+}
+
+function loadChecklist(){
+  try{
+    var state = JSON.parse(localStorage.getItem('fr_runbook_checks') || '[]');
+    var items = document.querySelectorAll('.check-item');
+    items.forEach(function(item, i){
+      if(state[i]){
+        item.querySelector('.check-box').classList.add('done');
+        item.querySelector('.check-text').classList.add('done-text');
+      }
+    });
+  }catch(e){}
+}
+
+function resetChecklist(){
+  document.querySelectorAll('.check-box').forEach(function(b){ b.classList.remove('done'); });
+  document.querySelectorAll('.check-text').forEach(function(t){ t.classList.remove('done-text'); });
+  try{ localStorage.removeItem('fr_runbook_checks'); }catch(e){}
+}
+
+window.addEventListener('DOMContentLoaded', loadChecklist);
+</script>
+</body>
+</html>

@@ -918,7 +918,12 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
   <!-- TOOLS (hidden until auth) -->
   <div id="comm-tools" class="hidden">
   <div class="comm-inner">
-    <div class="comm-title">⚙ Commissioner Tools <button onclick="toggleComm()" style="float:right;background:none;border:1px solid var(--bdr2);color:var(--ink3);font-size:13px;padding:3px 10px;border-radius:6px;cursor:pointer;font-family:var(--fd);">✕ Close</button></div>
+    <div class="comm-title">⚙ Commissioner Tools
+      <span style="float:right;display:flex;gap:8px;align-items:center;">
+        <a href="runbook.html" target="_blank" style="font-family:var(--fd);font-size:11px;font-weight:700;color:var(--ink3);text-decoration:none;border:1px solid var(--bdr2);padding:3px 10px;border-radius:6px;text-transform:uppercase;letter-spacing:.5px;transition:all .15s;" onmouseover="this.style.color='var(--or)';this.style.borderColor='var(--or)'" onmouseout="this.style.color='var(--ink3)';this.style.borderColor='var(--bdr2)'">📋 Runbook</a>
+        <button onclick="toggleComm()" style="background:none;border:1px solid var(--bdr2);color:var(--ink3);font-size:13px;padding:3px 10px;border-radius:6px;cursor:pointer;font-family:var(--fd);">✕ Close</button>
+      </span>
+    </div>
     <div class="comm-cols">
       <div>
         <div class="csect">Import week scores</div>
