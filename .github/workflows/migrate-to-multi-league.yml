@@ -1,0 +1,242 @@
+name: Migrate to Multi-League
+
+on:
+  workflow_dispatch:
+    inputs:
+      comm_uid:
+        description: 'Your Firebase UID (find in browser LocalStorage → fr_user_2026 → uid)'
+        required: true
+      confirm:
+        description: 'Type MIGRATE to confirm you want to run this'
+        required: true
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm intent
+        run: |
+          if [ "${{ inputs.confirm }}" != "MIGRATE" ]; then
+            echo "❌ You must type MIGRATE in the confirm field to run this."
+            exit 1
+          fi
+          echo "✅ Confirmed — starting migration"
+
+      - name: Run migration
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          COMM_UID: ${{ inputs.comm_uid }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+
+          const FB_URL    = process.env.FIREBASE_DB_URL;
+          const LEAGUE_ID = 'fr_refresh26';
+          const COMM_UID  = process.env.COMM_UID || '';
+
+          function fbGet(path) {
+            return new Promise((resolve, reject) => {
+              const u = new URL(FB_URL + path);
+              https.get({ hostname: u.hostname, path: u.pathname + u.search }, res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { resolve(null); } });
+              }).on('error', reject);
+            });
+          }
+
+          function fbPut(path, payload) {
+            return new Promise((resolve, reject) => {
+              const body = JSON.stringify(payload);
+              const u = new URL(FB_URL + path);
+              const req = https.request({
+                hostname: u.hostname, path: u.pathname + u.search, method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+              }, res => { let d=''; res.on('data',c=>d+=c); res.on('end',()=>resolve(d)); });
+              req.on('error', reject);
+              req.write(body); req.end();
+            });
+          }
+
+          let step = 0;
+          async function run(name, fn) {
+            step++;
+            process.stdout.write(`[${step}] ${name}... `);
+            try { await fn(); console.log('✅'); }
+            catch(e) { console.log('❌ ' + e.message); throw e; }
+          }
+
+          async function migrate() {
+            console.log('\n=== Fantasy Refresh Multi-League Migration ===');
+            console.log(`League ID: ${LEAGUE_ID}`);
+            console.log(`Commissioner UID: ${COMM_UID || '(not set)'}\n`);
+
+            // 1. Check existing data
+            await run('Checking existing data', async () => {
+              const season   = await fbGet('/season2026.json?shallow=true');
+              const pool     = await fbGet('/playerPool2026/count.json');
+              const users    = await fbGet('/users2026.json?shallow=true');
+              const salaries = await fbGet('/salaries2026.json?shallow=true');
+              console.log(`\n   season2026 weeks: ${season ? Object.keys(season).length : 0}`);
+              console.log(`   playerPool2026: ${pool || 0} players`);
+              console.log(`   users2026: ${users ? Object.keys(users).length : 0} users`);
+              console.log(`   salaries2026 weeks: ${salaries ? Object.keys(salaries).length : 0}`);
+            });
+
+            // 2. League settings
+            await run('Creating league settings', () => fbPut(
+              `/leagues/${LEAGUE_ID}/settings.json`,
+              {
+                leagueId: LEAGUE_ID,
+                name: 'Fantasy Refresh 2026',
+                season: 2026,
+                format: 'cumulative',
+                guillotine: false,
+                guillotineStartWeek: null,
+                divisions: false,
+                divisionCount: 0,
+                divisionNames: {},
+                cap: 60000,
+                maxSalary: 11300,
+                minSalary: 3700,
+                joinCode: 'REFRESH26',
+                visibility: 'private',
+                commissioners: COMM_UID ? [COMM_UID] : [],
+                created: Date.now(),
+                createdBy: COMM_UID || 'migrated',
+                maxMembers: 100,
+                entryFee: 0,
+                prizePool: 0,
+                active: true,
+                legacy: true,
+                legacyPath: 'season2026'
+              }
+            ));
+
+            // 3. Player pool
+            await run('Migrating player pool → /playerPool/2026/', async () => {
+              const pool = await fbGet('/playerPool2026.json');
+              if (!pool) return console.log('\n   (empty — skipping)');
+              await fbPut('/playerPool/2026.json', pool);
+            });
+
+            // 4. Season scores
+            await run('Migrating season scores', async () => {
+              const season = await fbGet('/season2026.json');
+              if (!season) return console.log('\n   (empty — skipping)');
+              const normalized = {};
+              Object.entries(season).forEach(([week, weekData]) => {
+                if (week === 'meta') { normalized.meta = weekData; return; }
+                if (Array.isArray(weekData)) {
+                  const obj = {};
+                  weekData.forEach((e, i) => { obj[e.uid || e.name || `e${i}`] = e; });
+                  normalized[week] = obj;
+                } else {
+                  normalized[week] = weekData;
+                }
+              });
+              await fbPut(`/leagues/${LEAGUE_ID}/season/2026.json`, normalized);
+              console.log(`\n   Weeks: ${Object.keys(normalized).filter(k=>k!=='meta').length}`);
+            });
+
+            // 5. Lineups
+            await run('Migrating lineups', async () => {
+              const data = await fbGet('/lineups2026.json');
+              if (!data) return console.log('\n   (empty — skipping)');
+              await fbPut(`/leagues/${LEAGUE_ID}/lineups/2026.json`, data);
+              console.log(`\n   Weeks: ${Object.keys(data).length}`);
+            });
+
+            // 6. Salaries
+            await run('Migrating salaries', async () => {
+              const data = await fbGet('/salaries2026.json');
+              if (!data) return console.log('\n   (empty — skipping)');
+              await fbPut(`/leagues/${LEAGUE_ID}/salaries/2026.json`, data);
+              console.log(`\n   Weeks: ${Object.keys(data).length}`);
+            });
+
+            // 7. Locks
+            await run('Migrating locks', async () => {
+              const data = await fbGet('/locks2026.json');
+              if (!data) return console.log('\n   (empty — skipping)');
+              await fbPut(`/leagues/${LEAGUE_ID}/locks/2026.json`, data);
+            });
+
+            // 8. Users + members
+            await run('Migrating users + building members', async () => {
+              const users = await fbGet('/users2026.json');
+              if (!users) return console.log('\n   (empty — skipping)');
+              const members = {};
+              let count = 0;
+              for (const [uid, p] of Object.entries(users)) {
+                await fbPut(`/users/${uid}.json`, {
+                  uid, email: p.email||'', name: p.name||'',
+                  created: p.created||Date.now(),
+                  leagues: {
+                    [LEAGUE_ID]: {
+                      teamName: p.team2026||p.teamName||'',
+                      joined: p.created||Date.now(),
+                      role: COMM_UID && uid === COMM_UID ? 'commissioner' : 'member'
+                    }
+                  }
+                });
+                members[uid] = {
+                  uid, teamName: p.team2026||p.teamName||'',
+                  division: null, joined: p.created||Date.now(),
+                  active: true, eliminated: false
+                };
+                count++;
+              }
+              if (Object.keys(members).length) {
+                await fbPut(`/leagues/${LEAGUE_ID}/members.json`, members);
+              }
+              console.log(`\n   Users: ${count}`);
+            });
+
+            // 9. Reactions
+            await run('Migrating reactions', async () => {
+              const data = await fbGet('/reactions2026.json');
+              if (!data) return console.log('\n   (empty — skipping)');
+              await fbPut(`/leagues/${LEAGUE_ID}/reactions/2026.json`, data);
+            });
+
+            // 10. Preseason
+            await run('Migrating preseason', async () => {
+              const data = await fbGet('/preseason2026.json');
+              if (!data) return console.log('\n   (empty — skipping)');
+              await fbPut(`/leagues/${LEAGUE_ID}/season/preseason.json`, data);
+            });
+
+            // 11. Preseason salaries + lineups
+            await run('Migrating preseason salaries', async () => {
+              const data = await fbGet('/salariespreseason2026.json');
+              if (!data) return console.log('\n   (empty — skipping)');
+              await fbPut(`/leagues/${LEAGUE_ID}/salaries/preseason.json`, data);
+            });
+
+            await run('Migrating preseason lineups', async () => {
+              const data = await fbGet('/lineupspreseason2026.json');
+              if (!data) return console.log('\n   (empty — skipping)');
+              await fbPut(`/leagues/${LEAGUE_ID}/lineups/preseason.json`, data);
+            });
+
+            // 12. Migration log
+            await run('Writing migration log', () => fbPut(
+              `/migrationLog/${LEAGUE_ID}.json`,
+              {
+                leagueId: LEAGUE_ID, migratedAt: Date.now(),
+                commUid: COMM_UID, status: 'complete',
+                note: 'Old paths preserved as backup'
+              }
+            ));
+
+            console.log('\n╔══════════════════════════════════════════╗');
+            console.log('║  ✅ Migration Complete!                   ║');
+            console.log(`║  League: /leagues/${LEAGUE_ID}/  ║`);
+            console.log('║  Old paths: preserved as backup          ║');
+            console.log('║  Next: update app to use new paths       ║');
+            console.log('╚══════════════════════════════════════════╝\n');
+          }
+
+          migrate().catch(e => { console.error('Migration failed:', e.message); process.exit(1); });
+          SCRIPT
