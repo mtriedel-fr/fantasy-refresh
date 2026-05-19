@@ -629,7 +629,8 @@ function joinLeague(){
           maxSalary:  settings.maxSalary,
           minSalary:  settings.minSalary,
           role:       'member',
-          teamName:   ''
+          teamName:   '',
+          promptTeamName: true  // flag: show team name prompt on first load
         });
         showSuccess('join', settings.name, code, settings.format, settings.guillotine);
       });

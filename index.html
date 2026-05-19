@@ -3487,6 +3487,19 @@ function toggleTheme(){
 function setMyTeam(val){
   myTeam = val.trim();
   try{ localStorage.setItem('fr_myteam', myTeam); }catch(e){}
+  // Debounced save to Firebase
+  clearTimeout(window._teamSaveTimer);
+  if(myTeam.length >= 2){
+    window._teamSaveTimer = setTimeout(function(){
+      var user = null;
+      try{ user = JSON.parse(localStorage.getItem('fr_user_'+FR_SEASON)); }catch(e){}
+      if(!user) return;
+      FR.fb.patch(FR.paths.member(user.uid), { teamName: myTeam })
+        .then(function(){ FR.fb.patch('/users/'+user.uid+'/leagues/'+FR.ctx().leagueId, { teamName: myTeam }); })
+        .catch(function(){});
+      try{ localStorage.setItem('fr_teamname_'+FR.ctx().leagueId, myTeam); }catch(e){}
+    }, 1000);
+  }
   renderAll();
 }
 
@@ -3928,6 +3941,110 @@ function handleLeagueSwitch(leagueId){
   });
 }
 
+
+// ── TEAM NAME (per-league) ─────────────────────────────────────
+function loadTeamName(){
+  var user = null;
+  try{ user = JSON.parse(localStorage.getItem('fr_user_'+FR_SEASON)); }catch(e){}
+  if(!user) return;
+
+  var ctx = FR.ctx();
+  var leagueId = ctx.leagueId;
+  var cacheKey = 'fr_teamname_'+leagueId;
+
+  // Check cache first
+  try{
+    var cached = localStorage.getItem(cacheKey);
+    if(cached){
+      myTeam = cached;
+      applyTeamName(cached);
+    }
+  }catch(e){}
+
+  // Load from Firebase (source of truth)
+  FR.fb.get(FR.paths.member(user.uid))
+    .then(function(member){
+      if(member && member.teamName){
+        myTeam = member.teamName;
+        applyTeamName(member.teamName);
+        try{ localStorage.setItem(cacheKey, member.teamName); }catch(e){}
+      } else if(!myTeam){
+        // No team name set — prompt after short delay
+        setTimeout(function(){
+          promptTeamName(ctx.leagueName || 'this league');
+        }, 1500);
+      }
+      // Clear prompt flag after checking
+      if(ctx.promptTeamName){
+        FR.saveContext(Object.assign({}, ctx, { promptTeamName: false }));
+        if(!member || !member.teamName){
+          promptTeamName(ctx.leagueName || 'this league');
+        }
+      }
+    })
+    .catch(function(){});
+}
+
+function applyTeamName(name){
+  myTeam = name;
+  try{ localStorage.setItem('fr_myteam', name); }catch(e){}
+  var inp = document.getElementById('my-team-input');
+  if(inp && !inp.value) inp.value = name;
+  // Update auth badge if showing team name
+  var badge = document.getElementById('fr-sign-btn');
+  if(badge && badge.textContent.includes('👤')){
+    badge.textContent = '👤 '+name;
+  }
+}
+
+function promptTeamName(leagueName){
+  var modal = document.getElementById('team-name-modal');
+  if(!modal) return;
+  var label = document.getElementById('team-name-league-label');
+  if(label) label.textContent = leagueName;
+  modal.style.display = 'flex';
+  setTimeout(function(){
+    var inp = document.getElementById('team-name-inp');
+    if(inp) inp.focus();
+  }, 100);
+}
+
+function saveTeamName(){
+  var inp  = document.getElementById('team-name-inp');
+  var name = inp ? inp.value.trim() : '';
+  var status = document.getElementById('team-name-status');
+  if(!name){ status.textContent='Enter a team name'; return; }
+
+  var user = null;
+  try{ user = JSON.parse(localStorage.getItem('fr_user_'+FR_SEASON)); }catch(e){}
+  if(!user){ status.textContent='Not signed in'; return; }
+
+  var leagueId = FR.ctx().leagueId;
+  status.textContent = 'Saving…';
+
+  // Save to league members
+  FR.fb.patch(FR.paths.member(user.uid), { teamName: name })
+    .then(function(){
+      // Also update user's league entry
+      return FR.fb.patch('/users/'+user.uid+'/leagues/'+leagueId, { teamName: name });
+    })
+    .then(function(){
+      // Update league context
+      var ctx = FR.ctx();
+      FR.saveContext(Object.assign({}, ctx, { teamName: name }));
+      // Cache locally
+      try{ localStorage.setItem('fr_teamname_'+leagueId, name); }catch(e){}
+      // Apply
+      applyTeamName(name);
+      // Close modal
+      document.getElementById('team-name-modal').style.display = 'none';
+      showToast('Team name set: '+name+' ✓');
+    })
+    .catch(function(){
+      status.textContent = 'Save failed — try again';
+    });
+}
+
 var frAuth = {
   user: null,
   _teamAvail: false,
@@ -4102,6 +4219,7 @@ var frAuth = {
 // Boot auth after page loads
 frAuth.init();
 initLeagueSwitcher();
+loadTeamName();
 
 
 // ── COMMISSIONER USER PANEL ───────────────────────────────────
@@ -4631,6 +4749,29 @@ function toggleSalaryLock(){
       <button class="fr-btn" onclick="frAuth.submitProfile()">Save &amp; Enter →</button>
     </div>
 
+  </div>
+</div>
+
+
+<!-- TEAM NAME PROMPT MODAL -->
+<div id="team-name-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:600;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:var(--bg2);border-radius:16px;border-top:3px solid var(--or);border-bottom:3px solid var(--pk);width:100%;max-width:420px;padding:32px;text-align:center;">
+    <div style="font-size:40px;margin-bottom:12px;">🏈</div>
+    <div style="font-family:var(--fd);font-size:24px;font-weight:900;color:var(--or);text-transform:uppercase;margin-bottom:4px;">Set Your Team Name</div>
+    <div id="team-name-league-label" style="font-family:var(--fd);font-size:12px;color:var(--pk);text-transform:uppercase;letter-spacing:.8px;margin-bottom:16px;"></div>
+    <p style="font-size:13px;color:var(--ink3);margin-bottom:20px;line-height:1.6;">Choose your team name for this league. You can have different names in different leagues.</p>
+    <input type="text" id="team-name-inp" placeholder="e.g. Mahomes Alone" maxlength="30"
+      style="width:100%;padding:12px 14px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:10px;color:var(--or);font-family:var(--fd);font-size:18px;font-weight:700;outline:none;text-align:center;margin-bottom:8px;"
+      oninput="document.getElementById('team-name-counter').textContent=(30-this.value.length)+' chars left'"
+      onkeydown="if(event.key==='Enter')saveTeamName()">
+    <div id="team-name-counter" style="font-family:var(--fd);font-size:10px;color:var(--ink3);margin-bottom:16px;">30 chars left</div>
+    <button onclick="saveTeamName()" style="width:100%;padding:13px;background:linear-gradient(135deg,var(--or),var(--pk));border:none;border-radius:10px;color:#050808;font-family:var(--fd);font-size:15px;font-weight:900;text-transform:uppercase;cursor:pointer;">
+      Set Team Name →
+    </button>
+    <button onclick="document.getElementById('team-name-modal').style.display='none'" style="width:100%;padding:8px;background:none;border:none;color:var(--ink3);font-family:var(--fd);font-size:11px;cursor:pointer;margin-top:8px;text-transform:uppercase;">
+      Skip for now
+    </button>
+    <div id="team-name-status" style="font-family:var(--fd);font-size:11px;color:var(--pk);margin-top:8px;min-height:14px;text-transform:uppercase;"></div>
   </div>
 </div>
 
