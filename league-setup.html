@@ -207,7 +207,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
         <!-- Format -->
         <div class="form-group">
           <label class="form-label">League Format</label>
-          <div class="format-grid">
+          <div class="format-grid" style="grid-template-columns:1fr 1fr 1fr;">
             <div class="format-opt selected" id="fmt-cumulative" onclick="selectFormat('cumulative')">
               <div class="format-opt-title">📊 Cumulative</div>
               <div class="format-opt-desc">Weekly scores add up all season. Most points at the end wins.</div>
@@ -216,15 +216,19 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
               <div class="format-opt-title">⚔️ Head to Head</div>
               <div class="format-opt-desc">Weekly matchups. Win/loss record determines playoffs.</div>
             </div>
+            <div class="format-opt" id="fmt-guillotine" onclick="selectFormat('guillotine')">
+              <div class="format-opt-title">☠️ Guillotine</div>
+              <div class="format-opt-desc">Last place eliminated each week. Last team standing wins.</div>
+            </div>
           </div>
         </div>
 
         <!-- Optional toggles -->
         <div style="background:var(--bg3);border-radius:10px;border:1px solid var(--bdr);padding:0 16px;">
-          <div class="toggle-row">
+          <div class="toggle-row" id="tog-guillotine-row">
             <div>
               <div class="toggle-label">☠️ Guillotine</div>
-              <div class="toggle-sub">Lowest scorer eliminated each week (concurrent)</div>
+              <div class="toggle-sub">Run guillotine concurrently alongside main format</div>
             </div>
             <label class="toggle"><input type="checkbox" id="tog-guillotine"><span class="toggle-slider"></span></label>
           </div>
@@ -425,11 +429,26 @@ function selectFormat(fmt){
   selectedFmt = fmt;
   document.getElementById('fmt-cumulative').classList.toggle('selected', fmt==='cumulative');
   document.getElementById('fmt-headtohead').classList.toggle('selected', fmt==='headtohead');
-  // Enable divisions toggle only for H2H
+  document.getElementById('fmt-guillotine').classList.toggle('selected', fmt==='guillotine');
+
+  // Divisions: H2H only
   var divRow = document.getElementById('tog-divisions-row');
   divRow.style.opacity = fmt==='headtohead' ? '1' : '.4';
   divRow.style.pointerEvents = fmt==='headtohead' ? 'auto' : 'none';
   if(fmt !== 'headtohead') document.getElementById('tog-divisions').checked = false;
+
+  // Concurrent guillotine toggle: hide when standalone guillotine selected
+  var togRow = document.getElementById('tog-guillotine-row');
+  if(fmt === 'guillotine'){
+    togRow.style.opacity = '.4';
+    togRow.style.pointerEvents = 'none';
+    document.getElementById('tog-guillotine').checked = false;
+    togRow.querySelector('.toggle-sub').textContent = 'Not available — this league IS a guillotine';
+  } else {
+    togRow.style.opacity = '1';
+    togRow.style.pointerEvents = 'auto';
+    togRow.querySelector('.toggle-sub').textContent = 'Run guillotine concurrently alongside main format';
+  }
 }
 
 // ── CREATE LEAGUE ─────────────────────────────────────────────
@@ -563,7 +582,7 @@ function lookupLeague(){
         joinTargetLeagueId = match.leagueId;
         document.getElementById('join-league-name').textContent = match.name;
         document.getElementById('join-league-meta').textContent =
-          (match.format==='headtohead'?'⚔️ Head to Head':'📊 Cumulative')
+          (match.format==='headtohead'?'⚔️ Head to Head':match.format==='guillotine'?'☠️ Guillotine':'📊 Cumulative')
           + (match.guillotine?' · ☠️ Guillotine':'')
           + ' · ' + (match.members||0) + '/' + match.maxMembers + ' players';
         preview.style.display = 'block';
