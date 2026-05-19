@@ -2659,7 +2659,7 @@ function buildCompareRankChart(teamStats, weeks){
     return t;
   })());
 
-  var maxRank = allNames.length || 68;
+  var maxRank = allNames.length || Object.keys(seasonData[curKey]||{}).length || 10;
   
   
 
@@ -2932,7 +2932,7 @@ function buildRankChartInline(weekData){
   var ranked=weekData.filter(function(d){return d.rank!==null;});
   if(!ranked.length) return '';
   var allR=ranked.map(function(d){return d.rank;}).concat(ranked.map(function(d){return d.cumStanding||d.rank;}));
-  var maxR=Math.max.apply(null,allR.concat([ranked[0].total||68])), minR=1;
+  var maxR=Math.max.apply(null,allR.concat([ranked[0].total||allR.length||10])), minR=1;
   function xp(i){return PAD.l+(i/(ranked.length-1||1))*iW;}
   function yp(r){return PAD.t+iH-((maxR-r)/(maxR-minR||1))*iH;}
   var rp=ranked.map(function(d,i){return(i?'L':'M')+xp(i).toFixed(1)+' '+yp(d.rank).toFixed(1);}).join(' ');
