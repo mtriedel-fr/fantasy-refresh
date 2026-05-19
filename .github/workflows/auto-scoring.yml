@@ -151,7 +151,7 @@ jobs:
           // ── LOCK RUN — Tuesday 9am ─────────────────────────────
           async function lockScores(week) {
             console.log(`Locking scores for Week ${week}...`);
-            const scores = await firebaseGet(`/season${SEASON}/${week}.json`).catch(() => null);
+            const scores = await firebaseGet(`/leagues/fr_refresh26/season/${SEASON}/${week}.json`).catch(() => null);
             if (!scores) { console.log('No scores to lock.'); return; }
 
             const updates = {};
@@ -162,7 +162,7 @@ jobs:
             });
 
             if (Object.keys(updates).length) {
-              await firebasePatch(`/season${SEASON}/${week}.json`, updates);
+              await firebasePatch(`/leagues/fr_refresh26/season/${SEASON}/${week}.json`, updates);
               console.log(`✅ Locked ${Object.keys(updates).length} scores for Week ${week}`);
             } else {
               console.log('All scores already locked.');
@@ -234,13 +234,13 @@ jobs:
             });
 
             // Load all submitted lineups for this week
-            const lineups = await firebaseGet(`/lineups${SEASON}/week${week}.json`).catch(() => null);
+            const lineups = await firebaseGet(`/leagues/fr_refresh26/lineups/${SEASON}/week${week}.json`).catch(() => null);
             if (!lineups) { console.log('No lineups submitted yet.'); return; }
 
             console.log(`\nScoring ${Object.keys(lineups).length} lineup(s)...`);
 
             // Load existing scores to preserve locked ones
-            const existingScores = await firebaseGet(`/season${SEASON}/${week}.json`).catch(() => ({}));
+            const existingScores = await firebaseGet(`/leagues/fr_refresh26/season/${SEASON}/${week}.json`).catch(() => ({}));
 
             const scoreUpdates = {};
 
@@ -297,12 +297,12 @@ jobs:
 
             // Write all scores in one PATCH
             if (Object.keys(scoreUpdates).length) {
-              await firebasePatch(`/season${SEASON}/${week}.json`, scoreUpdates);
+              await firebasePatch(`/leagues/fr_refresh26/season/${SEASON}/${week}.json`, scoreUpdates);
               console.log(`\n✅ Wrote ${Object.keys(scoreUpdates).length} scores to Firebase`);
             }
 
             // Update week meta
-            await firebasePut(`/season${SEASON}/meta.json`, {
+            await firebasePut(`/leagues/fr_refresh26/season/${SEASON}/meta.json`, {
               week,
               lastScored:  Date.now(),
               allFinal,
