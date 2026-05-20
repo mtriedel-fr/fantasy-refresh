@@ -237,7 +237,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
               <div class="toggle-label">🏟️ Divisions</div>
               <div class="toggle-sub">Split league into divisions (H2H only)</div>
             </div>
-            <label class="toggle"><input type="checkbox" id="tog-divisions" onchange="onDivisionsToggle()"><span class="toggle-slider"></span></label>
+            <label class="toggle"><input type="checkbox" id="tog-divisions" disabled onchange="onDivisionsToggle()"><span class="toggle-slider"></span></label>
           </div>
           <div class="toggle-row">
             <div>
@@ -248,77 +248,132 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
           </div>
         </div>
 
-        <!-- Advanced settings (collapsed by default) -->
-        <details style="margin-top:16px;" id="adv-details">
+        <!-- H2H SETTINGS PANEL (shown only when H2H selected) -->
+        <div id="h2h-settings" style="display:none;margin-top:12px;background:var(--bg3);border-radius:10px;border:1px solid var(--bdr);overflow:hidden;">
+          <div style="padding:10px 16px;background:var(--bg4);border-bottom:1px solid var(--bdr);">
+            <span style="font-family:var(--fd);font-size:11px;font-weight:800;color:var(--or);text-transform:uppercase;letter-spacing:.8px;">⚔️ Head to Head Settings</span>
+          </div>
+          <!-- League size + divisions -->
+          <div style="padding:14px 16px;border-bottom:1px solid var(--bdr);">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px;">
+              <div class="form-group" style="margin:0;">
+                <label class="form-label">Total Teams</label>
+                <input type="number" class="form-input" id="h2h-teams" value="12" min="4" max="32" oninput="updateH2HCalc()">
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label class="form-label">Divisions</label>
+                <select class="form-input" id="h2h-divisions" onchange="updateH2HCalc()" style="color:var(--or);">
+                  <option value="0">No Divisions</option>
+                  <option value="2">2 Divisions</option>
+                  <option value="3">3 Divisions</option>
+                  <option value="4">4 Divisions</option>
+                </select>
+              </div>
+            </div>
+            <div id="h2h-division-size-hint" style="display:none;font-size:12px;color:var(--ink3);background:var(--bg2);padding:8px 12px;border-radius:8px;border:1px solid var(--bdr);">
+              <span id="h2h-div-breakdown"></span>
+            </div>
+          </div>
+          <!-- Playoff settings -->
+          <div style="padding:14px 16px;border-bottom:1px solid var(--bdr);">
+            <div style="font-family:var(--fd);font-size:11px;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;">🏆 Playoff Settings</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px;">
+              <div class="form-group" style="margin:0;">
+                <label class="form-label">Playoffs Start</label>
+                <select class="form-input" id="h2h-playoff-start" style="color:var(--or);">
+                  <option value="14">Week 14</option>
+                  <option value="15" selected>Week 15</option>
+                  <option value="16">Week 16</option>
+                  <option value="17">Week 17</option>
+                </select>
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label class="form-label">Playoff Teams</label>
+                <input type="number" class="form-input" id="h2h-playoff-teams" value="4" min="2" max="16" oninput="updateH2HCalc()">
+              </div>
+            </div>
+            <div id="h2h-playoff-hint" style="font-size:11px;color:var(--ink3);">4 of 12 teams make playoffs</div>
+            <div id="h2h-wildcard-info" style="display:none;font-size:12px;color:var(--ink3);background:var(--bg2);padding:8px 12px;border-radius:8px;border:1px solid var(--bdr);margin-top:8px;">
+              <span id="h2h-wildcard-breakdown"></span>
+            </div>
+          </div>
+          <!-- Division winner rules (shown only when divisions > 0) -->
+          <div id="h2h-div-winner-row" style="display:none;padding:0 16px;">
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label">🏅 Division Winner Auto-Bid</div>
+                <div class="toggle-sub">Division winners automatically qualify for playoffs</div>
+              </div>
+              <label class="toggle"><input type="checkbox" id="tog-div-autobid" checked><span class="toggle-slider"></span></label>
+            </div>
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label">🌱 Division Winner Top Seed</div>
+                <div class="toggle-sub">Division winners are top seeds (seeded by record, no auto-bye)</div>
+              </div>
+              <label class="toggle"><input type="checkbox" id="tog-div-topseed" checked><span class="toggle-slider"></span></label>
+            </div>
+          </div>
+        </div>
+
+        <!-- ROSTER & CAP (visible for all formats, open by default) -->
+        <details style="margin-top:12px;" id="adv-details" open>
           <summary style="font-family:var(--fd);font-size:12px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;cursor:pointer;padding:8px 0;">
-            ⚙️ Advanced Settings — Roster &amp; Cap
+            ⚙️ Roster &amp; Cap
           </summary>
           <div style="padding:12px 0;">
-
             <!-- Roster slots -->
-            <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;">Roster Slots</div>
+            <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;">Roster Slots <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:10px;">(default: QB · RB×2 · WR×3 · TE · FLEX · DEF)</span></div>
             <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;">
               <div class="form-group" style="margin:0;">
                 <label class="form-label">QB</label>
-                <input type="number" class="form-input roster-inp" id="adv-qb" value="1" min="1" max="4" oninput="updateCap()">
+                <input type="number" class="form-input" id="adv-qb" value="1" min="1" max="4" oninput="updateCap()">
               </div>
               <div class="form-group" style="margin:0;">
                 <label class="form-label">RB</label>
-                <input type="number" class="form-input roster-inp" id="adv-rb" value="2" min="1" max="6" oninput="updateCap()">
+                <input type="number" class="form-input" id="adv-rb" value="2" min="1" max="6" oninput="updateCap()">
               </div>
               <div class="form-group" style="margin:0;">
                 <label class="form-label">WR</label>
-                <input type="number" class="form-input roster-inp" id="adv-wr" value="3" min="1" max="6" oninput="updateCap()">
+                <input type="number" class="form-input" id="adv-wr" value="3" min="1" max="6" oninput="updateCap()">
               </div>
               <div class="form-group" style="margin:0;">
                 <label class="form-label">TE</label>
-                <input type="number" class="form-input roster-inp" id="adv-te" value="1" min="0" max="3" oninput="updateCap()">
+                <input type="number" class="form-input" id="adv-te" value="1" min="0" max="3" oninput="updateCap()">
               </div>
               <div class="form-group" style="margin:0;">
                 <label class="form-label">FLEX</label>
-                <input type="number" class="form-input roster-inp" id="adv-flex" value="1" min="0" max="4" oninput="updateCap()">
+                <input type="number" class="form-input" id="adv-flex" value="1" min="0" max="4" oninput="updateCap()">
               </div>
               <div class="form-group" style="margin:0;">
                 <label class="form-label">DEF</label>
-                <input type="number" class="form-input roster-inp" id="adv-def" value="1" min="0" max="2" oninput="updateCap()">
+                <input type="number" class="form-input" id="adv-def" value="1" min="0" max="2" oninput="updateCap()">
               </div>
             </div>
-
             <!-- FLEX eligibility -->
-            <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px;">FLEX Eligible Positions</div>
-            <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
-              <label style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--ink2);cursor:pointer;">
-                <input type="checkbox" id="flex-wr" checked style="accent-color:var(--or);"> WR
-              </label>
-              <label style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--ink2);cursor:pointer;">
-                <input type="checkbox" id="flex-rb" checked style="accent-color:var(--or);"> RB
-              </label>
-              <label style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--ink2);cursor:pointer;">
-                <input type="checkbox" id="flex-te" checked style="accent-color:var(--or);"> TE
-              </label>
-              <label style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--ink2);cursor:pointer;">
-                <input type="checkbox" id="flex-qb" style="accent-color:var(--or);"> QB
-              </label>
+            <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px;">FLEX Eligible</div>
+            <div style="display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap;">
+              <label style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--ink2);cursor:pointer;"><input type="checkbox" id="flex-wr" checked style="accent-color:var(--or);"> WR</label>
+              <label style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--ink2);cursor:pointer;"><input type="checkbox" id="flex-rb" checked style="accent-color:var(--or);"> RB</label>
+              <label style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--ink2);cursor:pointer;"><input type="checkbox" id="flex-te" checked style="accent-color:var(--or);"> TE</label>
+              <label style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--ink2);cursor:pointer;"><input type="checkbox" id="flex-qb" style="accent-color:var(--or);"> QB</label>
             </div>
-
             <!-- Auto-calculated cap -->
             <div style="background:var(--bg2);border-radius:8px;border:1px solid var(--bdr2);padding:12px 14px;">
               <div style="display:flex;align-items:center;justify-content:space-between;">
                 <div>
                   <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;">Salary Cap</div>
-                  <div style="font-size:11px;color:var(--ink3);margin-top:2px;" id="cap-formula">9 players × $7,000 = $63,000</div>
+                  <div style="font-size:11px;color:var(--ink3);margin-top:2px;" id="cap-formula">9 players × $6,667 = $60,000</div>
                 </div>
-                <div style="font-family:var(--fd);font-size:26px;font-weight:900;color:var(--or);" id="adv-cap-display">$63,000</div>
+                <div style="font-family:var(--fd);font-size:26px;font-weight:900;color:var(--or);" id="adv-cap-display">$60,000</div>
               </div>
-              <input type="hidden" id="adv-cap" value="63000">
+              <input type="hidden" id="adv-cap" value="60000">
             </div>
-
-            <!-- Max league members -->
+            <!-- Max members -->
             <div class="form-group" style="margin-top:12px;margin-bottom:0;">
               <label class="form-label">Max League Members</label>
               <input type="number" class="form-input" id="adv-members" value="20" min="4" max="100">
             </div>
-
           </div>
         </details>
       </div>
@@ -838,7 +893,7 @@ function goDirectToLeague(leagueId){
 // ── HELPERS ───────────────────────────────────────────────────
 
 // ── CAP CALCULATOR ─────────────────────────────────────────────
-var CAP_PER_PLAYER = 7000; // $60,000 / 9 players ≈ $6,667 → rounded to $7,000
+var CAP_PER_PLAYER = 6667; // $60,000 / 9 players = $6,667
 
 function updateCap(){
   var qb   = parseInt(document.getElementById('adv-qb').value)   || 1;
@@ -849,12 +904,12 @@ function updateCap(){
   var def  = parseInt(document.getElementById('adv-def').value)  || 1;
   var total = qb + rb + wr + te + flex + def;
   // Round to nearest $1,000
-  var cap = Math.round(total * CAP_PER_PLAYER / 1000) * 1000;
+  var cap = Math.round((total * CAP_PER_PLAYER) / 1000) * 1000;
   var formula = document.getElementById('cap-formula');
   var display = document.getElementById('adv-cap-display');
   var hidden  = document.getElementById('adv-cap');
-  if(formula) formula.textContent = total+' players × $'+CAP_PER_PLAYER.toLocaleString()+' = $'+cap.toLocaleString();
-  if(display) display.textContent = '$'+cap.toLocaleString();
+  if(formula) formula.textContent = total + ' players × $' + CAP_PER_PLAYER.toLocaleString() + ' = $' + cap.toLocaleString();
+  if(display) display.textContent = '$' + cap.toLocaleString();
   if(hidden)  hidden.value = cap;
 }
 
