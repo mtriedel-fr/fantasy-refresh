@@ -241,6 +241,110 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
           </div>
         </div>
 
+
+        <!-- CUMULATIVE SETTINGS PANEL (shown only when Cumulative selected) -->
+        <div id="cum-settings" style="display:none;margin-top:12px;background:var(--bg3);border-radius:10px;border:1px solid var(--bdr);overflow:hidden;">
+          <div style="padding:10px 16px;background:var(--bg4);border-bottom:1px solid var(--bdr);">
+            <span style="font-family:var(--fd);font-size:11px;font-weight:800;color:var(--or);text-transform:uppercase;letter-spacing:.8px;">📊 Cumulative Playoff Settings</span>
+          </div>
+
+          <!-- Playoff type selection -->
+          <div style="padding:14px 16px;border-bottom:1px solid var(--bdr);">
+            <div style="font-family:var(--fd);font-size:11px;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;">Playoff Format</div>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:10px 12px;border-radius:8px;border:1px solid var(--bdr2);transition:all .15s;" id="cum-opt-none" onclick="selectCumPlayoff('none')">
+                <input type="radio" name="cum-playoff" value="none" checked style="margin-top:2px;accent-color:var(--or);">
+                <div>
+                  <div style="font-family:var(--fd);font-size:13px;font-weight:800;color:var(--ink);">🏁 No Playoffs</div>
+                  <div style="font-size:12px;color:var(--ink3);margin-top:2px;">Pure season total. Highest cumulative score at end of season wins.</div>
+                </div>
+              </label>
+              <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:10px 12px;border-radius:8px;border:1px solid var(--bdr2);transition:all .15s;" id="cum-opt-bracket" onclick="selectCumPlayoff('bracket')">
+                <input type="radio" name="cum-playoff" value="bracket" style="margin-top:2px;accent-color:var(--or);">
+                <div>
+                  <div style="font-family:var(--fd);font-size:13px;font-weight:800;color:var(--ink);">🏆 Standard Bracket</div>
+                  <div style="font-size:12px;color:var(--ink3);margin-top:2px;">Top N teams make playoffs. Single-week matchups by cumulative score.</div>
+                </div>
+              </label>
+              <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:10px 12px;border-radius:8px;border:1px solid var(--bdr2);transition:all .15s;" id="cum-opt-tiers" onclick="selectCumPlayoff('tiers')">
+                <input type="radio" name="cum-playoff" value="tiers" style="margin-top:2px;accent-color:var(--or);">
+                <div>
+                  <div style="font-family:var(--fd);font-size:13px;font-weight:800;color:var(--ink);">⬇️ Tiered Cuts</div>
+                  <div style="font-size:12px;color:var(--ink3);margin-top:2px;">Bottom players eliminated each week across multiple tiers until a winner remains.</div>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <!-- Bracket options (shown when bracket selected) -->
+          <div id="cum-bracket-opts" style="display:none;padding:14px 16px;border-bottom:1px solid var(--bdr);">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+              <div class="form-group" style="margin:0;">
+                <label class="form-label">Playoff Teams</label>
+                <input type="number" class="form-input" id="cum-bracket-teams" value="4" min="2" max="16" oninput="updateCumCalc()">
+                <div class="form-hint" id="cum-bracket-hint">top 4 teams qualify</div>
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label class="form-label">Playoffs Start</label>
+                <select class="form-input" id="cum-bracket-start" style="color:var(--or);">
+                  <option value="14">Week 14</option>
+                  <option value="15" selected>Week 15</option>
+                  <option value="16">Week 16</option>
+                  <option value="17">Week 17</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tiers options (shown when tiers selected) -->
+          <div id="cum-tiers-opts" style="display:none;padding:14px 16px;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+              <div class="form-group" style="margin:0;">
+                <label class="form-label">Number of Tiers</label>
+                <input type="number" class="form-input" id="cum-tier-count" value="3" min="2" max="8" oninput="buildTierSchedule()">
+                <div class="form-hint">each tier = one elimination round</div>
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label class="form-label">Tiers Start Week</label>
+                <select class="form-input" id="cum-tier-start" onchange="buildTierSchedule()" style="color:var(--or);">
+                  <option value="10">Week 10</option>
+                  <option value="11">Week 11</option>
+                  <option value="12">Week 12</option>
+                  <option value="13" selected>Week 13</option>
+                  <option value="14">Week 14</option>
+                  <option value="15">Week 15</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Tier end condition -->
+            <div style="font-family:var(--fd);font-size:11px;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;">End Condition</div>
+            <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px;">
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink2);cursor:pointer;">
+                <input type="radio" name="tier-end" value="last" checked onchange="buildTierSchedule()" style="accent-color:var(--or);">
+                Continue until 1 winner remains
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink2);cursor:pointer;">
+                <input type="radio" name="tier-end" value="week" onchange="buildTierSchedule()" style="accent-color:var(--or);">
+                Stop at a set final week — leader wins
+              </label>
+            </div>
+            <div id="tier-final-week-row" style="display:none;margin-bottom:12px;">
+              <div class="form-group" style="margin:0;">
+                <label class="form-label">Final Week</label>
+                <select class="form-input" id="cum-tier-final-week" style="color:var(--or);">
+                  <option value="16">Week 16</option>
+                  <option value="17" selected>Week 17</option>
+                  <option value="18">Week 18</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Tier schedule preview -->
+            <div id="tier-schedule-preview" style="background:var(--bg2);border-radius:8px;border:1px solid var(--bdr);padding:12px;"></div>
+          </div>
+        </div>
+
         <!-- H2H SETTINGS PANEL (shown only when H2H selected) -->
         <div id="h2h-settings" style="display:none;margin-top:12px;background:var(--bg3);border-radius:10px;border:1px solid var(--bdr);overflow:hidden;">
           <div style="padding:10px 16px;background:var(--bg4);border-bottom:1px solid var(--bdr);">
@@ -532,8 +636,10 @@ function selectFormat(fmt){
   document.getElementById('fmt-headtohead').classList.toggle('selected', fmt==='headtohead');
   document.getElementById('fmt-guillotine').classList.toggle('selected', fmt==='guillotine');
 
-  // H2H expanded settings
+  // Show/hide cumulative and H2H settings panels
+  var cumSettings = document.getElementById('cum-settings');
   var h2hSettings = document.getElementById('h2h-settings');
+  cumSettings.style.display = fmt === 'cumulative' ? 'block' : 'none';
   h2hSettings.style.display = fmt === 'headtohead' ? 'block' : 'none';
 
   // Reset divisions dropdown when leaving H2H
@@ -621,6 +727,8 @@ function createLeague(){
   var divisions    = (parseInt(document.getElementById('h2h-divisions').value)||0) > 0;
   var isPublic     = document.getElementById('tog-public').checked;
   // H2H specific
+  // Cumulative playoff config
+  var cumPlayoff   = selectedFmt === 'cumulative' ? getCumPlayoffSettings() : {};
   var h2hTeams     = selectedFmt === 'headtohead' ? (parseInt(document.getElementById('h2h-teams').value)||12) : null;
   var h2hDivisions = selectedFmt === 'headtohead' ? (parseInt(document.getElementById('h2h-divisions').value)||0) : 0;
   var playoffStart = selectedFmt === 'headtohead' ? (parseInt(document.getElementById('h2h-playoff-start').value)||15) : null;
@@ -681,6 +789,8 @@ function createLeague(){
     playoffTeams:        playoffTeams,
     divisionAutobid:     divAutobid,
     divisionTopSeed:     divTopSeed,
+    // Cumulative playoff
+    ...cumPlayoff,
     visibility:          isPublic ? 'public' : 'private',
     commissioners:       [currentUser.uid],
     created:             Date.now(),
@@ -890,6 +1000,94 @@ function updateCap(){
   if(formula) formula.textContent = total + ' players × $' + CAP_PER_PLAYER.toLocaleString() + ' = $' + cap.toLocaleString();
   if(display) display.textContent = '$' + cap.toLocaleString();
   if(hidden)  hidden.value = cap;
+}
+
+// ── CUMULATIVE PLAYOFF SETTINGS ────────────────────────────────
+var cumPlayoffType = 'none';
+
+function selectCumPlayoff(type){
+  cumPlayoffType = type;
+  // Style radio option rows
+  ['none','bracket','tiers'].forEach(function(t){
+    var el = document.getElementById('cum-opt-'+t);
+    if(el) el.style.borderColor = t === type ? 'var(--or)' : 'var(--bdr2)';
+  });
+  // Show/hide sub-options
+  document.getElementById('cum-bracket-opts').style.display = type === 'bracket' ? 'block' : 'none';
+  document.getElementById('cum-tiers-opts').style.display   = type === 'tiers'   ? 'block' : 'none';
+  if(type === 'tiers') buildTierSchedule();
+}
+
+function updateCumCalc(){
+  var teams = parseInt(document.getElementById('cum-bracket-teams').value) || 4;
+  var hint  = document.getElementById('cum-bracket-hint');
+  if(hint) hint.textContent = 'top ' + teams + ' teams qualify';
+}
+
+function buildTierSchedule(){
+  var tiers     = parseInt(document.getElementById('cum-tier-count').value) || 3;
+  var startWeek = parseInt(document.getElementById('cum-tier-start').value) || 13;
+  var endMode   = document.querySelector('input[name="tier-end"]:checked').value;
+  var finalWeek = parseInt(document.getElementById('cum-tier-final-week').value) || 17;
+  var preview   = document.getElementById('tier-schedule-preview');
+  var finalRow  = document.getElementById('tier-final-week-row');
+
+  // Show/hide final week selector
+  finalRow.style.display = endMode === 'week' ? 'block' : 'none';
+
+  // Build tier schedule
+  var rows = [];
+  var week = startWeek;
+  for(var i = 1; i <= tiers; i++){
+    if(endMode === 'week' && week > finalWeek) break;
+    rows.push({ tier: i, week: week });
+    week++;
+  }
+
+  if(!rows.length){
+    preview.innerHTML = '<div style="font-size:12px;color:var(--pk);">Start week + tiers extends past final week — adjust settings.</div>';
+    return;
+  }
+
+  var html = '<div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;">Tier Schedule Preview</div>';
+  rows.forEach(function(r){
+    var isLast = r.tier === rows.length;
+    html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--bdr);">'
+      + '<span style="font-family:var(--fd);font-size:12px;color:var(--ink2);">Tier '+r.tier+' cut</span>'
+      + '<span style="font-family:var(--fd);font-size:12px;color:var(--ink3);">Week '+r.week+'</span>'
+      + '<span style="font-family:var(--fd);font-size:11px;font-weight:700;color:var(--pk);">Bottom 50% eliminated</span>'
+      + '</div>';
+  });
+
+  if(endMode === 'week'){
+    html += '<div style="padding:6px 0;font-family:var(--fd);font-size:12px;color:var(--or);font-weight:700;">'
+      + '🏆 Final Week '+finalWeek+' — leader at end of week wins</div>';
+  } else {
+    html += '<div style="padding:6px 0;font-family:var(--fd);font-size:12px;color:var(--or);font-weight:700;">'
+      + '🏆 Final week: Week '+(startWeek+tiers-1)+' — last team standing wins</div>';
+  }
+
+  preview.innerHTML = html;
+}
+
+function getCumPlayoffSettings(){
+  if(cumPlayoffType === 'none') return { playoffFormat:'none' };
+  if(cumPlayoffType === 'bracket') return {
+    playoffFormat:   'bracket',
+    playoffTeams:    parseInt(document.getElementById('cum-bracket-teams').value)||4,
+    playoffStartWeek:parseInt(document.getElementById('cum-bracket-start').value)||15
+  };
+  if(cumPlayoffType === 'tiers'){
+    var endMode = document.querySelector('input[name="tier-end"]:checked').value;
+    return {
+      playoffFormat:    'tiers',
+      tierCount:        parseInt(document.getElementById('cum-tier-count').value)||3,
+      tierStartWeek:    parseInt(document.getElementById('cum-tier-start').value)||13,
+      tierEndMode:      endMode,
+      tierFinalWeek:    endMode === 'week' ? parseInt(document.getElementById('cum-tier-final-week').value)||17 : null
+    };
+  }
+  return { playoffFormat:'none' };
 }
 
 function genLeagueId(){
