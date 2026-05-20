@@ -248,24 +248,77 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
           </div>
         </div>
 
-        <!-- Cap settings (collapsed by default) -->
-        <details style="margin-top:16px;">
+        <!-- Advanced settings (collapsed by default) -->
+        <details style="margin-top:16px;" id="adv-details">
           <summary style="font-family:var(--fd);font-size:12px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;cursor:pointer;padding:8px 0;">
-            ⚙️ Advanced Settings
+            ⚙️ Advanced Settings — Roster &amp; Cap
           </summary>
-          <div style="padding:12px 0;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
-            <div class="form-group" style="margin-bottom:0;">
-              <label class="form-label">Salary Cap</label>
-              <input type="number" class="form-input" id="adv-cap" value="60000" step="1000">
+          <div style="padding:12px 0;">
+
+            <!-- Roster slots -->
+            <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;">Roster Slots</div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;">
+              <div class="form-group" style="margin:0;">
+                <label class="form-label">QB</label>
+                <input type="number" class="form-input roster-inp" id="adv-qb" value="1" min="1" max="4" oninput="updateCap()">
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label class="form-label">RB</label>
+                <input type="number" class="form-input roster-inp" id="adv-rb" value="2" min="1" max="6" oninput="updateCap()">
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label class="form-label">WR</label>
+                <input type="number" class="form-input roster-inp" id="adv-wr" value="3" min="1" max="6" oninput="updateCap()">
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label class="form-label">TE</label>
+                <input type="number" class="form-input roster-inp" id="adv-te" value="1" min="0" max="3" oninput="updateCap()">
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label class="form-label">FLEX</label>
+                <input type="number" class="form-input roster-inp" id="adv-flex" value="1" min="0" max="4" oninput="updateCap()">
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label class="form-label">DEF</label>
+                <input type="number" class="form-input roster-inp" id="adv-def" value="1" min="0" max="2" oninput="updateCap()">
+              </div>
             </div>
-            <div class="form-group" style="margin-bottom:0;">
-              <label class="form-label">Max Salary</label>
-              <input type="number" class="form-input" id="adv-max" value="11300" step="100">
+
+            <!-- FLEX eligibility -->
+            <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px;">FLEX Eligible Positions</div>
+            <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+              <label style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--ink2);cursor:pointer;">
+                <input type="checkbox" id="flex-wr" checked style="accent-color:var(--or);"> WR
+              </label>
+              <label style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--ink2);cursor:pointer;">
+                <input type="checkbox" id="flex-rb" checked style="accent-color:var(--or);"> RB
+              </label>
+              <label style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--ink2);cursor:pointer;">
+                <input type="checkbox" id="flex-te" checked style="accent-color:var(--or);"> TE
+              </label>
+              <label style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--ink2);cursor:pointer;">
+                <input type="checkbox" id="flex-qb" style="accent-color:var(--or);"> QB
+              </label>
             </div>
-            <div class="form-group" style="margin-bottom:0;">
-              <label class="form-label">Max Players</label>
+
+            <!-- Auto-calculated cap -->
+            <div style="background:var(--bg2);border-radius:8px;border:1px solid var(--bdr2);padding:12px 14px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;">
+                <div>
+                  <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;">Salary Cap</div>
+                  <div style="font-size:11px;color:var(--ink3);margin-top:2px;" id="cap-formula">9 players × $7,000 = $63,000</div>
+                </div>
+                <div style="font-family:var(--fd);font-size:26px;font-weight:900;color:var(--or);" id="adv-cap-display">$63,000</div>
+              </div>
+              <input type="hidden" id="adv-cap" value="63000">
+            </div>
+
+            <!-- Max league members -->
+            <div class="form-group" style="margin-top:12px;margin-bottom:0;">
+              <label class="form-label">Max League Members</label>
               <input type="number" class="form-input" id="adv-members" value="20" min="4" max="100">
             </div>
+
           </div>
         </details>
       </div>
@@ -537,9 +590,24 @@ function createLeague(){
   var playoffTeams = selectedFmt === 'headtohead' ? (parseInt(document.getElementById('h2h-playoff-teams').value)||4) : null;
   var divAutobid   = selectedFmt === 'headtohead' && h2hDivisions > 0 ? document.getElementById('tog-div-autobid').checked : false;
   var divTopSeed   = selectedFmt === 'headtohead' && h2hDivisions > 0 ? document.getElementById('tog-div-topseed').checked : false;
-  var cap        = parseInt(document.getElementById('adv-cap').value) || 60000;
-  var maxSal     = parseInt(document.getElementById('adv-max').value) || 11300;
+  var cap        = parseInt(document.getElementById('adv-cap').value) || 63000;
   var maxMembers = parseInt(document.getElementById('adv-members').value) || 20;
+  var maxSal     = 11300; // fixed
+  // Roster config
+  var rosterConfig = {
+    qb:   parseInt(document.getElementById('adv-qb').value)   || 1,
+    rb:   parseInt(document.getElementById('adv-rb').value)   || 2,
+    wr:   parseInt(document.getElementById('adv-wr').value)   || 3,
+    te:   parseInt(document.getElementById('adv-te').value)   || 1,
+    flex: parseInt(document.getElementById('adv-flex').value) || 1,
+    def:  parseInt(document.getElementById('adv-def').value)  || 1,
+    flexEligible: {
+      wr: document.getElementById('flex-wr').checked,
+      rb: document.getElementById('flex-rb').checked,
+      te: document.getElementById('flex-te').checked,
+      qb: document.getElementById('flex-qb').checked
+    }
+  };
   var status     = document.getElementById('status-create');
   var btn        = document.getElementById('btn-create');
 
@@ -569,6 +637,7 @@ function createLeague(){
     minSalary:           3700,
     joinCode:            code,
     // H2H specific
+    rosterConfig,
     h2hTeams:            h2hTeams,
     h2hDivisions:        h2hDivisions,
     playoffStartWeek:    playoffStart,
@@ -764,6 +833,28 @@ function goDirectToLeague(leagueId){
 }
 
 // ── HELPERS ───────────────────────────────────────────────────
+
+// ── CAP CALCULATOR ─────────────────────────────────────────────
+var CAP_PER_PLAYER = 7000; // $60,000 / 9 players ≈ $6,667 → rounded to $7,000
+
+function updateCap(){
+  var qb   = parseInt(document.getElementById('adv-qb').value)   || 1;
+  var rb   = parseInt(document.getElementById('adv-rb').value)   || 2;
+  var wr   = parseInt(document.getElementById('adv-wr').value)   || 3;
+  var te   = parseInt(document.getElementById('adv-te').value)   || 1;
+  var flex = parseInt(document.getElementById('adv-flex').value) || 1;
+  var def  = parseInt(document.getElementById('adv-def').value)  || 1;
+  var total = qb + rb + wr + te + flex + def;
+  // Round to nearest $1,000
+  var cap = Math.round(total * CAP_PER_PLAYER / 1000) * 1000;
+  var formula = document.getElementById('cap-formula');
+  var display = document.getElementById('adv-cap-display');
+  var hidden  = document.getElementById('adv-cap');
+  if(formula) formula.textContent = total+' players × $'+CAP_PER_PLAYER.toLocaleString()+' = $'+cap.toLocaleString();
+  if(display) display.textContent = '$'+cap.toLocaleString();
+  if(hidden)  hidden.value = cap;
+}
+
 function genLeagueId(){
   var chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
   var id = 'fr_';
