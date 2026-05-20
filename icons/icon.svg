@@ -1,5 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="80" fill="#050808"/>
-  <circle cx="256" cy="256" r="220" fill="#00E5D4"/>
-  <text x="256" y="320" font-family="Arial Black,sans-serif" font-size="200" font-weight="900" fill="#050808" text-anchor="middle">FR</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <circle cx="50" cy="50" r="50" fill="#050808"/>
+  <path d="M80 50 C80 28 66 14 50 14 C34 14 20 28 20 50" fill="none" stroke="#00E5D4" stroke-width="7" stroke-linecap="round"/>
+  <line x1="50" y1="14" x2="42" y2="24" stroke="#00E5D4" stroke-width="7" stroke-linecap="round"/>
+  <line x1="50" y1="14" x2="58" y2="24" stroke="#00E5D4" stroke-width="7" stroke-linecap="round"/>
+  <path d="M20 50 C20 72 34 86 50 86 C66 86 80 72 80 50" fill="none" stroke="#FF5FA0" stroke-width="7" stroke-linecap="round"/>
+  <line x1="50" y1="86" x2="42" y2="76" stroke="#FF5FA0" stroke-width="7" stroke-linecap="round"/>
+  <line x1="50" y1="86" x2="58" y2="76" stroke="#FF5FA0" stroke-width="7" stroke-linecap="round"/>
+  <line x1="35" y1="50" x2="65" y2="50" stroke="#F0FAFA" stroke-width="2" stroke-linecap="round"/>
+  <line x1="46" y1="44" x2="46" y2="56" stroke="#F0FAFA" stroke-width="2" stroke-linecap="round"/>
+  <line x1="54" y1="44" x2="54" y2="56" stroke="#F0FAFA" stroke-width="2" stroke-linecap="round"/>
 </svg>
