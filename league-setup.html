@@ -232,13 +232,6 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
             </div>
             <label class="toggle"><input type="checkbox" id="tog-guillotine"><span class="toggle-slider"></span></label>
           </div>
-          <div class="toggle-row" id="tog-divisions-row" style="opacity:.4;">
-            <div>
-              <div class="toggle-label">🏟️ Divisions</div>
-              <div class="toggle-sub">Split league into divisions (H2H only)</div>
-            </div>
-            <label class="toggle"><input type="checkbox" id="tog-divisions" disabled onchange="onDivisionsToggle()"><span class="toggle-slider"></span></label>
-          </div>
           <div class="toggle-row">
             <div>
               <div class="toggle-label">🌐 Public League</div>
@@ -543,14 +536,10 @@ function selectFormat(fmt){
   var h2hSettings = document.getElementById('h2h-settings');
   h2hSettings.style.display = fmt === 'headtohead' ? 'block' : 'none';
 
-  // Divisions toggle: H2H only
-  var divRow = document.getElementById('tog-divisions-row');
-  var divInp = document.getElementById('tog-divisions');
-  divRow.style.opacity = fmt === 'headtohead' ? '1' : '.4';
-  divInp.disabled = fmt !== 'headtohead';
+  // Reset divisions dropdown when leaving H2H
   if(fmt !== 'headtohead'){
-    divInp.checked = false;
-    document.getElementById('h2h-divisions').value = '0';
+    var divSel = document.getElementById('h2h-divisions');
+    if(divSel) divSel.value = '0';
     updateH2HCalc();
   }
 
@@ -568,14 +557,6 @@ function selectFormat(fmt){
     togInp.disabled = false;
     togRow.querySelector('.toggle-sub').textContent = 'Run guillotine concurrently alongside main format';
   }
-}
-
-function onDivisionsToggle(){
-  var hasDivisions = document.getElementById('tog-divisions').checked;
-  var divSel = document.getElementById('h2h-divisions');
-  if(hasDivisions && divSel.value === '0') divSel.value = '2';
-  else if(!hasDivisions) divSel.value = '0';
-  updateH2HCalc();
 }
 
 function updateH2HCalc(){
@@ -603,9 +584,7 @@ function updateH2HCalc(){
     if(divHint) divHint.style.display = 'block';
     if(divLabel) divLabel.textContent = '(' + numDivs + ' divs, ' + perDiv + '/div)';
     if(divWinRow) divWinRow.style.display = 'block';
-    // Sync the divisions toggle
-    var tog = document.getElementById('tog-divisions');
-    if(tog && !tog.checked) tog.checked = true;
+
   } else {
     if(divHint) divHint.style.display = 'none';
     if(divLabel) divLabel.textContent = '(none)';
@@ -639,7 +618,7 @@ function createLeague(){
   var code     = document.getElementById('league-code').value.trim().toUpperCase()
                  || document.getElementById('league-code').placeholder;
   var guillotine   = document.getElementById('tog-guillotine').checked;
-  var divisions    = document.getElementById('tog-divisions').checked;
+  var divisions    = (parseInt(document.getElementById('h2h-divisions').value)||0) > 0;
   var isPublic     = document.getElementById('tog-public').checked;
   // H2H specific
   var h2hTeams     = selectedFmt === 'headtohead' ? (parseInt(document.getElementById('h2h-teams').value)||12) : null;
