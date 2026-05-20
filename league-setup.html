@@ -232,12 +232,12 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
             </div>
             <label class="toggle"><input type="checkbox" id="tog-guillotine"><span class="toggle-slider"></span></label>
           </div>
-          <div class="toggle-row" id="tog-divisions-row" style="opacity:.4;pointer-events:none;">
+          <div class="toggle-row" id="tog-divisions-row" style="opacity:.4;">
             <div>
               <div class="toggle-label">🏟️ Divisions</div>
               <div class="toggle-sub">Split league into divisions (H2H only)</div>
             </div>
-            <label class="toggle"><input type="checkbox" id="tog-divisions"><span class="toggle-slider"></span></label>
+            <label class="toggle"><input type="checkbox" id="tog-divisions" onchange="onDivisionsToggle()"><span class="toggle-slider"></span></label>
           </div>
           <div class="toggle-row">
             <div>
@@ -490,24 +490,27 @@ function selectFormat(fmt){
 
   // Divisions toggle: H2H only
   var divRow = document.getElementById('tog-divisions-row');
+  var divInp = document.getElementById('tog-divisions');
   divRow.style.opacity = fmt === 'headtohead' ? '1' : '.4';
-  divRow.style.pointerEvents = fmt === 'headtohead' ? 'auto' : 'none';
+  divInp.disabled = fmt !== 'headtohead';
   if(fmt !== 'headtohead'){
-    document.getElementById('tog-divisions').checked = false;
+    divInp.checked = false;
     document.getElementById('h2h-divisions').value = '0';
     updateH2HCalc();
   }
 
-  // Concurrent guillotine: hide for standalone guillotine
-  var togRow = document.getElementById('tog-guillotine-row');
+
+  // Concurrent guillotine: disable for standalone guillotine
+  var togRow  = document.getElementById('tog-guillotine-row');
+  var togInp  = document.getElementById('tog-guillotine');
   if(fmt === 'guillotine'){
     togRow.style.opacity = '.4';
-    togRow.style.pointerEvents = 'none';
-    document.getElementById('tog-guillotine').checked = false;
+    togInp.checked  = false;
+    togInp.disabled = true;
     togRow.querySelector('.toggle-sub').textContent = 'Not available — this league IS a guillotine';
   } else {
     togRow.style.opacity = '1';
-    togRow.style.pointerEvents = 'auto';
+    togInp.disabled = false;
     togRow.querySelector('.toggle-sub').textContent = 'Run guillotine concurrently alongside main format';
   }
 }
