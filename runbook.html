@@ -133,7 +133,23 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
 <body>
 
 <nav class="nav">
-  <a href="index.html" class="nav-logo">Fantasy<span>Refresh</span></a>
+  <a href="index.html" class="nav-logo" style="display:flex;align-items:center;gap:8px;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="36" height="36" style="flex-shrink:0;">
+  <defs>
+    <linearGradient id="tlg" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#00E5D4"/>
+      <stop offset="100%" stop-color="#00E5D4" stop-opacity="0.6"/>
+    </linearGradient>
+    <linearGradient id="plg" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#FF5FA0"/>
+      <stop offset="100%" stop-color="#FF5FA0" stop-opacity="0.6"/>
+    </linearGradient>
+  </defs>
+  <rect x="25" y="25" width="350" height="350" rx="70" fill="#050808"/>
+  <g transform="translate(200,200) scale(3.79) translate(-475.5,-241.6)">
+    <path fill="url(#tlg)" d="M504.547,265.443h-9.019a30.964,30.964,0,0,0-29.042-52.733,1.5,1.5,0,1,0,.792,2.894,27.955,27.955,0,0,1,25.512,48.253l0-10.169h-.011a1.493,1.493,0,0,0-2.985,0h0v13.255a1.5,1.5,0,0,0,1.5,1.5h13.256a1.5,1.5,0,1,0,0-3Z"/>
+    <path fill="url(#plg)" d="M485.389,267.995a27.956,27.956,0,0,1-25.561-48.213l0,10.2h.015a1.491,1.491,0,0,0,2.978,0h.007V216.791a1.484,1.484,0,0,0-1.189-1.532l-.018-.005a1.533,1.533,0,0,0-.223-.022c-.024,0-.046-.007-.07-.007H448.071a1.5,1.5,0,0,0,0,3h8.995a30.963,30.963,0,0,0,29.115,52.664,1.5,1.5,0,0,0-.792-2.894Z"/>
+  </g>
+</svg>Fantasy<span>Refresh</span></a>
   <div class="nav-right">
     <a href="index.html" class="nav-link">← App</a>
     <button class="theme-btn" onclick="toggleTheme()" id="theme-btn">🌙</button>
