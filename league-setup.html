@@ -431,13 +431,21 @@ function selectFormat(fmt){
   document.getElementById('fmt-headtohead').classList.toggle('selected', fmt==='headtohead');
   document.getElementById('fmt-guillotine').classList.toggle('selected', fmt==='guillotine');
 
-  // Divisions: H2H only
-  var divRow = document.getElementById('tog-divisions-row');
-  divRow.style.opacity = fmt==='headtohead' ? '1' : '.4';
-  divRow.style.pointerEvents = fmt==='headtohead' ? 'auto' : 'none';
-  if(fmt !== 'headtohead') document.getElementById('tog-divisions').checked = false;
+  // H2H expanded settings
+  var h2hSettings = document.getElementById('h2h-settings');
+  h2hSettings.style.display = fmt === 'headtohead' ? 'block' : 'none';
 
-  // Concurrent guillotine toggle: hide when standalone guillotine selected
+  // Divisions toggle: H2H only
+  var divRow = document.getElementById('tog-divisions-row');
+  divRow.style.opacity = fmt === 'headtohead' ? '1' : '.4';
+  divRow.style.pointerEvents = fmt === 'headtohead' ? 'auto' : 'none';
+  if(fmt !== 'headtohead'){
+    document.getElementById('tog-divisions').checked = false;
+    document.getElementById('h2h-divisions').value = '0';
+    updateH2HCalc();
+  }
+
+  // Concurrent guillotine: hide for standalone guillotine
   var togRow = document.getElementById('tog-guillotine-row');
   if(fmt === 'guillotine'){
     togRow.style.opacity = '.4';
@@ -451,14 +459,84 @@ function selectFormat(fmt){
   }
 }
 
+function onDivisionsToggle(){
+  var hasDivisions = document.getElementById('tog-divisions').checked;
+  var divSel = document.getElementById('h2h-divisions');
+  if(hasDivisions && divSel.value === '0') divSel.value = '2';
+  else if(!hasDivisions) divSel.value = '0';
+  updateH2HCalc();
+}
+
+function updateH2HCalc(){
+  var totalTeams  = parseInt(document.getElementById('h2h-teams').value) || 12;
+  var numDivs     = parseInt(document.getElementById('h2h-divisions').value) || 0;
+  var playoffTeams= parseInt(document.getElementById('h2h-playoff-teams').value) || 4;
+  var hint        = document.getElementById('h2h-teams-hint');
+  var divHint     = document.getElementById('h2h-division-size-hint');
+  var divLabel    = document.getElementById('h2h-div-label');
+  var wcInfo      = document.getElementById('h2h-wildcard-info');
+  var wcBreak     = document.getElementById('h2h-wildcard-breakdown');
+  var divBreak    = document.getElementById('h2h-div-breakdown');
+  var divWinRow   = document.getElementById('h2h-div-winner-row');
+  var playoffHint = document.getElementById('h2h-playoff-hint');
+
+  if(hint) hint.textContent = totalTeams + ' teams';
+
+  // Division breakdown
+  if(numDivs > 0){
+    var perDiv = Math.floor(totalTeams / numDivs);
+    var remainder = totalTeams % numDivs;
+    var breakdown = numDivs + ' divisions of ' + perDiv + ' teams';
+    if(remainder) breakdown += ' (' + remainder + ' division(s) get 1 extra)';
+    if(divBreak) divBreak.textContent = breakdown;
+    if(divHint) divHint.style.display = 'block';
+    if(divLabel) divLabel.textContent = '(' + numDivs + ' divs, ' + perDiv + '/div)';
+    if(divWinRow) divWinRow.style.display = 'block';
+    // Sync the divisions toggle
+    var tog = document.getElementById('tog-divisions');
+    if(tog && !tog.checked) tog.checked = true;
+  } else {
+    if(divHint) divHint.style.display = 'none';
+    if(divLabel) divLabel.textContent = '(none)';
+    if(divWinRow) divWinRow.style.display = 'none';
+  }
+
+  // Playoff validation
+  if(playoffTeams > totalTeams){
+    document.getElementById('h2h-playoff-teams').value = totalTeams;
+    playoffTeams = totalTeams;
+  }
+  if(playoffHint) playoffHint.textContent = playoffTeams + ' of ' + totalTeams + ' teams make playoffs';
+
+  // Wild card breakdown
+  if(numDivs > 0 && playoffTeams > 0){
+    var autobid = document.getElementById('tog-div-autobid') && document.getElementById('tog-div-autobid').checked;
+    var divWinners = Math.min(numDivs, playoffTeams);
+    var wildcards = playoffTeams - divWinners;
+    if(wcBreak) wcBreak.textContent =
+      (autobid ? divWinners + ' division winner autobids' : divWinners + ' top-seeded division winners')
+      + (wildcards > 0 ? ' + ' + wildcards + ' wild card' + (wildcards > 1 ? 's' : '') : '');
+    if(wcInfo) wcInfo.style.display = 'block';
+  } else {
+    if(wcInfo) wcInfo.style.display = 'none';
+  }
+}
+
 // ── CREATE LEAGUE ─────────────────────────────────────────────
 function createLeague(){
   var name     = document.getElementById('league-name').value.trim();
   var code     = document.getElementById('league-code').value.trim().toUpperCase()
                  || document.getElementById('league-code').placeholder;
-  var guillotine = document.getElementById('tog-guillotine').checked;
-  var divisions  = document.getElementById('tog-divisions').checked;
-  var isPublic   = document.getElementById('tog-public').checked;
+  var guillotine   = document.getElementById('tog-guillotine').checked;
+  var divisions    = document.getElementById('tog-divisions').checked;
+  var isPublic     = document.getElementById('tog-public').checked;
+  // H2H specific
+  var h2hTeams     = selectedFmt === 'headtohead' ? (parseInt(document.getElementById('h2h-teams').value)||12) : null;
+  var h2hDivisions = selectedFmt === 'headtohead' ? (parseInt(document.getElementById('h2h-divisions').value)||0) : 0;
+  var playoffStart = selectedFmt === 'headtohead' ? (parseInt(document.getElementById('h2h-playoff-start').value)||15) : null;
+  var playoffTeams = selectedFmt === 'headtohead' ? (parseInt(document.getElementById('h2h-playoff-teams').value)||4) : null;
+  var divAutobid   = selectedFmt === 'headtohead' && h2hDivisions > 0 ? document.getElementById('tog-div-autobid').checked : false;
+  var divTopSeed   = selectedFmt === 'headtohead' && h2hDivisions > 0 ? document.getElementById('tog-div-topseed').checked : false;
   var cap        = parseInt(document.getElementById('adv-cap').value) || 60000;
   var maxSal     = parseInt(document.getElementById('adv-max').value) || 11300;
   var maxMembers = parseInt(document.getElementById('adv-members').value) || 20;
@@ -490,11 +568,18 @@ function createLeague(){
     maxSalary:           maxSal,
     minSalary:           3700,
     joinCode:            code,
+    // H2H specific
+    h2hTeams:            h2hTeams,
+    h2hDivisions:        h2hDivisions,
+    playoffStartWeek:    playoffStart,
+    playoffTeams:        playoffTeams,
+    divisionAutobid:     divAutobid,
+    divisionTopSeed:     divTopSeed,
     visibility:          isPublic ? 'public' : 'private',
     commissioners:       [currentUser.uid],
     created:             Date.now(),
     createdBy:           currentUser.uid,
-    maxMembers,
+    maxMembers: h2hTeams || maxMembers,
     entryFee:            0,
     prizePool:           0,
     active:              true
