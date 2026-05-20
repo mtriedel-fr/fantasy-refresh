@@ -154,19 +154,19 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
     <div class="card">
       <div class="card-top">
         <div class="card-title">Welcome 🏈</div>
-        <div class="card-sub">What would you like to do? You can always create or join more leagues later.</div>
+        <div class="card-sub">Are you starting a new league or joining one a friend set up? You can be in multiple leagues at once.</div>
       </div>
       <div class="card-body">
         <div class="choice-grid">
           <div class="choice" id="choice-create" onclick="selectChoice('create')">
             <div class="choice-icon">🏟️</div>
             <div class="choice-title">Create a League</div>
-            <div class="choice-desc">Set up a new league and invite players with a join code</div>
+            <div class="choice-desc">Set up your league, customize the rules, and share a code with your players</div>
           </div>
           <div class="choice" id="choice-join" onclick="selectChoice('join')">
             <div class="choice-icon">🎟️</div>
             <div class="choice-title">Join a League</div>
-            <div class="choice-desc">Enter a join code from your commissioner</div>
+            <div class="choice-desc">Your league organizer will give you a short code to enter here</div>
           </div>
         </div>
         <!-- Existing leagues (shown if user already has leagues) -->
@@ -187,7 +187,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
     <div class="card">
       <div class="card-top">
         <div class="card-title">Create League</div>
-        <div class="card-sub">Set up your league. You can change most settings later.</div>
+        <div class="card-sub">Set it up how you want. You can adjust most of this later.</div>
       </div>
       <div class="card-body">
         <!-- League Name -->
@@ -210,15 +210,15 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
           <div class="format-grid" style="grid-template-columns:1fr 1fr 1fr;">
             <div class="format-opt selected" id="fmt-cumulative" onclick="selectFormat('cumulative')">
               <div class="format-opt-title">📊 Cumulative</div>
-              <div class="format-opt-desc">Weekly scores add up all season. Most points at the end wins.</div>
+              <div class="format-opt-desc">Your scores stack up week over week. Highest total at season's end wins.</div>
             </div>
             <div class="format-opt" id="fmt-headtohead" onclick="selectFormat('headtohead')">
               <div class="format-opt-title">⚔️ Head to Head</div>
-              <div class="format-opt-desc">Weekly matchups. Win/loss record determines playoffs.</div>
+              <div class="format-opt-desc">You face a different opponent each week. Best record makes the playoffs — just like the NFL.</div>
             </div>
             <div class="format-opt" id="fmt-guillotine" onclick="selectFormat('guillotine')">
               <div class="format-opt-title">☠️ Guillotine</div>
-              <div class="format-opt-desc">Last place eliminated each week. Last team standing wins.</div>
+              <div class="format-opt-desc">Lowest scorer gets knocked out every week. Survive longer than everyone else to win.</div>
             </div>
           </div>
         </div>
@@ -228,7 +228,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
           <div class="toggle-row" id="tog-guillotine-row">
             <div>
               <div class="toggle-label">☠️ Guillotine</div>
-              <div class="toggle-sub">Run guillotine concurrently alongside main format</div>
+              <div class="toggle-sub">Also run a survival side-game — lowest weekly scorer gets eliminated each week</div>
             </div>
             <label class="toggle"><input type="checkbox" id="tog-guillotine"><span class="toggle-slider"></span></label>
           </div>
@@ -255,22 +255,22 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
               <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:10px 12px;border-radius:8px;border:1px solid var(--bdr2);transition:all .15s;" id="cum-opt-none" onclick="selectCumPlayoff('none')">
                 <input type="radio" name="cum-playoff" value="none" checked style="margin-top:2px;accent-color:var(--or);">
                 <div>
-                  <div style="font-family:var(--fd);font-size:13px;font-weight:800;color:var(--ink);">🏁 No Playoffs</div>
-                  <div style="font-size:12px;color:var(--ink3);margin-top:2px;">Pure season total. Highest cumulative score at end of season wins.</div>
+                  <div style="font-family:var(--fd);font-size:13px;font-weight:800;color:var(--ink);">🏁 No Playoffs — Season Total Wins</div>
+                  <div style="font-size:12px;color:var(--ink3);margin-top:2px;">Highest total score after 18 weeks wins. Simple, no drama at the end.</div>
                 </div>
               </label>
               <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:10px 12px;border-radius:8px;border:1px solid var(--bdr2);transition:all .15s;" id="cum-opt-bracket" onclick="selectCumPlayoff('bracket')">
                 <input type="radio" name="cum-playoff" value="bracket" style="margin-top:2px;accent-color:var(--or);">
                 <div>
-                  <div style="font-family:var(--fd);font-size:13px;font-weight:800;color:var(--ink);">🏆 Standard Bracket</div>
-                  <div style="font-size:12px;color:var(--ink3);margin-top:2px;">Top N teams make playoffs. Single-week matchups by cumulative score.</div>
+                  <div style="font-family:var(--fd);font-size:13px;font-weight:800;color:var(--ink);">🏆 Playoff Bracket</div>
+                  <div style="font-size:12px;color:var(--ink3);margin-top:2px;">Top teams earn a playoff spot. Head-to-head matchups decide the champion in the final weeks.</div>
                 </div>
               </label>
               <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:10px 12px;border-radius:8px;border:1px solid var(--bdr2);transition:all .15s;" id="cum-opt-tiers" onclick="selectCumPlayoff('tiers')">
                 <input type="radio" name="cum-playoff" value="tiers" style="margin-top:2px;accent-color:var(--or);">
                 <div>
-                  <div style="font-family:var(--fd);font-size:13px;font-weight:800;color:var(--ink);">⬇️ Tiered Cuts</div>
-                  <div style="font-size:12px;color:var(--ink3);margin-top:2px;">Bottom players eliminated each week across multiple tiers until a winner remains.</div>
+                  <div style="font-family:var(--fd);font-size:13px;font-weight:800;color:var(--ink);">⬇️ Survivor Cuts</div>
+                  <div style="font-size:12px;color:var(--ink3);margin-top:2px;">In the final weeks, the bottom half gets eliminated each round until one team is left standing.</div>
                 </div>
               </label>
             </div>
@@ -416,11 +416,11 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
         <!-- ROSTER & CAP (visible for all formats, open by default) -->
         <details style="margin-top:12px;" id="adv-details" open>
           <summary style="font-family:var(--fd);font-size:12px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;cursor:pointer;padding:8px 0;">
-            ⚙️ Roster &amp; Cap
+            ⚙️ Customize Roster &amp; Budget
           </summary>
           <div style="padding:12px 0;">
             <!-- Roster slots -->
-            <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;">Roster Slots <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:10px;">(default: QB · RB×2 · WR×3 · TE · FLEX · DEF)</span></div>
+            <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;">Roster Slots <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:10px;">— change how many of each position your teams must fill</span></div>
             <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;">
               <div class="form-group" style="margin:0;">
                 <label class="form-label">QB</label>
@@ -657,11 +657,11 @@ function selectFormat(fmt){
     togRow.style.opacity = '.4';
     togInp.checked  = false;
     togInp.disabled = true;
-    togRow.querySelector('.toggle-sub').textContent = 'Not available — this league IS a guillotine';
+    togRow.querySelector('.toggle-sub').textContent = 'Not available — this league is already a survivor format';
   } else {
     togRow.style.opacity = '1';
     togInp.disabled = false;
-    togRow.querySelector('.toggle-sub').textContent = 'Run guillotine concurrently alongside main format';
+    togRow.querySelector('.toggle-sub').textContent = 'Also run a survival side-game — lowest weekly scorer gets eliminated each week';
   }
 }
 
