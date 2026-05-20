@@ -2,7 +2,14 @@
 <html lang="en" data-theme="dark">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- PWA -->
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#00E5D4">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Fantasy Refresh">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Fantasy Refresh — Season-Long DFS Football</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏈</text></svg>">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
@@ -171,6 +178,17 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
 </head>
 <body>
 
+<!-- INSTALL BANNER (shown when PWA installable) -->
+<div id="install-banner" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:200;background:var(--bg2);border-top:2px solid var(--or);padding:12px 20px;display:none;align-items:center;gap:12px;box-shadow:0 -4px 24px rgba(0,0,0,.4);">
+  <img src="/icons/icon-72.png" style="width:40px;height:40px;border-radius:10px;flex-shrink:0;">
+  <div style="flex:1;">
+    <div style="font-family:var(--fd);font-size:14px;font-weight:800;color:var(--ink);text-transform:uppercase;">Add to Home Screen</div>
+    <div style="font-size:12px;color:var(--ink3);">Install Fantasy Refresh for quick access all season</div>
+  </div>
+  <button id="install-btn" style="background:var(--or);border:none;border-radius:8px;padding:8px 16px;font-family:var(--fd);font-size:13px;font-weight:800;color:#050808;cursor:pointer;text-transform:uppercase;flex-shrink:0;">Install</button>
+  <button onclick="document.getElementById('install-banner').style.display='none'" style="background:none;border:none;color:var(--ink3);font-size:18px;cursor:pointer;flex-shrink:0;">✕</button>
+</div>
+
 <!-- NAV -->
 <nav class="nav">
   <div class="nav-logo">Fantasy<span>Refresh</span></div>
@@ -190,7 +208,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
     <span class="or">Smarter.</span><br>
     Win <span class="pk">Bigger.</span>
   </h1>
-  <p class="hero-sub">Finally — a fantasy league where skill matters more than luck. Pick a fresh team every week, so one injury never wrecks your season. Build the best roster your $60,000 budget allows and prove you're actually good at this.</p>
+  <p class="hero-sub">A fantasy league where skill matters more than luck. Fresh roster every week. Injuries are a one-week problem, not a season-long disaster.</p>
   <div class="hero-btns">
     <button class="btn-primary" onclick="scrollToSignup()">Join the League →</button>
     <button class="btn-secondary" onclick="scrollToHow()">How It Works</button>
@@ -360,76 +378,25 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
     <div class="step">
       <div class="step-n">01</div>
       <div class="step-title">You Get $60,000</div>
-      <div class="step-desc">Every single week you get a fresh $60,000 to build a brand new roster. No carryover from last week. One bad week doesn't dig you into a hole — just come back stronger next Sunday.</div>
+      <div class="step-desc">Every week you get $60,000 to spend on any active NFL players. Star players cost more — that's the strategy.</div>
     </div>
     <div class="step">
       <div class="step-n">02</div>
       <div class="step-title">Pick Your Team</div>
-      <div class="step-desc">Pick 9 players: QB, 2 RBs, 3 WRs, TE, Flex, Defense. You can't afford every star — choosing the right mix of big names and value picks is what separates the best managers from the lucky ones. Submit before the first kickoff.</div>
+      <div class="step-desc">Fill 9 roster slots: QB, 2 RBs, 3 WRs, TE, Flex, Defense. Stay under the cap. Submit your lineup before the first game kicks off.</div>
     </div>
     <div class="step">
       <div class="step-n">03</div>
       <div class="step-title">Games Kick Off</div>
-      <div class="step-desc">Once a player's game kicks off, they're locked in. But late-game players — Sunday Night, Monday Night — stay swappable until their kickoff. And if someone gets hurt? Next week you just don't pick them. No waiver wire, no dead roster spot all season.</div>
+      <div class="step-desc">Players lock when their individual game starts — not all at once. Sunday Night and Monday Night players stay available until their kickoff.</div>
     </div>
     <div class="step">
       <div class="step-n">04</div>
       <div class="step-title">Watch It Unfold</div>
-      <div class="step-desc">Your score updates automatically throughout the day as your players perform. See where you stand in real time. Final scores lock Tuesday morning.</div>
+      <div class="step-desc">Points update automatically as your players perform. Standings update live all day. Scores finalize Tuesday morning.</div>
     </div>
   </div>
 </section>
-
-<!-- FEATURES -->
-<section style="padding:0 24px 80px;max-width:1100px;margin:0 auto;">
-  <div class="features">
-    <div class="feature">
-      <div class="feature-icon">🏈</div>
-      <div>
-        <div class="feature-title">Injuries Don't Kill Your Season</div>
-        <div class="feature-desc">Your star RB tears his ACL in Week 3? Next week, you just pick someone else. No dead roster spot following you around all season.</div>
-      </div>
-    </div>
-    <div class="feature">
-      <div class="feature-icon">💰</div>
-      <div>
-        <div class="feature-title">Skill Over Luck</div>
-        <div class="feature-desc">18 weeks of roster-building decisions — good managers rise to the top. There's nowhere to hide behind a lucky draft pick from August.</div>
-      </div>
-    </div>
-    <div class="feature">
-      <div class="feature-icon">🔒</div>
-      <div>
-        <div class="feature-title">React As The Day Unfolds</div>
-        <div class="feature-desc">Players only lock when their game starts. If your RB is ruled out Sunday morning, swap him for someone still playing. More strategy, less luck.</div>
-      </div>
-    </div>
-    <div class="feature">
-      <div class="feature-icon">📡</div>
-      <div>
-        <div class="feature-title">Live Scoring</div>
-        <div class="feature-desc">Fantasy points update every few minutes during games. Watch the leaderboard move in real time all Sunday long.</div>
-      </div>
-    </div>
-    <div class="feature">
-      <div class="feature-icon">📊</div>
-      <div>
-        <div class="feature-title">Season-Long Standings</div>
-        <div class="feature-desc">Your weekly scores stack up all season. Track your position, hot streaks, and weekly high scores across 18 weeks.</div>
-      </div>
-    </div>
-    <div class="feature">
-      <div class="feature-icon">🏆</div>
-      <div>
-        <div class="feature-title">Playoff Bracket</div>
-        <div class="feature-desc">The best teams earn a playoff spot. The season ends with one champion — could be you.</div>
-      </div>
-    </div>
-  </div>
-</section>
-
-
-
 
 <!-- WHY FANTASY REFRESH -->
 <section style="padding:0 24px 80px;max-width:800px;margin:0 auto;">
@@ -440,21 +407,21 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
         <div style="font-size:24px;flex-shrink:0;margin-top:2px;">🩹</div>
         <div>
           <div style="font-family:var(--fd);font-size:17px;font-weight:800;color:var(--ink);text-transform:uppercase;margin-bottom:4px;">One injury shouldn't ruin 5 months</div>
-          <div style="font-size:14px;color:var(--ink3);line-height:1.7;">Traditional fantasy leagues are over the moment your first-round pick goes on IR in September. Here, injuries are a one-week problem — not a season-long sentence.</div>
+          <div style="font-size:14px;color:var(--ink3);line-height:1.7;">In traditional fantasy, one injury in September can wreck your whole season. Here, it's a one-week problem. Next week you just pick someone else.</div>
         </div>
       </div>
       <div style="display:flex;gap:16px;">
         <div style="font-size:24px;flex-shrink:0;margin-top:2px;">🧠</div>
         <div>
           <div style="font-family:var(--fd);font-size:17px;font-weight:800;color:var(--ink);text-transform:uppercase;margin-bottom:4px;">Prove you're actually good at fantasy</div>
-          <div style="font-size:14px;color:var(--ink3);line-height:1.7;">In a season-long draft league, half the battle is getting lucky in August. Here, your decisions happen every single week — 18 chances to outmanage everyone else in your league.</div>
+          <div style="font-size:14px;color:var(--ink3);line-height:1.7;">Traditional leagues are half decided by who gets lucky in a draft. Here, your decisions happen every single week — 18 chances to prove you're better than everyone else.</div>
         </div>
       </div>
       <div style="display:flex;gap:16px;">
         <div style="font-size:24px;flex-shrink:0;margin-top:2px;">📅</div>
         <div>
           <div style="font-family:var(--fd);font-size:17px;font-weight:800;color:var(--ink);text-transform:uppercase;margin-bottom:4px;">Every week feels like it matters</div>
-          <div style="font-size:14px;color:var(--ink3);line-height:1.7;">No more checking out in November because your team is 3-8. Every week is a fresh start. You're always in it.</div>
+          <div style="font-size:14px;color:var(--ink3);line-height:1.7;">No more dead teams in November. Every week is a reset. You're always in contention.</div>
         </div>
       </div>
     </div>
@@ -554,6 +521,33 @@ function toggleTheme(){
     });
   }catch(e){}
 })();
+
+// ── PWA INSTALL PROMPT ─────────────────────────────────────────
+var deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', function(e){
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  var banner = document.getElementById('install-banner');
+  if(banner) banner.style.display = 'flex';
+});
+document.addEventListener('DOMContentLoaded', function(){
+  var btn = document.getElementById('install-btn');
+  if(btn){
+    btn.addEventListener('click', function(){
+      if(!deferredInstallPrompt) return;
+      deferredInstallPrompt.prompt();
+      deferredInstallPrompt.userChoice.then(function(result){
+        deferredInstallPrompt = null;
+        document.getElementById('install-banner').style.display = 'none';
+      });
+    });
+  }
+});
+window.addEventListener('appinstalled', function(){
+  var banner = document.getElementById('install-banner');
+  if(banner) banner.style.display = 'none';
+  deferredInstallPrompt = null;
+});
 
 var FB_API_KEY  = 'AIzaSyA-2hcf2hzThk7MuEm9DAvRICK95koE9gM';
 var FB_DB_URL   = 'https://fantasy-refresh-default-rtdb.firebaseio.com';
@@ -754,5 +748,13 @@ function startDraftAnimation(){
   setTimeout(runStep, 2000);
 }
 </script>
+  <script>
+    if('serviceWorker' in navigator){
+      window.addEventListener('load', function(){
+        navigator.serviceWorker.register('/sw.js')
+          .catch(function(e){ console.warn('SW registration failed:', e); });
+      });
+    }
+  </script>
 </body>
 </html>
