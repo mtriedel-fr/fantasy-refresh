@@ -1,12 +1,17 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <circle cx="50" cy="50" r="50" fill="#050808"/>
-  <path d="M80 50 C80 28 66 14 50 14 C34 14 20 28 20 50" fill="none" stroke="#00E5D4" stroke-width="7" stroke-linecap="round"/>
-  <line x1="50" y1="14" x2="42" y2="24" stroke="#00E5D4" stroke-width="7" stroke-linecap="round"/>
-  <line x1="50" y1="14" x2="58" y2="24" stroke="#00E5D4" stroke-width="7" stroke-linecap="round"/>
-  <path d="M20 50 C20 72 34 86 50 86 C66 86 80 72 80 50" fill="none" stroke="#FF5FA0" stroke-width="7" stroke-linecap="round"/>
-  <line x1="50" y1="86" x2="42" y2="76" stroke="#FF5FA0" stroke-width="7" stroke-linecap="round"/>
-  <line x1="50" y1="86" x2="58" y2="76" stroke="#FF5FA0" stroke-width="7" stroke-linecap="round"/>
-  <line x1="35" y1="50" x2="65" y2="50" stroke="#F0FAFA" stroke-width="2" stroke-linecap="round"/>
-  <line x1="46" y1="44" x2="46" y2="56" stroke="#F0FAFA" stroke-width="2" stroke-linecap="round"/>
-  <line x1="54" y1="44" x2="54" y2="56" stroke="#F0FAFA" stroke-width="2" stroke-linecap="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
+  <defs>
+    <linearGradient id="tg" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#00E5D4"/>
+      <stop offset="100%" stop-color="#00E5D4" stop-opacity="0.6"/>
+    </linearGradient>
+    <linearGradient id="pg" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#FF5FA0"/>
+      <stop offset="100%" stop-color="#FF5FA0" stop-opacity="0.6"/>
+    </linearGradient>
+  </defs>
+  <rect x="25" y="25" width="350" height="350" rx="70" fill="#050808"/>
+  <g transform="translate(200,200) scale(3.79) translate(-475.5,-241.6)">
+    <path fill="url(#tg)" d="M504.547,265.443h-9.019a30.964,30.964,0,0,0-29.042-52.733,1.5,1.5,0,1,0,.792,2.894,27.955,27.955,0,0,1,25.512,48.253l0-10.169h-.011a1.493,1.493,0,0,0-2.985,0h0v13.255a1.5,1.5,0,0,0,1.5,1.5h13.256a1.5,1.5,0,1,0,0-3Z"/>
+    <path fill="url(#pg)" d="M485.389,267.995a27.956,27.956,0,0,1-25.561-48.213l0,10.2h.015a1.491,1.491,0,0,0,2.978,0h.007V216.791a1.484,1.484,0,0,0-1.189-1.532l-.018-.005a1.533,1.533,0,0,0-.223-.022c-.024,0-.046-.007-.07-.007H448.071a1.5,1.5,0,0,0,0,3h8.995a30.963,30.963,0,0,0,29.115,52.664,1.5,1.5,0,0,0-.792-2.894Z"/>
+  </g>
 </svg>
