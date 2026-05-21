@@ -286,7 +286,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
 .section{padding:72px 24px;max-width:1100px;margin:0 auto;}
 .section-title{font-family:var(--fd);font-size:clamp(30px,5vw,50px);font-weight:900;color:var(--ink);text-transform:uppercase;text-align:center;margin-bottom:8px;}
 .section-sub{font-size:15px;color:var(--ink3);text-align:center;margin-bottom:44px;line-height:1.6;}
-.steps{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
 .step{background:var(--bg2);border-radius:14px;border:1px solid var(--bdr);padding:26px 22px;position:relative;overflow:hidden;}
 .step::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;}
 .step:nth-child(1)::before{background:var(--or);}
@@ -357,7 +357,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
   .preview-roster{border-right:none;border-bottom:1px solid var(--bdr);max-height:220px;overflow:hidden;}
   .signup-wrap{padding:28px 20px;}
   .why-box{padding:28px 20px;}
-  .steps{gap:12px;}
+  .steps{grid-template-columns:1fr;gap:10px;}
 }
 @media(max-width:380px){
   .nav-btn{font-size:11px;padding:7px 4px;}
@@ -667,23 +667,18 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
   <div class="steps">
     <div class="step">
       <div class="step-n">01</div>
-      <div class="step-title">Studs Cost More — Draft Wisely</div>
-      <div class="step-desc">You get $60,000 per week. Elite players eat your cap. Spread it smart or go all-in on one stud and hope — that's the game.</div>
+      <div class="step-title">Draft Wisely</div>
+      <div class="step-desc">Everyone has the same budget. Studs eat the cap — spread it smart or go all-in on one or two and pray. That's the game.</div>
     </div>
     <div class="step">
       <div class="step-n">02</div>
       <div class="step-title">Pick Your Team</div>
-      <div class="step-desc">Fill your roster, stay under the cap, and submit. Tweak all weekend — players lock at their own kickoff, not all at once.</div>
+      <div class="step-desc">Stay flexible all weekend. Swap players right up until their kickoff — SNF and MNF studs are fair game until the last second.</div>
     </div>
     <div class="step">
       <div class="step-n">03</div>
-      <div class="step-title">Games Kick Off</div>
-      <div class="step-desc">Players lock when their game starts — not all at once. Sunday Night and Monday Night players stay available until kickoff.</div>
-    </div>
-    <div class="step">
-      <div class="step-n">04</div>
       <div class="step-title">Watch It Unfold</div>
-      <div class="step-desc">Points update automatically. Standings shift live all day. Scores finalize Tuesday. Next week — you do it again.</div>
+      <div class="step-desc">Points update automatically as your players perform. Standings shift live all day. Scores finalize Tuesday. Next week — you do it again.</div>
     </div>
   </div>
 </section>
