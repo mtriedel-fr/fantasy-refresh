@@ -1,6 +1,5 @@
 // Fantasy Refresh — Service Worker
 // Caches static assets for fast loads and offline support
-
 const CACHE_NAME    = 'fr-v1';
 const CACHE_STATIC  = 'fr-static-v1';
 
@@ -14,8 +13,7 @@ const PRECACHE = [
   '/preseason.html',
   '/league-context.js',
   '/manifest.json',
-  '/icons/icon-192.png',
-  '/icons/icon-512.png'
+  '/icons/icon.svg'
 ];
 
 // ── INSTALL ────────────────────────────────────────────────────
