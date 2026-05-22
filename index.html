@@ -41,8 +41,7 @@ html{overflow-x:hidden;}
   --pu:#7040E0;--pu2:#9068F8;--pu4:#EAE0FF;
   --ink:#0A1818;--ink2:#1A6060;--ink3:#3A8888;
   --bdr:#B8E8E0;--bdr2:#90D8D0;--red:#E8337A;--grn:#00A898;
-}
-body{background:#040A0A;min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:24px 16px;font-family:var(--fb);overflow-x:hidden;}
+}body{background:#040A0A;min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:0;font-family:var(--fb);overflow-x:hidden;}
 .wrap{width:100%;max-width:960px;min-width:0;border-radius:16px;overflow:hidden;border:1px solid #0A2A2A;box-shadow:0 24px 80px rgba(0,210,200,.08);}
 
 /* HEADER */
@@ -762,7 +761,16 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
 </head>
 <body>
 <div class="wrap">
-
+<div id="install-guide-banner" style="background:linear-gradient(135deg,#0D1515,#101C1C);border-bottom:2px solid #00E5D4;padding:10px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
+  <div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;color:#6ABFBF;text-transform:uppercase;letter-spacing:.5px;">📱 Add Fantasy Refresh to your home screen for the best experience</div>
+  <div style="display:flex;gap:8px;flex-shrink:0;">
+    <a href="/install-guide" style="font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:800;color:#050808;background:#00E5D4;padding:6px 14px;border-radius:8px;text-decoration:none;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;">How to Install</a>
+    <button onclick="document.getElementById('install-guide-banner').style.display='none';try{localStorage.setItem('fr_install_dismissed','1')}catch(e){}" style="background:none;border:1px solid #0D3535;border-radius:8px;color:#3A8888;font-size:16px;padding:4px 10px;cursor:pointer;line-height:1;">✕</button>
+  </div>
+</div>
+<script>
+try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(display-mode: standalone)').matches){document.getElementById('install-guide-banner').style.display='none';}}catch(e){}
+</script>
 <div class="hdr">
   <div class="logo">
     <div class="logo-box"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="36" height="36" style="flex-shrink:0;">
