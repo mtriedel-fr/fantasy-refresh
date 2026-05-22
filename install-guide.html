@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fantasy Refresh — Add to Home Screen</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --or:#00E5D4;--pk:#FF5FA0;--pu:#9B6DFF;
+  --bg:#0A0F0F;--bg2:#0D1515;--bg3:#101C1C;
+  --ink:#F0FAFA;--ink2:#6ABFBF;--ink3:#3A8888;
+  --bdr:#0D3535;--bdr2:#104040;
+  --fd:'Barlow Condensed',sans-serif;--fb:'Barlow',sans-serif;
+}
+html,body{background:var(--bg);color:var(--ink);font-family:var(--fb);}
+body{max-width:680px;margin:0 auto;padding:40px 24px 60px;}
+
+/* grid noise texture overlay */
+body::before{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-image:repeating-linear-gradient(0deg,rgba(0,229,212,.015) 0px,transparent 1px,transparent 40px),
+                   repeating-linear-gradient(90deg,rgba(0,229,212,.015) 0px,transparent 1px,transparent 40px);
+}
+
+/* glow blobs */
+body::after{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:
+    radial-gradient(ellipse 50% 30% at 80% 10%, rgba(255,95,160,.07) 0%, transparent 70%),
+    radial-gradient(ellipse 40% 25% at 10% 80%, rgba(0,229,212,.06) 0%, transparent 70%);
+}
+
+*{position:relative;z-index:1;}
+
+/* ── HEADER ── */
+.header{text-align:center;margin-bottom:44px;padding-bottom:32px;border-bottom:1px solid var(--bdr2);}
+
+.logo{display:inline-flex;align-items:center;gap:10px;margin-bottom:20px;}
+.logo-svg{width:48px;height:48px;}
+.logo-text{font-family:var(--fd);font-size:32px;font-weight:900;color:var(--ink);letter-spacing:.5px;}
+.logo-text span{color:var(--pk);}
+
+.header-title{
+  font-family:var(--fd);font-size:clamp(38px,8vw,58px);font-weight:900;
+  text-transform:uppercase;line-height:.95;letter-spacing:-1px;margin-bottom:12px;
+}
+.header-title .line1{color:var(--ink2);display:block;font-size:.6em;}
+.header-title .line2{color:var(--or);display:block;}
+
+.header-sub{font-size:15px;color:var(--ink3);line-height:1.6;max-width:440px;margin:0 auto;}
+.header-sub strong{color:var(--ink2);}
+
+/* ── PLATFORM CARDS ── */
+.platform{
+  background:var(--bg2);border-radius:16px;border:1px solid var(--bdr2);
+  margin-bottom:20px;overflow:hidden;
+}
+.platform-header{
+  display:flex;align-items:center;gap:14px;
+  padding:18px 22px;border-bottom:1px solid var(--bdr);
+}
+.platform-icon{
+  width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;
+  font-size:22px;flex-shrink:0;
+}
+.platform-icon.apple{background:rgba(0,229,212,.1);border:1px solid rgba(0,229,212,.2);}
+.platform-icon.android{background:rgba(155,109,255,.1);border:1px solid rgba(155,109,255,.2);}
+.platform-icon.desktop{background:rgba(255,95,160,.1);border:1px solid rgba(255,95,160,.2);}
+
+.platform-name{font-family:var(--fd);font-size:22px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;}
+.platform-name.apple{color:var(--or);}
+.platform-name.android{color:var(--pu);}
+.platform-name.desktop{color:var(--pk);}
+.platform-note{font-size:12px;color:var(--ink3);margin-top:2px;}
+
+.steps-list{padding:16px 22px;display:flex;flex-direction:column;gap:0;}
+.step-row{
+  display:flex;align-items:flex-start;gap:14px;
+  padding:11px 0;border-bottom:1px solid var(--bdr);
+}
+.step-row:last-child{border-bottom:none;}
+.step-num{
+  width:26px;height:26px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--fd);font-size:13px;font-weight:900;
+  flex-shrink:0;margin-top:1px;
+}
+.step-num.apple{background:rgba(0,229,212,.12);color:var(--or);border:1px solid rgba(0,229,212,.3);}
+.step-num.android{background:rgba(155,109,255,.12);color:var(--pu);border:1px solid rgba(155,109,255,.3);}
+.step-num.desktop{background:rgba(255,95,160,.12);color:var(--pk);border:1px solid rgba(255,95,160,.3);}
+
+.step-text{font-size:14px;color:var(--ink2);line-height:1.6;padding-top:3px;}
+.step-text em{
+  font-style:normal;font-weight:600;color:var(--ink);
+  background:var(--bg3);padding:1px 7px;border-radius:5px;
+  border:1px solid var(--bdr2);font-family:var(--fd);font-size:13px;letter-spacing:.3px;
+}
+
+/* ── HEADS UP BOX ── */
+.heads-up{
+  background:linear-gradient(135deg,var(--bg2),var(--bg3));
+  border-radius:14px;border:1px solid var(--bdr2);border-left:3px solid var(--pk);
+  padding:20px 22px;margin-bottom:20px;
+}
+.heads-up-title{
+  font-family:var(--fd);font-size:13px;font-weight:800;color:var(--pk);
+  text-transform:uppercase;letter-spacing:1.5px;margin-bottom:12px;
+  display:flex;align-items:center;gap:7px;
+}
+.heads-up-title::before{content:'⚠';font-size:14px;}
+.heads-up-row{display:flex;gap:10px;margin-bottom:8px;align-items:flex-start;}
+.heads-up-row:last-child{margin-bottom:0;}
+.heads-up-dot{width:5px;height:5px;border-radius:50%;background:var(--pk);flex-shrink:0;margin-top:7px;}
+.heads-up-text{font-size:13px;color:var(--ink3);line-height:1.6;}
+.heads-up-text strong{color:var(--ink2);}
+
+/* ── FOOTER ── */
+.footer{text-align:center;padding-top:28px;border-top:1px solid var(--bdr);}
+.footer-logo{font-family:var(--fd);font-size:18px;font-weight:900;color:var(--or);margin-bottom:6px;}
+.footer-logo span{color:var(--pk);}
+.footer-url{
+  display:inline-block;font-family:var(--fd);font-size:20px;font-weight:800;
+  color:var(--or);letter-spacing:.5px;text-decoration:none;
+  border-bottom:2px solid rgba(0,229,212,.3);padding-bottom:2px;
+}
+.footer-sub{font-size:12px;color:var(--ink3);margin-top:8px;}
+
+@media print{
+  body::before,body::after{display:none;}
+  body{padding:20px;background:#fff;color:#000;}
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="logo">
+    <svg class="logo-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
+      <defs>
+        <linearGradient id="tlg" x1="100%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="#00E5D4"/>
+          <stop offset="100%" stop-color="#00E5D4" stop-opacity="0.6"/>
+        </linearGradient>
+        <linearGradient id="plg" x1="0%" y1="100%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#FF5FA0"/>
+          <stop offset="100%" stop-color="#FF5FA0" stop-opacity="0.6"/>
+        </linearGradient>
+      </defs>
+      <rect x="25" y="25" width="350" height="350" rx="70" fill="#050808"/>
+      <g transform="translate(200,200) scale(3.79) translate(-475.5,-241.6)">
+        <path fill="url(#tlg)" d="M504.547,265.443h-9.019a30.964,30.964,0,0,0-29.042-52.733,1.5,1.5,0,1,0,.792,2.894,27.955,27.955,0,0,1,25.512,48.253l0-10.169h-.011a1.493,1.493,0,0,0-2.985,0h0v13.255a1.5,1.5,0,0,0,1.5,1.5h13.256a1.5,1.5,0,1,0,0-3Z"/>
+        <path fill="url(#plg)" d="M485.389,267.995a27.956,27.956,0,0,1-25.561-48.213l0,10.2h.015a1.491,1.491,0,0,0,2.978,0h.007V216.791a1.484,1.484,0,0,0-1.189-1.532l-.018-.005a1.533,1.533,0,0,0-.223-.022c-.024,0-.046-.007-.07-.007H448.071a1.5,1.5,0,0,0,0,3h8.995a30.963,30.963,0,0,0,29.115,52.664,1.5,1.5,0,0,0-.792-2.894Z"/>
+      </g>
+    </svg>
+    <div class="logo-text">Fantasy<span>Refresh</span></div>
+  </div>
+
+  <div class="header-title">
+    <span class="line1">Add to your</span>
+    <span class="line2">Home Screen</span>
+  </div>
+  <p class="header-sub">No app store needed. Install <strong>Fantasy Refresh</strong> directly from your browser in under 30 seconds — works just like a real app.</p>
+</div>
+
+<!-- IPHONE -->
+<div class="platform">
+  <div class="platform-header">
+    <div class="platform-icon apple">📱</div>
+    <div>
+      <div class="platform-name apple">iPhone — Safari</div>
+      <div class="platform-note">Must use Safari — Chrome on iOS won't work for this</div>
+    </div>
+  </div>
+  <div class="steps-list">
+    <div class="step-row">
+      <div class="step-num apple">1</div>
+      <div class="step-text">Open <strong>fantasyrefresh.com</strong> in <em>Safari</em></div>
+    </div>
+    <div class="step-row">
+      <div class="step-num apple">2</div>
+      <div class="step-text">Tap the <em>Share button</em> — the box with an arrow pointing up, at the bottom of the screen</div>
+    </div>
+    <div class="step-row">
+      <div class="step-num apple">3</div>
+      <div class="step-text">Scroll down the share sheet and tap <em>Add to Home Screen</em></div>
+    </div>
+    <div class="step-row">
+      <div class="step-num apple">4</div>
+      <div class="step-text">Tap <em>Add</em> in the top right corner</div>
+    </div>
+    <div class="step-row">
+      <div class="step-num apple">5</div>
+      <div class="step-text">The Fantasy Refresh icon appears on your home screen — tap it to launch full screen ✓</div>
+    </div>
+  </div>
+</div>
+
+<!-- ANDROID -->
+<div class="platform">
+  <div class="platform-header">
+    <div class="platform-icon android">🤖</div>
+    <div>
+      <div class="platform-name android">Android — Chrome</div>
+      <div class="platform-note">Works best in Chrome — Samsung Browser also supported</div>
+    </div>
+  </div>
+  <div class="steps-list">
+    <div class="step-row">
+      <div class="step-num android">1</div>
+      <div class="step-text">Open <strong>fantasyrefresh.com</strong> in <em>Chrome</em></div>
+    </div>
+    <div class="step-row">
+      <div class="step-num android">2</div>
+      <div class="step-text">Tap the <em>three dots ⋮</em> in the top right corner</div>
+    </div>
+    <div class="step-row">
+      <div class="step-num android">3</div>
+      <div class="step-text">Tap <em>Add to Home Screen</em> or <em>Install App</em></div>
+    </div>
+    <div class="step-row">
+      <div class="step-num android">4</div>
+      <div class="step-text">Tap <em>Add</em> to confirm — done ✓</div>
+    </div>
+  </div>
+</div>
+
+<!-- DESKTOP -->
+<div class="platform">
+  <div class="platform-header">
+    <div class="platform-icon desktop">💻</div>
+    <div>
+      <div class="platform-name desktop">Desktop — Chrome or Edge</div>
+      <div class="platform-note">One-click install from the address bar</div>
+    </div>
+  </div>
+  <div class="steps-list">
+    <div class="step-row">
+      <div class="step-num desktop">1</div>
+      <div class="step-text">Open <strong>fantasyrefresh.com</strong> in Chrome or Edge</div>
+    </div>
+    <div class="step-row">
+      <div class="step-num desktop">2</div>
+      <div class="step-text">Look for the <em>install icon</em> on the right side of the address bar — it looks like a monitor with a download arrow</div>
+    </div>
+    <div class="step-row">
+      <div class="step-num desktop">3</div>
+      <div class="step-text">Click it and hit <em>Install</em> — the app opens in its own window going forward ✓</div>
+    </div>
+  </div>
+</div>
+
+<!-- HEADS UP -->
+<div class="heads-up">
+  <div class="heads-up-title">Heads Up</div>
+  <div class="heads-up-row">
+    <div class="heads-up-dot"></div>
+    <div class="heads-up-text"><strong>iPhone users must use Safari.</strong> Chrome and other browsers on iOS don't support Add to Home Screen.</div>
+  </div>
+  <div class="heads-up-row">
+    <div class="heads-up-dot"></div>
+    <div class="heads-up-text"><strong>Don't see the option on Android?</strong> Visit the site, close the browser, reopen it, and try again — Chrome sometimes delays the prompt on first visit.</div>
+  </div>
+  <div class="heads-up-row">
+    <div class="heads-up-dot"></div>
+    <div class="heads-up-text"><strong>Already installed?</strong> Look for the Fantasy Refresh icon on your home screen — tap it to launch full screen with no browser bar.</div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  <div class="footer-logo">Fantasy<span>Refresh</span></div>
+  <a class="footer-url" href="https://fantasyrefresh.com">fantasyrefresh.com</a>
+  <div class="footer-sub">2026 NFL Season · Season-Long Salary Cap Fantasy Football</div>
+</div>
+
+</body>
+</html>
