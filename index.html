@@ -4031,10 +4031,12 @@ function applyTeamName(name){
     var ctx = FR.ctx();
     ctxLabel.textContent = ctx.leagueName ? ctx.leagueName : '';
   }
-  // Update auth badge if showing team name
+ // Update auth badge always when team name is confirmed
   var badge = document.getElementById('fr-sign-btn');
-  if(badge && badge.textContent.includes('👤')){
-    badge.textContent = '👤 '+name;
+  if(badge && frAuth.user){
+    frAuth.user.teamName = name;
+    frAuth.user.team2026 = name;
+    frAuth._updateBadge(frAuth.user);
   }
 }
 
