@@ -4158,12 +4158,13 @@ var frAuth = {
     frApiPost('signInWithPassword',{email:email,password:pass,returnSecureToken:true})
       .then(function(d){
         if(d.error){ err.textContent='Incorrect email or password'; return; }
-        return frDbGet('/users/'+d.localId)
-          .then(function(profile){
-            var user = {uid:d.localId, email:d.email,
-              team2026: profile?profile.team2026:null,
-              dk2025:   profile?profile.dk2025:null};
-            frAuth._save(user);
+      return frDbGet('/leagues/fr_refresh26/members/'+d.localId)
+  .then(function(profile){
+    var user = {uid:d.localId, email:d.email,
+      team2026: profile?profile.teamName:null,
+      teamName: profile?profile.teamName:null,
+      dk2025:   null};
+    frAuth._save(user);
             if(!user.team2026){ frAuth.show('profile'); }
             else { frAuth.close(); frAuth._applyToSite(user); }
           });
