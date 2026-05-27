@@ -4264,20 +4264,48 @@ frAuth.show('profile');
     if(!frAuth.user){ err.textContent='Not signed in'; return; }
     err.textContent = 'Saving…';
     var uid = frAuth.user.uid;
-    var profile = {team2026:teamName, dk2025:frAuth._selectedDk||null,
-      email:frAuth.user.email||null, created:Date.now()};
+    var email = frAuth.user.email;
+
+    // Save league context first so checkFirstRun never redirects
+    FR.saveContext({
+      leagueId:   'fr_refresh26',
+      leagueName: "OG King/Queen of the Hill '26",
+      season:     2026,
+      format:     'cumulative',
+      guillotine: false,
+      role:       'member'
+    });
+
+    // Write member record and team name to Firebase
     Promise.all([
-      frDbSet('/users'+FR_SEASON+'/'+uid, profile),
-      frDbSet('/teamNames'+FR_SEASON+'/'+encodeURIComponent(teamName.toLowerCase()),
-              {uid:uid,team:teamName})
+      frDbSet('/leagues/fr_refresh26/members/'+uid, {
+        uid:        uid,
+        email:      email,
+        teamName:   teamName,
+        joined:     Date.now(),
+        role:       'member',
+        active:     true,
+        eliminated: false
+      }),
+      frDbSet('/teamNames2026/'+encodeURIComponent(teamName.toLowerCase()),
+              {uid:uid, team:teamName})
     ]).then(function(){
+      frAuth.user.teamName = teamName;
       frAuth.user.team2026 = teamName;
-      frAuth.user.dk2025   = frAuth._selectedDk||null;
       frAuth._save(frAuth.user);
       frAuth.close();
       frAuth._applyToSite(frAuth.user);
-      showToast('Welcome to Fantasy Refresh, '+teamName+'! 🏈');
-    }).catch(function(){ err.textContent='Could not save — try again'; });
+      showToast('Welcome to OG King/Queen of the Hill \'26, '+teamName+'! 🏈');
+    }).catch(function(e){
+      console.error('Profile save error:', e);
+      // Save failed but context is set — let them in anyway
+      frAuth.user.teamName = teamName;
+      frAuth.user.team2026 = teamName;
+      frAuth._save(frAuth.user);
+      frAuth.close();
+      frAuth._applyToSite(frAuth.user);
+      showToast('Welcome, '+teamName+'! 🏈');
+    });
   },
 
   forgotPassword: function(){
