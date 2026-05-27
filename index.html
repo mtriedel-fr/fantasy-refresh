@@ -4241,7 +4241,7 @@ var frAuth = {
       });
   },
 
-  signOut: function(){
+signOut: function(){
     frAuth.user = null;
     try{ localStorage.removeItem('fr_user_'+FR_SEASON); }catch(e){}
     myTeam = '';
@@ -4249,10 +4249,9 @@ var frAuth = {
     var inp = $id('my-team-input');
     if(inp){ inp.value=''; inp.style.display=''; }
     frAuth._updateBadge(null);
-    renderAll();
     showToast('Signed out');
+    setTimeout(function(){ window.location.href = 'welcome.html'; }, 800);
   },
-
   _save: function(user){
     frAuth.user = user;
     // Save without idToken for security
