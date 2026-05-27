@@ -14,7 +14,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Fantasy Refresh — OG King/Queen of the Hill '26</title>
+<title>Fantasy Refresh — OG King/Queen of Fantasy '26</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20400%20400'><defs><linearGradient%20id='tg'%20x1='100%'%20y1='0%'%20x2='0%'%20y2='100%'><stop%20offset='0%'%20stop-color='%2300E5D4'/><stop%20offset='100%'%20stop-color='%2300E5D4'%20stop-opacity='0.6'/></linearGradient><linearGradient%20id='pg'%20x1='0%'%20y1='100%'%20x2='100%'%20y2='0%'><stop%20offset='0%'%20stop-color='%23FF5FA0'/><stop%20offset='100%'%20stop-color='%23FF5FA0'%20stop-opacity='0.6'/></linearGradient></defs><rect%20x='25'%20y='25'%20width='350'%20height='350'%20rx='70'%20fill='%23050808'/><g%20transform='translate(200,200)%20scale(3.79)%20translate(-475.5,-241.6)'><path%20fill='url(%23tg)'%20d='M504.547,265.443h-9.019a30.964,30.964,0,0,0-29.042-52.733,1.5,1.5,0,1,0,.792,2.894,27.955,27.955,0,0,1,25.512,48.253l0-10.169h-.011a1.493,1.493,0,0,0-2.985,0h0v13.255a1.5,1.5,0,0,0,1.5,1.5h13.256a1.5,1.5,0,1,0,0-3Z'/><path%20fill='url(%23pg)'%20d='M485.389,267.995a27.956,27.956,0,0,1-25.561-48.213l0,10.2h.015a1.491,1.491,0,0,0,2.978,0h.007V216.791a1.484,1.484,0,0,0-1.189-1.532l-.018-.005a1.533,1.533,0,0,0-.223-.022c-.024,0-.046-.007-.07-.007H448.071a1.5,1.5,0,0,0,0,3h8.995a30.963,30.963,0,0,0,29.115,52.664,1.5,1.5,0,0,0-.792-2.894Z'/></g></svg>">
   <link rel="apple-touch-icon" href="/icons/icon.svg">
 <script src="league-context.js"></script>
@@ -807,13 +807,13 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
 
 <div class="wk-bar">
   <div class="wk-bar-label">
-    <span id="wk-bar-season">2026 Season</span>
+    <span id="wk-bar-season">OG King/Queen of Fantasy '26</span>
   </div>
   <select class="wk-select" id="wk-select" onchange="setWeekFromSelect(this.value)">
   </select>
   <div class="league-switcher">
     <select class="league-select" id="league-select" onchange="handleLeagueSwitch(this.value)" title="Switch league">
-      <option value="fr_refresh26">FR 2026</option>
+      <option value="fr_refresh26">OG King/Queen of Fantasy '26</option>
     </select>
     <button class="league-new-btn" onclick="window.location.href='league-setup.html'" title="Create or join a league">+ League</button>
     <select class="season-select" id="season-select" onchange="switchSeason(this.value)" title="Switch season">
@@ -3815,7 +3815,7 @@ function openShareCard(){
 
   document.getElementById('share-preview').innerHTML =
     '<div class="share-card-inner">'
-    + '<div class="share-card-league">Fantasy Refresh · 2026 Season</div>'
+    + '<div class="share-card-league">OG King/Queen of Fantasy \'26</div>'
     + '<div class="share-card-name">'+myEntry.name+'</div>'
     + '<div class="share-card-score">'+fmtScore(myEntry.score)+'</div>'
     + '<div class="share-card-pts">points · week '+currentWeek+'</div>'
@@ -4826,9 +4826,9 @@ function toggleSalaryLock(){
     <div class="fr-panel" id="fr-profile">
       <div class="fr-logo">✏️</div>
       <div class="fr-title">Set Up Your Team</div>
-      <div class="fr-sub">Choose your 2026 team name. This is permanent for the season.</div>
+      <div class="fr-sub">Choose your team name. This is permanent for the season.</div>
       <div class="fr-field">
-        <label class="fr-label">Your 2026 Team Name</label>
+        <label class="fr-label">Your Team Name</label>
         <input type="text" id="fr-prof-team" class="fr-input" placeholder="The Mahomies..." maxlength="40"
           oninput="frAuth.checkTeamName(this.value)">
         <div id="fr-prof-status" style="font-size:11px;margin-top:4px;min-height:16px;color:#3A8888;"></div>
