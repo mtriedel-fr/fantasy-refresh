@@ -4181,7 +4181,7 @@ var frAuth = {
     err.textContent = '';
     if(!email){ err.textContent='Enter your email'; return; }
     if(pass.length<6){ err.textContent='Password must be at least 6 characters'; return; }
-    if(code!==FR_JOIN_CODE){ err.textContent='Incorrect join code'; return; }
+    if(code.toUpperCase()!==FR_JOIN_CODE.toUpperCase()){ err.textContent='Incorrect join code'; return; }
     err.textContent = 'Creating account…';
     frApiPost('signUp',{email:email,password:pass,returnSecureToken:true})
       .then(function(d){
@@ -4190,8 +4190,17 @@ var frAuth = {
             ?'Account already exists — sign in instead':d.error.message;
           return;
         }
-        frAuth._save({uid:d.localId,email:d.email,team2026:null,dk2025:null});
-        frAuth.show('profile');
+        frAuth._save({uid:d.localId,email:d.email,team2026:null,teamName:null,dk2025:null});
+// Add member to league
+FR.fb.patch('/leagues/fr_refresh26/members/'+d.localId, {
+  uid: d.localId,
+  email: d.email,
+  joined: Date.now(),
+  role: 'member',
+  active: true,
+  eliminated: false
+});
+frAuth.show('profile');
       }).catch(function(){ err.textContent='Sign up failed — try again'; });
   },
 
