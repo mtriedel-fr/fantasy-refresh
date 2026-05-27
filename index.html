@@ -4158,7 +4158,7 @@ var frAuth = {
     frApiPost('signInWithPassword',{email:email,password:pass,returnSecureToken:true})
       .then(function(d){
         if(d.error){ err.textContent='Incorrect email or password'; return; }
-        return frDbGet('/users'+FR_SEASON+'/'+d.localId)
+        return frDbGet('/users/'+d.localId)
           .then(function(profile){
             var user = {uid:d.localId, email:d.email,
               team2026: profile?profile.team2026:null,
