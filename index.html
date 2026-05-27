@@ -3455,15 +3455,39 @@ function checkFirstRun(){
     if(!u){ window.location.href = 'welcome.html'; return; }
     var ctx = localStorage.getItem('fr_league_ctx');
     if(!ctx){
-      // Default new users into fr_refresh26
-      FR.saveContext({
-        leagueId:   'fr_refresh26',
-        leagueName: "OG King/Queen of the Hill '26",
-        season:     2026,
-        format:     'cumulative',
-        guillotine: false,
-        role:       'member'
-      });
+      var user = JSON.parse(u);
+      // Check if user has leagues in their profile
+      FR.fb.get('/users/' + user.uid)
+        .then(function(profile){
+          if(profile && profile.leagues && Object.keys(profile.leagues).length > 0){
+            // User has leagues — load their first one
+            var firstId = Object.keys(profile.leagues)[0];
+            FR.switchLeague(firstId).catch(function(){});
+          } else {
+            // New user — check if they're a member of fr_refresh26
+            FR.fb.get('/leagues/fr_refresh26/members/' + user.uid)
+              .then(function(member){
+                if(member){
+                  // They signed up with REFRESH26 — put them in fr_refresh26
+                  FR.saveContext({
+                    leagueId:   'fr_refresh26',
+                    leagueName: "OG King/Queen of the Hill '26",
+                    season:     2026,
+                    format:     'cumulative',
+                    guillotine: false,
+                    role:       'member'
+                  });
+                } else {
+                  // Genuinely new — send to league setup
+                  window.location.href = 'league-setup.html';
+                }
+              }).catch(function(){
+                window.location.href = 'league-setup.html';
+              });
+          }
+        }).catch(function(){
+          window.location.href = 'league-setup.html';
+        });
     }
   }catch(e){}
 }
