@@ -4209,16 +4209,34 @@ var frAuth = {
             ?'Account already exists — sign in instead':d.error.message;
           return;
         }
-        frAuth._save({uid:d.localId,email:d.email,team2026:null,teamName:null,dk2025:null});
-// Add member to league
-FR.fb.patch('/leagues/fr_refresh26/members/'+d.localId, {
-  uid: d.localId,
-  email: d.email,
-  joined: Date.now(),
-  role: 'member',
-  active: true,
-  eliminated: false
+ frAuth._save({uid:d.localId,email:d.email,team2026:null,teamName:null,dk2025:null});
+// Set league context immediately so checkFirstRun doesn't redirect
+FR.saveContext({
+  leagueId:   'fr_refresh26',
+  leagueName: "OG King/Queen of the Hill '26",
+  season:     2026,
+  format:     'cumulative',
+  guillotine: false,
+  role:       'member'
 });
+// Add member to league — uses Firebase auth token after account creation
+frApiPost('signInWithPassword',{email:d.email,password:$id('fr-su-pass').value,returnSecureToken:true})
+  .then(function(signIn){
+    if(signIn.idToken){
+      fetch(FR.FB_DB_URL+'/leagues/fr_refresh26/members/'+d.localId+'.json?auth='+signIn.idToken,{
+        method:'PATCH',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          uid: d.localId,
+          email: d.email,
+          joined: Date.now(),
+          role: 'member',
+          active: true,
+          eliminated: false
+        })
+      });
+    }
+  }).catch(function(){});
 frAuth.show('profile');
       }).catch(function(){ err.textContent='Sign up failed — try again'; });
   },
