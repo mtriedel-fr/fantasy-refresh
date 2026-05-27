@@ -4170,27 +4170,27 @@ var frAuth = {
   },
 
   submitSignIn: function(){
-    var email = $id('fr-si-email').value.trim();
-    var pass  = $id('fr-si-pass').value;
-    var err   = $id('fr-si-err');
-    err.textContent = '';
-    if(!email||!pass){ err.textContent='Enter email and password'; return; }
-    err.textContent = 'Signing in…';
-    frApiPost('signInWithPassword',{email:email,password:pass,returnSecureToken:true})
-      .then(function(d){
-        if(d.error){ err.textContent='Incorrect email or password'; return; }
-      return frDbGet('/leagues/fr_refresh26/members/'+d.localId)
-  .then(function(profile){
-    var user = {uid:d.localId, email:d.email,
-      team2026: profile?profile.teamName:null,
-      teamName: profile?profile.teamName:null,
-      dk2025:   null};
-    frAuth._save(user);
-            if(!user.team2026){ frAuth.show('profile'); }
-            else { frAuth.close(); frAuth._applyToSite(user); }
-          });
-      }).catch(function(){ err.textContent='Sign in failed — try again'; });
-  },
+  frApiPost('signInWithPassword',{email:email,password:pass,returnSecureToken:true})
+  .then(function(d){
+    if(d.error){ err.textContent='Incorrect email or password'; return; }
+    return frDbGet('/leagues/fr_refresh26/members/'+d.localId)
+      .then(function(profile){
+        var user = {uid:d.localId, email:d.email,
+          team2026: profile?profile.teamName:null,
+          teamName: profile?profile.teamName:null,
+          dk2025:   null};
+        frAuth._save(user);
+        // Clear cached team name from previous session
+        try{
+          localStorage.removeItem('fr_myteam');
+          localStorage.removeItem('fr_teamname_fr_refresh26');
+          localStorage.removeItem('fr_league_ctx');
+        }catch(e){}
+        if(!user.team2026){ frAuth.show('profile'); }
+        else { frAuth.close(); frAuth._applyToSite(user); }
+      });
+  }).catch(function(){ err.textContent='Sign in failed — try again'; });
+},
 
   submitSignUp: function(){
     var email = $id('fr-su-email').value.trim();
