@@ -7,10 +7,9 @@
   // ── CONSTANTS ───────────────────────────────────────────────
   var FB_DB_URL  = 'https://fantasy-refresh-default-rtdb.firebaseio.com';
   var FR_SEASON  = '2026';
-  var DEFAULT_LEAGUE_ID = 'fr_refresh26'; // 2026 legacy league
+  var DEFAULT_LEAGUE_ID = 'fr_refresh26';
 
   // ── LEAGUE CONTEXT ──────────────────────────────────────────
-  // Loaded from localStorage, set at login or league switch
   var _ctx = null;
 
   function loadContext() {
@@ -19,10 +18,9 @@
       var raw = localStorage.getItem('fr_league_ctx');
       if (raw) { _ctx = JSON.parse(raw); return _ctx; }
     } catch(e) {}
-    // Default to 2026 league if nothing stored
     _ctx = {
       leagueId:   DEFAULT_LEAGUE_ID,
-      leagueName: 'Fantasy Refresh 2026',
+      leagueName: "OG King/Queen of the Hill '26",
       season:     2026,
       format:     'cumulative',
       guillotine: false,
@@ -45,53 +43,36 @@
   function ctx() { return loadContext(); }
 
   var paths = {
-    // League root
-    league:        function()       { return '/leagues/' + ctx().leagueId; },
-    settings:      function()       { return paths.league() + '/settings'; },
-    members:       function()       { return paths.league() + '/members'; },
-    member:        function(uid)    { return paths.members() + '/' + uid; },
-
-    // Season data
-    season:        function()       { return paths.league() + '/season/' + ctx().season; },
-    week:          function(w)      { return paths.season() + '/' + w; },
-    weekEntry:     function(w, uid) { return paths.week(w) + '/' + uid; },
-    seasonMeta:    function()       { return paths.season() + '/meta'; },
-
-    // Lineups
-    lineups:       function()       { return paths.league() + '/lineups/' + ctx().season; },
-    weekLineups:   function(w)      { return paths.lineups() + '/week' + w; },
-    myLineup:      function(w, uid) { return paths.weekLineups(w) + '/' + uid; },
-
-    // Salaries
-    salaries:      function()       { return paths.league() + '/salaries/' + ctx().season; },
-    weekSalaries:  function(w)      { return paths.salaries() + '/week' + w; },
-
-    // Locks
-    locks:         function()       { return paths.league() + '/locks/' + ctx().season; },
-    weekLocks:     function(w)      { return paths.locks() + '/week' + w; },
-    locksMeta:     function()       { return paths.locks() + '/meta'; },
-
-    // Matchups (H2H)
-    matchups:      function()       { return paths.league() + '/matchups/' + ctx().season; },
-    weekMatchups:  function(w)      { return paths.matchups() + '/week' + w; },
-
-    // Reactions
-    reactions:     function()       { return paths.league() + '/reactions/' + ctx().season; },
-    weekReactions: function(w)      { return paths.reactions() + '/' + w; },
-
-    // Global (shared across leagues)
-    playerPool:    function()       { return '/playerPool/' + ctx().season; },
-    players:       function()       { return paths.playerPool() + '/players'; },
-    user:          function(uid)    { return '/users/' + uid; },
-
-    // Preseason
-    preseason:     function()       { return paths.league() + '/season/preseason'; },
-    preSeasonSal:  function(w)      { return paths.league() + '/salaries/preseason/week' + w; },
-    preSeasonLin:  function(w)      { return paths.league() + '/lineups/preseason/week' + w; },
-    preSeasonLocks:function(w)      { return paths.league() + '/locks/preseason/week' + w; },
-
-    // Firebase REST URLs (append .json)
-    url:           function(p)      { return FB_DB_URL + p + '.json'; }
+    league:         function()       { return '/leagues/' + ctx().leagueId; },
+    settings:       function()       { return paths.league() + '/settings'; },
+    commissioners:  function()       { return paths.league() + '/commissioners'; },
+    commissioner:   function(uid)    { return paths.commissioners() + '/' + uid; },
+    members:        function()       { return paths.league() + '/members'; },
+    member:         function(uid)    { return paths.members() + '/' + uid; },
+    season:         function()       { return paths.league() + '/season/' + ctx().season; },
+    week:           function(w)      { return paths.season() + '/' + w; },
+    weekEntry:      function(w, uid) { return paths.week(w) + '/' + uid; },
+    seasonMeta:     function()       { return paths.season() + '/meta'; },
+    lineups:        function()       { return paths.league() + '/lineups/' + ctx().season; },
+    weekLineups:    function(w)      { return paths.lineups() + '/week' + w; },
+    myLineup:       function(w, uid) { return paths.weekLineups(w) + '/' + uid; },
+    salaries:       function()       { return paths.league() + '/salaries/' + ctx().season; },
+    weekSalaries:   function(w)      { return paths.salaries() + '/week' + w; },
+    locks:          function()       { return paths.league() + '/locks/' + ctx().season; },
+    weekLocks:      function(w)      { return paths.locks() + '/week' + w; },
+    locksMeta:      function()       { return paths.locks() + '/meta'; },
+    matchups:       function()       { return paths.league() + '/matchups/' + ctx().season; },
+    weekMatchups:   function(w)      { return paths.matchups() + '/week' + w; },
+    reactions:      function()       { return paths.league() + '/reactions/' + ctx().season; },
+    weekReactions:  function(w)      { return paths.reactions() + '/' + w; },
+    playerPool:     function()       { return '/playerPool/' + ctx().season; },
+    players:        function()       { return paths.playerPool() + '/players'; },
+    user:           function(uid)    { return '/users/' + uid; },
+    preseason:      function()       { return paths.league() + '/season/preseason'; },
+    preSeasonSal:   function(w)      { return paths.league() + '/salaries/preseason/week' + w; },
+    preSeasonLin:   function(w)      { return paths.league() + '/lineups/preseason/week' + w; },
+    preSeasonLocks: function(w)      { return paths.league() + '/locks/preseason/week' + w; },
+    url:            function(p)      { return FB_DB_URL + p + '.json'; }
   };
 
   // ── FIREBASE HELPERS ────────────────────────────────────────
@@ -120,8 +101,40 @@
     }
   };
 
+  // ── COMMISSIONER CHECK ──────────────────────────────────────
+  // Checks /leagues/{leagueId}/commissioners/{uid} = true
+  // Returns promise resolving to { isComm: bool, isCreator: bool }
+  function checkCommissionerStatus(uid) {
+    if (!uid) return Promise.resolve({ isComm: false, isCreator: false });
+    return Promise.all([
+      fb.get(paths.commissioner(uid)),
+      fb.get(paths.settings())
+    ]).then(function(results) {
+      var commVal   = results[0];  // true | null
+      var settings  = results[1];
+      var isComm    = commVal === true;
+      var isCreator = settings && settings.creatorUid === uid;
+      return { isComm: isComm || isCreator, isCreator: isCreator };
+    }).catch(function() {
+      return { isComm: false, isCreator: false };
+    });
+  }
+
+  // Legacy shim — keep old callers working
+  function isCommissioner(uid) {
+    return checkCommissionerStatus(uid).then(function(s) { return s.isComm; });
+  }
+
+  // ── ADD / REMOVE CO-COMMISSIONER ───────────────────────────
+  function addCoCommissioner(targetUid) {
+    return fb.put(paths.commissioner(targetUid), true);
+  }
+
+  function removeCoCommissioner(targetUid) {
+    return fb.delete(paths.commissioner(targetUid));
+  }
+
   // ── LEAGUE LOADER ───────────────────────────────────────────
-  // Call at app boot to load league settings from Firebase
   function loadLeagueSettings(leagueId) {
     var id = leagueId || ctx().leagueId;
     return fb.get('/leagues/' + id + '/settings')
@@ -129,22 +142,21 @@
         if (!settings) throw new Error('League not found: ' + id);
         var current = loadContext();
         saveContext(Object.assign({}, current, {
-          leagueId:   settings.leagueId,
-          leagueName: settings.name,
-          season:     settings.season,
-          format:     settings.format,
-          guillotine: settings.guillotine,
-          cap:        settings.cap,
-          maxSalary:  settings.maxSalary,
-          minSalary:  settings.minSalary,
-          joinCode:   settings.joinCode
+          leagueId:   settings.leagueId   || id,
+          leagueName: settings.name       || "OG King/Queen of the Hill '26",
+          season:     settings.season     || 2026,
+          format:     settings.format     || 'cumulative',
+          guillotine: settings.guillotine || false,
+          cap:        settings.cap        || 60000,
+          maxSalary:  settings.maxSalary  || 11300,
+          minSalary:  settings.minSalary  || 3700,
+          joinCode:   settings.joinCode   || ''
         }));
         return settings;
       });
   }
 
   // ── USER LEAGUE LIST ────────────────────────────────────────
-  // Returns all leagues a user is in
   function getUserLeagues(uid) {
     return fb.get('/users/' + uid)
       .then(function(profile) {
@@ -158,7 +170,6 @@
   // ── SWITCH LEAGUE ───────────────────────────────────────────
   function switchLeague(leagueId) {
     return loadLeagueSettings(leagueId).then(function(settings) {
-      // Get user's team name in this league
       var user = null;
       try { user = JSON.parse(localStorage.getItem('fr_user_' + FR_SEASON)); } catch(e) {}
       if (user && user.uid) {
@@ -175,38 +186,23 @@
     });
   }
 
-  // ── IS COMMISSIONER ─────────────────────────────────────────
-  function isCommissioner(uid) {
-    return fb.get('/leagues/' + ctx().leagueId + '/settings')
-      .then(function(settings) {
-        var comms = settings && settings.commissioners || [];
-        return comms.indexOf(uid) >= 0;
-      });
-  }
-
   // ── EXPOSE GLOBAL ───────────────────────────────────────────
   global.FR = {
-    // Context
-    ctx:                loadContext,
-    saveContext:        saveContext,
-    clearContext:       clearContext,
-
-    // Path builders
-    paths:              paths,
-
-    // Firebase helpers
-    fb:                 fb,
-
-    // League management
-    loadLeagueSettings: loadLeagueSettings,
-    getUserLeagues:     getUserLeagues,
-    switchLeague:       switchLeague,
-    isCommissioner:     isCommissioner,
-
-    // Constants
-    FB_DB_URL:          FB_DB_URL,
-    FR_SEASON:          FR_SEASON,
-    DEFAULT_LEAGUE_ID:  DEFAULT_LEAGUE_ID
+    ctx:                  loadContext,
+    saveContext:          saveContext,
+    clearContext:         clearContext,
+    paths:                paths,
+    fb:                   fb,
+    loadLeagueSettings:   loadLeagueSettings,
+    getUserLeagues:       getUserLeagues,
+    switchLeague:         switchLeague,
+    isCommissioner:       isCommissioner,
+    checkCommissionerStatus: checkCommissionerStatus,
+    addCoCommissioner:    addCoCommissioner,
+    removeCoCommissioner: removeCoCommissioner,
+    FB_DB_URL:            FB_DB_URL,
+    FR_SEASON:            FR_SEASON,
+    DEFAULT_LEAGUE_ID:    DEFAULT_LEAGUE_ID
   };
 
 })(window);
