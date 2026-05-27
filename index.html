@@ -799,7 +799,7 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
     <div class="hdr-sub" id="hdr-sub">Ready to import</div>
     <div style="display:flex;gap:6px;align-items:center;justify-content:flex-end;">
       <button class="fr-badge" id="fr-sign-btn" onclick="frAuth.openSignIn()">🔑 Sign In</button>
-      <button class="comm-btn" onclick="toggleComm()" id="comm-toggle">⚙ Commissioner</button>
+     <button class="comm-btn" onclick="toggleComm()" id="comm-toggle" style="display:none;">⚙ Commissioner</button>
       <button class="comm-btn theme-toggle" onclick="toggleTheme()" id="theme-btn" title="Toggle light/dark mode">🌙</button>
     </div>
   </div>
@@ -932,18 +932,7 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
 
 <div class="comm-panel hidden" id="comm-panel">
   <!-- PASSWORD GATE -->
-  <div id="comm-gate" class="comm-gate">
-    <div class="comm-gate-inner">
-      <div class="comm-gate-icon">🔐</div>
-      <div class="comm-gate-title">Commissioner Access</div>
-      <div class="comm-gate-sub">Enter your password to access commissioner tools</div>
-      <div class="comm-gate-row">
-        <input type="password" id="comm-pw-input" class="comm-pw-input" placeholder="Password..." onkeydown="if(event.key==='Enter') checkCommPw()">
-        <button class="comm-pw-btn" onclick="checkCommPw()">Enter</button>
-      </div>
-      <div id="comm-pw-err" class="comm-pw-err hidden">Incorrect password</div>
-    </div>
-  </div>
+<div id="comm-gate" class="comm-gate hidden"></div>
   <!-- TOOLS (hidden until auth) -->
   <div id="comm-tools" class="hidden">
   <div class="comm-inner">
@@ -994,6 +983,20 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
           <div style="font-size:11px;color:var(--ink3);margin-top:6px;">Change by editing <code>FR_JOIN_CODE</code> in the file.</div>
         </div>
 
+       <!-- MANAGE COMMISSIONERS -->
+        <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--bdr);" id="manage-comm-section">
+          <div class="csect">👑 Commissioners</div>
+          <div style="font-size:12px;color:var(--ink2);margin-bottom:10px;line-height:1.5;">Add or remove co-commissioners. They get full access to these tools. Only you can manage this list.</div>
+          <div id="comm-list" style="margin-bottom:12px;"></div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <select id="comm-add-select" class="wk-select" style="flex:1;font-size:12px;">
+              <option value="">Pick a registered player…</option>
+            </select>
+            <button class="salary-btn" onclick="addCommissionerFromSelect()" style="white-space:nowrap;">+ Add</button>
+          </div>
+          <div id="comm-add-status" style="font-family:var(--fd);font-size:11px;color:var(--ink3);margin-top:6px;min-height:14px;text-transform:uppercase;letter-spacing:.3px;"></div>
+        </div>
+
         <!-- SEASON HISTORY -->
         <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--bdr);">
           <div class="csect">🏈 Player Pool</div>
@@ -1036,23 +1039,6 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
   </div>
   </div><!-- end comm-tools -->
 </div><!-- end comm-panel -->
-<!-- COMPARE MODAL -->
-<div id="cmp-modal" class="cmp-modal hidden">
-  <div class="cmp-overlay" onclick="closeCompare()"></div>
-  <div class="cmp-box">
-    <div class="cmp-hdr">
-      <div class="cmp-title">⚡ Compare Teams</div>
-      <div class="cmp-sub" id="cmp-sub">Select up to 6 teams from the standings</div>
-      <button class="cmp-close" onclick="closeCompare()">✕</button>
-    </div>
-    <div class="cmp-chips" id="cmp-chips"></div>
-    <div id="cmp-body"></div>
-    <div class="cmp-footer">
-      <button class="cmp-clear-btn" onclick="clearCompare()">Clear all</button>
-    </div>
-  </div>
-</div>
-
 
 <!-- FIRST RUN MODAL -->
 <div class="firstrun-modal hidden" id="firstrun-modal">
@@ -2794,45 +2780,43 @@ function removeFromCompare(name){
 
 
 
-var COMM_PW = 'refresh2025'; // Change this to your own password
 var commUnlocked = false;
 
-function checkCommPw(){
-  var input = document.getElementById('comm-pw-input').value;
-  var err = document.getElementById('comm-pw-err');
-  if(input === COMM_PW){
+function checkCommPw(){ /* legacy no-op */ }
+
+function initCommissionerAccess(){
+  var user = null;
+  try{ user = JSON.parse(localStorage.getItem('fr_user_' + FR_SEASON)); }catch(e){}
+  if(!user || !user.uid) return;
+  FR.checkCommissionerStatus(user.uid).then(function(status){
+    if(!status.isComm) return;
     commUnlocked = true;
-    document.getElementById('comm-gate').classList.add('hidden');
-    document.getElementById('comm-tools').classList.remove('hidden');
-    err.classList.add('hidden');
+    // Store role in context
+    var ctx = FR.ctx();
+    FR.saveContext(Object.assign({}, ctx, {
+      role: status.isCreator ? 'creator' : 'commissioner'
+    }));
+    // Show commissioner button
+    var btn = document.getElementById('comm-toggle');
+    if(btn) btn.style.display = 'inline-flex';
     try{ sessionStorage.setItem('fr_comm','1'); }catch(e){}
-    renderHistory();
-    renderUserPanel();
-    loadPoolStatus();
-    initSalaryPanel();
-  } else {
-    err.classList.remove('hidden');
-    document.getElementById('comm-pw-input').value = '';
-    document.getElementById('comm-pw-input').focus();
-  }
+  }).catch(function(){});
 }
 
 function toggleComm(){
+  if(!commUnlocked){ return; }
   var p = document.getElementById('comm-panel');
   var hidden = p.classList.contains('hidden');
   p.classList.toggle('hidden');
   document.getElementById('comm-toggle').textContent = hidden ? '✕ Close' : '⚙ Commissioner';
   if(!hidden) return;
-  // Check if already unlocked this browser session
-  try{ if(sessionStorage.getItem('fr_comm') === '1'){ commUnlocked = true; } }catch(e){}
-  if(commUnlocked){
-    document.getElementById('comm-gate').classList.add('hidden');
-    document.getElementById('comm-tools').classList.remove('hidden');
-    renderHistory();
-    renderUserPanel();
-    loadPoolStatus();
-    initSalaryPanel();
-  }
+  document.getElementById('comm-gate').classList.add('hidden');
+  document.getElementById('comm-tools').classList.remove('hidden');
+  renderHistory();
+renderUserPanel();
+renderCommissionerList();
+loadPoolStatus();
+initSalaryPanel();
   // Wire up drag and drop once
   var zone = document.getElementById('drop-zone');
   if(zone && !zone._dd){
@@ -4308,6 +4292,7 @@ var frAuth = {
 frAuth.init();
 initLeagueSwitcher();
 loadTeamName();
+initCommissionerAccess();
 
 
 // ── COMMISSIONER USER PANEL ───────────────────────────────────
@@ -4751,7 +4736,89 @@ function toggleSalaryLock(){
       });
     });
 }
+// ── COMMISSIONER MANAGEMENT ───────────────────────────────────
+function renderCommissionerList(){
+  var section = document.getElementById('manage-comm-section');
+  if(!section) return;
+  var user = null;
+  try{ user = JSON.parse(localStorage.getItem('fr_user_'+FR_SEASON)); }catch(e){}
+  if(!user) return;
 
+  // Only creator can manage commissioners
+  FR.checkCommissionerStatus(user.uid).then(function(status){
+    if(!status.isCreator){
+      section.style.display = 'none';
+      return;
+    }
+    // Load current commissioners
+    FR.fb.get(FR.paths.commissioners()).then(function(data){
+      var list = document.getElementById('comm-list');
+      if(!data){ list.innerHTML = '<div style="color:var(--ink3);font-size:13px;">No co-commissioners yet.</div>'; return; }
+      var uids = Object.keys(data).filter(function(uid){ return data[uid] === true; });
+      if(!uids.length){ list.innerHTML = '<div style="color:var(--ink3);font-size:13px;">No co-commissioners yet.</div>'; return; }
+      // Load member names for each UID
+      Promise.all(uids.map(function(uid){
+        return FR.fb.get(FR.paths.member(uid)).then(function(m){
+          return { uid: uid, name: (m && m.teamName) || (m && m.email) || uid };
+        }).catch(function(){ return { uid: uid, name: uid }; });
+      })).then(function(members){
+        list.innerHTML = members.map(function(m){
+          var isMe = m.uid === user.uid;
+          return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--bdr);">'
+            + '<span style="font-family:var(--fd);font-size:13px;font-weight:700;color:var(--or);">'
+            + m.name + (isMe ? ' <span style="color:var(--pk);font-size:10px;">(You — Creator)</span>' : '') + '</span>'
+            + (!isMe ? '<button class="del-btn" onclick="removeCommissioner(\''+m.uid+'\')" style="color:var(--pk);border-color:rgba(255,95,160,.3);">Remove</button>' : '')
+            + '</div>';
+        }).join('');
+      });
+    });
+    // Populate add dropdown with registered members who aren't already commissioners
+    FR.fb.get(FR.paths.commissioners()).then(function(commData){
+      FR.fb.get(FR.paths.members()).then(function(members){
+        var sel = document.getElementById('comm-add-select');
+        if(!sel || !members) return;
+        var existingUids = commData ? Object.keys(commData) : [];
+        sel.innerHTML = '<option value="">Pick a registered player…</option>';
+        Object.keys(members).forEach(function(uid){
+          if(existingUids.indexOf(uid) >= 0) return; // already a commissioner
+          var m = members[uid];
+          var name = (m && m.teamName) || (m && m.email) || uid;
+          var opt = document.createElement('option');
+          opt.value = uid;
+          opt.textContent = name;
+          sel.appendChild(opt);
+        });
+      });
+    });
+  });
+}
+
+function addCommissionerFromSelect(){
+  var sel = document.getElementById('comm-add-select');
+  var status = document.getElementById('comm-add-status');
+  if(!sel || !sel.value){ status.textContent = 'Select a player first'; status.style.color = 'var(--pk)'; return; }
+  var targetUid = sel.value;
+  status.textContent = 'Adding…'; status.style.color = 'var(--ink3)';
+  FR.addCoCommissioner(targetUid).then(function(){
+    status.textContent = '✓ Co-commissioner added';
+    status.style.color = 'var(--or)';
+    renderCommissionerList();
+    showToast('Co-commissioner added ✓');
+  }).catch(function(){
+    status.textContent = 'Failed — try again';
+    status.style.color = 'var(--pk)';
+  });
+}
+
+function removeCommissioner(uid){
+  if(!confirm('Remove this co-commissioner? They will lose access immediately.')) return;
+  FR.removeCoCommissioner(uid).then(function(){
+    renderCommissionerList();
+    showToast('Co-commissioner removed');
+  }).catch(function(){
+    showToast('Could not remove — try again', true);
+  });
+}
 </script>
 
 <!-- SHARE MODAL -->
