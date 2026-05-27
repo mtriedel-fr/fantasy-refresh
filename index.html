@@ -4275,10 +4275,11 @@ signOut: function(){
   _updateBadge: function(user){
     var btn = $id('fr-sign-btn');
     if(!btn) return;
-    if(user && user.team2026){
-      btn.textContent = '👤 '+user.team2026;
+    var name = user && (user.teamName || user.team2026);
+    if(name){
+      btn.textContent = '👤 '+name;
       btn.onclick = function(){
-        if(confirm('Signed in as: '+user.team2026+'\n\nSign out?')) frAuth.signOut();
+        if(confirm('Signed in as: '+name+'\n\nSign out?')) frAuth.signOut();
       };
     } else {
       btn.textContent = '🔑 Sign In';
