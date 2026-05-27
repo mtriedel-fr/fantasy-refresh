@@ -4260,10 +4260,10 @@ signOut: function(){
     })); }catch(e){}
   },
 
-  _applyToSite: function(user){
+ _applyToSite: function(user){
     // Connect auth to main site
-    if(user && user.team2026){
-      myTeam = user.team2026;
+    if(user && (user.team2026 || user.teamName)){
+      myTeam = user.team2026 || user.teamName;
       try{ localStorage.setItem('fr_myteam', myTeam); }catch(e){}
       var inp = $id('my-team-input');
       if(inp){ inp.value = myTeam; inp.style.display='none'; }
