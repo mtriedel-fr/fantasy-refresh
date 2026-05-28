@@ -1070,15 +1070,23 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
 <div class="toast" id="toast"></div>
 
 <script>
-// ── AUTH GATE — redirect to welcome if not signed in ───────────
+// ── AUTH GATE ──────────────────────────────────────────────────
 (function(){
   try{
     var u = localStorage.getItem('fr_user_2026');
     var hasSignup = window.location.search.indexOf('signup=1') >= 0;
     var hasSignin = window.location.search.indexOf('signin=1') >= 0;
     var hasCreate = window.location.search.indexOf('create=1') >= 0;
+    var hasComm   = window.location.search.indexOf('comm=1') >= 0;
+    // No user and no auth flow — go to welcome
     if(!u && !hasSignup && !hasSignin && !hasCreate){
       window.location.href = 'welcome.html';
+      return;
+    }
+    // Already signed in and no special param — go to home
+    if(u && !hasSignup && !hasSignin && !hasCreate && !hasComm){
+      window.location.href = 'home.html';
+      return;
     }
   }catch(e){}
 })();
@@ -4262,15 +4270,11 @@ submitSignUp: function(){
             });
             var displayName = ($id('fr-su-name') && $id('fr-su-name').value.trim()) || '';
     frAuth._save({uid:d.localId, email:d.email, displayName:displayName, team2026:null, teamName:null, dk2025:null});
-          frAuth._pendingLeagueId = match.leagueId;
-frAuth._pendingLeagueName = match.name;
-if(frAuth._pendingCreate){
-  frAuth._pendingCreate = false;
-  frAuth.close();
-  setTimeout(function(){ window.location.href = 'league-setup.html?mode=create'; }, 400);
-} else {
-  frAuth.show('profile');
-}
+            frAuth.show('profile');
+            // Store league id for profile save
+            frAuth._pendingLeagueId = match.leagueId;
+            frAuth._pendingLeagueName = match.name;
+          });
       })
       .catch(function(e){
         err.textContent = e.message || 'Sign up failed — try again';
