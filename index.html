@@ -4204,9 +4204,10 @@ var frAuth = {
     return frDbGet('/leagues/fr_refresh26/members/'+d.localId)
       .then(function(profile){
         var user = {uid:d.localId, email:d.email,
-          team2026: profile?profile.teamName:null,
-          teamName: profile?profile.teamName:null,
-          dk2025:   null};
+          team2026:     profile?profile.teamName:null,
+          teamName:     profile?profile.teamName:null,
+          displayName:  profile?profile.displayName:'',
+          dk2025:       null};
         frAuth._save(user);
         // Clear cached team name from previous session
         try{
@@ -4259,7 +4260,8 @@ submitSignUp: function(){
               role:       'member',
               promptTeamName: true
             });
-            frAuth._save({uid:d.localId, email:d.email, team2026:null, teamName:null, dk2025:null});
+            var displayName = ($id('fr-su-name') && $id('fr-su-name').value.trim()) || '';
+    frAuth._save({uid:d.localId, email:d.email, displayName:displayName, team2026:null, teamName:null, dk2025:null});
             frAuth.show('profile');
             // Store league id for profile save
             frAuth._pendingLeagueId = match.leagueId;
@@ -4314,6 +4316,7 @@ submitSignUp: function(){
         uid:        uid,
         email:      email,
         teamName:   teamName,
+        displayName: frAuth.user.displayName || '',
         joined:     Date.now(),
         role:       'member',
         active:     true,
@@ -4374,8 +4377,8 @@ signOut: function(){
     frAuth.user = user;
     // Save without idToken for security
     try{ localStorage.setItem('fr_user_'+FR_SEASON, JSON.stringify({
-      uid:user.uid, email:user.email, team2026:user.team2026,
-      teamName:user.teamName, dk2025:user.dk2025
+      uid:user.uid, email:user.email, displayName:user.displayName||'',
+      team2026:user.team2026, teamName:user.teamName, dk2025:user.dk2025
     })); }catch(e){}
   },
 
@@ -5002,6 +5005,10 @@ function removeCommissioner(uid){
       <div class="fr-logo">🎉</div>
       <div class="fr-title">Join the League</div>
       <div class="fr-sub">Create your account and choose your team name.</div>
+      <div class="fr-field">
+        <label class="fr-label">Your Name</label>
+        <input type="text" id="fr-su-name" class="fr-input" placeholder="First name or nickname" autocomplete="given-name">
+      </div>
       <div class="fr-field">
         <label class="fr-label">Email</label>
         <input type="email" id="fr-su-email" class="fr-input" placeholder="your@email.com">
