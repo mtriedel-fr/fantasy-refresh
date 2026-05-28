@@ -3450,6 +3450,9 @@ function renderNumbers(curEntries){
 
 // ── FIRST RUN PROMPT ──────────────────────────────────────────
 function checkFirstRun(){
+  // Don't redirect if coming from welcome page
+  if(window.location.search.indexOf('signup=1') > -1 ||
+     window.location.search.indexOf('signin=1') > -1){ return; }
   try{
     var u = localStorage.getItem('fr_user_'+FR_SEASON);
     if(!u){ window.location.href = 'welcome.html'; return; }
@@ -4169,29 +4172,33 @@ var frAuth = {
     $id('fr-auth-overlay').classList.add('open');
   },
 
-  submitSignIn: function(){
-  frApiPost('signInWithPassword',{email:email,password:pass,returnSecureToken:true})
-  .then(function(d){
-    if(d.error){ err.textContent='Incorrect email or password'; return; }
-    return frDbGet('/leagues/fr_refresh26/members/'+d.localId)
-      .then(function(profile){
-        var user = {uid:d.localId, email:d.email,
-          team2026: profile?profile.teamName:null,
-          teamName: profile?profile.teamName:null,
-          dk2025:   null};
-        frAuth._save(user);
-        // Clear cached team name from previous session
-        try{
-          localStorage.removeItem('fr_myteam');
-          localStorage.removeItem('fr_teamname_fr_refresh26');
-          localStorage.removeItem('fr_league_ctx');
-        }catch(e){}
-        if(!user.team2026){ frAuth.show('profile'); }
-        else { frAuth.close(); frAuth._applyToSite(user); }
-      });
-  }).catch(function(){ err.textContent='Sign in failed — try again'; });
-},
-
+ submitSignIn: function(){
+    var email = $id('fr-si-email').value.trim();
+    var pass  = $id('fr-si-pass').value;
+    var err   = $id('fr-si-err');
+    err.textContent = '';
+    if(!email||!pass){ err.textContent='Enter email and password'; return; }
+    err.textContent = 'Signing in…';
+    frApiPost('signInWithPassword',{email:email,password:pass,returnSecureToken:true})
+    .then(function(d){
+      if(d.error){ err.textContent='Incorrect email or password'; return; }
+      return frDbGet('/leagues/fr_refresh26/members/'+d.localId)
+        .then(function(profile){
+          var user = {uid:d.localId, email:d.email,
+            team2026: profile?profile.teamName:null,
+            teamName: profile?profile.teamName:null,
+            dk2025:   null};
+          frAuth._save(user);
+          try{
+            localStorage.removeItem('fr_myteam');
+            localStorage.removeItem('fr_teamname_fr_refresh26');
+            localStorage.removeItem('fr_league_ctx');
+          }catch(e){}
+          if(!user.team2026){ frAuth.show('profile'); }
+          else { frAuth.close(); frAuth._applyToSite(user); }
+        });
+    }).catch(function(){ err.textContent='Sign in failed — try again'; });
+  },
 submitSignUp: function(){
     var email = $id('fr-su-email').value.trim();
     var pass  = $id('fr-su-pass').value;
@@ -4271,18 +4278,17 @@ submitSignUp: function(){
     if(!teamName){ err.textContent='Choose a team name'; return; }
     if(!frAuth._teamAvail){ err.textContent='That name is taken — try another'; return; }
     if(!frAuth.user){ err.textContent='Not signed in'; return; }
-    err.textContent = 'Saving…';
-    var uid = frAuth.user.uid;
-    var email = frAuth.user.email;
-
-    // Save league context first so checkFirstRun never redirects
+    // Save league context using the pending league from sign-up
+    var targetLeague = frAuth._pendingLeagueId || 'fr_refresh26';
+    var targetLeagueName = frAuth._pendingLeagueName || "OG King/Queen of the Hill '26";
     FR.saveContext({
-      leagueId:   'fr_refresh26',
-      leagueName: "OG King/Queen of the Hill '26",
+      leagueId:   targetLeague,
+      leagueName: targetLeagueName,
       season:     2026,
       format:     'cumulative',
       guillotine: false,
       role:       'member'
+    });
     });
 
     // Write member record and team name to Firebase
@@ -4339,11 +4345,11 @@ signOut: function(){
     showToast('Signed out');
     setTimeout(function(){ window.location.href = 'welcome.html'; }, 800);
   },
-  _save: function(user){
+ _save: function(user){
     frAuth.user = user;
-    // Save without idToken for security
     try{ localStorage.setItem('fr_user_'+FR_SEASON, JSON.stringify({
-      uid:user.uid, email:user.email, team2026:user.team2026, dk2025:user.dk2025
+      uid:user.uid, email:user.email, team2026:user.team2026,
+      teamName:user.teamName, dk2025:user.dk2025
     })); }catch(e){}
   },
 
