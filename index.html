@@ -1239,7 +1239,12 @@ function boot(){
   checkFirstRun();
 }
 
-loadFromCloud();
+// Only load data if not in auth flow
+if(window.location.search.indexOf('signup=1') < 0 &&
+   window.location.search.indexOf('signin=1') < 0 &&
+   window.location.search.indexOf('create=1') < 0){
+  loadFromCloud();
+}
 
 // ── WEEK BAR ───────────────────────────────────────────────────
 function buildWeekBar(){
