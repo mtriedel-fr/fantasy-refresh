@@ -4262,11 +4262,15 @@ submitSignUp: function(){
             });
             var displayName = ($id('fr-su-name') && $id('fr-su-name').value.trim()) || '';
     frAuth._save({uid:d.localId, email:d.email, displayName:displayName, team2026:null, teamName:null, dk2025:null});
-            frAuth.show('profile');
-            // Store league id for profile save
-            frAuth._pendingLeagueId = match.leagueId;
-            frAuth._pendingLeagueName = match.name;
-          });
+          frAuth._pendingLeagueId = match.leagueId;
+frAuth._pendingLeagueName = match.name;
+if(frAuth._pendingCreate){
+  frAuth._pendingCreate = false;
+  frAuth.close();
+  setTimeout(function(){ window.location.href = 'league-setup.html?mode=create'; }, 400);
+} else {
+  frAuth.show('profile');
+}
       })
       .catch(function(e){
         err.textContent = e.message || 'Sign up failed — try again';
