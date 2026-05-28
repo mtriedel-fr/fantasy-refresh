@@ -4383,21 +4383,19 @@ signOut: function(){
 
 // Boot auth after page loads
   // Auto-open modal if redirected from welcome page
-(function(){
-  try{
-    if(window.location.search.indexOf('signup=1') > -1){
-      window.history.replaceState({}, '', 'index.html');
-      setTimeout(function(){ frAuth.show('signup'); }, 600);
-    } else if(window.location.search.indexOf('signin=1') > -1){
-      window.history.replaceState({}, '', 'index.html');
-      setTimeout(function(){ frAuth.show('signin'); }, 600);
-    }
-  }catch(e){}
-})();
-frAuth.init();
-initLeagueSwitcher();
-loadTeamName();
-initCommissionerAccess();
+// If coming from welcome page for signup/signin, skip init and open modal
+if(window.location.search.indexOf('signup=1') > -1){
+  window.history.replaceState({}, '', 'index.html');
+  setTimeout(function(){ frAuth.show('signup'); }, 300);
+} else if(window.location.search.indexOf('signin=1') > -1){
+  window.history.replaceState({}, '', 'index.html');
+  setTimeout(function(){ frAuth.show('signin'); }, 300);
+} else {
+  frAuth.init();
+  initLeagueSwitcher();
+  loadTeamName();
+  initCommissionerAccess();
+}
 
 
 // ── COMMISSIONER USER PANEL ───────────────────────────────────
