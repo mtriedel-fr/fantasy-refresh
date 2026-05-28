@@ -4402,9 +4402,8 @@ signOut: function(){
       if(inp){ inp.value = myTeam; inp.style.display='none'; }
     }
     frAuth._updateBadge(user);
-    // Only route to home if not already in a league
-    if(window.location.search.indexOf('league=1') < 0 &&
-       window.location.search.indexOf('comm=1') < 0){
+    // Only route to home if not coming from a league card
+    if(!frAuth._fromLeague && !frAuth._fromComm){
       setTimeout(function(){ window.location.href = 'home.html'; }, 400);
     } else {
       renderAll();
@@ -4439,12 +4438,24 @@ if(window.location.search.indexOf('signup=1') > -1){
   window.history.replaceState({}, '', 'index.html');
   setTimeout(function(){ frAuth.show('signin'); }, 300);
 } else {
-  // league=1, comm=1, or direct — run normal app init
+  // Store params before clearing URL
+  var _fromLeague = window.location.search.indexOf('league=1') >= 0;
+  var _fromComm   = window.location.search.indexOf('comm=1') >= 0;
   window.history.replaceState({}, '', 'index.html');
+  // Pass param info to frAuth so _applyToSite knows context
+  frAuth._fromLeague = _fromLeague;
+  frAuth._fromComm   = _fromComm;
   frAuth.init();
   initLeagueSwitcher();
   loadTeamName();
   initCommissionerAccess();
+  // Open commissioner panel if coming from home gear icon
+  if(_fromComm){
+    setTimeout(function(){ 
+      var btn = document.getElementById('comm-toggle');
+      if(btn) btn.click();
+    }, 1000);
+  }
 }
 
 
