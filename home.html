@@ -165,7 +165,7 @@ body{background:var(--bg);min-height:100vh;font-family:var(--fb);color:var(--ink
 
 <div class="main">
   <div class="greeting">
-    <div class="greeting-sub">Welcome back</div>
+    <div class="greeting-sub">Good to see you</div>
     <div class="greeting-name" id="greeting-name">Loading<span>...</span></div>
   </div>
 
@@ -257,9 +257,9 @@ function enterLeague(leagueId) {
       });
       var teamName = currentUser.teamName || '';
       try { localStorage.setItem('fr_teamname_' + leagueId, teamName); } catch(e) {}
-      window.location.href = 'index.html';
+      window.location.href = 'index.html?league=1';
     })
-    .catch(function() { window.location.href = 'index.html'; });
+    .catch(function() { window.location.href = 'index.html?league=1'; });
 }
 
 // Open commissioner settings
@@ -352,7 +352,7 @@ function loadLeagues() {
 
   // Greeting
   var greetEl = document.getElementById('greeting-name');
-  if (greetEl) greetEl.innerHTML = displayName + '<span>.</span>';
+  if (greetEl) greetEl.innerHTML = displayName + "'s <span>Refresh!</span>";
 
   var userEl = document.getElementById('hdr-user');
   if (userEl) userEl.textContent = '👤 ' + displayName;

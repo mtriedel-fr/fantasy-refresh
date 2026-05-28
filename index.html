@@ -1083,8 +1083,9 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
       window.location.href = 'welcome.html';
       return;
     }
+    var hasLeague = window.location.search.indexOf('league=1') >= 0;
     // Already signed in and no special param — go to home
-    if(u && !hasSignup && !hasSignin && !hasCreate && !hasComm){
+    if(u && !hasSignup && !hasSignin && !hasCreate && !hasComm && !hasLeague){
       window.location.href = 'home.html';
       return;
     }
