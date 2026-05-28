@@ -922,6 +922,18 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
         <button onclick="toggleComm()" style="background:none;border:1px solid var(--bdr2);color:var(--ink3);font-size:13px;padding:3px 10px;border-radius:6px;cursor:pointer;font-family:var(--fd);">✕ Close</button>
       </span>
     </div>
+
+    <!-- LEAGUE MESSAGE -->
+    <div style="margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid var(--bdr);">
+      <div class="csect">📢 League Message</div>
+      <div style="font-size:12px;color:var(--ink3);margin-bottom:10px;line-height:1.5;">Shown to all members on their home page. Use it for weekly trash talk, announcements, or motivation.</div>
+      <textarea id="league-message-inp" rows="3" placeholder="e.g. Week 4 is here. No excuses. Draft wisely." style="width:100%;padding:10px 12px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:10px;color:var(--ink);font-family:var(--fb);font-size:14px;resize:vertical;outline:none;transition:border-color .15s;" onfocus="this.style.borderColor='var(--or)'" onblur="this.style.borderColor='var(--bdr2)'"></textarea>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+        <button onclick="saveLeagueMessage()" style="background:linear-gradient(135deg,var(--or),var(--pk));border:none;border-radius:8px;padding:8px 18px;color:#050808;font-family:var(--fd);font-size:13px;font-weight:800;text-transform:uppercase;cursor:pointer;">Save Message</button>
+        <button onclick="clearLeagueMessage()" style="background:none;border:1px solid var(--bdr2);border-radius:8px;padding:8px 14px;color:var(--ink3);font-family:var(--fd);font-size:12px;cursor:pointer;text-transform:uppercase;">Clear</button>
+        <span id="league-message-status" style="font-family:var(--fd);font-size:11px;color:var(--or);text-transform:uppercase;letter-spacing:.5px;"></span>
+      </div>
+    </div>
     <div class="comm-cols">
       <div>
         <div class="csect">Import week scores</div>
@@ -2920,7 +2932,8 @@ function toggleComm(){
   document.getElementById('comm-gate').classList.add('hidden');
   document.getElementById('comm-tools').classList.remove('hidden');
   renderHistory();
-renderUserPanel();
+  renderUserPanel();
+  loadLeagueMessage();
 renderCommissionerList();
 loadPoolStatus();
 initSalaryPanel();
@@ -4632,6 +4645,48 @@ function handleLeagueSwitch(leagueId){
   }).catch(function(){
     showToast('Could not switch league', true);
   });
+}
+
+// ── LEAGUE MESSAGE ─────────────────────────────────────────────────
+function loadLeagueMessage(){
+  var ctx = FRAuth.getLeagueCtx();
+  if(!ctx) return;
+  FR.fb.get('/leagues/' + ctx.leagueId + '/settings/weekMessage')
+    .then(function(msg){
+      var inp = document.getElementById('league-message-inp');
+      if(inp && msg && typeof msg === 'string') inp.value = msg;
+    }).catch(function(){});
+}
+
+function saveLeagueMessage(){
+  var inp = document.getElementById('league-message-inp');
+  var status = document.getElementById('league-message-status');
+  if(!inp) return;
+  var msg = inp.value.trim();
+  var ctx = FRAuth.getLeagueCtx();
+  if(!ctx) return;
+  status.textContent = 'Saving…';
+  FRAuth.db.set('/leagues/' + ctx.leagueId + '/settings/weekMessage', msg)
+    .then(function(){
+      status.textContent = '✓ Saved';
+      setTimeout(function(){ status.textContent = ''; }, 3000);
+    }).catch(function(){
+      status.textContent = '✗ Error saving';
+    });
+}
+
+function clearLeagueMessage(){
+  var inp = document.getElementById('league-message-inp');
+  var status = document.getElementById('league-message-status');
+  if(!inp) return;
+  inp.value = '';
+  var ctx = FRAuth.getLeagueCtx();
+  if(!ctx) return;
+  FRAuth.db.set('/leagues/' + ctx.leagueId + '/settings/weekMessage', '')
+    .then(function(){
+      status.textContent = '✓ Cleared';
+      setTimeout(function(){ status.textContent = ''; }, 3000);
+    }).catch(function(){});
 }
 
 // ── BOTTOM NAV ─────────────────────────────────────────────────────

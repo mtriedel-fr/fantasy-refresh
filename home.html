@@ -109,6 +109,9 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
 @keyframes spin{to{transform:rotate(360deg);}}
 .loading-text{font-family:var(--fd);font-size:12px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;}
 
+/* GREETING MESSAGE */
+.greeting-message{font-size:14px;color:var(--ink2);margin-top:6px;line-height:1.5;min-height:20px;font-style:italic;}
+
 /* WEEK PILL */
 .week-pill{display:inline-flex;align-items:center;gap:6px;background:rgba(255,95,160,.1);border:1px solid rgba(255,95,160,.25);border-radius:20px;padding:5px 12px;margin-bottom:16px;}
 .week-dot{width:6px;height:6px;border-radius:50%;background:var(--pk);flex-shrink:0;}
@@ -166,8 +169,8 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
 <div class="main">
 
   <div class="greeting">
-    <div class="greeting-eyebrow">Good to see you</div>
     <div class="greeting-name" id="greeting-name">—<span>'s Refresh!</span></div>
+    <div class="greeting-message" id="greeting-message"></div>
   </div>
 
   <div class="week-pill" id="week-pill">
@@ -365,6 +368,19 @@ function loadLeagues() {
       leagueIds.push(ctx.leagueId);
     }
   } catch(e) {}
+
+  // Load commissioner message for active league
+  var ctx = FRAuth.getLeagueCtx();
+  if(ctx && ctx.leagueId){
+    fetch(FB_DB_URL + '/leagues/' + ctx.leagueId + '/settings/weekMessage.json')
+      .then(function(r){ return r.json(); })
+      .then(function(msg){
+        var el = document.getElementById('greeting-message');
+        if(el && msg && typeof msg === 'string'){
+          el.textContent = '“' + msg + '”';
+        }
+      }).catch(function(){});
+  }
 
   // Try user profile for additional leagues (non-blocking)
   fetch(FB_DB_URL + '/users/' + uid + '.json')
