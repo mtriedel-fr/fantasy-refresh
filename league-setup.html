@@ -16,7 +16,8 @@
 <circle cx='50' cy='50' r='50' fill='%23050808'/><!-- Top-right arc (teal) — from ~200deg to ~20deg clockwise --><path d='M 22 62 A 32 32 0 1 1 78 62' fill='none' stroke='%2300E5D4' stroke-width='9' stroke-linecap='round'/><!-- Teal arrowhead pointing right at top --><polygon points='78,50 68,44 72,58' fill='%2300E5D4'/><!-- Bottom arc (pink) — short return arc --><path d='M 78 62 A 32 32 0 0 1 22 62' fill='none' stroke='%23FF5FA0' stroke-width='9' stroke-linecap='round'/><!-- Pink arrowhead pointing left at bottom --><polygon points='22,50 32,44 28,58' fill='%23FF5FA0'/></svg>">
 <circle cx='50' cy='50' r='50' fill='%23050808'/><path d='M80 50 C80 28 66 14 50 14 C34 14 20 28 20 50' fill='none' stroke='%2300E5D4' stroke-width='7' stroke-linecap='round'/><line x1='50' y1='14' x2='42' y2='24' stroke='%2300E5D4' stroke-width='7' stroke-linecap='round'/><line x1='50' y1='14' x2='58' y2='24' stroke='%2300E5D4' stroke-width='7' stroke-linecap='round'/><path d='M20 50 C20 72 34 86 50 86 C66 86 80 72 80 50' fill='none' stroke='%23FF5FA0' stroke-width='7' stroke-linecap='round'/><line x1='50' y1='86' x2='42' y2='76' stroke='%23FF5FA0' stroke-width='7' stroke-linecap='round'/><line x1='50' y1='86' x2='58' y2='76' stroke='%23FF5FA0' stroke-width='7' stroke-linecap='round'/><line x1='35' y1='50' x2='65' y2='50' stroke='%23F0FAFA' stroke-width='2' stroke-linecap='round'/><line x1='46' y1='44' x2='46' y2='56' stroke='%23F0FAFA' stroke-width='2' stroke-linecap='round'/><line x1='54' y1='44' x2='54' y2='56' stroke='%23F0FAFA' stroke-width='2' stroke-linecap='round'/></svg>">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
-<script src="league-context.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/league-context.js"></script>
 <style>
 :root{
   --hdr:#050808;--bg:#0A0F0F;--bg2:#0D1515;--bg3:#101C1C;--bg4:#142020;
@@ -567,9 +568,8 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
 <div class="toast" id="toast"></div>
 
 <script>
-var FB_DB_URL  = 'https://fantasy-refresh-default-rtdb.firebaseio.com';
-var FB_API_KEY = 'AIzaSyA-2hcf2hzThk7MuEm9DAvRICK95koE9gM';
-var FR_SEASON  = '2026';
+var FB_DB_URL = FRAuth.FB_DB_URL;
+var FR_SEASON = FRAuth.SEASON;
 
 var currentUser  = null;
 var selectedMode = null;   // 'create' | 'join'
@@ -580,17 +580,36 @@ var joinTargetLeagueId = null;
 
 // ── BOOT ──────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', function(){
-  // Apply saved theme
+  // Apply theme via FRAuth
+  var t = FRAuth.applyTheme();
+  var btn = document.getElementById('theme-btn');
+  if(btn) btn.textContent = t === 'light' ? '☀️' : '🌙';
+
+  // Route guard — requires sign in
+  FRAuth.requireAuth();
+
+  // Get user from FRAuth
+  currentUser = FRAuth.getUser();
+  if(!currentUser) return;
+
+  // Update nav
+  var navUser = document.getElementById('nav-user');
+  if(navUser) navUser.textContent = currentUser.displayName || currentUser.teamName || currentUser.email;
+
+  // Handle ?mode= URL param to auto-select screen
   try{
-    var t = localStorage.getItem('fr_theme');
-    if(t) document.documentElement.setAttribute('data-theme', t);
+    var params = new URLSearchParams(window.location.search);
+    var mode = params.get('mode');
+    if(mode === 'create'){
+      selectChoice('create');
+      setTimeout(function(){ nextFromChoice(); }, 100);
+    } else if(mode === 'join'){
+      selectChoice('join');
+      setTimeout(function(){ nextFromChoice(); }, 100);
+    }
+    // Clean URL
+    window.history.replaceState({}, '', '/league-setup.html');
   }catch(e){}
-
-  // Load current user
-  try{ currentUser = JSON.parse(localStorage.getItem('fr_user_'+FR_SEASON)); }catch(e){}
-  if(!currentUser){ window.location.href = 'welcome.html'; return; }
-
-  document.getElementById('nav-user').textContent = currentUser.teamName || currentUser.email || '';
 
   // Load existing leagues for this user
   loadUserLeagues();
@@ -827,9 +846,6 @@ function createLeague(){
     active:              true
   };
 
-  // Write join code index entry
-  FR.fb.put('/joinCodes/'+code, newLeagueId).catch(function(){});
-
   // Write settings
   FR.fb.put('/leagues/'+newLeagueId+'/settings', settings)
     .then(function(){
@@ -894,27 +910,34 @@ function lookupLeague(){
   var preview = document.getElementById('join-preview');
   if(code.length < 4){ preview.style.display='none'; return; }
 
-  // Look up league by join code via joinCodes index
-  FR.fb.get('/joinCodes/' + code)
-    .then(function(leagueId){
-      if(!leagueId){ preview.style.display = 'none'; return; }
-      return FR.fb.get('/leagues/' + leagueId + '/settings')
-        .then(function(match){
-          if(match){
-            joinTargetLeagueId = match.leagueId;
-            document.getElementById('join-league-name').textContent = match.name;
-            document.getElementById('join-league-meta').textContent =
-              (match.format==='headtohead'?'⚔️ Head to Head':match.format==='guillotine'?'☠️ Guillotine':'📊 Cumulative')
-              + (match.guillotine?' · ☠️ Guillotine':'')
-              + ' · ' + (match.members||0) + '/' + match.maxMembers + ' players';
-            preview.style.display = 'block';
-          } else {
-            joinTargetLeagueId = null;
-            preview.style.display = 'none';
-          }
+  // Search leagues by join code
+  fetch(FB_DB_URL + '/leagues.json?shallow=true')
+    .then(function(r){ return r.json(); })
+    .then(function(ids){
+      if(!ids) return;
+      var searches = Object.keys(ids).map(function(id){
+        return FR.fb.get('/leagues/'+id+'/settings').then(function(s){
+          return s && s.joinCode === code ? s : null;
         });
+      });
+      return Promise.all(searches);
     })
-    .catch(function(){ preview.style.display = 'none'; });
+    .then(function(results){
+      var match = results && results.find(function(s){ return s; });
+      if(match){
+        joinTargetLeagueId = match.leagueId;
+        document.getElementById('join-league-name').textContent = match.name;
+        document.getElementById('join-league-meta').textContent =
+          (match.format==='headtohead'?'⚔️ Head to Head':match.format==='guillotine'?'☠️ Guillotine':'📊 Cumulative')
+          + (match.guillotine?' · ☠️ Guillotine':'')
+          + ' · ' + (match.members||0) + '/' + match.maxMembers + ' players';
+        preview.style.display = 'block';
+      } else {
+        joinTargetLeagueId = null;
+        preview.style.display = 'none';
+      }
+    })
+    .catch(function(){});
 }
 
 function joinLeague(){
@@ -992,12 +1015,12 @@ function showSuccess(mode, name, code, format, guillotine){
 }
 
 function goToLeague(){
-  window.location.href = 'home.html';
+  window.location.href = '/home.html';
 }
 
 function goDirectToLeague(leagueId){
   FR.switchLeague(leagueId).then(function(){
-    window.location.href = 'home.html';
+    window.location.href = '/home.html';
   });
 }
 
@@ -1148,9 +1171,7 @@ function debounce(fn, ms){
 }
 
 function signOut(){
-  try{ localStorage.removeItem('fr_user_'+FR_SEASON); }catch(e){}
-  FR.clearContext();
-  window.location.href = 'welcome.html?stay=1';
+  FRAuth.signOut(); // clears all storage and redirects to welcome
 }
 
 function showToast(msg){
