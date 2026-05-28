@@ -458,6 +458,16 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
 }
 
 /* COMMISSIONER */
+/* BOTTOM NAV */
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:var(--hdr);border-top:1px solid var(--bdr);display:flex;align-items:center;z-index:100;padding-bottom:env(safe-area-inset-bottom);}
+.bn-item{flex:1;display:flex;flex-direction:column;align-items:center;padding:10px 0 8px;gap:3px;cursor:pointer;-webkit-tap-highlight-color:transparent;border:none;background:transparent;}
+.bn-icon{font-size:18px;line-height:1;}
+.bn-label{font-family:var(--fd);font-size:9px;text-transform:uppercase;letter-spacing:.5px;font-weight:700;}
+.bn-item.active .bn-label{color:var(--or);}
+.bn-item.active .bn-icon{filter:drop-shadow(0 0 3px var(--or));}
+.bn-item:not(.active) .bn-label{color:var(--ink3);}
+.bn-item:not(.active) .bn-icon{opacity:.5;}
+
 .comm-panel{background:var(--hdr);border-top:2px solid var(--or);}
 .comm-inner{padding:24px 28px;}
 /* COMMISSIONER PASSWORD GATE */
@@ -840,8 +850,8 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
   </div>
 </div>
 
-<!-- PRIMARY NAV TAB BAR -->
-<div class="nav-tab-bar" id="nav-tab-bar">
+<!-- PRIMARY NAV TAB BAR - hidden, replaced by bottom nav -->
+<div class="nav-tab-bar" id="nav-tab-bar" style="display:none;">
   <div class="nav-tab active" id="navtab-yourweek" onclick="handleNav('yourweek')">
     <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
     <span>Your Week</span>
@@ -1109,6 +1119,7 @@ function initCommissionerAccess(){
     .then(function(status){
       var btn = document.getElementById('comm-toggle');
       if(btn) btn.style.display = (status.isComm || status.isCreator) ? '' : 'none';
+      updateMoreCommBtn();
     });
 }
 
@@ -4623,6 +4634,39 @@ function handleLeagueSwitch(leagueId){
   });
 }
 
+// ── BOTTOM NAV ─────────────────────────────────────────────────────
+function switchBottomNav(tabName, btnId){
+  // Use existing handleNav function
+  handleNav(tabName);
+  // Update bottom nav active state
+  document.querySelectorAll('.bn-item').forEach(function(b){ b.classList.remove('active'); });
+  var btn = document.getElementById(btnId);
+  if(btn) btn.classList.add('active');
+  // Close more menu if open
+  var more = document.getElementById('more-menu');
+  if(more) more.style.display = 'none';
+  moreMenuOpen = false;
+}
+
+var moreMenuOpen = false;
+function toggleMoreMenu(){
+  var menu = document.getElementById('more-menu');
+  if(!menu) return;
+  moreMenuOpen = !moreMenuOpen;
+  menu.style.display = moreMenuOpen ? 'block' : 'none';
+  var btn = document.getElementById('bn-more');
+  if(btn) btn.classList.toggle('active', moreMenuOpen);
+}
+
+// Show/hide commissioner button in more menu
+function updateMoreCommBtn(){
+  var btn = document.getElementById('more-comm-btn');
+  var toggle = document.getElementById('comm-toggle');
+  if(btn && toggle){
+    btn.style.display = toggle.style.display === 'none' ? 'none' : '';
+  }
+}
+
 // ── BOOT ──────────────────────────────────────────────────────────
 updateUserBadge();
 initCommissionerAccess();
@@ -4647,6 +4691,60 @@ checkFirstRun();
     <button onclick="saveTeamName()" style="width:100%;padding:13px;background:linear-gradient(135deg,var(--or),var(--pk));border:none;border-radius:10px;color:#050808;font-family:var(--fd);font-size:15px;font-weight:900;text-transform:uppercase;cursor:pointer;">Set Team Name →</button>
     <button onclick="document.getElementById('team-name-modal').style.display='none'" style="width:100%;padding:8px;background:none;border:none;color:var(--ink3);font-family:var(--fd);font-size:11px;cursor:pointer;margin-top:8px;text-transform:uppercase;">Skip for now</button>
     <div id="team-name-status" style="font-family:var(--fd);font-size:11px;color:var(--pk);margin-top:8px;min-height:14px;text-transform:uppercase;"></div>
+  </div>
+</div>
+
+<!-- BOTTOM NAV -->
+<nav class="bottom-nav" id="bottom-nav">
+  <button class="bn-item" onclick="window.location.href='/home.html'">
+    <span class="bn-icon">🏠</span>
+    <span class="bn-label">Home</span>
+  </button>
+  <button class="bn-item active" id="bn-week" onclick="switchBottomNav('yourweek','bn-week')">
+    <span class="bn-icon">📊</span>
+    <span class="bn-label">My Week</span>
+  </button>
+  <button class="bn-item" id="bn-season" onclick="switchBottomNav('yourseason','bn-season')">
+    <span class="bn-icon">📅</span>
+    <span class="bn-label">Season</span>
+  </button>
+  <button class="bn-item" id="bn-standings" onclick="switchBottomNav('season','bn-standings')">
+    <span class="bn-icon">🏆</span>
+    <span class="bn-label">Stands</span>
+  </button>
+  <button class="bn-item" id="bn-more" onclick="toggleMoreMenu()">
+    <span class="bn-icon">⚡</span>
+    <span class="bn-label">More</span>
+  </button>
+</nav>
+
+<!-- MORE MENU (slides up) -->
+<div id="more-menu" style="display:none;position:fixed;bottom:60px;left:0;right:0;background:var(--bg2);border-top:1px solid var(--bdr2);padding:16px;z-index:99;">
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">
+    <button onclick="switchBottomNav('guillotine','bn-more');toggleMoreMenu()" style="background:var(--bg3);border:1px solid var(--bdr2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;">
+      <div style="font-size:20px;margin-bottom:4px;">☠️</div>
+      <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink2);text-transform:uppercase;">Guillotine</div>
+    </button>
+    <button onclick="switchBottomNav('league','bn-more');toggleMoreMenu()" style="background:var(--bg3);border:1px solid var(--bdr2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;">
+      <div style="font-size:20px;margin-bottom:4px;">🏈</div>
+      <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink2);text-transform:uppercase;">League</div>
+    </button>
+    <button onclick="window.location.href='/draft.html'" style="background:var(--bg3);border:1px solid var(--bdr2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;">
+      <div style="font-size:20px;margin-bottom:4px;">📋</div>
+      <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink2);text-transform:uppercase;">Draft</div>
+    </button>
+    <button onclick="switchBottomNav('playoffs','bn-more');toggleMoreMenu()" style="background:var(--bg3);border:1px solid var(--bdr2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;">
+      <div style="font-size:20px;margin-bottom:4px;">🎯</div>
+      <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink2);text-transform:uppercase;">Playoffs</div>
+    </button>
+    <button onclick="switchBottomNav('season','bn-more');toggleMoreMenu()" style="background:var(--bg3);border:1px solid var(--bdr2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;">
+      <div style="font-size:20px;margin-bottom:4px;">🌟</div>
+      <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink2);text-transform:uppercase;">Wrap</div>
+    </button>
+    <button onclick="toggleComm();toggleMoreMenu()" style="background:rgba(255,230,32,.08);border:1px solid rgba(255,230,32,.2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;" id="more-comm-btn" style="display:none;">
+      <div style="font-size:20px;margin-bottom:4px;">⚙️</div>
+      <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:#FFE620;text-transform:uppercase;">Comm</div>
+    </button>
   </div>
 </div>
 
