@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#00E5D4">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Fantasy Refresh — My Leagues</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icons/icon.svg">
+<script src="league-context.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+html{overflow-x:hidden;}
+:root{
+  --hdr:#050808;--hdr2:#080E0E;
+  --bg:#0A0F0F;--bg2:#0D1515;--bg3:#101C1C;--bg4:#142020;
+  --or:#00E5D4;--or2:#33EDE0;
+  --pk:#FF5FA0;--pk2:#FF85B8;
+  --pu:#9B6DFF;--pu2:#B899FF;
+  --ink:#F0FAFA;--ink2:#6ABFBF;--ink3:#3A8888;
+  --bdr:#0D3535;--bdr2:#104040;
+  --fd:'Barlow Condensed',sans-serif;
+  --fb:'Barlow',sans-serif;
+}
+[data-theme="light"]{
+  --hdr:#050808;--hdr2:#080E0E;
+  --bg:#F0FAFA;--bg2:#E0F5F5;--bg3:#FFFFFF;--bg4:#F5FEFE;
+  --or:#00A898;--or2:#00C4B4;
+  --pk:#E8337A;--pk2:#F05590;
+  --pu:#7040E0;--pu2:#9068F8;
+  --ink:#0A1818;--ink2:#1A6060;--ink3:#3A8888;
+  --bdr:#B8E8E0;--bdr2:#90D8D0;
+}
+body{background:var(--bg);min-height:100vh;font-family:var(--fb);color:var(--ink);}
+
+/* HEADER */
+.hdr{background:var(--hdr);border-bottom:2px solid var(--pk);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
+.hdr-logo{display:flex;align-items:center;gap:10px;}
+.hdr-logo-mark{width:36px;height:36px;background:linear-gradient(135deg,var(--or),var(--pk));border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.hdr-logo-text{font-family:var(--fd);font-size:22px;font-weight:800;color:var(--ink);text-transform:uppercase;letter-spacing:.5px;}
+.hdr-logo-text span{color:var(--pk);}
+.hdr-right{display:flex;align-items:center;gap:8px;}
+.hdr-user{font-family:var(--fd);font-size:13px;font-weight:700;color:var(--or);background:rgba(0,229,212,.1);border:1px solid rgba(0,229,212,.3);padding:5px 12px;border-radius:20px;cursor:pointer;transition:all .15s;white-space:nowrap;max-width:160px;overflow:hidden;text-overflow:ellipsis;}
+.hdr-user:hover{background:rgba(0,229,212,.2);}
+.hdr-btn{background:transparent;border:1px solid var(--bdr2);color:var(--ink3);font-family:var(--fd);font-size:12px;font-weight:700;padding:5px 10px;border-radius:8px;cursor:pointer;transition:all .15s;text-transform:uppercase;letter-spacing:.5px;}
+.hdr-btn:hover{border-color:var(--or);color:var(--or);}
+
+/* MAIN */
+.main{max-width:600px;margin:0 auto;padding:24px 16px 100px;}
+
+/* GREETING */
+.greeting{margin-bottom:28px;}
+.greeting-sub{font-family:var(--fd);font-size:12px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:4px;}
+.greeting-name{font-family:var(--fd);font-size:36px;font-weight:900;color:var(--ink);text-transform:uppercase;letter-spacing:.5px;line-height:1;}
+.greeting-name span{color:var(--or);}
+
+/* SECTION */
+.section-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;margin-top:8px;}
+.section-title{font-family:var(--fd);font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:1.5px;}
+
+/* LEAGUE CARD */
+.league-card{background:var(--bg2);border-radius:16px;border:1px solid var(--bdr);margin-bottom:12px;overflow:hidden;transition:transform .15s,box-shadow .15s;cursor:pointer;position:relative;}
+.league-card:active{transform:scale(.98);}
+.league-card:hover{box-shadow:0 8px 32px rgba(0,229,212,.08);}
+.league-card-accent{height:3px;background:linear-gradient(90deg,var(--or),var(--pk));}
+.league-card-accent.guillotine{background:linear-gradient(90deg,var(--pk),var(--pu));}
+.league-card-accent.headtohead{background:linear-gradient(90deg,var(--pu),var(--or));}
+.league-card-body{padding:16px 18px;}
+.league-card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px;}
+.league-card-info{flex:1;min-width:0;}
+.league-card-name{font-family:var(--fd);font-size:20px;font-weight:800;color:var(--ink);text-transform:uppercase;letter-spacing:.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:4px;}
+.league-card-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.league-badge{font-family:var(--fd);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;padding:2px 8px;border-radius:10px;}
+.badge-cumulative{background:rgba(0,229,212,.12);color:var(--or);border:1px solid rgba(0,229,212,.3);}
+.badge-guillotine{background:rgba(255,95,160,.12);color:var(--pk);border:1px solid rgba(255,95,160,.3);}
+.badge-headtohead{background:rgba(155,109,255,.12);color:var(--pu);border:1px solid rgba(155,109,255,.3);}
+.badge-commissioner{background:rgba(255,230,32,.12);color:#FFE620;border:1px solid rgba(255,230,32,.3);}
+.league-card-actions{display:flex;align-items:center;gap:6px;flex-shrink:0;}
+.comm-gear{background:rgba(255,230,32,.1);border:1px solid rgba(255,230,32,.25);color:#FFE620;width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s;flex-shrink:0;}
+.comm-gear:hover{background:rgba(255,230,32,.2);}
+.comm-gear svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+.enter-arrow{background:var(--or);color:#050808;width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s;}
+.enter-arrow svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;}
+
+/* TEAM STATS */
+.team-name-row{display:flex;align-items:center;gap:6px;margin-bottom:10px;}
+.team-name-label{font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;white-space:nowrap;}
+.team-name-value{font-family:var(--fd);font-size:14px;font-weight:700;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.league-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--bdr);border-radius:10px;overflow:hidden;}
+.league-stat{background:var(--bg3);padding:10px 12px;text-align:center;}
+.league-stat-lbl{font-family:var(--fd);font-size:9px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;}
+.league-stat-val{font-family:var(--fd);font-size:20px;font-weight:800;color:var(--or);line-height:1;}
+.league-stat-val.rank{color:var(--pk);}
+.league-stat-val.neutral{color:var(--ink2);}
+
+/* EMPTY */
+.no-leagues{text-align:center;padding:48px 24px;background:var(--bg2);border-radius:16px;border:1px dashed var(--bdr2);margin-bottom:12px;}
+.no-leagues-icon{font-size:48px;margin-bottom:12px;opacity:.5;}
+.no-leagues-title{font-family:var(--fd);font-size:20px;font-weight:800;color:var(--ink2);text-transform:uppercase;margin-bottom:6px;}
+.no-leagues-sub{font-size:13px;color:var(--ink3);line-height:1.6;}
+
+/* ACTION CARDS */
+.action-cards{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:20px;}
+.action-card{background:var(--bg2);border:1px solid var(--bdr);border-radius:14px;padding:18px 16px;cursor:pointer;transition:all .15s;text-align:center;}
+.action-card:hover{border-color:var(--or);background:var(--bg3);}
+.action-card:active{transform:scale(.97);}
+.action-card-icon{font-size:28px;margin-bottom:8px;}
+.action-card-title{font-family:var(--fd);font-size:14px;font-weight:800;color:var(--ink);text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px;}
+.action-card-sub{font-size:11px;color:var(--ink3);line-height:1.4;}
+
+/* LOADING */
+.loading-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 24px;gap:14px;}
+.loading-spinner{width:36px;height:36px;border:3px solid var(--bdr2);border-top-color:var(--or);border-radius:50%;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.loading-text{font-family:var(--fd);font-size:12px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;}
+
+/* TOAST */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--or);color:#050808;font-family:var(--fd);font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:12px 20px;border-radius:8px;transform:translateY(80px);opacity:0;transition:all .3s;z-index:9999;pointer-events:none;}
+.toast.show{transform:translateY(0);opacity:1;}
+.toast.err{background:var(--pk);}
+
+/* MOBILE */
+@media(max-width:480px){
+  .main{padding:20px 12px 100px;}
+  .greeting-name{font-size:28px;}
+  .league-card-name{font-size:17px;}
+  .league-stat-val{font-size:18px;}
+}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="hdr-logo">
+    <div class="hdr-logo-mark">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="24" height="24">
+        <defs>
+          <linearGradient id="tlg" x1="100%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#00E5D4"/>
+            <stop offset="100%" stop-color="#00E5D4" stop-opacity="0.6"/>
+          </linearGradient>
+          <linearGradient id="plg" x1="0%" y1="100%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#FF5FA0"/>
+            <stop offset="100%" stop-color="#FF5FA0" stop-opacity="0.6"/>
+          </linearGradient>
+        </defs>
+        <rect x="25" y="25" width="350" height="350" rx="70" fill="#050808"/>
+        <g transform="translate(200,200) scale(3.79) translate(-475.5,-241.6)">
+          <path fill="url(#tlg)" d="M504.547,265.443h-9.019a30.964,30.964,0,0,0-29.042-52.733,1.5,1.5,0,1,0,.792,2.894,27.955,27.955,0,0,1,25.512,48.253l0-10.169h-.011a1.493,1.493,0,0,0-2.985,0h0v13.255a1.5,1.5,0,0,0,1.5,1.5h13.256a1.5,1.5,0,1,0,0-3Z"/>
+          <path fill="url(#plg)" d="M485.389,267.995a27.956,27.956,0,0,1-25.561-48.213l0,10.2h.015a1.491,1.491,0,0,0,2.978,0h.007V216.791a1.484,1.484,0,0,0-1.189-1.532l-.018-.005a1.533,1.533,0,0,0-.223-.022c-.024,0-.046-.007-.07-.007H448.071a1.5,1.5,0,0,0,0,3h8.995a30.963,30.963,0,0,0,29.115,52.664,1.5,1.5,0,0,0-.792-2.894Z"/>
+        </g>
+      </svg>
+    </div>
+    <div class="hdr-logo-text">Fantasy <span>Refresh</span></div>
+  </div>
+  <div class="hdr-right">
+    <button class="hdr-btn" onclick="toggleTheme()" id="theme-btn">🌙</button>
+    <div class="hdr-user" id="hdr-user" onclick="confirmSignOut()">👤 —</div>
+  </div>
+</div>
+
+<div class="main">
+  <div class="greeting">
+    <div class="greeting-sub">Welcome back</div>
+    <div class="greeting-name" id="greeting-name">Loading<span>...</span></div>
+  </div>
+
+  <div class="section-hdr">
+    <div class="section-title">Your Leagues</div>
+  </div>
+
+  <div id="leagues-wrap">
+    <div class="loading-wrap">
+      <div class="loading-spinner"></div>
+      <div class="loading-text">Loading your leagues</div>
+    </div>
+  </div>
+
+  <div class="action-cards">
+    <div class="action-card" onclick="window.location.href='league-setup.html?mode=create'">
+      <div class="action-card-icon">🏆</div>
+      <div class="action-card-title">Create League</div>
+      <div class="action-card-sub">Start a new league and invite players</div>
+    </div>
+    <div class="action-card" onclick="window.location.href='league-setup.html?mode=join'">
+      <div class="action-card-icon">🎟</div>
+      <div class="action-card-title">Join League</div>
+      <div class="action-card-sub">Enter a join code to join an existing league</div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// Auth check - must be first
+var currentUser = null;
+try { currentUser = JSON.parse(localStorage.getItem('fr_user_2026')); } catch(e) {}
+if (!currentUser) { window.location.href = 'welcome.html?stay=1'; }
+
+var FB_DB_URL = 'https://fantasy-refresh-default-rtdb.firebaseio.com';
+
+// Theme
+function toggleTheme() {
+  var html = document.documentElement;
+  var light = html.getAttribute('data-theme') !== 'light';
+  html.setAttribute('data-theme', light ? 'light' : 'dark');
+  document.getElementById('theme-btn').textContent = light ? '☀️' : '🌙';
+  try { localStorage.setItem('fr_theme', light ? 'light' : 'dark'); } catch(e) {}
+}
+(function() {
+  try {
+    var t = localStorage.getItem('fr_theme');
+    if (t) {
+      document.documentElement.setAttribute('data-theme', t);
+      var btn = document.getElementById('theme-btn');
+      if (btn) btn.textContent = t === 'light' ? '☀️' : '🌙';
+    }
+  } catch(e) {}
+})();
+
+// Toast
+function showToast(msg, isErr) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast' + (isErr ? ' err' : '') + ' show';
+  setTimeout(function() { t.className = 'toast' + (isErr ? ' err' : ''); }, 3000);
+}
+
+// Sign out
+function confirmSignOut() {
+  var name = currentUser ? (currentUser.displayName || currentUser.teamName || currentUser.email) : '';
+  if (confirm('Signed in as: ' + name + '\n\nSign out?')) {
+    localStorage.removeItem('fr_user_2026');
+    localStorage.removeItem('fr_league_ctx');
+    localStorage.removeItem('fr_myteam');
+    window.location.href = 'welcome.html?stay=1';
+  }
+}
+
+// Enter a league
+function enterLeague(leagueId) {
+  FR.fb.get('/leagues/' + leagueId + '/settings')
+    .then(function(s) {
+      FR.saveContext({
+        leagueId:   leagueId,
+        leagueName: s ? (s.name || leagueId) : leagueId,
+        season:     s ? (s.season || 2026) : 2026,
+        format:     s ? (s.format || 'cumulative') : 'cumulative',
+        guillotine: s ? (s.guillotine || false) : false,
+        cap:        s ? (s.cap || 60000) : 60000,
+        role:       'member'
+      });
+      var teamName = currentUser.teamName || '';
+      try { localStorage.setItem('fr_teamname_' + leagueId, teamName); } catch(e) {}
+      window.location.href = 'index.html';
+    })
+    .catch(function() { window.location.href = 'index.html'; });
+}
+
+// Open commissioner settings
+function openCommSettings(leagueId, e) {
+  e.stopPropagation();
+  FR.saveContext(Object.assign({}, FR.ctx(), { leagueId: leagueId }));
+  window.location.href = 'index.html?comm=1';
+}
+
+// Format badge HTML
+function formatBadge(s) {
+  if (s.guillotine) return '<span class="league-badge badge-guillotine">☠️ Guillotine</span>';
+  if (s.format === 'headtohead') return '<span class="league-badge badge-headtohead">⚔️ H2H</span>';
+  return '<span class="league-badge badge-cumulative">📊 Cumulative</span>';
+}
+
+function accentClass(s) {
+  if (s.guillotine) return 'guillotine';
+  if (s.format === 'headtohead') return 'headtohead';
+  return '';
+}
+
+// Build a league card
+function buildLeagueCard(l) {
+  var s = l.settings;
+  var m = l.member;
+  var teamName = (m && m.teamName) || currentUser.teamName || '—';
+  var accent = accentClass(s);
+
+  var rank = '—', score = '—', wksLeft = '—';
+
+  if (l.seasonData) {
+    var weeks = Object.keys(l.seasonData).filter(function(k) {
+      return !isNaN(Number(k)) && l.seasonData[k] && l.seasonData[k].length;
+    }).map(Number);
+
+    if (weeks.length) {
+      var latest = Math.max.apply(null, weeks);
+      var entries = l.seasonData[String(latest)] || [];
+      var myEntry = entries.find(function(e) {
+        return e.name && teamName && e.name.toLowerCase() === teamName.toLowerCase();
+      });
+      if (myEntry) {
+        score = myEntry.score ? myEntry.score.toFixed(1) : '—';
+        var sorted = entries.slice().sort(function(a, b) { return b.score - a.score; });
+        var r = sorted.findIndex(function(e) { return e.name === myEntry.name; });
+        rank = r >= 0 ? '#' + (r + 1) : '—';
+      }
+      wksLeft = 18 - weeks.length;
+    }
+  }
+
+  var commBadge = l.isComm ? '<span class="league-badge badge-commissioner">👑 Commissioner</span>' : '';
+  var commGear = l.isComm
+    ? '<div class="comm-gear" onclick="openCommSettings(\'' + l.leagueId + '\',event)" title="League settings">'
+      + '<svg viewBox="0 0 24 24"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/>'
+      + '<path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>'
+      + '</div>'
+    : '';
+
+  return '<div class="league-card" onclick="enterLeague(\'' + l.leagueId + '\')">'
+    + '<div class="league-card-accent ' + accent + '"></div>'
+    + '<div class="league-card-body">'
+    + '<div class="league-card-top">'
+    + '<div class="league-card-info">'
+    + '<div class="league-card-name">' + s.name + '</div>'
+    + '<div class="league-card-meta">' + formatBadge(s) + commBadge + '</div>'
+    + '</div>'
+    + '<div class="league-card-actions">' + commGear
+    + '<div class="enter-arrow"><svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></div>'
+    + '</div></div>'
+    + '<div class="team-name-row">'
+    + '<span class="team-name-label">Your team:</span>'
+    + '<span class="team-name-value">' + teamName + '</span>'
+    + '</div>'
+    + '<div class="league-stats">'
+    + '<div class="league-stat"><div class="league-stat-lbl">Rank</div><div class="league-stat-val rank">' + rank + '</div></div>'
+    + '<div class="league-stat"><div class="league-stat-lbl">Score</div><div class="league-stat-val">' + score + '</div></div>'
+    + '<div class="league-stat"><div class="league-stat-lbl">Wks Left</div><div class="league-stat-val neutral">' + wksLeft + '</div></div>'
+    + '</div>'
+    + '</div></div>';
+}
+
+// Load leagues
+function loadLeagues() {
+  if (!currentUser) return;
+
+  var uid = currentUser.uid;
+  var displayName = currentUser.displayName || currentUser.teamName || currentUser.email || 'Coach';
+
+  // Greeting
+  var greetEl = document.getElementById('greeting-name');
+  if (greetEl) greetEl.innerHTML = displayName + '<span>.</span>';
+
+  var userEl = document.getElementById('hdr-user');
+  if (userEl) userEl.textContent = '👤 ' + displayName;
+
+  // Build league ID list
+  var leagueIds = ['fr_refresh26'];
+  try {
+    var ctx = JSON.parse(localStorage.getItem('fr_league_ctx'));
+    if (ctx && ctx.leagueId && leagueIds.indexOf(ctx.leagueId) < 0) {
+      leagueIds.push(ctx.leagueId);
+    }
+  } catch(e) {}
+
+  // Try user profile for more leagues
+  fetch(FB_DB_URL + '/users/' + uid + '.json')
+    .then(function(r) { return r.json(); })
+    .then(function(profile) {
+      if (profile && profile.leagues) {
+        Object.keys(profile.leagues).forEach(function(id) {
+          if (leagueIds.indexOf(id) < 0) leagueIds.push(id);
+        });
+      }
+      renderLeagueCards(leagueIds, uid);
+    })
+    .catch(function() { renderLeagueCards(leagueIds, uid); });
+}
+
+function renderLeagueCards(leagueIds, uid) {
+  var wrap = document.getElementById('leagues-wrap');
+
+  Promise.all(leagueIds.map(function(leagueId) {
+    return Promise.all([
+      fetch(FB_DB_URL + '/leagues/' + leagueId + '/settings.json').then(function(r) { return r.json(); }),
+      fetch(FB_DB_URL + '/leagues/' + leagueId + '/members/' + uid + '.json').then(function(r) { return r.json(); }),
+      fetch(FB_DB_URL + '/leagues/' + leagueId + '/commissioners/' + uid + '.json').then(function(r) { return r.json(); }),
+      fetch(FB_DB_URL + '/leagues/' + leagueId + '/season/2026.json').then(function(r) { return r.json(); }).catch(function() { return null; })
+    ]).then(function(results) {
+      return {
+        leagueId:   leagueId,
+        settings:   results[0],
+        member:     results[1],
+        isComm:     results[2] === true,
+        seasonData: results[3]
+      };
+    }).catch(function() { return null; });
+  }))
+  .then(function(leagues) {
+    var myLeagues = leagues.filter(function(l) {
+      return l && l.settings && l.member && l.member !== null;
+    });
+
+    if (!myLeagues.length) {
+      wrap.innerHTML = '<div class="no-leagues">'
+        + '<div class="no-leagues-icon">🏈</div>'
+        + '<div class="no-leagues-title">No leagues yet</div>'
+        + '<div class="no-leagues-sub">Create a new league or enter a join code to get started.</div>'
+        + '</div>';
+      return;
+    }
+
+    wrap.innerHTML = myLeagues.map(function(l) {
+      return buildLeagueCard(l);
+    }).join('');
+  })
+  .catch(function() {
+    wrap.innerHTML = '<div class="no-leagues">'
+      + '<div class="no-leagues-icon">⚠️</div>'
+      + '<div class="no-leagues-title">Could not load leagues</div>'
+      + '<div class="no-leagues-sub">Check your connection and try again.</div>'
+      + '</div>';
+  });
+}
+
+// Boot
+loadLeagues();
+</script>
+
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('/sw.js').catch(function() {});
+  });
+}
+</script>
+</body>
+</html>
