@@ -1226,8 +1226,17 @@ function boot(){
   checkFirstRun();
 }
 
-loadFromCloud();
-
+// Auth gate — redirect to welcome if not signed in
+(function(){
+  try{
+    var u = localStorage.getItem('fr_user_2026');
+    if(!u && window.location.search.indexOf('signup=1') < 0 && window.location.search.indexOf('signin=1') < 0){
+      window.location.href = 'welcome.html';
+      return;
+    }
+  }catch(e){}
+  loadFromCloud();
+})();
 // ── WEEK BAR ───────────────────────────────────────────────────
 function buildWeekBar(){
   var sel = document.getElementById('wk-select');
