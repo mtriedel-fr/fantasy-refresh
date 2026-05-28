@@ -1230,13 +1230,15 @@ function boot(){
 (function(){
   try{
     var u = localStorage.getItem('fr_user_2026');
-    if(!u && window.location.search.indexOf('signup=1') < 0 && window.location.search.indexOf('signin=1') < 0){
+    var hasSignup = window.location.search.indexOf('signup=1') >= 0;
+    var hasSignin = window.location.search.indexOf('signin=1') >= 0;
+    if(!u && !hasSignup && !hasSignin){
       window.location.href = 'welcome.html';
       return;
     }
   }catch(e){}
   loadFromCloud();
-})();
+}());
 // ── WEEK BAR ───────────────────────────────────────────────────
 function buildWeekBar(){
   var sel = document.getElementById('wk-select');
@@ -4298,8 +4300,6 @@ submitSignUp: function(){
       guillotine: false,
       role:       'member'
     });
-    });
-
     // Write member record and team name to Firebase
 var targetLeague = frAuth._pendingLeagueId || 'fr_refresh26';
     Promise.all([
