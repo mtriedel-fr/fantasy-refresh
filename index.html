@@ -4231,20 +4231,13 @@ submitSignUp: function(){
     if(!code){ err.textContent='Enter your join code'; return; }
     err.textContent = 'Finding league…';
 
-    // Look up league by join code first
-    fetch(FB_DB_URL + '/leagues.json?shallow=true')
-      .then(function(r){ return r.json(); })
-      .then(function(ids){
-        if(!ids) throw new Error('No leagues found');
-        var searches = Object.keys(ids).map(function(id){
-          return FR.fb.get('/leagues/'+id+'/settings').then(function(s){
-            return s && s.joinCode && s.joinCode.toUpperCase() === code ? s : null;
-          });
-        });
-        return Promise.all(searches);
+    // Look up league by join code via joinCodes index
+    FR.fb.get('/joinCodes/' + code)
+      .then(function(leagueId){
+        if(!leagueId) throw new Error('Invalid join code');
+        return FR.fb.get('/leagues/' + leagueId + '/settings');
       })
-      .then(function(results){
-        var match = results && results.find(function(s){ return s; });
+      .then(function(match){
         if(!match) throw new Error('Invalid join code');
         err.textContent = 'Creating account…';
 

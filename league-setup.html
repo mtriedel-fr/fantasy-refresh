@@ -827,6 +827,9 @@ function createLeague(){
     active:              true
   };
 
+  // Write join code index entry
+  FR.fb.put('/joinCodes/'+code, newLeagueId).catch(function(){});
+
   // Write settings
   FR.fb.put('/leagues/'+newLeagueId+'/settings', settings)
     .then(function(){
@@ -891,34 +894,27 @@ function lookupLeague(){
   var preview = document.getElementById('join-preview');
   if(code.length < 4){ preview.style.display='none'; return; }
 
-  // Search leagues by join code
-  fetch(FB_DB_URL + '/leagues.json?shallow=true')
-    .then(function(r){ return r.json(); })
-    .then(function(ids){
-      if(!ids) return;
-      var searches = Object.keys(ids).map(function(id){
-        return FR.fb.get('/leagues/'+id+'/settings').then(function(s){
-          return s && s.joinCode === code ? s : null;
+  // Look up league by join code via joinCodes index
+  FR.fb.get('/joinCodes/' + code)
+    .then(function(leagueId){
+      if(!leagueId){ preview.style.display = 'none'; return; }
+      return FR.fb.get('/leagues/' + leagueId + '/settings')
+        .then(function(match){
+          if(match){
+            joinTargetLeagueId = match.leagueId;
+            document.getElementById('join-league-name').textContent = match.name;
+            document.getElementById('join-league-meta').textContent =
+              (match.format==='headtohead'?'⚔️ Head to Head':match.format==='guillotine'?'☠️ Guillotine':'📊 Cumulative')
+              + (match.guillotine?' · ☠️ Guillotine':'')
+              + ' · ' + (match.members||0) + '/' + match.maxMembers + ' players';
+            preview.style.display = 'block';
+          } else {
+            joinTargetLeagueId = null;
+            preview.style.display = 'none';
+          }
         });
-      });
-      return Promise.all(searches);
     })
-    .then(function(results){
-      var match = results && results.find(function(s){ return s; });
-      if(match){
-        joinTargetLeagueId = match.leagueId;
-        document.getElementById('join-league-name').textContent = match.name;
-        document.getElementById('join-league-meta').textContent =
-          (match.format==='headtohead'?'⚔️ Head to Head':match.format==='guillotine'?'☠️ Guillotine':'📊 Cumulative')
-          + (match.guillotine?' · ☠️ Guillotine':'')
-          + ' · ' + (match.members||0) + '/' + match.maxMembers + ' players';
-        preview.style.display = 'block';
-      } else {
-        joinTargetLeagueId = null;
-        preview.style.display = 'none';
-      }
-    })
-    .catch(function(){});
+    .catch(function(){ preview.style.display = 'none'; });
 }
 
 function joinLeague(){
