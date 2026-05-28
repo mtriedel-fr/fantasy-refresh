@@ -3480,7 +3480,9 @@ function checkFirstRun(){
   // Don't redirect if coming from welcome page for signup/signin
   if(window.location.search.indexOf('signup=1') > -1 ||
      window.location.search.indexOf('signin=1') > -1 ||
-     window.location.search.indexOf('create=1') > -1){ return; }
+     window.location.search.indexOf('create=1') > -1 ||
+     window.location.search.indexOf('league=1') > -1 ||
+     window.location.search.indexOf('comm=1') > -1){ return; }
   try{
     var u = localStorage.getItem('fr_user_'+FR_SEASON);
     if(!u){ window.location.href = 'welcome.html'; return; }
@@ -4400,8 +4402,13 @@ signOut: function(){
       if(inp){ inp.value = myTeam; inp.style.display='none'; }
     }
     frAuth._updateBadge(user);
-    // Route to home page after sign in
-    setTimeout(function(){ window.location.href = 'home.html'; }, 400);
+    // Only route to home if not already in a league
+    if(window.location.search.indexOf('league=1') < 0 &&
+       window.location.search.indexOf('comm=1') < 0){
+      setTimeout(function(){ window.location.href = 'home.html'; }, 400);
+    } else {
+      renderAll();
+    }
   },
 
   _updateBadge: function(user){
@@ -4420,7 +4427,7 @@ signOut: function(){
   }
 };
 
-// If coming from welcome page for signup/signin/create, open modal
+// Route based on URL params
 if(window.location.search.indexOf('signup=1') > -1){
   window.history.replaceState({}, '', 'index.html');
   setTimeout(function(){ frAuth.show('signup'); }, 300);
@@ -4432,6 +4439,8 @@ if(window.location.search.indexOf('signup=1') > -1){
   window.history.replaceState({}, '', 'index.html');
   setTimeout(function(){ frAuth.show('signin'); }, 300);
 } else {
+  // league=1, comm=1, or direct — run normal app init
+  window.history.replaceState({}, '', 'index.html');
   frAuth.init();
   initLeagueSwitcher();
   loadTeamName();
