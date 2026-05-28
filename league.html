@@ -1122,19 +1122,6 @@ function toggleTheme(){
 })();
 
 // ── COMMISSIONER ACCESS ────────────────────────────────────────────
-function initCommissionerAccess(){
-  var user = FRAuth.getUser();
-  if(!user) return;
-  var ctx = FRAuth.getLeagueCtx();
-  var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
-  FRAuth.checkCommissioner(user.uid, leagueId)
-    .then(function(status){
-      var btn = document.getElementById('comm-toggle');
-      if(btn) btn.style.display = (status.isComm || status.isCreator) ? '' : 'none';
-      updateMoreCommBtn();
-    });
-}
-
 // ── TEAM NAME ─────────────────────────────────────────────────────
 function loadTeamName(){
   var user = FRAuth.getUser();
@@ -2904,20 +2891,21 @@ var commUnlocked = false;
 function checkCommPw(){ /* legacy no-op */ }
 
 function initCommissionerAccess(){
-  var user = null;
-  try{ user = JSON.parse(localStorage.getItem('fr_user_' + FR_SEASON)); }catch(e){}
+  var user = FRAuth.getUser();
   if(!user || !user.uid) return;
-  FR.checkCommissionerStatus(user.uid).then(function(status){
-    if(!status.isComm) return;
+  var ctx = FRAuth.getLeagueCtx();
+  var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+  FRAuth.checkCommissioner(user.uid, leagueId).then(function(status){
+    if(!status.isComm && !status.isCreator) return;
     commUnlocked = true;
-    // Store role in context
-    var ctx = FR.ctx();
-    FR.saveContext(Object.assign({}, ctx, {
+    FR.saveContext(Object.assign({}, FR.ctx(), {
       role: status.isCreator ? 'creator' : 'commissioner'
     }));
-    // Show commissioner button
     var btn = document.getElementById('comm-toggle');
     if(btn) btn.style.display = 'inline-flex';
+    var moreBtn = document.getElementById('more-comm-btn');
+    if(moreBtn) moreBtn.style.display = '';
+    updateMoreCommBtn();
     try{ sessionStorage.setItem('fr_comm','1'); }catch(e){}
   }).catch(function(){});
 }
