@@ -415,12 +415,11 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
     <button id="theme-toggle" class="nav-theme" onclick="toggleTheme()" title="Toggle light/dark mode">🌙</button>
   </div>
   <!-- Row 2: Action buttons -->
-  <div class="nav-row2">
-    <button class="nav-btn nav-create" onclick="scrollToSignup()">+ Create League</button>
-    <button class="nav-btn nav-join-btn" onclick="scrollToSignup()">Join League</button>
+<div class="nav-row2">
+    <button class="nav-btn nav-create" onclick="window.location.href='league-setup.html'">+ Create League</button>
+    <button class="nav-btn nav-join-btn" onclick="window.location.href='index.html?signup=1'">Join League</button>
     <button class="nav-btn nav-signin" onclick="openSignIn()">Sign In</button>
   </div>
-</nav>
 
 <!-- HERO -->
 <section class="hero">
@@ -857,7 +856,9 @@ window.addEventListener('DOMContentLoaded', function(){
 });
 
 // ── NAV HELPERS ────────────────────────────────────────────────
-function scrollToSignup(){ document.getElementById('signup').scrollIntoView({behavior:'smooth'}); }
+function scrollToSignup(){
+  window.location.href = 'index.html?signup=1';
+}
 function scrollToHow(){ document.getElementById('how-it-works').scrollIntoView({behavior:'smooth'}); }
 function openSignIn(){
   document.getElementById('signin-modal').classList.add('open');
