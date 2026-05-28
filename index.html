@@ -4192,7 +4192,7 @@ var frAuth = {
   }).catch(function(){ err.textContent='Sign in failed — try again'; });
 },
 
-  submitSignUp: function(){
+submitSignUp: function(){
     var email = $id('fr-su-email').value.trim();
     var pass  = $id('fr-su-pass').value;
     var code  = $id('fr-su-code').value.trim().toUpperCase();
@@ -4200,45 +4200,54 @@ var frAuth = {
     err.textContent = '';
     if(!email){ err.textContent='Enter your email'; return; }
     if(pass.length<6){ err.textContent='Password must be at least 6 characters'; return; }
-    if(code.toUpperCase()!==FR_JOIN_CODE.toUpperCase()){ err.textContent='Incorrect join code'; return; }
-    err.textContent = 'Creating account…';
-    frApiPost('signUp',{email:email,password:pass,returnSecureToken:true})
-      .then(function(d){
-        if(d.error){
-          err.textContent = d.error.message.includes('EMAIL_EXISTS')
-            ?'Account already exists — sign in instead':d.error.message;
-          return;
-        }
- frAuth._save({uid:d.localId,email:d.email,team2026:null,teamName:null,dk2025:null});
-// Set league context immediately so checkFirstRun doesn't redirect
-FR.saveContext({
-  leagueId:   'fr_refresh26',
-  leagueName: "OG King/Queen of the Hill '26",
-  season:     2026,
-  format:     'cumulative',
-  guillotine: false,
-  role:       'member'
-});
-// Add member to league — uses Firebase auth token after account creation
-frApiPost('signInWithPassword',{email:d.email,password:$id('fr-su-pass').value,returnSecureToken:true})
-  .then(function(signIn){
-    if(signIn.idToken){
-      fetch(FR.FB_DB_URL+'/leagues/fr_refresh26/members/'+d.localId+'.json?auth='+signIn.idToken,{
-        method:'PATCH',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({
-          uid: d.localId,
-          email: d.email,
-          joined: Date.now(),
-          role: 'member',
-          active: true,
-          eliminated: false
-        })
+    if(!code){ err.textContent='Enter your join code'; return; }
+    err.textContent = 'Finding league…';
+
+    // Look up league by join code first
+    fetch(FB_DB_URL + '/leagues.json?shallow=true')
+      .then(function(r){ return r.json(); })
+      .then(function(ids){
+        if(!ids) throw new Error('No leagues found');
+        var searches = Object.keys(ids).map(function(id){
+          return FR.fb.get('/leagues/'+id+'/settings').then(function(s){
+            return s && s.joinCode && s.joinCode.toUpperCase() === code ? s : null;
+          });
+        });
+        return Promise.all(searches);
+      })
+      .then(function(results){
+        var match = results && results.find(function(s){ return s; });
+        if(!match) throw new Error('Invalid join code');
+        err.textContent = 'Creating account…';
+
+        // Create Firebase account
+        return frApiPost('signUp',{email:email,password:pass,returnSecureToken:true})
+          .then(function(d){
+            if(d.error){
+              throw new Error(d.error.message.includes('EMAIL_EXISTS')
+                ? 'Account already exists — sign in instead' : d.error.message);
+            }
+            // Save league context immediately
+            FR.saveContext({
+              leagueId:   match.leagueId,
+              leagueName: match.name,
+              season:     match.season || 2026,
+              format:     match.format || 'cumulative',
+              guillotine: match.guillotine || false,
+              cap:        match.cap || 60000,
+              role:       'member',
+              promptTeamName: true
+            });
+            frAuth._save({uid:d.localId, email:d.email, team2026:null, teamName:null, dk2025:null});
+            frAuth.show('profile');
+            // Store league id for profile save
+            frAuth._pendingLeagueId = match.leagueId;
+            frAuth._pendingLeagueName = match.name;
+          });
+      })
+      .catch(function(e){
+        err.textContent = e.message || 'Sign up failed — try again';
       });
-    }
-  }).catch(function(){});
-frAuth.show('profile');
-      }).catch(function(){ err.textContent='Sign up failed — try again'; });
   },
 
   checkTeamName: function(name){
@@ -4277,8 +4286,9 @@ frAuth.show('profile');
     });
 
     // Write member record and team name to Firebase
+var targetLeague = frAuth._pendingLeagueId || 'fr_refresh26';
     Promise.all([
-      frDbSet('/leagues/fr_refresh26/members/'+uid, {
+      frDbSet('/leagues/'+targetLeague+'/members/'+uid, {
         uid:        uid,
         email:      email,
         teamName:   teamName,
@@ -4366,6 +4376,18 @@ signOut: function(){
 };
 
 // Boot auth after page loads
+  // Auto-open modal if redirected from welcome page
+(function(){
+  try{
+    if(window.location.search.indexOf('signup=1') > -1){
+      window.history.replaceState({}, '', 'index.html');
+      setTimeout(function(){ frAuth.show('signup'); }, 600);
+    } else if(window.location.search.indexOf('signin=1') > -1){
+      window.history.replaceState({}, '', 'index.html');
+      setTimeout(function(){ frAuth.show('signin'); }, 600);
+    }
+  }catch(e){}
+})();
 frAuth.init();
 initLeagueSwitcher();
 loadTeamName();
