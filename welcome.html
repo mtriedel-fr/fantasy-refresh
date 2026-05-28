@@ -307,43 +307,11 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
 .why-title{font-family:var(--fd);font-size:16px;font-weight:800;color:var(--ink);text-transform:uppercase;margin-bottom:3px;}
 .why-desc{font-size:13px;color:var(--ink3);line-height:1.7;}
 
-/* ── SIGN UP ── */
-.signup-section{padding:0 24px 72px;}
-.signup-wrap{background:linear-gradient(135deg,var(--bg2),var(--bg3));border-radius:20px;border:1px solid var(--bdr2);border-top:3px solid var(--or);border-bottom:3px solid var(--pk);padding:44px 36px;max-width:500px;margin:0 auto;text-align:center;}
-.signup-title{font-family:var(--fd);font-size:30px;font-weight:900;color:var(--or);text-transform:uppercase;margin-bottom:6px;}
-.signup-sub{font-size:13px;color:var(--ink3);margin-bottom:26px;line-height:1.6;}
-.signup-form{display:flex;flex-direction:column;gap:12px;text-align:left;}
-.form-group{display:flex;flex-direction:column;gap:5px;}
-.form-label{font-family:var(--fd);font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;}
-.form-input{padding:11px 14px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:10px;color:var(--or);font-family:var(--fb);font-size:14px;outline:none;transition:border-color .15s;}
-.form-input:focus{border-color:var(--or);}
-.form-input::placeholder{color:var(--ink3);}
-.form-error{font-size:12px;color:var(--pk);margin-top:2px;display:none;}
-.form-error.show{display:block;}
-.signup-btn{width:100%;padding:14px;background:linear-gradient(135deg,var(--or),var(--pk));border:none;border-radius:12px;color:#050808;font-family:var(--fd);font-size:15px;font-weight:900;text-transform:uppercase;letter-spacing:.8px;cursor:pointer;transition:opacity .15s;margin-top:4px;}
-.signup-btn:hover{opacity:.9;}
-.signup-btn:disabled{opacity:.4;cursor:not-allowed;}
-.signup-status{font-family:var(--fd);font-size:12px;text-align:center;margin-top:8px;min-height:16px;text-transform:uppercase;letter-spacing:.5px;}
-.signup-status.ok{color:var(--or);}
-.signup-status.err{color:var(--pk);}
-.signin-link{margin-top:14px;font-size:13px;color:var(--ink3);}
-.signin-link a{color:var(--or);text-decoration:none;font-weight:600;}
-.signin-link a:hover{text-decoration:underline;}
-
 /* ── FOOTER ── */
 .footer{border-top:1px solid var(--bdr);padding:28px 24px;text-align:center;}
 .footer-logo{font-family:var(--fd);font-size:20px;font-weight:900;color:var(--or);margin-bottom:6px;}
 .footer-logo span{color:var(--pk);}
 .footer-text{font-size:13px;color:var(--ink3);}
-
-/* ── SIGN IN MODAL ── */
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:500;display:none;align-items:center;justify-content:center;padding:20px;}
-.modal-overlay.open{display:flex;}
-.modal{background:var(--bg2);border-radius:16px;border-top:3px solid var(--or);width:100%;max-width:400px;padding:30px;}
-.modal-title{font-family:var(--fd);font-size:24px;font-weight:900;color:var(--or);text-transform:uppercase;margin-bottom:4px;}
-.modal-sub{font-size:13px;color:var(--ink3);margin-bottom:22px;}
-.modal-close{float:right;background:none;border:none;color:var(--ink3);font-size:20px;cursor:pointer;margin-top:-4px;}
-.modal-close:hover{color:var(--pk);}
 
 /* ── MOBILE ── */
 @media(max-width:600px){
@@ -415,11 +383,12 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
     <button id="theme-toggle" class="nav-theme" onclick="toggleTheme()" title="Toggle light/dark mode">🌙</button>
   </div>
   <!-- Row 2: Action buttons -->
-<div class="nav-row2">
+  <div class="nav-row2">
     <button class="nav-btn nav-create" onclick="window.location.href='league-setup.html'">+ Create League</button>
     <button class="nav-btn nav-join-btn" onclick="window.location.href='index.html?signup=1'">Join League</button>
-    <button class="nav-btn nav-signin" onclick="openSignIn()">Sign In</button>
+    <button class="nav-btn nav-signin" onclick="window.location.href='index.html?signin=1'">Sign In</button>
   </div>
+</nav>
 
 <!-- HERO -->
 <section class="hero">
@@ -720,68 +689,11 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
   </div>
 </div>
 
-<!-- SIGN UP -->
-<section class="signup-section" id="signup">
-  <div class="signup-wrap">
-    <div class="signup-title">Join the League</div>
-    <p class="signup-sub">Welcome to OG King/Queen of the Hill '26. Got a join code? You're a few seconds away. Create your account and start drafting.</p>
-    <div class="signup-form" id="signup-form">
-      <div class="form-group">
-        <label class="form-label">First Name</label>
-        <input type="text" class="form-input" id="su-name" placeholder="Your first name" autocomplete="given-name">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Email Address</label>
-        <input type="email" class="form-input" id="su-email" placeholder="you@example.com" autocomplete="email">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Password</label>
-        <input type="password" class="form-input" id="su-password" placeholder="At least 6 characters" autocomplete="new-password">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Join Code</label>
-        <input type="text" class="form-input" id="su-code" placeholder="Enter your league join code" autocomplete="off" style="text-transform:uppercase;">
-        <div class="form-error" id="su-code-err">Invalid join code. Contact your commissioner.</div>
-      </div>
-      <button class="signup-btn" id="su-btn" onclick="handleSignup()">Create Account →</button>
-      <div class="signup-status" id="su-status"></div>
-    </div>
-    <div id="signup-success" style="display:none;text-align:center;padding:20px 0;">
-      <div style="font-size:44px;margin-bottom:14px;">🎉</div>
-      <div style="font-family:var(--fd);font-size:24px;font-weight:900;color:var(--or);text-transform:uppercase;margin-bottom:8px;">You're In!</div>
-      <div style="font-size:14px;color:var(--ink3);margin-bottom:22px;">Welcome to Fantasy Refresh. Head to the app to set your team name and get ready to draft.</div>
-      <a href="index.html" style="display:inline-block;padding:14px 34px;background:linear-gradient(135deg,var(--or),var(--pk));border-radius:12px;color:#050808;font-family:var(--fd);font-size:15px;font-weight:900;text-transform:uppercase;text-decoration:none;">Go to the App →</a>
-    </div>
-    <div class="signin-link">Already have an account? <a href="#" onclick="openSignIn();return false;">Sign in here</a></div>
-  </div>
-</section>
-
 <!-- FOOTER -->
 <footer class="footer">
   <div class="footer-logo">Fantasy<span>Refresh</span></div>
   <div class="footer-text">OG King/Queen of the Hill '26 · 2026 NFL Season · <a href="index.html" style="color:var(--ink3);">Enter App</a></div>
 </footer>
-
-<!-- SIGN IN MODAL -->
-<div class="modal-overlay" id="signin-modal" onclick="if(event.target===this)closeSignIn()">
-  <div class="modal">
-    <button class="modal-close" onclick="closeSignIn()">✕</button>
-    <div class="modal-title">Sign In</div>
-    <div class="modal-sub">Welcome back. Enter your credentials to continue.</div>
-    <div style="display:flex;flex-direction:column;gap:12px;">
-      <div class="form-group">
-        <label class="form-label">Email</label>
-        <input type="email" class="form-input" id="si-email" placeholder="you@example.com" autocomplete="email">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Password</label>
-        <input type="password" class="form-input" id="si-password" placeholder="Your password" autocomplete="current-password" onkeydown="if(event.key==='Enter')handleSignIn()">
-      </div>
-      <button class="signup-btn" id="si-btn" onclick="handleSignIn()">Sign In →</button>
-      <div class="signup-status" id="si-status"></div>
-    </div>
-  </div>
-</div>
 
 <script>
 // ── THEME ──────────────────────────────────────────────────────
@@ -831,23 +743,13 @@ window.addEventListener('appinstalled', function(){
   deferredInstallPrompt = null;
 });
 
-var FB_API_KEY = 'AIzaSyA-2hcf2hzThk7MuEm9DAvRICK95koE9gM';
-var FB_DB_URL = 'https://fantasy-refresh-default-rtdb.firebaseio.com';
-var FR_JOIN_CODE = 'REFRESH26';
-var FR_SEASON = '2026';
-
-// ── CHECK IF ALREADY SIGNED IN ─────────────────────────────────
+// ── CHECK IF ALREADY SIGNED IN — redirect to app ───────────────
 window.addEventListener('DOMContentLoaded', function(){
   try{
-    var u = localStorage.getItem('fr_user_'+FR_SEASON);
+    var u = localStorage.getItem('fr_user_2026');
     if(u){
-      var parsed = JSON.parse(u);
-      fetch('https://fantasy-refresh-default-rtdb.firebaseio.com/users/'+parsed.uid+'.json')
-        .then(function(r){ return r.json(); })
-        .then(function(profile){
-          var hasLeagues = profile && profile.leagues && Object.keys(profile.leagues).length > 0;
-          window.location.href = hasLeagues ? 'index.html' : 'league-setup.html';
-        }).catch(function(){ window.location.href = 'index.html'; });
+      var ctx = localStorage.getItem('fr_league_ctx');
+      window.location.href = ctx ? 'index.html' : 'league-setup.html';
       return;
     }
   }catch(e){}
@@ -856,15 +758,7 @@ window.addEventListener('DOMContentLoaded', function(){
 });
 
 // ── NAV HELPERS ────────────────────────────────────────────────
-function scrollToSignup(){
-  window.location.href = 'index.html?signup=1';
-}
 function scrollToHow(){ document.getElementById('how-it-works').scrollIntoView({behavior:'smooth'}); }
-function openSignIn(){
-  document.getElementById('signin-modal').classList.add('open');
-  setTimeout(function(){ document.getElementById('si-email').focus(); }, 100);
-}
-function closeSignIn(){ document.getElementById('signin-modal').classList.remove('open'); }
 
 // ── TAB SWITCHER ───────────────────────────────────────────────
 function switchTab(name, el){
@@ -943,81 +837,6 @@ function startLiveScoreAnimation(){
   }, 2800);
 }
 
-// ── SIGN UP ────────────────────────────────────────────────────
-function handleSignup(){
-  var name = document.getElementById('su-name').value.trim();
-  var email = document.getElementById('su-email').value.trim();
-  var password = document.getElementById('su-password').value;
-  var code = document.getElementById('su-code').value.trim().toUpperCase();
-  var btn = document.getElementById('su-btn');
-  var status = document.getElementById('su-status');
-  var codeErr = document.getElementById('su-code-err');
-  codeErr.classList.remove('show');
-  if(!name){ status.textContent='Enter your first name'; status.className='signup-status err'; return; }
-  if(!email || !email.includes('@')){ status.textContent='Enter a valid email'; status.className='signup-status err'; return; }
-  if(password.length < 6){ status.textContent='Password must be at least 6 characters'; status.className='signup-status err'; return; }
-  if(code !== FR_JOIN_CODE){ codeErr.classList.add('show'); return; }
-  btn.disabled = true; btn.textContent = 'Creating account…'; status.textContent = ''; status.className = 'signup-status';
-  fetch('https://identitytoolkit.googleapis.com/v1/accounts:signUp?key='+FB_API_KEY, {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ email, password, returnSecureToken:true })
-  }).then(function(r){ return r.json(); })
-  .then(function(data){
-    if(data.error) throw new Error(data.error.message);
-    var uid = data.localId; var token = data.idToken;
-    return fetch(FB_DB_URL+'/users'+FR_SEASON+'/'+uid+'.json?auth='+token, {
-      method:'PUT', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ email, name, uid, created:Date.now() })
-    }).then(function(){
-      var user = { uid, email, name, token, created:Date.now() };
-      localStorage.setItem('fr_user_'+FR_SEASON, JSON.stringify(user));
-      document.getElementById('signup-form').style.display = 'none';
-      document.getElementById('signup-success').style.display = 'block';
-      document.querySelector('.signin-link').style.display = 'none';
-    });
-  }).catch(function(e){
-    var msg = e.message || 'Sign up failed';
-    if(msg.includes('EMAIL_EXISTS')) msg = 'That email is already registered. Sign in instead.';
-    if(msg.includes('WEAK_PASSWORD')) msg = 'Password must be at least 6 characters.';
-    status.textContent = msg; status.className = 'signup-status err';
-    btn.disabled = false; btn.textContent = 'Create Account →';
-  });
-}
-
-// ── SIGN IN ────────────────────────────────────────────────────
-function handleSignIn(){
-  var email = document.getElementById('si-email').value.trim();
-  var password = document.getElementById('si-password').value;
-  var btn = document.getElementById('si-btn');
-  var status = document.getElementById('si-status');
-  if(!email || !password){ status.textContent='Enter email and password'; status.className='signup-status err'; return; }
-  btn.disabled = true; btn.textContent = 'Signing in…'; status.textContent = ''; status.className = 'signup-status';
-  fetch('https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key='+FB_API_KEY, {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ email, password, returnSecureToken:true })
-  }).then(function(r){ return r.json(); })
-  .then(function(data){
-    if(data.error) throw new Error(data.error.message);
-    return fetch(FB_DB_URL+'/users'+FR_SEASON+'/'+data.localId+'.json')
-      .then(function(r){ return r.json(); })
-      .then(function(profile){
-        var user = { uid: data.localId, email: data.email, name: (profile&&profile.name)||'', team2026:(profile&&profile.team2026)||'', token:data.idToken };
-        localStorage.setItem('fr_user_'+FR_SEASON, JSON.stringify(user));
-        fetch('https://fantasy-refresh-default-rtdb.firebaseio.com/users/'+data.localId+'.json')
-          .then(function(r){ return r.json(); })
-          .then(function(profile){
-            var hasLeagues = profile && profile.leagues && Object.keys(profile.leagues).length > 0;
-            window.location.href = hasLeagues ? 'index.html' : 'league-setup.html';
-          }).catch(function(){ window.location.href = 'league-setup.html'; });
-      });
-  }).catch(function(e){
-    var msg = e.message || 'Sign in failed';
-    if(msg.includes('INVALID_LOGIN_CREDENTIALS')||msg.includes('INVALID_PASSWORD')) msg = 'Wrong email or password.';
-    if(msg.includes('TOO_MANY_ATTEMPTS')) msg = 'Too many attempts. Try again later.';
-    status.textContent = msg; status.className = 'signup-status err';
-    btn.disabled = false; btn.textContent = 'Sign In →';
-  });
-}
 </script>
 <script>
 if('serviceWorker' in navigator){
