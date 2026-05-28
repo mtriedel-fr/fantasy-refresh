@@ -4326,17 +4326,26 @@ submitSignUp: function(){
       frAuth.user.team2026 = teamName;
       frAuth._save(frAuth.user);
       frAuth.close();
-      frAuth._applyToSite(frAuth.user);
-      showToast('Welcome to OG King/Queen of the Hill \'26, '+teamName+'! 🏈');
+      showToast('Welcome, '+teamName+'! 🏈');
+      if(frAuth._pendingCreate){
+        frAuth._pendingCreate = false;
+        setTimeout(function(){ window.location.href = 'league-setup.html?mode=create'; }, 800);
+      } else {
+        setTimeout(function(){ window.location.href = 'home.html'; }, 800);
+      }
     }).catch(function(e){
       console.error('Profile save error:', e);
-      // Save failed but context is set — let them in anyway
       frAuth.user.teamName = teamName;
       frAuth.user.team2026 = teamName;
       frAuth._save(frAuth.user);
       frAuth.close();
-      frAuth._applyToSite(frAuth.user);
       showToast('Welcome, '+teamName+'! 🏈');
+      if(frAuth._pendingCreate){
+        frAuth._pendingCreate = false;
+        setTimeout(function(){ window.location.href = 'league-setup.html?mode=create'; }, 800);
+      } else {
+        setTimeout(function(){ window.location.href = 'home.html'; }, 800);
+      }
     });
   },
 
@@ -4359,7 +4368,7 @@ signOut: function(){
     if(inp){ inp.value=''; inp.style.display=''; }
     frAuth._updateBadge(null);
     showToast('Signed out');
-    setTimeout(function(){ window.location.href = 'welcome.html?stay=1'; }, 800);
+    setTimeout(function(){ window.location.href = 'welcome.html?stay=1'; }, 600);
   },
   _save: function(user){
     frAuth.user = user;
@@ -4379,7 +4388,8 @@ signOut: function(){
       if(inp){ inp.value = myTeam; inp.style.display='none'; }
     }
     frAuth._updateBadge(user);
-    renderAll();
+    // Route to home page after sign in
+    setTimeout(function(){ window.location.href = 'home.html'; }, 400);
   },
 
   _updateBadge: function(user){
