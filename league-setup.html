@@ -590,7 +590,7 @@ window.addEventListener('DOMContentLoaded', function(){
   try{ currentUser = JSON.parse(localStorage.getItem('fr_user_'+FR_SEASON)); }catch(e){}
   if(!currentUser){ window.location.href = 'welcome.html'; return; }
 
-  document.getElementById('nav-user').textContent = currentUser.name || currentUser.email;
+  document.getElementById('nav-user').textContent = currentUser.teamName || currentUser.email || '';
 
   // Load existing leagues for this user
   loadUserLeagues();
@@ -818,7 +818,7 @@ function createLeague(){
     // Cumulative playoff
     ...cumPlayoff,
     visibility:          isPublic ? 'public' : 'private',
-    commissioners:       [currentUser.uid],
+    commissioners:       {[currentUser.uid]: true},
     created:             Date.now(),
     createdBy:           currentUser.uid,
     maxMembers: h2hTeams || maxMembers,
@@ -1154,7 +1154,7 @@ function debounce(fn, ms){
 function signOut(){
   try{ localStorage.removeItem('fr_user_'+FR_SEASON); }catch(e){}
   FR.clearContext();
-  window.location.href = 'welcome.html';
+  window.location.href = 'welcome.html?stay=1';
 }
 
 function showToast(msg){

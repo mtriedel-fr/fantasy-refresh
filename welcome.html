@@ -384,7 +384,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
   </div>
   <!-- Row 2: Action buttons -->
   <div class="nav-row2">
-    <button class="nav-btn nav-create" onclick="navTo('league-setup.html')">+ Create League</button>
+    <button class="nav-btn nav-create" onclick="navTo('index.html?create=1')">+ Create League</button>
     <button class="nav-btn nav-join-btn" onclick="navTo('index.html?signup=1')">Join League</button>
     <button class="nav-btn nav-signin" onclick="navTo('index.html?signin=1')">Sign In</button>
   </div>
@@ -763,8 +763,8 @@ window.addEventListener('DOMContentLoaded', function(){
 function scrollToHow(){ document.getElementById('how-it-works').scrollIntoView({behavior:'smooth'}); }
 
 function navTo(url){
-  // If user is signed in and going to signup, sign them out first
-  if(url.indexOf('signup=1') >= 0){
+  // Clear session when going to signup, signin, or create — fresh start
+  if(url.indexOf('signup=1') >= 0 || url.indexOf('signin=1') >= 0 || url.indexOf('create=1') >= 0){
     try{
       localStorage.removeItem('fr_user_2026');
       localStorage.removeItem('fr_league_ctx');
