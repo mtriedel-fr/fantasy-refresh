@@ -2911,8 +2911,14 @@ function initCommissionerAccess(){
 }
 
 function toggleComm(){
-  if(!commUnlocked){ return; }
+  if(!commUnlocked){
+    // Try re-running init in case it hasn't completed yet
+    initCommissionerAccess();
+    setTimeout(function(){ if(commUnlocked) toggleComm(); }, 1500);
+    return;
+  }
   var p = document.getElementById('comm-panel');
+  if(!p){ console.warn('comm-panel not found'); return; }
   var hidden = p.classList.contains('hidden');
   p.classList.toggle('hidden');
   document.getElementById('comm-toggle').textContent = hidden ? '✕ Close' : '⚙ Commissioner';
@@ -4712,11 +4718,16 @@ function updateMoreCommBtn(){
 
 // ── BOOT ──────────────────────────────────────────────────────────
 updateUserBadge();
-initCommissionerAccess();
 initLeagueSwitcher();
 loadTeamName();
 loadFromCloud();
 checkFirstRun();
+// Run commissioner check after a short delay to ensure Firebase is ready
+setTimeout(function(){ initCommissionerAccess(); }, 800);
+// Also run on DOMContentLoaded as backup
+document.addEventListener('DOMContentLoaded', function(){
+  setTimeout(function(){ initCommissionerAccess(); }, 500);
+});
 </script>
 
 <!-- TEAM NAME PROMPT MODAL -->
