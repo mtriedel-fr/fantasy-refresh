@@ -384,17 +384,15 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
   </div>
   <!-- Row 2: Action buttons -->
   <div class="nav-row2">
-    <button class="nav-btn nav-create" onclick="window.location.href='league-setup.html'">+ Create League</button>
-    <button class="nav-btn nav-join-btn" onclick="window.location.href='index.html?signup=1'">Join League</button>
-    <button class="nav-btn nav-signin" onclick="window.location.href='index.html?signin=1'">Sign In</button>
+    <button class="nav-btn nav-create" onclick="navTo('league-setup.html')">+ Create League</button>
+    <button class="nav-btn nav-join-btn" onclick="navTo('index.html?signup=1')">Join League</button>
+    <button class="nav-btn nav-signin" onclick="navTo('index.html?signin=1')">Sign In</button>
   </div>
 </nav>
 
 <!-- HERO -->
 <section class="hero">
   <div class="hero-bg"></div>
-  <div class="hero-tag">OG King/Queen of the Hill '26</div>
-
   <p style="font-family:var(--fd);font-size:clamp(22px,5vw,36px);font-weight:700;color:var(--ink2);text-transform:uppercase;letter-spacing:.5px;line-height:1.2;margin-bottom:10px;text-align:center;">Think you're good<br>at Fantasy Football?</p>
   <h1 class="hero-title" style="font-size:clamp(72px,18vw,148px);margin-bottom:18px;"><span class="pk">PROVE IT!</span></h1>
 
@@ -692,7 +690,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
 <!-- FOOTER -->
 <footer class="footer">
   <div class="footer-logo">Fantasy<span>Refresh</span></div>
-  <div class="footer-text">OG King/Queen of the Hill '26 · 2026 NFL Season · <a href="index.html" style="color:var(--ink3);">Enter App</a></div>
+  <div class="footer-text">Fantasy Refresh · Est. 2026</div>
 </footer>
 
 <script>
@@ -746,11 +744,15 @@ window.addEventListener('appinstalled', function(){
 // ── CHECK IF ALREADY SIGNED IN — redirect to app ───────────────
 window.addEventListener('DOMContentLoaded', function(){
   try{
-    var u = localStorage.getItem('fr_user_2026');
-    if(u){
-      var ctx = localStorage.getItem('fr_league_ctx');
-      window.location.href = ctx ? 'index.html' : 'league-setup.html';
-      return;
+    // Don't auto-redirect if user explicitly came to welcome page
+    var noRedirect = window.location.search.indexOf('stay=1') >= 0;
+    if(!noRedirect){
+      var u = localStorage.getItem('fr_user_2026');
+      if(u){
+        var ctx = localStorage.getItem('fr_league_ctx');
+        window.location.href = ctx ? 'index.html' : 'league-setup.html';
+        return;
+      }
     }
   }catch(e){}
   startDraftAnimation();
@@ -759,6 +761,19 @@ window.addEventListener('DOMContentLoaded', function(){
 
 // ── NAV HELPERS ────────────────────────────────────────────────
 function scrollToHow(){ document.getElementById('how-it-works').scrollIntoView({behavior:'smooth'}); }
+
+function navTo(url){
+  // If user is signed in and going to signup, sign them out first
+  if(url.indexOf('signup=1') >= 0){
+    try{
+      localStorage.removeItem('fr_user_2026');
+      localStorage.removeItem('fr_league_ctx');
+      localStorage.removeItem('fr_myteam');
+      localStorage.removeItem('fr_teamname_fr_refresh26');
+    }catch(e){}
+  }
+  window.location.href = url;
+}
 
 // ── TAB SWITCHER ───────────────────────────────────────────────
 function switchTab(name, el){
