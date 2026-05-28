@@ -1070,6 +1070,18 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
 <div class="toast" id="toast"></div>
 
 <script>
+// ── AUTH GATE — redirect to welcome if not signed in ───────────
+(function(){
+  try{
+    var u = localStorage.getItem('fr_user_2026');
+    var hasSignup = window.location.search.indexOf('signup=1') >= 0;
+    var hasSignin = window.location.search.indexOf('signin=1') >= 0;
+    if(!u && !hasSignup && !hasSignin){
+      window.location.href = 'welcome.html';
+    }
+  }catch(e){}
+})();
+
 // ── CONSTANTS ──────────────────────────────────────────────────
 var WEEKS = 18;
 var MED = ['🥇','🥈','🥉'];
@@ -1226,19 +1238,8 @@ function boot(){
   checkFirstRun();
 }
 
-// Auth gate — redirect to welcome if not signed in
-(function(){
-  try{
-    var u = localStorage.getItem('fr_user_2026');
-    var hasSignup = window.location.search.indexOf('signup=1') >= 0;
-    var hasSignin = window.location.search.indexOf('signin=1') >= 0;
-    if(!u && !hasSignup && !hasSignin){
-      window.location.href = 'welcome.html';
-      return;
-    }
-  }catch(e){}
-  loadFromCloud();
-}());
+loadFromCloud();
+
 // ── WEEK BAR ───────────────────────────────────────────────────
 function buildWeekBar(){
   var sel = document.getElementById('wk-select');
@@ -3461,7 +3462,7 @@ function renderNumbers(curEntries){
 
 // ── FIRST RUN PROMPT ──────────────────────────────────────────
 function checkFirstRun(){
-  // Don't redirect if coming from welcome page
+  // Don't redirect if coming from welcome page for signup/signin
   if(window.location.search.indexOf('signup=1') > -1 ||
      window.location.search.indexOf('signin=1') > -1){ return; }
   try{
@@ -4183,7 +4184,7 @@ var frAuth = {
     $id('fr-auth-overlay').classList.add('open');
   },
 
- submitSignIn: function(){
+  submitSignIn: function(){
     var email = $id('fr-si-email').value.trim();
     var pass  = $id('fr-si-pass').value;
     var err   = $id('fr-si-err');
@@ -4191,25 +4192,27 @@ var frAuth = {
     if(!email||!pass){ err.textContent='Enter email and password'; return; }
     err.textContent = 'Signing in…';
     frApiPost('signInWithPassword',{email:email,password:pass,returnSecureToken:true})
-    .then(function(d){
-      if(d.error){ err.textContent='Incorrect email or password'; return; }
-      return frDbGet('/leagues/fr_refresh26/members/'+d.localId)
-        .then(function(profile){
-          var user = {uid:d.localId, email:d.email,
-            team2026: profile?profile.teamName:null,
-            teamName: profile?profile.teamName:null,
-            dk2025:   null};
-          frAuth._save(user);
-          try{
-            localStorage.removeItem('fr_myteam');
-            localStorage.removeItem('fr_teamname_fr_refresh26');
-            localStorage.removeItem('fr_league_ctx');
-          }catch(e){}
-          if(!user.team2026){ frAuth.show('profile'); }
-          else { frAuth.close(); frAuth._applyToSite(user); }
-        });
-    }).catch(function(){ err.textContent='Sign in failed — try again'; });
-  },
+  .then(function(d){
+    if(d.error){ err.textContent='Incorrect email or password'; return; }
+    return frDbGet('/leagues/fr_refresh26/members/'+d.localId)
+      .then(function(profile){
+        var user = {uid:d.localId, email:d.email,
+          team2026: profile?profile.teamName:null,
+          teamName: profile?profile.teamName:null,
+          dk2025:   null};
+        frAuth._save(user);
+        // Clear cached team name from previous session
+        try{
+          localStorage.removeItem('fr_myteam');
+          localStorage.removeItem('fr_teamname_fr_refresh26');
+          localStorage.removeItem('fr_league_ctx');
+        }catch(e){}
+        if(!user.team2026){ frAuth.show('profile'); }
+        else { frAuth.close(); frAuth._applyToSite(user); }
+      });
+  }).catch(function(){ err.textContent='Sign in failed — try again'; });
+},
+
 submitSignUp: function(){
     var email = $id('fr-su-email').value.trim();
     var pass  = $id('fr-su-pass').value;
@@ -4289,7 +4292,11 @@ submitSignUp: function(){
     if(!teamName){ err.textContent='Choose a team name'; return; }
     if(!frAuth._teamAvail){ err.textContent='That name is taken — try another'; return; }
     if(!frAuth.user){ err.textContent='Not signed in'; return; }
-    // Save league context using the pending league from sign-up
+    err.textContent = 'Saving…';
+    var uid = frAuth.user.uid;
+    var email = frAuth.user.email;
+
+    // Save league context using pending league from sign-up
     var targetLeague = frAuth._pendingLeagueId || 'fr_refresh26';
     var targetLeagueName = frAuth._pendingLeagueName || "OG King/Queen of the Hill '26";
     FR.saveContext({
@@ -4300,8 +4307,8 @@ submitSignUp: function(){
       guillotine: false,
       role:       'member'
     });
+
     // Write member record and team name to Firebase
-var targetLeague = frAuth._pendingLeagueId || 'fr_refresh26';
     Promise.all([
       frDbSet('/leagues/'+targetLeague+'/members/'+uid, {
         uid:        uid,
@@ -4354,8 +4361,9 @@ signOut: function(){
     showToast('Signed out');
     setTimeout(function(){ window.location.href = 'welcome.html'; }, 800);
   },
- _save: function(user){
+  _save: function(user){
     frAuth.user = user;
+    // Save without idToken for security
     try{ localStorage.setItem('fr_user_'+FR_SEASON, JSON.stringify({
       uid:user.uid, email:user.email, team2026:user.team2026,
       teamName:user.teamName, dk2025:user.dk2025
@@ -4390,9 +4398,7 @@ signOut: function(){
   }
 };
 
-// Boot auth after page loads
-  // Auto-open modal if redirected from welcome page
-// If coming from welcome page for signup/signin, skip init and open modal
+// If coming from welcome page for signup/signin, open modal instead of init
 if(window.location.search.indexOf('signup=1') > -1){
   window.history.replaceState({}, '', 'index.html');
   setTimeout(function(){ frAuth.show('signup'); }, 300);
