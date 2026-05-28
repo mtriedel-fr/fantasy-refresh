@@ -62,7 +62,7 @@ html{overflow-x:hidden;}
 /* WEEK BAR */
 .wk-bar{background:var(--hdr2);padding:0;display:flex;flex-direction:column;border-bottom:1px solid #FF2D78;}
 .wk-bar-league{background:var(--hdr);padding:8px 28px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;}
-.wk-bar-league-name{font-family:var(--fd);font-size:16px;font-weight:800;color:var(--ink);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.wk-bar-league-name{font-family:var(--fd);font-size:16px;font-weight:800;color:var(--or);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .wk-bar-controls{padding:8px 28px;display:flex;align-items:center;justify-content:space-between;gap:12px;}
 .wk-bar-label{font-family:var(--fd);font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#1A5A5A;display:flex;align-items:center;gap:8px;}
 .wk-bar-label .dot-live{width:7px;height:7px;background:var(--grn);border-radius:50%;display:inline-block;}
@@ -750,12 +750,17 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
 </script>
 <div class="hdr">
   <div class="logo">
-    <div class="logo-box"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="36" height="36" style="flex-shrink:0;">
-  <g transform="translate(200,200) scale(3.79) translate(-475.5,-241.6)">
-    <path fill="#050808" d="M504.547,265.443h-9.019a30.964,30.964,0,0,0-29.042-52.733,1.5,1.5,0,1,0,.792,2.894,27.955,27.955,0,0,1,25.512,48.253l0-10.169h-.011a1.493,1.493,0,0,0-2.985,0h0v13.255a1.5,1.5,0,0,0,1.5,1.5h13.256a1.5,1.5,0,1,0,0-3Z"/>
-    <path fill="#050808" d="M485.389,267.995a27.956,27.956,0,0,1-25.561-48.213l0,10.2h.015a1.491,1.491,0,0,0,2.978,0h.007V216.791a1.484,1.484,0,0,0-1.189-1.532l-.018-.005a1.533,1.533,0,0,0-.223-.022c-.024,0-.046-.007-.07-.007H448.071a1.5,1.5,0,0,0,0,3h8.995a30.963,30.963,0,0,0,29.115,52.664,1.5,1.5,0,0,0-.792-2.894Z"/>
-  </g>
-</svg></div>
+    <svg style="width:36px;height:36px;flex-shrink:0;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
+      <defs>
+        <linearGradient id="tlg" x1="100%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#00E5D4"/><stop offset="100%" stop-color="#00E5D4" stop-opacity="0.6"/></linearGradient>
+        <linearGradient id="plg" x1="0%" y1="100%" x2="100%" y2="0%"><stop offset="0%" stop-color="#FF5FA0"/><stop offset="100%" stop-color="#FF5FA0" stop-opacity="0.6"/></linearGradient>
+      </defs>
+      <rect x="25" y="25" width="350" height="350" rx="70" fill="#050808"/>
+      <g transform="translate(200,200) scale(3.79) translate(-475.5,-241.6)">
+        <path fill="url(#tlg)" d="M504.547,265.443h-9.019a30.964,30.964,0,0,0-29.042-52.733,1.5,1.5,0,1,0,.792,2.894,27.955,27.955,0,0,1,25.512,48.253l0-10.169h-.011a1.493,1.493,0,0,0-2.985,0h0v13.255a1.5,1.5,0,0,0,1.5,1.5h13.256a1.5,1.5,0,1,0,0-3Z"/>
+        <path fill="url(#plg)" d="M485.389,267.995a27.956,27.956,0,0,1-25.561-48.213l0,10.2h.015a1.491,1.491,0,0,0,2.978,0h.007V216.791a1.484,1.484,0,0,0-1.189-1.532l-.018-.005a1.533,1.533,0,0,0-.223-.022c-.024,0-.046-.007-.07-.007H448.071a1.5,1.5,0,0,0,0,3h8.995a30.963,30.963,0,0,0,29.115,52.664,1.5,1.5,0,0,0-.792-2.894Z"/>
+      </g>
+    </svg>
     <div>
       <div class="logo-txt">Fantasy <span>Refresh</span></div>
       <div class="logo-sub">Weekly Salary Cap League</div>
@@ -783,9 +788,6 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
     <select class="wk-select" id="wk-select" onchange="setWeekFromSelect(this.value)">
     </select>
     <div class="league-switcher">
-      <select class="league-select" id="league-select" onchange="handleLeagueSwitch(this.value)" title="Switch league">
-        <option value="fr_refresh26">OG King/Queen of Fantasy '26</option>
-      </select>
       <select class="season-select" id="season-select" onchange="switchSeason(this.value)" title="Switch season">
         <option value="2026" selected>2026</option>
         <option value="PS26">PS'26</option>
@@ -1057,13 +1059,21 @@ function updateUserBadge(){
   var user = FRAuth.getUser();
   var btn = document.getElementById('fr-sign-btn');
   if(!btn) return;
-  if(user){
-    var name = user.teamName || user.displayName || user.email || '—';
-    btn.textContent = '👤 ' + name;
-  } else {
-    btn.textContent = '🔑 Sign In';
-  }
+  var name = (user && (user.teamName || user.displayName || user.email)) || '—';
+  btn.textContent = '👤 ' + name;
 }
+
+// Call updateUserBadge whenever team name is applied
+var _origApplyTeamName = null;
+window.addEventListener('DOMContentLoaded', function(){
+  if(typeof applyTeamName === 'function'){
+    _origApplyTeamName = applyTeamName;
+    applyTeamName = function(name){
+      _origApplyTeamName(name);
+      updateUserBadge();
+    };
+  }
+});
 
 function confirmSignOut(){
   var user = FRAuth.getUser();
@@ -2086,7 +2096,7 @@ function renderSeasonWrap(){
 
 
 function showEmpty(){
-  var html = '<div class="empty"><div class="empty-icon">🏈</div><div class="empty-title">No data yet</div><div class="empty-sub">Click <strong>Commissioner</strong> above<br>and import your first week&#39;s scores.</div></div>';
+  var html = '<div class="empty"><div class="empty-title">Season hasn\'t started yet</div></div>';
   ['sw','mw','wt','wf','wn','my-season-wrap'].forEach(function(id){
     var el = document.getElementById(id);
     if(el) el.innerHTML = html;
