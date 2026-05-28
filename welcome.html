@@ -2,21 +2,17 @@
 <html lang="en" data-theme="dark">
 <head>
 <meta charset="UTF-8">
-<link rel="manifest" href="/manifest.json">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#00E5D4">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Fantasy Refresh">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fantasy Refresh — OG King/Queen of the Hill '26</title>
-
-<!-- Favicon: inline SVG logo -->
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20400%20400'><defs><linearGradient%20id='tg'%20x1='100%'%20y1='0%'%20x2='0%'%20y2='100%'><stop%20offset='0%'%20stop-color='%2300E5D4'/><stop%20offset='100%'%20stop-color='%2300E5D4'%20stop-opacity='0.6'/></linearGradient><linearGradient%20id='pg'%20x1='0%'%20y1='100%'%20x2='100%'%20y2='0%'><stop%20offset='0%'%20stop-color='%23FF5FA0'/><stop%20offset='100%'%20stop-color='%23FF5FA0'%20stop-opacity='0.6'/></linearGradient></defs><rect%20x='25'%20y='25'%20width='350'%20height='350'%20rx='70'%20fill='%23050808'/><g%20transform='translate(200,200)%20scale(3.79)%20translate(-475.5,-241.6)'><path%20fill='url(%23tg)'%20d='M504.547,265.443h-9.019a30.964,30.964,0,0,0-29.042-52.733,1.5,1.5,0,1,0,.792,2.894,27.955,27.955,0,0,1,25.512,48.253l0-10.169h-.011a1.493,1.493,0,0,0-2.985,0h0v13.255a1.5,1.5,0,0,0,1.5,1.5h13.256a1.5,1.5,0,1,0,0-3Z'/><path%20fill='url(%23pg)'%20d='M485.389,267.995a27.956,27.956,0,0,1-25.561-48.213l0,10.2h.015a1.491,1.491,0,0,0,2.978,0h.007V216.791a1.484,1.484,0,0,0-1.189-1.532l-.018-.005a1.533,1.533,0,0,0-.223-.022c-.024,0-.046-.007-.07-.007H448.071a1.5,1.5,0,0,0,0,3h8.995a30.963,30.963,0,0,0,29.115,52.664,1.5,1.5,0,0,0-.792-2.894Z'/></g></svg>">
-
-<!-- Apple touch icon: points to PNG version (no white border issue) -->
+<title>Fantasy Refresh — Weekly Salary Cap Football</title>
+<link rel="manifest" href="/manifest.json">
 <link rel="apple-touch-icon" href="/icons/icon.svg">
-
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20400%20400'><defs><linearGradient%20id='tg'%20x1='100%'%20y1='0%'%20x2='0%'%20y2='100%'><stop%20offset='0%'%20stop-color='%2300E5D4'/><stop%20offset='100%'%20stop-color='%2300E5D4'%20stop-opacity='0.6'/></linearGradient><linearGradient%20id='pg'%20x1='0%'%20y1='100%'%20x2='100%'%20y2='0%'><stop%20offset='0%'%20stop-color='%23FF5FA0'/><stop%20offset='100%'%20stop-color='%23FF5FA0'%20stop-opacity='0.6'/></linearGradient></defs><rect%20x='25'%20y='25'%20width='350'%20height='350'%20rx='70'%20fill='%23050808'/><g%20transform='translate(200,200)%20scale(3.79)%20translate(-475.5,-241.6)'><path%20fill='url(%23tg)'%20d='M504.547,265.443h-9.019a30.964,30.964,0,0,0-29.042-52.733,1.5,1.5,0,1,0,.792,2.894,27.955,27.955,0,0,1,25.512,48.253l0-10.169h-.011a1.493,1.493,0,0,0-2.985,0h0v13.255a1.5,1.5,0,0,0,1.5,1.5h13.256a1.5,1.5,0,1,0,0-3Z'/><path%20fill='url(%23pg)'%20d='M485.389,267.995a27.956,27.956,0,0,1-25.561-48.213l0,10.2h.015a1.491,1.491,0,0,0,2.978,0h.007V216.791a1.484,1.484,0,0,0-1.189-1.532l-.018-.005a1.533,1.533,0,0,0-.223-.022c-.024,0-.046-.007-.07-.007H448.071a1.5,1.5,0,0,0,0,3h8.995a30.963,30.963,0,0,0,29.115,52.664,1.5,1.5,0,0,0-.792-2.894Z'/></g></svg>">
+<script src="/js/auth.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -35,212 +31,87 @@
 [data-theme="light"] .nav{background:rgba(240,248,248,.95);}
 [data-theme="light"] .preview-screen{box-shadow:0 40px 80px rgba(0,0,0,.15),0 0 0 1px rgba(0,122,112,.15);}
 [data-theme="light"] .hero-bg{background:radial-gradient(ellipse 80% 60% at 50% 0%, rgba(0,122,112,.06) 0%, transparent 70%);}
-
 *{box-sizing:border-box;margin:0;padding:0;}
 body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100vh;overflow-x:hidden;}
 
-/* ── NAV (2-row mobile layout) ── */
-.nav{
-  position:fixed;top:0;left:0;right:0;z-index:100;
-  background:rgba(5,8,8,.92);backdrop-filter:blur(12px);
-  border-bottom:2px solid var(--bdr2);
-}
-/* Row 1: Logo + theme toggle */
-.nav-row1{
-  display:flex;align-items:center;justify-content:space-between;
-  padding:10px 18px 8px;border-bottom:1px solid var(--bdr);
-}
-.nav-logo{
-  display:flex;align-items:center;gap:9px;
-  font-family:var(--fd);font-size:22px;font-weight:900;
-  color:var(--ink);letter-spacing:.5px;
-}
+/* NAV */
+.nav{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(5,8,8,.92);backdrop-filter:blur(12px);border-bottom:2px solid var(--bdr2);}
+.nav-row1{display:flex;align-items:center;justify-content:space-between;padding:10px 18px 8px;border-bottom:1px solid var(--bdr);}
+.nav-logo{display:flex;align-items:center;gap:9px;font-family:var(--fd);font-size:22px;font-weight:900;color:var(--ink);letter-spacing:.5px;}
 .nav-logo span{color:var(--pk);}
-
-/* Logo SVG sized to match the icon-192.png proportions, no white bg */
-.nav-logo-svg{
-  width:34px;height:34px;
-  flex-shrink:0;display:block;
-  /* Render SVG with transparent bg — fixes the white-border on iPhone */
-}
-
-.nav-theme{
-  background:none;border:1px solid var(--bdr2);border-radius:8px;
-  padding:6px 9px;cursor:pointer;font-size:15px;transition:all .15s;
-  line-height:1;
-}
+.nav-logo-svg{width:34px;height:34px;flex-shrink:0;display:block;}
+.nav-theme{background:none;border:1px solid var(--bdr2);border-radius:8px;padding:6px 9px;cursor:pointer;font-size:15px;transition:all .15s;line-height:1;}
 .nav-theme:hover{border-color:var(--or);}
-
-/* Row 2: Action buttons */
-.nav-row2{
-  display:flex;align-items:center;gap:8px;
-  padding:8px 18px 10px;
-}
-.nav-btn{
-  flex:1;font-family:var(--fd);font-size:13px;font-weight:800;
-  padding:9px 10px;border-radius:9px;border:none;cursor:pointer;
-  text-transform:uppercase;letter-spacing:.5px;transition:all .15s;
-  text-align:center;
-}
-.nav-create{
-  background:linear-gradient(135deg,var(--or),var(--pk));
-  color:#050808;
-}
+.nav-row2{display:flex;align-items:center;gap:8px;padding:8px 18px 10px;}
+.nav-btn{flex:1;font-family:var(--fd);font-size:13px;font-weight:800;padding:9px 10px;border-radius:9px;border:none;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;transition:all .15s;text-align:center;}
+.nav-create{background:linear-gradient(135deg,var(--or),var(--pk));color:#050808;}
 .nav-create:hover{opacity:.85;}
-.nav-join-btn{
-  background:transparent;border:1.5px solid var(--pk);color:var(--pk);
-}
-.nav-join-btn:hover{background:rgba(255,95,160,.1);}
-.nav-signin{
-  background:transparent;border:1.5px solid var(--bdr2);color:var(--ink2);
-}
+.nav-signin{background:transparent;border:1.5px solid var(--bdr2);color:var(--ink2);}
 .nav-signin:hover{border-color:var(--or);color:var(--or);}
 
-/* ── HERO ── */
-.hero{
-  min-height:100vh;display:flex;flex-direction:column;
-  align-items:center;justify-content:center;
-  padding:130px 20px 60px;text-align:center;position:relative;overflow:hidden;
-}
-.hero-bg{
-  position:absolute;inset:0;
-  background:
-    radial-gradient(ellipse 80% 60% at 50% 0%, rgba(0,229,212,.08) 0%, transparent 70%),
-    radial-gradient(ellipse 60% 40% at 80% 80%, rgba(255,95,160,.06) 0%, transparent 60%);
-  pointer-events:none;
-}
-
-/* Tagline — replace "2026 Season" */
-.hero-tag{
-  font-family:var(--fd);font-size:13px;font-weight:800;color:var(--pk);
-  text-transform:uppercase;letter-spacing:2px;margin-bottom:18px;
-  display:inline-flex;align-items:center;gap:8px;
-}
-.hero-tag::before,.hero-tag::after{content:'';width:24px;height:1px;background:var(--pk);opacity:.5;}
-
-/* Main headline */
-.hero-title{
-  font-family:var(--fd);font-size:clamp(44px,10vw,88px);font-weight:900;
-  line-height:.95;color:var(--ink);text-transform:uppercase;
-  letter-spacing:-1px;margin-bottom:18px;
-}
-.hero-title .or{color:var(--or);}
+/* HERO */
+.hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:130px 20px 60px;text-align:center;position:relative;overflow:hidden;}
+.hero-bg{position:absolute;inset:0;background:radial-gradient(ellipse 80% 60% at 50% 0%, rgba(0,229,212,.08) 0%, transparent 70%),radial-gradient(ellipse 60% 40% at 80% 80%, rgba(255,95,160,.06) 0%, transparent 60%);pointer-events:none;}
+.hero-title{font-family:var(--fd);font-size:clamp(44px,10vw,88px);font-weight:900;line-height:.95;color:var(--ink);text-transform:uppercase;letter-spacing:-1px;margin-bottom:18px;}
 .hero-title .pk{color:var(--pk);}
-
-.hero-sub{
-  font-size:clamp(15px,2.5vw,18px);color:var(--ink2);
-  max-width:520px;line-height:1.6;margin-bottom:36px;
-}
-
-.hero-btns{
-  display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:56px;
-}
-.btn-primary{
-  font-family:var(--fd);font-size:16px;font-weight:900;padding:14px 34px;
-  background:linear-gradient(135deg,var(--or),var(--pk));
-  border:none;border-radius:12px;color:#050808;cursor:pointer;
-  text-transform:uppercase;letter-spacing:.8px;transition:opacity .15s;
-}
+.hero-sub{font-size:clamp(15px,2.5vw,18px);color:var(--ink2);max-width:520px;line-height:1.6;margin-bottom:36px;}
+.hero-btns{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:56px;}
+.btn-primary{font-family:var(--fd);font-size:16px;font-weight:900;padding:14px 34px;background:linear-gradient(135deg,var(--or),var(--pk));border:none;border-radius:12px;color:#050808;cursor:pointer;text-transform:uppercase;letter-spacing:.8px;transition:opacity .15s;}
 .btn-primary:hover{opacity:.85;}
-.btn-secondary{
-  font-family:var(--fd);font-size:15px;font-weight:800;padding:14px 30px;
-  background:transparent;border:1.5px solid var(--bdr2);border-radius:12px;
-  color:var(--ink2);cursor:pointer;text-transform:uppercase;
-  letter-spacing:.5px;transition:all .15s;
-}
+.btn-secondary{font-family:var(--fd);font-size:15px;font-weight:800;padding:14px 30px;background:transparent;border:1.5px solid var(--bdr2);border-radius:12px;color:var(--ink2);cursor:pointer;text-transform:uppercase;letter-spacing:.5px;transition:all .15s;}
 .btn-secondary:hover{border-color:var(--or);color:var(--or);}
 
-/* ── PREVIEW PANELS (3 tabs) ── */
+/* PREVIEW TABS */
 .preview-wrap{width:100%;max-width:900px;margin:0 auto;position:relative;}
 .preview-tabs{display:flex;gap:0;margin-bottom:0;border-bottom:none;}
-.preview-tab{
-  flex:1;font-family:var(--fd);font-size:12px;font-weight:800;
-  padding:10px 8px;background:var(--bg2);border:1px solid var(--bdr);
-  color:var(--ink3);cursor:pointer;text-transform:uppercase;letter-spacing:.6px;
-  transition:all .15s;text-align:center;
-}
+.preview-tab{flex:1;font-family:var(--fd);font-size:12px;font-weight:800;padding:10px 8px;background:var(--bg2);border:1px solid var(--bdr);color:var(--ink3);cursor:pointer;text-transform:uppercase;letter-spacing:.6px;transition:all .15s;text-align:center;}
 .preview-tab:first-child{border-radius:10px 0 0 0;}
 .preview-tab:last-child{border-radius:0 10px 0 0;}
 .preview-tab.active{background:var(--hdr);color:var(--or);border-bottom-color:var(--hdr);border-top:2px solid var(--or);}
 .preview-tab:not(.active):hover{color:var(--ink2);background:var(--bg3);}
-
 .preview-panel{display:none;}
 .preview-panel.active{display:block;}
-
-.preview-screen{
-  background:var(--bg2);border-radius:0 0 16px 16px;border:1px solid var(--bdr2);
-  border-top:none;overflow:hidden;
-  box-shadow:0 40px 80px rgba(0,0,0,.6),0 0 0 1px rgba(0,229,212,.1);
-}
-.preview-bar{
-  background:var(--hdr);border-bottom:3px solid var(--or);
-  padding:10px 16px;display:flex;align-items:center;gap:10px;
-}
+.preview-screen{background:var(--bg2);border-radius:0 0 16px 16px;border:1px solid var(--bdr2);border-top:none;overflow:hidden;box-shadow:0 40px 80px rgba(0,0,0,.6),0 0 0 1px rgba(0,229,212,.1);}
+.preview-bar{background:var(--hdr);border-bottom:3px solid var(--or);padding:10px 16px;display:flex;align-items:center;gap:10px;}
 .preview-logo{font-family:var(--fd);font-size:16px;font-weight:900;color:var(--or);}
 .preview-logo span{color:var(--pk);}
 .preview-week{font-family:var(--fd);font-size:11px;color:var(--ink2);text-transform:uppercase;letter-spacing:.8px;margin-left:auto;}
-
-/* Draft panel */
-.preview-cap{
-  background:var(--bg2);border-bottom:1px solid var(--bdr);
-  padding:10px 16px;display:flex;align-items:center;justify-content:space-between;
-}
+.preview-cap{background:var(--bg2);border-bottom:1px solid var(--bdr);padding:10px 16px;display:flex;align-items:center;justify-content:space-between;}
 .preview-cap-label{font-family:var(--fd);font-size:9px;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;}
 .preview-cap-val{font-family:var(--fd);font-size:22px;font-weight:900;color:var(--or);}
 .preview-cap-avg{font-family:var(--fd);font-size:13px;font-weight:700;color:var(--ink2);}
-.preview-games{
-  background:var(--hdr);border-bottom:2px solid var(--pk);
-  padding:8px 12px;display:flex;gap:8px;overflow:hidden;
-}
-.preview-game{
-  flex-shrink:0;padding:5px 10px;background:var(--bg3);
-  border:1px solid var(--bdr2);border-radius:16px;
-  font-family:var(--fd);font-size:11px;font-weight:700;color:var(--ink2);text-align:center;
-}
+.preview-games{background:var(--hdr);border-bottom:2px solid var(--pk);padding:8px 12px;display:flex;gap:8px;overflow:hidden;}
+.preview-game{flex-shrink:0;padding:5px 10px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:16px;font-family:var(--fd);font-size:11px;font-weight:700;color:var(--ink2);text-align:center;}
 .preview-game.active{background:rgba(255,95,160,.15);border-color:var(--pk);color:var(--pk);}
 .preview-game-sub{font-size:9px;color:var(--ink3);margin-top:1px;}
-.preview-main{display:grid;grid-template-columns:200px 1fr;height:320px;}
-.preview-roster{border-right:1px solid var(--bdr);padding:10px;}
-.preview-slot{
-  background:var(--bg3);border-radius:8px;margin-bottom:6px;
-  border:1px solid var(--bdr);padding:8px 10px;
-  display:flex;align-items:center;gap:6px;
-}
-.preview-slot.filled{border-color:var(--bdr2);}
-.preview-slot-pos{font-family:var(--fd);font-size:10px;font-weight:800;min-width:30px;}
-.preview-slot-name{font-family:var(--fd);font-size:12px;font-weight:700;color:var(--ink);flex:1;}
-.preview-slot-sal{font-family:var(--fd);font-size:11px;font-weight:800;color:var(--or);}
-.preview-slot-empty{font-family:var(--fd);font-size:11px;color:var(--ink3);flex:1;}
-.preview-players{padding:0;overflow:hidden;}
+.preview-main{display:grid;grid-template-columns:1fr 1fr;height:280px;}
+.preview-roster{border-right:1px solid var(--bdr);overflow:auto;padding:8px 0;}
+.preview-slot{display:flex;align-items:center;padding:7px 14px;gap:8px;border-bottom:1px solid var(--bdr);}
+.preview-slot:last-child{border-bottom:none;}
+.preview-slot-pos{font-family:var(--fd);font-size:10px;font-weight:800;padding:2px 6px;border-radius:4px;text-transform:uppercase;min-width:36px;text-align:center;}
+.preview-slot-name{font-family:var(--fd);font-size:13px;font-weight:700;color:var(--ink);flex:1;}
+.preview-slot-sal{font-family:var(--fd);font-size:12px;color:var(--or);}
+.preview-slot-empty{font-family:var(--fd);font-size:12px;color:var(--bdr2);flex:1;}
+.preview-players{overflow:auto;}
 .preview-teams{display:grid;grid-template-columns:1fr 1fr;height:100%;}
-.preview-team-hdr{
-  background:var(--bg2);padding:6px 12px;
-  font-family:var(--fd);font-size:12px;font-weight:800;color:var(--ink2);
-  text-align:center;border-bottom:1px solid var(--bdr);
-}
-.preview-player-row{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--bdr);}
-.preview-player-pos{font-family:var(--fd);font-size:10px;font-weight:800;width:26px;text-align:center;padding:2px 0;border-radius:4px;}
-.preview-player-name{font-family:var(--fd);font-size:12px;font-weight:700;flex:1;color:var(--ink);}
-.preview-player-sal{font-family:var(--fd);font-size:11px;font-weight:800;color:var(--ink2);}
-.preview-draft-btn{
-  font-family:var(--fd);font-size:10px;font-weight:800;
-  padding:3px 8px;border-radius:5px;
-  border:1px solid rgba(0,229,212,.3);background:rgba(0,229,212,.1);
-  color:var(--or);cursor:pointer;
-}
+.preview-team-hdr{font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;padding:8px 12px;background:var(--bg2);border-bottom:1px solid var(--bdr);}
+.preview-player-row{display:flex;align-items:center;gap:6px;padding:7px 10px;border-bottom:1px solid var(--bdr);}
+.preview-player-pos{font-family:var(--fd);font-size:9px;font-weight:800;padding:2px 5px;border-radius:3px;text-transform:uppercase;}
+.preview-player-name{font-family:var(--fd);font-size:12px;font-weight:700;color:var(--ink);flex:1;}
+.preview-player-sal{font-family:var(--fd);font-size:11px;color:var(--ink3);margin-right:4px;}
+.preview-draft-btn{font-family:var(--fd);font-size:9px;font-weight:800;padding:2px 7px;background:rgba(0,229,212,.15);border:1px solid rgba(0,229,212,.3);border-radius:6px;color:var(--or);cursor:pointer;white-space:nowrap;}
 
-/* Live Score panel */
-.live-scores-grid{display:flex;flex-direction:column;gap:0;max-height:380px;overflow:hidden;}
-.live-matchup{display:flex;align-items:center;padding:12px 16px;border-bottom:1px solid var(--bdr);gap:12px;}
+/* LIVE SCORES */
+.live-scores-grid{padding:0;}
+.live-matchup{display:flex;align-items:center;padding:12px 16px;border-bottom:1px solid var(--bdr);}
 .live-matchup:last-child{border-bottom:none;}
 .lm-team{flex:1;}
-.lm-name{font-family:var(--fd);font-size:15px;font-weight:800;color:var(--ink);text-transform:uppercase;}
-.lm-pts{font-family:var(--fd);font-size:28px;font-weight:900;color:var(--or);line-height:1;}
+.lm-name{font-family:var(--fd);font-size:13px;font-weight:800;color:var(--ink);}
+.lm-pts{font-family:var(--fd);font-size:26px;font-weight:900;letter-spacing:-1px;line-height:1;padding:0 4px;}
 .lm-pts.winning{color:var(--or);}
 .lm-pts.losing{color:var(--ink3);}
 .lm-vs{font-family:var(--fd);font-size:11px;font-weight:700;color:var(--bdr2);text-transform:uppercase;letter-spacing:1px;}
 .lm-status{font-family:var(--fd);font-size:10px;font-weight:700;color:var(--pk);text-transform:uppercase;letter-spacing:.5px;margin-top:2px;display:flex;align-items:center;gap:4px;}
-.lm-status .live-dot{animation:pulse 1s ease-in-out infinite;}
 .lm-proj{font-family:var(--fd);font-size:11px;color:var(--ink3);margin-top:2px;}
 .lm-bar-bg{height:3px;background:var(--bdr);border-radius:2px;margin-top:6px;}
 .lm-bar-fill{height:3px;background:linear-gradient(90deg,var(--or),var(--pk));border-radius:2px;}
@@ -248,7 +119,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
 .live-panel-title{font-family:var(--fd);font-size:11px;font-weight:700;color:var(--ink2);text-transform:uppercase;letter-spacing:1px;}
 .live-panel-badge{font-family:var(--fd);font-size:10px;font-weight:700;color:var(--or);background:rgba(0,229,212,.12);border:1px solid rgba(0,229,212,.3);padding:2px 8px;border-radius:10px;}
 
-/* Weekly Standings panel */
+/* STANDINGS */
 .standings-table{width:100%;border-collapse:collapse;}
 .standings-table th{padding:8px 12px;text-align:left;font-family:var(--fd);font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--ink2);border-bottom:1px solid var(--bdr);background:var(--bg2);}
 .standings-table td{padding:11px 12px;border-bottom:1px solid var(--bdr);font-family:var(--fd);}
@@ -264,25 +135,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
 .st-live{font-family:var(--fd);font-size:10px;font-weight:700;color:var(--pk);display:flex;align-items:center;gap:3px;}
 .standings-panel-hdr{background:var(--bg2);padding:8px 16px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;}
 
-/* Animations */
-@keyframes highlight{0%,100%{background:transparent}50%{background:rgba(0,229,212,.12)}}
-@keyframes fadeSlot{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
-@keyframes scoreUp{from{transform:scale(1)}50%{transform:scale(1.08);color:var(--or)}to{transform:scale(1)}}
-
-.anim-highlight{animation:highlight 1.5s ease-in-out;}
-.anim-fade{animation:fadeSlot .4s ease-out;}
-.anim-pulse{animation:pulse 2s ease-in-out infinite;}
-.score-bump{animation:scoreUp .5s ease-in-out;}
-
-.pos-QB{background:rgba(0,229,212,.15);color:var(--or);}
-.pos-RB{background:rgba(255,95,160,.15);color:var(--pk);}
-.pos-WR{background:rgba(155,109,255,.15);color:var(--pu);}
-.pos-TE{background:rgba(255,154,58,.15);color:#FF9A3A;}
-.pos-DEF{background:rgba(105,190,40,.15);color:#69BE28;}
-.live-dot{width:6px;height:6px;border-radius:50%;background:#FF9A3A;display:inline-block;margin-right:2px;animation:pulse 1s ease-in-out infinite;}
-
-/* ── HOW IT WORKS ── */
+/* HOW IT WORKS */
 .section{padding:72px 24px;max-width:1100px;margin:0 auto;}
 .section-title{font-family:var(--fd);font-size:clamp(30px,5vw,50px);font-weight:900;color:var(--ink);text-transform:uppercase;text-align:center;margin-bottom:8px;}
 .section-sub{font-size:15px;color:var(--ink3);text-align:center;margin-bottom:44px;line-height:1.6;}
@@ -292,12 +145,11 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
 .step:nth-child(1)::before{background:var(--or);}
 .step:nth-child(2)::before{background:var(--pk);}
 .step:nth-child(3)::before{background:var(--pu);}
-.step:nth-child(4)::before{background:#FF9A3A;}
 .step-n{font-family:var(--fd);font-size:46px;font-weight:900;color:var(--bdr2);margin-bottom:10px;line-height:1;}
 .step-title{font-family:var(--fd);font-size:17px;font-weight:800;color:var(--ink);text-transform:uppercase;margin-bottom:7px;}
 .step-desc{font-size:14px;color:var(--ink3);line-height:1.7;}
 
-/* ── WHY SECTION ── */
+/* WHY */
 .why-wrap{padding:0 24px 72px;max-width:800px;margin:0 auto;}
 .why-box{background:linear-gradient(135deg,var(--bg2),var(--bg3));border-radius:20px;border:1px solid var(--bdr2);border-left:4px solid var(--or);padding:36px 32px;}
 .why-label{font-family:var(--fd);font-size:11px;font-weight:800;color:var(--or);text-transform:uppercase;letter-spacing:2px;margin-bottom:14px;}
@@ -307,13 +159,28 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
 .why-title{font-family:var(--fd);font-size:16px;font-weight:800;color:var(--ink);text-transform:uppercase;margin-bottom:3px;}
 .why-desc{font-size:13px;color:var(--ink3);line-height:1.7;}
 
-/* ── FOOTER ── */
+/* FOOTER */
 .footer{border-top:1px solid var(--bdr);padding:28px 24px;text-align:center;}
 .footer-logo{font-family:var(--fd);font-size:20px;font-weight:900;color:var(--or);margin-bottom:6px;}
 .footer-logo span{color:var(--pk);}
 .footer-text{font-size:13px;color:var(--ink3);}
 
-/* ── MOBILE ── */
+/* ANIMATIONS */
+@keyframes highlight{0%,100%{background:transparent}50%{background:rgba(0,229,212,.12)}}
+@keyframes fadeSlot{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+@keyframes scoreUp{from{transform:scale(1)}50%{transform:scale(1.08);color:var(--or)}to{transform:scale(1)}}
+.anim-highlight{animation:highlight 1.5s ease-in-out;}
+.anim-fade{animation:fadeSlot .4s ease-out;}
+.score-bump{animation:scoreUp .5s ease-in-out;}
+.live-dot{width:6px;height:6px;border-radius:50%;background:#FF9A3A;display:inline-block;margin-right:2px;animation:pulse 1s ease-in-out infinite;}
+.pos-QB{background:rgba(0,229,212,.15);color:var(--or);}
+.pos-RB{background:rgba(255,95,160,.15);color:var(--pk);}
+.pos-WR{background:rgba(155,109,255,.15);color:var(--pu);}
+.pos-TE{background:rgba(255,154,58,.15);color:#FF9A3A;}
+.pos-DEF{background:rgba(105,190,40,.15);color:#69BE28;}
+
+/* MOBILE */
 @media(max-width:600px){
   .nav-row1{padding:8px 14px 7px;}
   .nav-logo{font-size:20px;}
@@ -323,7 +190,6 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
   .hero{padding:140px 16px 48px;}
   .preview-main{grid-template-columns:1fr;height:auto;}
   .preview-roster{border-right:none;border-bottom:1px solid var(--bdr);max-height:220px;overflow:hidden;}
-  .signup-wrap{padding:28px 20px;}
   .why-box{padding:28px 20px;}
   .steps{grid-template-columns:1fr;gap:10px;}
 }
@@ -336,17 +202,6 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
 
 <!-- INSTALL BANNER -->
 <div id="install-banner" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:200;background:var(--bg2);border-top:2px solid var(--or);padding:12px 20px;align-items:center;gap:12px;box-shadow:0 -4px 24px rgba(0,0,0,.4);">
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" style="width:40px;height:40px;border-radius:10px;flex-shrink:0;">
-    <defs>
-      <linearGradient id="bilg" x1="100%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#00E5D4"/><stop offset="100%" stop-color="#00E5D4" stop-opacity="0.6"/></linearGradient>
-      <linearGradient id="biplg" x1="0%" y1="100%" x2="100%" y2="0%"><stop offset="0%" stop-color="#FF5FA0"/><stop offset="100%" stop-color="#FF5FA0" stop-opacity="0.6"/></linearGradient>
-    </defs>
-    <rect x="25" y="25" width="350" height="350" rx="70" fill="#050808"/>
-    <g transform="translate(200,200) scale(3.79) translate(-475.5,-241.6)">
-      <path fill="url(#bilg)" d="M504.547,265.443h-9.019a30.964,30.964,0,0,0-29.042-52.733,1.5,1.5,0,1,0,.792,2.894,27.955,27.955,0,0,1,25.512,48.253l0-10.169h-.011a1.493,1.493,0,0,0-2.985,0h0v13.255a1.5,1.5,0,0,0,1.5,1.5h13.256a1.5,1.5,0,1,0,0-3Z"/>
-      <path fill="url(#biplg)" d="M485.389,267.995a27.956,27.956,0,0,1-25.561-48.213l0,10.2h.015a1.491,1.491,0,0,0,2.978,0h.007V216.791a1.484,1.484,0,0,0-1.189-1.532l-.018-.005a1.533,1.533,0,0,0-.223-.022c-.024,0-.046-.007-.07-.007H448.071a1.5,1.5,0,0,0,0,3h8.995a30.963,30.963,0,0,0,29.115,52.664,1.5,1.5,0,0,0-.792-2.894Z"/>
-    </g>
-  </svg>
   <div style="flex:1;">
     <div style="font-family:var(--fd);font-size:14px;font-weight:800;color:var(--ink);text-transform:uppercase;">Add to Home Screen</div>
     <div style="font-size:12px;color:var(--ink3);">Install Fantasy Refresh for quick access all season</div>
@@ -355,22 +210,14 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
   <button onclick="document.getElementById('install-banner').style.display='none'" style="background:none;border:none;color:var(--ink3);font-size:18px;cursor:pointer;flex-shrink:0;">✕</button>
 </div>
 
-<!-- NAV: 2-row mobile-first layout -->
+<!-- NAV -->
 <nav class="nav">
-  <!-- Row 1: Logo + dark/light toggle -->
   <div class="nav-row1">
     <div class="nav-logo">
-      <!-- SVG logo inline — no src, no white-border on iOS -->
       <svg class="nav-logo-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
         <defs>
-          <linearGradient id="tlg" x1="100%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stop-color="#00E5D4"/>
-            <stop offset="100%" stop-color="#00E5D4" stop-opacity="0.6"/>
-          </linearGradient>
-          <linearGradient id="plg" x1="0%" y1="100%" x2="100%" y2="0%">
-            <stop offset="0%" stop-color="#FF5FA0"/>
-            <stop offset="100%" stop-color="#FF5FA0" stop-opacity="0.6"/>
-          </linearGradient>
+          <linearGradient id="tlg" x1="100%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#00E5D4"/><stop offset="100%" stop-color="#00E5D4" stop-opacity="0.6"/></linearGradient>
+          <linearGradient id="plg" x1="0%" y1="100%" x2="100%" y2="0%"><stop offset="0%" stop-color="#FF5FA0"/><stop offset="100%" stop-color="#FF5FA0" stop-opacity="0.6"/></linearGradient>
         </defs>
         <rect x="25" y="25" width="350" height="350" rx="70" fill="#050808"/>
         <g transform="translate(200,200) scale(3.79) translate(-475.5,-241.6)">
@@ -382,10 +229,9 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
     </div>
     <button id="theme-toggle" class="nav-theme" onclick="toggleTheme()" title="Toggle light/dark mode">🌙</button>
   </div>
-  <!-- Row 2: Action buttons -->
   <div class="nav-row2">
-    <button class="nav-btn nav-create" onclick="navTo('index.html?signup=1')">Create Account</button>
-    <button class="nav-btn nav-signin" onclick="navTo('index.html?signin=1')">Sign In</button>
+    <button class="nav-btn nav-create" onclick="goTo('auth.html?mode=signup')">Create Account</button>
+    <button class="nav-btn nav-signin" onclick="goTo('auth.html?mode=signin')">Sign In</button>
   </div>
 </nav>
 
@@ -394,15 +240,13 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
   <div class="hero-bg"></div>
   <p style="font-family:var(--fd);font-size:clamp(22px,5vw,36px);font-weight:700;color:var(--ink2);text-transform:uppercase;letter-spacing:.5px;line-height:1.2;margin-bottom:10px;text-align:center;">Think you're good<br>at Fantasy Football?</p>
   <h1 class="hero-title" style="font-size:clamp(72px,18vw,148px);margin-bottom:18px;"><span class="pk">PROVE IT!</span></h1>
-
   <p class="hero-sub">Fresh roster every week. Salary cap every week. 18 chances to prove you're better than everyone else — no luck, no excuses.</p>
-
   <div class="hero-btns">
-    <button class="btn-primary" onclick="navTo('index.html?signup=1')">Create Account →</button>
+    <button class="btn-primary" onclick="goTo('auth.html?mode=signup')">Create Account →</button>
     <button class="btn-secondary" onclick="scrollToHow()">How It Works</button>
   </div>
 
-  <!-- 3-tab animated preview -->
+  <!-- 3-TAB PREVIEW -->
   <div class="preview-wrap">
     <div class="preview-tabs">
       <div class="preview-tab active" onclick="switchTab('draft',this)">🏈 Draft Preview</div>
@@ -431,24 +275,10 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
         </div>
         <div class="preview-main">
           <div class="preview-roster">
-            <div id="prev-slot-qb1" class="preview-slot filled">
-              <span class="preview-slot-pos pos-QB">QB</span>
-              <span class="preview-slot-name">P. Mahomes</span>
-              <span class="preview-slot-sal">$11,200</span>
-            </div>
-            <div id="prev-slot-rb1" class="preview-slot filled">
-              <span class="preview-slot-pos pos-RB">RB</span>
-              <span class="preview-slot-name">D. Henry</span>
-              <span class="preview-slot-sal">$10,300</span>
-            </div>
-            <div id="prev-slot-rb2" class="preview-slot">
-              <span class="preview-slot-pos pos-RB" style="color:var(--pk);">RB</span>
-              <span class="preview-slot-empty">— empty —</span>
-            </div>
-            <div id="prev-slot-wr1" class="preview-slot">
-              <span class="preview-slot-pos pos-WR" style="color:var(--pu);">WR</span>
-              <span class="preview-slot-empty">— empty —</span>
-            </div>
+            <div id="prev-slot-qb1" class="preview-slot"><span class="preview-slot-pos pos-QB">QB</span><span class="preview-slot-name">P. Mahomes</span><span class="preview-slot-sal">$11,200</span></div>
+            <div id="prev-slot-rb1" class="preview-slot"><span class="preview-slot-pos pos-RB">RB</span><span class="preview-slot-name">D. Henry</span><span class="preview-slot-sal">$10,300</span></div>
+            <div id="prev-slot-rb2" class="preview-slot"><span class="preview-slot-pos pos-RB" style="color:var(--pk);">RB</span><span class="preview-slot-empty">— empty —</span></div>
+            <div id="prev-slot-wr1" class="preview-slot"><span class="preview-slot-pos pos-WR" style="color:var(--pu);">WR</span><span class="preview-slot-empty">— empty —</span></div>
             <div class="preview-slot"><span class="preview-slot-pos pos-WR" style="color:var(--pu);">WR</span><span class="preview-slot-empty">— empty —</span></div>
             <div class="preview-slot"><span class="preview-slot-pos pos-WR" style="color:var(--pu);">WR</span><span class="preview-slot-empty">— empty —</span></div>
             <div class="preview-slot"><span class="preview-slot-pos pos-TE" style="color:#FF9A3A;">TE</span><span class="preview-slot-empty">— empty —</span></div>
@@ -493,78 +323,30 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
         </div>
         <div class="live-scores-grid">
           <div class="live-matchup">
-            <div class="lm-team">
-              <div class="lm-name">Gridiron Gang</div>
-              <div class="lm-status"><span class="live-dot"></span>In progress</div>
-              <div class="lm-bar-bg"><div class="lm-bar-fill" style="width:72%"></div></div>
-            </div>
-            <div style="text-align:center;padding:0 12px;">
-              <div class="lm-pts winning" id="ls-p1">87.4</div>
-              <div class="lm-vs">vs</div>
-              <div class="lm-pts losing" id="ls-p2">74.2</div>
-            </div>
-            <div class="lm-team" style="text-align:right;">
-              <div class="lm-name">Cash Money</div>
-              <div class="lm-proj" style="justify-content:flex-end;">Proj: 91.0</div>
-              <div class="lm-bar-bg"><div class="lm-bar-fill" style="width:55%"></div></div>
-            </div>
+            <div class="lm-team"><div class="lm-name">Gridiron Gang</div><div class="lm-status"><span class="live-dot"></span>In progress</div><div class="lm-bar-bg"><div class="lm-bar-fill" style="width:72%"></div></div></div>
+            <div style="text-align:center;padding:0 12px;"><div class="lm-pts winning" id="ls-p1">87.4</div><div class="lm-vs">vs</div><div class="lm-pts losing" id="ls-p2">74.2</div></div>
+            <div class="lm-team" style="text-align:right;"><div class="lm-name">Cash Money</div><div class="lm-proj" style="justify-content:flex-end;">Proj: 91.0</div><div class="lm-bar-bg"><div class="lm-bar-fill" style="width:55%"></div></div></div>
           </div>
           <div class="live-matchup">
-            <div class="lm-team">
-              <div class="lm-name">Salary Snipers</div>
-              <div class="lm-status"><span class="live-dot"></span>In progress</div>
-              <div class="lm-bar-bg"><div class="lm-bar-fill" style="width:83%"></div></div>
-            </div>
-            <div style="text-align:center;padding:0 12px;">
-              <div class="lm-pts winning" id="ls-p3">102.6</div>
-              <div class="lm-vs">vs</div>
-              <div class="lm-pts losing" id="ls-p4">68.1</div>
-            </div>
-            <div class="lm-team" style="text-align:right;">
-              <div class="lm-name">Budget Beasts</div>
-              <div class="lm-proj" style="justify-content:flex-end;">Proj: 80.3</div>
-              <div class="lm-bar-bg"><div class="lm-bar-fill" style="width:42%"></div></div>
-            </div>
+            <div class="lm-team"><div class="lm-name">Salary Snipers</div><div class="lm-status"><span class="live-dot"></span>In progress</div><div class="lm-bar-bg"><div class="lm-bar-fill" style="width:83%"></div></div></div>
+            <div style="text-align:center;padding:0 12px;"><div class="lm-pts winning" id="ls-p3">102.6</div><div class="lm-vs">vs</div><div class="lm-pts losing" id="ls-p4">68.1</div></div>
+            <div class="lm-team" style="text-align:right;"><div class="lm-name">Budget Beasts</div><div class="lm-proj" style="justify-content:flex-end;">Proj: 80.3</div><div class="lm-bar-bg"><div class="lm-bar-fill" style="width:42%"></div></div></div>
           </div>
           <div class="live-matchup">
-            <div class="lm-team">
-              <div class="lm-name">Cap Crushers</div>
-              <div class="lm-status"><span class="live-dot"></span>In progress</div>
-              <div class="lm-bar-bg"><div class="lm-bar-fill" style="width:61%"></div></div>
-            </div>
-            <div style="text-align:center;padding:0 12px;">
-              <div class="lm-pts winning" id="ls-p5">79.8</div>
-              <div class="lm-vs">vs</div>
-              <div class="lm-pts losing" id="ls-p6">77.3</div>
-            </div>
-            <div class="lm-team" style="text-align:right;">
-              <div class="lm-name">The Underdogs</div>
-              <div class="lm-proj" style="justify-content:flex-end;">Proj: 88.5</div>
-              <div class="lm-bar-bg"><div class="lm-bar-fill" style="width:59%"></div></div>
-            </div>
+            <div class="lm-team"><div class="lm-name">Cap Crushers</div><div class="lm-status"><span class="live-dot"></span>In progress</div><div class="lm-bar-bg"><div class="lm-bar-fill" style="width:61%"></div></div></div>
+            <div style="text-align:center;padding:0 12px;"><div class="lm-pts winning" id="ls-p5">79.8</div><div class="lm-vs">vs</div><div class="lm-pts losing" id="ls-p6">77.3</div></div>
+            <div class="lm-team" style="text-align:right;"><div class="lm-name">The Underdogs</div><div class="lm-proj" style="justify-content:flex-end;">Proj: 88.5</div><div class="lm-bar-bg"><div class="lm-bar-fill" style="width:59%"></div></div></div>
           </div>
           <div class="live-matchup">
-            <div class="lm-team">
-              <div class="lm-name">Stud Squad</div>
-              <div class="lm-status" style="color:var(--or);">✓ Final</div>
-              <div class="lm-bar-bg"><div class="lm-bar-fill" style="width:100%;background:var(--or)"></div></div>
-            </div>
-            <div style="text-align:center;padding:0 12px;">
-              <div class="lm-pts winning" id="ls-p7">118.3</div>
-              <div class="lm-vs">vs</div>
-              <div class="lm-pts losing" id="ls-p8">91.7</div>
-            </div>
-            <div class="lm-team" style="text-align:right;">
-              <div class="lm-name">Value Village</div>
-              <div class="lm-proj" style="justify-content:flex-end;">Final</div>
-              <div class="lm-bar-bg"><div class="lm-bar-fill" style="width:100%;background:var(--bdr2)"></div></div>
-            </div>
+            <div class="lm-team"><div class="lm-name">Stud Squad</div><div class="lm-status" style="color:var(--or);">✓ Final</div><div class="lm-bar-bg"><div class="lm-bar-fill" style="width:100%;background:var(--or)"></div></div></div>
+            <div style="text-align:center;padding:0 12px;"><div class="lm-pts winning" id="ls-p7">118.3</div><div class="lm-vs">vs</div><div class="lm-pts losing" id="ls-p8">91.7</div></div>
+            <div class="lm-team" style="text-align:right;"><div class="lm-name">Value Village</div><div class="lm-proj" style="justify-content:flex-end;">Final</div><div class="lm-bar-bg"><div class="lm-bar-fill" style="width:100%;background:var(--bdr2)"></div></div></div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- WEEKLY STANDINGS PANEL -->
+    <!-- STANDINGS PANEL -->
     <div class="preview-panel" id="panel-standings">
       <div class="preview-screen">
         <div class="preview-bar">
@@ -577,63 +359,18 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
           <div class="live-panel-badge">⚡ Updates as scores come in</div>
         </div>
         <table class="standings-table">
-          <thead>
-            <tr>
-              <th style="width:36px;">#</th>
-              <th>Team</th>
-              <th>Wk Pts</th>
-              <th>Season</th>
-              <th style="width:50px;">Move</th>
-            </tr>
-          </thead>
-          <tbody id="standings-tbody">
-            <tr>
-              <td class="st-rank top">1</td>
-              <td><div class="st-name">Stud Squad</div><div style="font-family:var(--fd);font-size:10px;color:var(--or);">✓ Final</div></td>
-              <td class="st-pts">118.3</td>
-              <td style="font-family:var(--fd);font-size:14px;color:var(--ink2);">874.1</td>
-              <td class="st-move up">▲1</td>
-            </tr>
-            <tr>
-              <td class="st-rank top">2</td>
-              <td><div class="st-name">Salary Snipers</div><div class="st-live"><span class="live-dot"></span>102.6 live</div></td>
-              <td class="st-pts" id="st-pts1">102.6</td>
-              <td style="font-family:var(--fd);font-size:14px;color:var(--ink2);">887.4</td>
-              <td class="st-move up">▲2</td>
-            </tr>
-            <tr>
-              <td class="st-rank top">3</td>
-              <td><div class="st-name">Value Village</div><div style="font-family:var(--fd);font-size:10px;color:var(--or);">✓ Final</div></td>
-              <td class="st-pts">91.7</td>
-              <td style="font-family:var(--fd);font-size:14px;color:var(--ink2);">831.5</td>
-              <td class="st-move dn">▼2</td>
-            </tr>
-            <tr>
-              <td class="st-rank">4</td>
-              <td><div class="st-name">Gridiron Gang</div><div class="st-live"><span class="live-dot"></span>87.4 live</div></td>
-              <td class="st-pts" id="st-pts3">87.4</td>
-              <td style="font-family:var(--fd);font-size:14px;color:var(--ink2);">861.0</td>
-              <td class="st-move up">▲1</td>
-            </tr>
-            <tr>
-              <td class="st-rank">5</td>
-              <td><div class="st-name">Cap Crushers</div><div class="st-live"><span class="live-dot"></span>79.8 live</div></td>
-              <td class="st-pts" id="st-pts4">79.8</td>
-              <td style="font-family:var(--fd);font-size:14px;color:var(--ink2);">843.2</td>
-              <td class="st-move" style="color:var(--ink3);">—</td>
-            </tr>
-            <tr>
-              <td class="st-rank">6</td>
-              <td><div class="st-name">Cash Money</div><div class="st-live"><span class="live-dot"></span>74.2 live</div></td>
-              <td class="st-pts" id="st-pts6">74.2</td>
-              <td style="font-family:var(--fd);font-size:14px;color:var(--ink2);">808.9</td>
-              <td class="st-move dn">▼1</td>
-            </tr>
+          <thead><tr><th style="width:36px;">#</th><th>Team</th><th>Wk Pts</th><th>Season</th><th style="width:50px;">Move</th></tr></thead>
+          <tbody>
+            <tr><td class="st-rank top">1</td><td><div class="st-name">Stud Squad</div><div style="font-family:var(--fd);font-size:10px;color:var(--or);">✓ Final</div></td><td class="st-pts">118.3</td><td style="font-family:var(--fd);font-size:14px;color:var(--ink2);">874.1</td><td class="st-move up">▲1</td></tr>
+            <tr><td class="st-rank top">2</td><td><div class="st-name">Salary Snipers</div><div class="st-live"><span class="live-dot"></span><span id="st-pts1">102.6</span> live</div></td><td class="st-pts" id="st-pts1b">102.6</td><td style="font-family:var(--fd);font-size:14px;color:var(--ink2);">861.3</td><td class="st-move up">▲2</td></tr>
+            <tr><td class="st-rank top">3</td><td><div class="st-name">Cap Crushers</div><div class="st-live"><span class="live-dot"></span><span id="st-pts3">79.8</span> live</div></td><td class="st-pts" id="st-pts3b">79.8</td><td style="font-family:var(--fd);font-size:14px;color:var(--ink2);">849.7</td><td class="st-move dn">▼1</td></tr>
+            <tr><td class="st-rank">4</td><td><div class="st-name">Gridiron Gang</div><div class="st-live"><span class="live-dot"></span><span id="st-pts4">87.4</span> live</div></td><td class="st-pts" id="st-pts4b">87.4</td><td style="font-family:var(--fd);font-size:14px;color:var(--ink2);">821.9</td><td class="st-move up">▲1</td></tr>
+            <tr><td class="st-rank">5</td><td><div class="st-name">Budget Beasts</div><div class="st-live"><span class="live-dot"></span><span id="st-pts6">74.2</span> live</div></td><td class="st-pts" id="st-pts6b">74.2</td><td style="font-family:var(--fd);font-size:14px;color:var(--ink2);">798.4</td><td class="st-move dn">▼2</td></tr>
           </tbody>
         </table>
       </div>
     </div>
-  </div><!-- /preview-wrap -->
+  </div>
 </section>
 
 <!-- HOW IT WORKS -->
@@ -659,7 +396,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
   </div>
 </section>
 
-<!-- WHY FANTASY REFRESH -->
+<!-- WHY -->
 <div class="why-wrap">
   <div class="why-box">
     <div class="why-label">Why We Built This</div>
@@ -694,134 +431,103 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
 </footer>
 
 <script>
-// ── THEME ──────────────────────────────────────────────────────
-function toggleTheme(){
-  var html = document.documentElement;
-  var light = html.getAttribute('data-theme') !== 'light';
-  html.setAttribute('data-theme', light ? 'light' : 'dark');
-  document.getElementById('theme-toggle').textContent = light ? '☀️' : '🌙';
-  try{ localStorage.setItem('fr_theme', light ? 'light' : 'dark'); }catch(e){}
+// ── ROUTE GUARD ─────────────────────────────────────────────────
+// Redirect signed-in users to home — they don't need the landing page
+FRAuth.redirectIfSignedIn();
+
+// ── THEME ───────────────────────────────────────────────────────
+function toggleTheme() {
+  var next = FRAuth.toggleTheme();
+  document.getElementById('theme-toggle').textContent = next === 'light' ? '☀️' : '🌙';
 }
-(function(){
-  try{
-    var t = localStorage.getItem('fr_theme');
-    if(!t){ t = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'; }
-    document.documentElement.setAttribute('data-theme', t);
-    window.addEventListener('DOMContentLoaded', function(){
-      var btn = document.getElementById('theme-toggle');
-      if(btn) btn.textContent = t === 'light' ? '☀️' : '🌙';
-    });
-  }catch(e){}
+(function() {
+  var t = FRAuth.applyTheme();
+  window.addEventListener('DOMContentLoaded', function() {
+    var btn = document.getElementById('theme-toggle');
+    if (btn) btn.textContent = t === 'light' ? '☀️' : '🌙';
+  });
 })();
 
-// ── PWA INSTALL ────────────────────────────────────────────────
+// ── PWA INSTALL ──────────────────────────────────────────────────
 var deferredInstallPrompt = null;
-window.addEventListener('beforeinstallprompt', function(e){
+window.addEventListener('beforeinstallprompt', function(e) {
   e.preventDefault();
   deferredInstallPrompt = e;
   var banner = document.getElementById('install-banner');
-  if(banner) banner.style.display = 'flex';
+  if (banner) banner.style.display = 'flex';
 });
-document.addEventListener('DOMContentLoaded', function(){
+document.addEventListener('DOMContentLoaded', function() {
   var btn = document.getElementById('install-btn');
-  if(btn){
-    btn.addEventListener('click', function(){
-      if(!deferredInstallPrompt) return;
+  if (btn) {
+    btn.addEventListener('click', function() {
+      if (!deferredInstallPrompt) return;
       deferredInstallPrompt.prompt();
-      deferredInstallPrompt.userChoice.then(function(){
+      deferredInstallPrompt.userChoice.then(function() {
         deferredInstallPrompt = null;
         document.getElementById('install-banner').style.display = 'none';
       });
     });
   }
-});
-window.addEventListener('appinstalled', function(){
-  var banner = document.getElementById('install-banner');
-  if(banner) banner.style.display = 'none';
-  deferredInstallPrompt = null;
-});
-
-// ── CHECK IF ALREADY SIGNED IN — redirect to app ───────────────
-window.addEventListener('DOMContentLoaded', function(){
-  try{
-    // Don't auto-redirect if user explicitly came to welcome page
-    var noRedirect = window.location.search.indexOf('stay=1') >= 0;
-    if(!noRedirect){
-      var u = localStorage.getItem('fr_user_2026');
-      if(u){
-        var ctx = localStorage.getItem('fr_league_ctx');
-        window.location.href = ctx ? 'home.html' : 'league-setup.html';
-        return;
-      }
-    }
-  }catch(e){}
   startDraftAnimation();
   startLiveScoreAnimation();
 });
+window.addEventListener('appinstalled', function() {
+  var banner = document.getElementById('install-banner');
+  if (banner) banner.style.display = 'none';
+  deferredInstallPrompt = null;
+});
 
-// ── NAV HELPERS ────────────────────────────────────────────────
-function scrollToHow(){ document.getElementById('how-it-works').scrollIntoView({behavior:'smooth'}); }
+// ── NAVIGATION ───────────────────────────────────────────────────
+function goTo(url) { window.location.href = url; }
+function scrollToHow() { document.getElementById('how-it-works').scrollIntoView({ behavior: 'smooth' }); }
 
-function navTo(url){
-  // Clear session when going to signup, signin, or create — fresh start
-  if(url.indexOf('signup=1') >= 0 || url.indexOf('signin=1') >= 0 || url.indexOf('create=1') >= 0){
-    try{
-      localStorage.removeItem('fr_user_2026');
-      localStorage.removeItem('fr_league_ctx');
-      localStorage.removeItem('fr_myteam');
-      localStorage.removeItem('fr_teamname_fr_refresh26');
-    }catch(e){}
-  }
-  window.location.href = url;
-}
-
-// ── TAB SWITCHER ───────────────────────────────────────────────
-function switchTab(name, el){
-  document.querySelectorAll('.preview-tab').forEach(function(t){ t.classList.remove('active'); });
-  document.querySelectorAll('.preview-panel').forEach(function(p){ p.classList.remove('active'); });
+// ── TAB SWITCHER ─────────────────────────────────────────────────
+function switchTab(name, el) {
+  document.querySelectorAll('.preview-tab').forEach(function(t) { t.classList.remove('active'); });
+  document.querySelectorAll('.preview-panel').forEach(function(p) { p.classList.remove('active'); });
   el.classList.add('active');
-  document.getElementById('panel-'+name).classList.add('active');
+  document.getElementById('panel-' + name).classList.add('active');
 }
 
-// ── DRAFT ANIMATION ────────────────────────────────────────────
-function startDraftAnimation(){
+// ── DRAFT ANIMATION ──────────────────────────────────────────────
+function startDraftAnimation() {
   var steps = [
-    function(){
+    function() {
       var slot = document.getElementById('prev-slot-rb2');
-      slot.classList.add('filled','anim-fade');
+      slot.classList.add('anim-fade');
       slot.innerHTML = '<span class="preview-slot-pos pos-RB">RB</span><span class="preview-slot-name">I. Pacheco</span><span class="preview-slot-sal">$7,800</span>';
       document.getElementById('prev-cap').textContent = '$30,700';
       document.getElementById('prev-avg').textContent = '$4,386';
       document.getElementById('prev-slots').textContent = '3';
     },
-    function(){
+    function() {
       var slot = document.getElementById('prev-slot-wr1');
-      slot.classList.add('filled','anim-fade');
+      slot.classList.add('anim-fade');
       slot.innerHTML = '<span class="preview-slot-pos pos-WR">WR</span><span class="preview-slot-name">T. Hill</span><span class="preview-slot-sal">$9,200</span>';
       document.getElementById('prev-cap').textContent = '$21,500';
       document.getElementById('prev-avg').textContent = '$3,583';
       document.getElementById('prev-slots').textContent = '4';
-      document.getElementById('prev-p3').classList.add('anim-highlight');
+      var p3 = document.getElementById('prev-p3');
+      if (p3) p3.classList.add('anim-highlight');
     },
-    function(){
-      setTimeout(function(){
-        ['prev-slot-rb2','prev-slot-wr1'].forEach(function(id){
-          var slot = document.getElementById(id);
-          slot.classList.remove('filled','anim-fade');
-          slot.innerHTML = id === 'prev-slot-rb2'
-            ? '<span class="preview-slot-pos pos-RB" style="color:var(--pk);">RB</span><span class="preview-slot-empty">— empty —</span>'
-            : '<span class="preview-slot-pos pos-WR" style="color:var(--pu);">WR</span><span class="preview-slot-empty">— empty —</span>';
-        });
+    function() {
+      setTimeout(function() {
+        var rb2 = document.getElementById('prev-slot-rb2');
+        var wr1 = document.getElementById('prev-slot-wr1');
+        rb2.classList.remove('anim-fade');
+        rb2.innerHTML = '<span class="preview-slot-pos pos-RB" style="color:var(--pk);">RB</span><span class="preview-slot-empty">— empty —</span>';
+        wr1.classList.remove('anim-fade');
+        wr1.innerHTML = '<span class="preview-slot-pos pos-WR" style="color:var(--pu);">WR</span><span class="preview-slot-empty">— empty —</span>';
         document.getElementById('prev-cap').textContent = '$38,500';
         document.getElementById('prev-avg').textContent = '$5,500';
         document.getElementById('prev-slots').textContent = '2';
         var p3 = document.getElementById('prev-p3');
-        if(p3) p3.classList.remove('anim-highlight');
+        if (p3) p3.classList.remove('anim-highlight');
       }, 2000);
     }
   ];
   var i = 0;
-  function runStep(){
+  function runStep() {
     steps[i % steps.length]();
     i++;
     setTimeout(runStep, i % steps.length === 0 ? 5000 : 2500);
@@ -829,34 +535,33 @@ function startDraftAnimation(){
   setTimeout(runStep, 2000);
 }
 
-// ── LIVE SCORE ANIMATION ───────────────────────────────────────
-function startLiveScoreAnimation(){
+// ── LIVE SCORE ANIMATION ─────────────────────────────────────────
+function startLiveScoreAnimation() {
   var scoreIds = [
-    {id:'ls-p1', base:87.4, max:5}, {id:'ls-p2', base:74.2, max:3},
-    {id:'ls-p3', base:102.6, max:6},{id:'ls-p4', base:68.1, max:4},
-    {id:'ls-p5', base:79.8, max:5}, {id:'ls-p6', base:77.3, max:4},
-    {id:'st-pts1', base:102.6, max:6},{id:'st-pts3', base:87.4, max:5},
-    {id:'st-pts4', base:79.8, max:5},{id:'st-pts6', base:74.2, max:3}
+    { id: 'ls-p1', base: 87.4 },  { id: 'ls-p2', base: 74.2 },
+    { id: 'ls-p3', base: 102.6 }, { id: 'ls-p4', base: 68.1 },
+    { id: 'ls-p5', base: 79.8 },  { id: 'ls-p6', base: 77.3 },
+    { id: 'st-pts1', base: 102.6 }, { id: 'st-pts3', base: 79.8 },
+    { id: 'st-pts4', base: 87.4 },  { id: 'st-pts6', base: 74.2 }
   ];
-  setInterval(function(){
-    var pick = scoreIds[Math.floor(Math.random()*scoreIds.length)];
+  setInterval(function() {
+    var pick = scoreIds[Math.floor(Math.random() * scoreIds.length)];
     var el = document.getElementById(pick.id);
-    if(!el) return;
+    if (!el) return;
     var cur = parseFloat(el.textContent) || pick.base;
     var inc = (Math.random() * 2.5 + 0.3).toFixed(1);
-    var next = (cur + parseFloat(inc)).toFixed(1);
-    el.textContent = next;
+    el.textContent = (cur + parseFloat(inc)).toFixed(1);
     el.classList.remove('score-bump');
     void el.offsetWidth;
     el.classList.add('score-bump');
   }, 2800);
 }
-
 </script>
+
 <script>
-if('serviceWorker' in navigator){
-  window.addEventListener('load', function(){
-    navigator.serviceWorker.register('/sw.js').catch(function(e){ console.warn('SW registration failed:', e); });
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('/sw.js').catch(function() {});
   });
 }
 </script>
