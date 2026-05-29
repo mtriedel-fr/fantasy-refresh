@@ -809,7 +809,6 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
 
 <!-- YOUR TEAM — directly below week bar -->
 <div class="my-team-bar" id="my-team-bar">
-  <span class="my-team-lbl">Your team:</span>
   <!-- Display mode -->
   <div id="my-team-display" style="display:flex;align-items:center;gap:8px;flex:1;">
     <span id="my-team-name-shown" style="font-family:var(--fd);font-size:15px;font-weight:700;color:var(--or);">—</span>
@@ -1081,12 +1080,12 @@ function getCurrentUser(){
   return FRAuth.getUser();
 }
 
-// Update header badge with user info
+// Update header badge with user info — shows display name (nickname)
 function updateUserBadge(){
   var user = FRAuth.getUser();
   var btn = document.getElementById('fr-sign-btn');
   if(!btn) return;
-  var name = (user && (user.teamName || user.displayName || user.email)) || '—';
+  var name = (user && (user.displayName || user.teamName || user.email)) || '—';
   btn.textContent = '👤 ' + name;
 }
 
@@ -1094,7 +1093,7 @@ function updateUserBadge(){
 
 function confirmSignOut(){
   var user = FRAuth.getUser();
-  var name = user ? (user.teamName || user.displayName || user.email) : '';
+  var name = user ? (user.displayName || user.teamName || user.email) : '';
   if(confirm('Signed in as: ' + name + '\n\nSign out?')){
     FRAuth.signOut();
   }
