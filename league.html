@@ -779,9 +779,11 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
   <div class="hdr-r">
     <div class="hdr-sub" id="hdr-sub"></div>
     <div style="display:flex;gap:6px;align-items:center;justify-content:flex-end;">
-<button class="fr-badge" id="fr-sign-btn" onclick="confirmSignOut()">👤 —</button>
+      <button class="fr-badge" id="fr-sign-btn" onclick="openProfileDrawer()" style="display:flex;align-items:center;gap:6px;">
+        <span id="fr-avatar" style="width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,var(--or),var(--pk));display:flex;align-items:center;justify-content:center;font-family:var(--fd);font-size:12px;font-weight:800;color:#050808;flex-shrink:0;">—</span>
+        <span id="fr-sign-name">—</span>
+      </button>
       <button class="comm-btn" onclick="toggleComm()" id="comm-toggle" style="display:none;">⚙ Commissioner</button>
-      <button class="comm-btn theme-toggle" onclick="toggleTheme()" id="theme-btn" title="Toggle light/dark mode">🌙</button>
     </div>
   </div>
 </div>
@@ -1080,23 +1082,109 @@ function getCurrentUser(){
   return FRAuth.getUser();
 }
 
-// Update header badge with user info — shows display name (nickname)
+// ── PROFILE DRAWER ────────────────────────────────────────────────
+function openProfileDrawer(){
+  var user = FRAuth.getUser();
+  if(!user) return;
+
+  // Populate user info
+  var initials = (user.displayName || user.teamName || '?').charAt(0).toUpperCase();
+  var avatar = document.getElementById('pd-avatar');
+  var frAvatar = document.getElementById('fr-avatar');
+  if(avatar) avatar.textContent = initials;
+  if(frAvatar) frAvatar.textContent = initials;
+
+  var name = user.displayName || user.teamName || '—';
+  var pdName = document.getElementById('pd-name');
+  var pdTeam = document.getElementById('pd-team');
+  var pdEmail = document.getElementById('pd-email');
+  if(pdName) pdName.textContent = name;
+  if(pdTeam) pdTeam.textContent = myTeam || user.teamName || '—';
+  if(pdEmail) pdEmail.textContent = user.email || '—';
+
+  // Theme state
+  updateDrawerTheme();
+
+  // Commissioner row
+  var commRow = document.getElementById('pd-comm-row');
+  if(commRow) commRow.style.display = commUnlocked ? 'flex' : 'none';
+
+  // Show drawer
+  var overlay = document.getElementById('profile-overlay');
+  var drawer = document.getElementById('profile-drawer');
+  if(overlay) overlay.style.display = 'block';
+  if(drawer){
+    drawer.style.display = 'block';
+    setTimeout(function(){ drawer.style.transform = 'translateY(0)'; }, 10);
+  }
+}
+
+function closeProfileDrawer(){
+  var overlay = document.getElementById('profile-overlay');
+  var drawer = document.getElementById('profile-drawer');
+  if(drawer) drawer.style.transform = 'translateY(100%)';
+  setTimeout(function(){
+    if(overlay) overlay.style.display = 'none';
+    if(drawer) drawer.style.display = 'none';
+  }, 300);
+}
+
+function updateDrawerTheme(){
+  var t = document.documentElement.getAttribute('data-theme');
+  var isLight = t === 'light';
+  var icon = document.getElementById('pd-theme-icon');
+  var label = document.getElementById('pd-theme-label');
+  var toggle = document.getElementById('pd-theme-toggle');
+  var dot = document.getElementById('pd-toggle-dot');
+  if(icon) icon.textContent = isLight ? '☀️' : '🌙';
+  if(label) label.textContent = isLight ? 'Light mode' : 'Dark mode';
+  if(toggle) toggle.style.background = isLight ? 'var(--or)' : 'var(--bdr2)';
+  if(dot) dot.style.right = isLight ? '2px' : 'auto';
+  if(dot) dot.style.left = isLight ? 'auto' : '2px';
+}
+
+function toggleThemeFromDrawer(){
+  toggleTheme();
+  updateDrawerTheme();
+}
+
+function togglePasswordChange(){
+  var section = document.getElementById('pd-pw-section');
+  if(section) section.style.display = section.style.display === 'none' ? 'block' : 'none';
+}
+
+function sendPasswordReset(){
+  var user = FRAuth.getUser();
+  if(!user || !user.email) return;
+  var status = document.getElementById('pd-pw-status');
+  if(status) status.textContent = 'Sending…';
+  FRAuth.resetPassword(user.email)
+    .then(function(){
+      if(status) status.textContent = '✓ Reset email sent';
+    })
+    .catch(function(e){
+      if(status){ status.style.color = 'var(--pk)'; status.textContent = '✗ ' + (e.message || 'Error'); }
+    });
+}
+
+// ── UPDATE USER BADGE ──────────────────────────────────────────────
 function updateUserBadge(){
   var user = FRAuth.getUser();
   var btn = document.getElementById('fr-sign-btn');
   if(!btn) return;
   var name = (user && (user.displayName || user.teamName || user.email)) || '—';
-  btn.textContent = '👤 ' + name;
+  var initials = name.charAt(0).toUpperCase();
+  var nameEl = document.getElementById('fr-sign-name');
+  var avatarEl = document.getElementById('fr-avatar');
+  if(nameEl) nameEl.textContent = name;
+  if(avatarEl) avatarEl.textContent = initials;
 }
 
 // Update header badge whenever team name is applied — handled inside applyTeamName now
 
 function confirmSignOut(){
-  var user = FRAuth.getUser();
-  var name = user ? (user.displayName || user.teamName || user.email) : '';
-  if(confirm('Signed in as: ' + name + '\n\nSign out?')){
-    FRAuth.signOut();
-  }
+  // Legacy - sign out now handled by profile drawer
+  FRAuth.signOut();
 }
 
 // ── THEME ─────────────────────────────────────────────────────────
@@ -4629,6 +4717,82 @@ function removeCommissioner(uid){
 </div>
 </div>
 
+
+<!-- PROFILE DRAWER -->
+<div id="profile-overlay" onclick="closeProfileDrawer()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:500;"></div>
+<div id="profile-drawer" style="display:none;position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-radius:20px 20px 0 0;border-top:3px solid var(--or);z-index:501;padding:0 0 env(safe-area-inset-bottom);max-height:90vh;overflow-y:auto;transform:translateY(100%);transition:transform .3s ease;">
+
+  <!-- Handle -->
+  <div style="display:flex;justify-content:center;padding:12px 0 4px;">
+    <div style="width:36px;height:4px;border-radius:2px;background:var(--bdr2);"></div>
+  </div>
+
+  <!-- User info -->
+  <div style="padding:16px 24px 20px;border-bottom:1px solid var(--bdr);">
+    <div style="display:flex;align-items:center;gap:14px;">
+      <div id="pd-avatar" style="width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,var(--or),var(--pk));display:flex;align-items:center;justify-content:center;font-family:var(--fd);font-size:22px;font-weight:900;color:#050808;flex-shrink:0;">—</div>
+      <div style="flex:1;min-width:0;">
+        <div id="pd-name" style="font-family:var(--fd);font-size:20px;font-weight:900;color:var(--ink);text-transform:uppercase;letter-spacing:.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">—</div>
+        <div id="pd-team" style="font-size:13px;color:var(--ink2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">—</div>
+        <div id="pd-email" style="font-size:11px;color:var(--ink3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">—</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings rows -->
+  <div style="padding:8px 0;">
+
+    <!-- Dark/Light mode -->
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 24px;cursor:pointer;" onclick="toggleThemeFromDrawer()">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <span id="pd-theme-icon" style="font-size:18px;">🌙</span>
+        <div>
+          <div style="font-family:var(--fd);font-size:15px;font-weight:700;color:var(--ink);text-transform:uppercase;">Appearance</div>
+          <div id="pd-theme-label" style="font-size:12px;color:var(--ink3);">Dark mode</div>
+        </div>
+      </div>
+      <div id="pd-theme-toggle" style="width:44px;height:24px;border-radius:12px;background:var(--or);position:relative;transition:background .2s;cursor:pointer;">
+        <div id="pd-toggle-dot" style="position:absolute;top:2px;right:2px;width:20px;height:20px;border-radius:50%;background:#050808;transition:right .2s;"></div>
+      </div>
+    </div>
+
+    <!-- Commissioner (only shown if comm) -->
+    <div id="pd-comm-row" style="display:none;align-items:center;justify-content:space-between;padding:14px 24px;cursor:pointer;border-top:1px solid var(--bdr);" onclick="closeProfileDrawer();setTimeout(toggleComm,200)">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <span style="font-size:18px;">⚙️</span>
+        <div>
+          <div style="font-family:var(--fd);font-size:15px;font-weight:700;color:#FFE620;text-transform:uppercase;">Commissioner Tools</div>
+          <div style="font-size:12px;color:var(--ink3);">Scores, salaries, league settings</div>
+        </div>
+      </div>
+      <span style="color:var(--ink3);font-size:18px;">›</span>
+    </div>
+
+    <!-- Change password -->
+    <div style="border-top:1px solid var(--bdr);">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 24px;cursor:pointer;" onclick="togglePasswordChange()">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span style="font-size:18px;">🔑</span>
+          <div>
+            <div style="font-family:var(--fd);font-size:15px;font-weight:700;color:var(--ink);text-transform:uppercase;">Change Password</div>
+            <div style="font-size:12px;color:var(--ink3);">Send a reset link to your email</div>
+          </div>
+        </div>
+        <span style="color:var(--ink3);font-size:18px;">›</span>
+      </div>
+      <div id="pd-pw-section" style="display:none;padding:0 24px 16px;">
+        <button onclick="sendPasswordReset()" style="width:100%;padding:11px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:10px;color:var(--or);font-family:var(--fd);font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;cursor:pointer;">Send Reset Email →</button>
+        <div id="pd-pw-status" style="font-family:var(--fd);font-size:11px;color:var(--or);text-align:center;margin-top:8px;min-height:14px;text-transform:uppercase;letter-spacing:.5px;"></div>
+      </div>
+    </div>
+
+    <!-- Sign out -->
+    <div style="border-top:1px solid var(--bdr);padding:14px 24px;">
+      <button onclick="FRAuth.signOut()" style="width:100%;padding:12px;background:rgba(255,95,160,.08);border:1px solid rgba(255,95,160,.2);border-radius:10px;color:var(--pk);font-family:var(--fd);font-size:14px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;cursor:pointer;transition:all .15s;">Sign Out</button>
+    </div>
+
+  </div>
+</div>
 
 <!-- TEAM NAME PROMPT MODAL -->
 <div id="team-name-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:600;align-items:center;justify-content:center;padding:20px;">
