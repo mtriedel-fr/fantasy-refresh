@@ -44,6 +44,12 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
 /* MAIN */
 .main{max-width:600px;margin:0 auto;padding:24px 16px 90px;}
 
+/* PROFILE BTN */
+.profile-btn{display:flex;align-items:center;gap:7px;background:rgba(0,229,212,.08);border:1px solid rgba(0,229,212,.2);border-radius:20px;padding:5px 12px 5px 5px;cursor:pointer;transition:all .15s;-webkit-tap-highlight-color:transparent;}
+.profile-btn:hover{background:rgba(0,229,212,.15);}
+.profile-avatar{width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--or),var(--pk));display:flex;align-items:center;justify-content:center;font-family:var(--fd);font-size:12px;font-weight:800;color:#050808;flex-shrink:0;}
+.profile-btn span:last-child{font-family:var(--fd);font-size:13px;font-weight:700;color:var(--or);white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis;}
+
 /* GREETING */
 .greeting{margin-bottom:28px;}
 .greeting-eyebrow{font-family:var(--fd);font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:2px;margin-bottom:4px;}
@@ -160,8 +166,10 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
     <div class="hdr-logo-text">Fantasy <span>Refresh</span></div>
   </div>
   <div class="hdr-right">
-    <button class="hdr-btn" onclick="toggleTheme()" id="theme-btn">🌙</button>
-    <div class="hdr-user" id="hdr-user" onclick="confirmSignOut()">👤 —</div>
+    <button class="profile-btn" id="hdr-user" onclick="openProfileDrawer()">
+      <span class="profile-avatar" id="hdr-avatar">—</span>
+      <span id="hdr-name">—</span>
+    </button>
   </div>
 </div>
 
@@ -169,7 +177,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
 <div class="main">
 
   <div class="greeting">
-    <div class="greeting-name" id="greeting-name">—<span>'s Refresh!</span></div>
+    <div class="greeting-name" id="greeting-name">—<span>'s Leagues</span></div>
   </div>
 
   <div class="week-pill" id="week-pill">
@@ -177,7 +185,6 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
     <span class="week-text" id="week-pill-text">Preseason · Season starts Sep 4</span>
   </div>
 
-  <div class="section-label">Your Leagues</div>
   <div id="leagues-wrap">
     <div class="loading-wrap">
       <div class="spinner"></div>
@@ -190,6 +197,59 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
 </div>
 
 <div class="toast" id="toast"></div>
+
+<!-- PROFILE DRAWER -->
+<div id="profile-overlay" onclick="closeProfileDrawer()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:500;"></div>
+<div id="profile-drawer" style="display:none;position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-radius:20px 20px 0 0;border-top:3px solid var(--or);z-index:501;padding:0 0 env(safe-area-inset-bottom);max-height:85vh;overflow-y:auto;transform:translateY(100%);transition:transform .3s ease;">
+  <div style="display:flex;justify-content:center;padding:12px 0 4px;">
+    <div style="width:36px;height:4px;border-radius:2px;background:var(--bdr2);"></div>
+  </div>
+  <div style="padding:16px 24px 20px;border-bottom:1px solid var(--bdr);">
+    <div style="display:flex;align-items:center;gap:14px;">
+      <div id="pd-avatar" style="width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,var(--or),var(--pk));display:flex;align-items:center;justify-content:center;font-family:var(--fd);font-size:22px;font-weight:900;color:#050808;flex-shrink:0;">—</div>
+      <div style="flex:1;min-width:0;">
+        <div id="pd-name" style="font-family:var(--fd);font-size:20px;font-weight:900;color:var(--ink);text-transform:uppercase;letter-spacing:.3px;">—</div>
+        <div id="pd-email" style="font-size:12px;color:var(--ink3);margin-top:2px;">—</div>
+      </div>
+    </div>
+  </div>
+  <div style="padding:8px 0;">
+    <!-- Appearance -->
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 24px;cursor:pointer;" onclick="toggleThemeFromDrawer()">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <span id="pd-theme-icon" style="font-size:18px;">🌙</span>
+        <div>
+          <div style="font-family:var(--fd);font-size:15px;font-weight:700;color:var(--ink);text-transform:uppercase;">Appearance</div>
+          <div id="pd-theme-label" style="font-size:12px;color:var(--ink3);">Dark mode</div>
+        </div>
+      </div>
+      <div id="pd-theme-toggle" style="width:44px;height:24px;border-radius:12px;background:var(--bdr2);position:relative;transition:background .2s;">
+        <div id="pd-toggle-dot" style="position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#F0FAFA;transition:left .2s;"></div>
+      </div>
+    </div>
+    <!-- Change Password -->
+    <div style="border-top:1px solid var(--bdr);">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 24px;cursor:pointer;" onclick="togglePasswordChange()">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span style="font-size:18px;">🔑</span>
+          <div>
+            <div style="font-family:var(--fd);font-size:15px;font-weight:700;color:var(--ink);text-transform:uppercase;">Change Password</div>
+            <div style="font-size:12px;color:var(--ink3);">Send a reset link to your email</div>
+          </div>
+        </div>
+        <span style="color:var(--ink3);font-size:18px;">›</span>
+      </div>
+      <div id="pd-pw-section" style="display:none;padding:0 24px 16px;">
+        <button onclick="sendPasswordReset()" style="width:100%;padding:11px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:10px;color:var(--or);font-family:var(--fd);font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;cursor:pointer;">Send Reset Email →</button>
+        <div id="pd-pw-status" style="font-family:var(--fd);font-size:11px;color:var(--or);text-align:center;margin-top:8px;min-height:14px;text-transform:uppercase;letter-spacing:.5px;"></div>
+      </div>
+    </div>
+    <!-- Sign out -->
+    <div style="border-top:1px solid var(--bdr);padding:14px 24px;">
+      <button onclick="FRAuth.signOut()" style="width:100%;padding:12px;background:rgba(255,95,160,.08);border:1px solid rgba(255,95,160,.2);border-radius:10px;color:var(--pk);font-family:var(--fd);font-size:14px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;cursor:pointer;">Sign Out</button>
+    </div>
+  </div>
+</div>
 
 <!-- BOTTOM NAV -->
 <nav class="bottom-nav">
@@ -364,6 +424,69 @@ function buildCard(l) {
   return card;
 }
 
+// ── PROFILE DRAWER ────────────────────────────────────────────
+function openProfileDrawer(){
+  if(!user) return;
+  var name = user.displayName || user.email || '—';
+  var initials = name.charAt(0).toUpperCase();
+  var avatar = document.getElementById('pd-avatar');
+  var pdName = document.getElementById('pd-name');
+  var pdEmail = document.getElementById('pd-email');
+  if(avatar) avatar.textContent = initials;
+  if(pdName) pdName.textContent = name;
+  if(pdEmail) pdEmail.textContent = user.email || '—';
+  updateDrawerTheme();
+  var overlay = document.getElementById('profile-overlay');
+  var drawer = document.getElementById('profile-drawer');
+  if(overlay) overlay.style.display = 'block';
+  if(drawer){ drawer.style.display = 'block'; setTimeout(function(){ drawer.style.transform = 'translateY(0)'; }, 10); }
+}
+
+function closeProfileDrawer(){
+  var overlay = document.getElementById('profile-overlay');
+  var drawer = document.getElementById('profile-drawer');
+  if(drawer) drawer.style.transform = 'translateY(100%)';
+  setTimeout(function(){
+    if(overlay) overlay.style.display = 'none';
+    if(drawer) drawer.style.display = 'none';
+  }, 300);
+}
+
+function updateDrawerTheme(){
+  var t = document.documentElement.getAttribute('data-theme');
+  var isLight = t === 'light';
+  var icon = document.getElementById('pd-theme-icon');
+  var label = document.getElementById('pd-theme-label');
+  var toggle = document.getElementById('pd-theme-toggle');
+  var dot = document.getElementById('pd-toggle-dot');
+  if(icon) icon.textContent = isLight ? '☀️' : '🌙';
+  if(label) label.textContent = isLight ? 'Light mode' : 'Dark mode';
+  if(toggle) toggle.style.background = isLight ? 'var(--or)' : 'var(--bdr2)';
+  if(dot){ dot.style.left = isLight ? '22px' : '2px'; }
+}
+
+function toggleThemeFromDrawer(){
+  var next = FRAuth.toggleTheme();
+  document.documentElement.setAttribute('data-theme', next);
+  updateDrawerTheme();
+}
+
+function togglePasswordChange(){
+  var s = document.getElementById('pd-pw-section');
+  if(s) s.style.display = s.style.display === 'none' ? 'block' : 'none';
+}
+
+function sendPasswordReset(){
+  if(!user || !user.email) return;
+  var status = document.getElementById('pd-pw-status');
+  if(status) status.textContent = 'Sending…';
+  FRAuth.resetPassword(user.email)
+    .then(function(){ if(status) status.textContent = '✓ Reset email sent'; })
+    .catch(function(e){ if(status){ status.style.color='var(--pk)'; status.textContent='✗ Error'; } });
+}
+
+function confirmSignOut(){ FRAuth.signOut(); }
+
 // ── LOAD LEAGUES ─────────────────────────────────────────────────
 function loadLeagues() {
   if (!user) return;
@@ -373,9 +496,11 @@ function loadLeagues() {
 
   // Update greeting and header
   var greet = document.getElementById('greeting-name');
-  if (greet) greet.innerHTML = displayName + '<span>\'s Refresh!</span>';
-  var badge = document.getElementById('hdr-user');
-  if (badge) badge.textContent = '👤 ' + (user.displayName || user.email || '—');
+  if (greet) greet.innerHTML = displayName + '<span>\'s Leagues</span>';
+  var nameEl = document.getElementById('hdr-name');
+  var avatarEl = document.getElementById('hdr-avatar');
+  if (nameEl) nameEl.textContent = displayName;
+  if (avatarEl) avatarEl.textContent = displayName.charAt(0).toUpperCase();
 
   // Collect league IDs to check
   var leagueIds = ['fr_refresh26'];
