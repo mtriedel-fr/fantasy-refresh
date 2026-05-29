@@ -790,7 +790,7 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
 <div class="wk-bar">
   <div class="wk-bar-league">
     <span class="wk-bar-league-name" id="wk-bar-season">OG King/Queen of Fantasy '26</span>
-    <button onclick="window.location.href='/home.html'" style="background:none;border:1px solid var(--bdr2);color:var(--ink3);font-family:var(--fd);font-size:11px;font-weight:700;padding:4px 10px;border-radius:6px;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;flex-shrink:0;margin-left:12px;">🏠 Home</button>
+    <button onclick="window.location.href='/home.html'" style="background:none;border:1px solid var(--bdr2);color:var(--ink3);font-family:var(--fd);font-size:11px;font-weight:700;padding:4px 10px;border-radius:6px;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;flex-shrink:0;margin-left:12px;">🏠</button>
   </div>
   <div class="wk-bar-controls">
     <select class="wk-select" id="wk-select" onchange="setWeekFromSelect(this.value)">
@@ -807,12 +807,10 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
 
 <!-- YOUR TEAM — directly below week bar -->
 <div class="my-team-bar" id="my-team-bar">
-  <!-- Display mode -->
   <div id="my-team-display" style="display:flex;align-items:center;gap:8px;flex:1;">
     <span id="my-team-name-shown" style="font-family:var(--fd);font-size:15px;font-weight:700;color:var(--or);">—</span>
-    <button onclick="editTeamName()" style="background:none;border:1px solid var(--bdr2);border-radius:6px;padding:2px 10px;font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink3);cursor:pointer;text-transform:uppercase;letter-spacing:.5px;transition:all .15s;" onmouseover="this.style.borderColor='var(--or)';this.style.color='var(--or)'" onmouseout="this.style.borderColor='var(--bdr2)';this.style.color='var(--ink3)'">Edit</button>
   </div>
-  <!-- Edit mode (hidden by default) -->
+  <!-- Edit mode (hidden by default, triggered from profile drawer) -->
   <div id="my-team-edit" style="display:none;flex:1;align-items:center;gap:6px;">
     <input type="text" id="my-team-input" placeholder="Your team name..." maxlength="30"
       style="flex:1;max-width:240px;"
@@ -821,7 +819,7 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
     <button onclick="confirmTeamName()" style="background:var(--or);border:none;border-radius:6px;padding:4px 12px;font-family:var(--fd);font-size:11px;font-weight:800;color:#050808;cursor:pointer;text-transform:uppercase;">Save</button>
     <button onclick="cancelTeamEdit()" style="background:none;border:1px solid var(--bdr2);border-radius:6px;padding:4px 10px;font-family:var(--fd);font-size:11px;color:var(--ink3);cursor:pointer;text-transform:uppercase;">✕</button>
   </div>
-  <span id="my-team-league-ctx" style="font-family:var(--fd);font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-left:auto;"></span>
+  <span id="my-team-league-ctx" style="display:none;"></span>
 </div>
 
 <!-- CONTEXT-AWARE STATS BAR -->
@@ -2204,10 +2202,15 @@ function renderSeasonWrap(){
 
 
 function showEmpty(){
-  var html = '<div class="empty"><div class="empty-title">Season hasn\'t started yet</div></div>';
+  var seasonStart = new Date('2026-09-03');
+  var now = new Date();
+  var days = Math.ceil((seasonStart - now) / (1000 * 60 * 60 * 24));
+  var msg = days > 0
+    ? '<div class="empty"><div class="empty-title" style="color:var(--or);font-size:22px;">' + days + ' days until kickoff</div><div class="empty-sub" style="font-family:var(--fd);font-size:12px;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-top:6px;">Season starts Sep 3, 2026</div></div>'
+    : '<div class="empty"><div class="empty-title">Season starting soon</div></div>';
   ['sw','mw','wt','wf','wn','my-season-wrap'].forEach(function(id){
     var el = document.getElementById(id);
-    if(el) el.innerHTML = html;
+    if(el) el.innerHTML = msg;
   });
   ['s-myscore','s-myfinish','s-mymovement','s-left'].forEach(function(id){
     var el = document.getElementById(id);
@@ -4762,6 +4765,20 @@ function removeCommissioner(uid){
         </div>
       </div>
       <span style="color:var(--ink3);font-size:18px;">›</span>
+    </div>
+
+    <!-- Edit Team Name -->
+    <div style="border-top:1px solid var(--bdr);">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 24px;cursor:pointer;" onclick="closeProfileDrawer();setTimeout(editTeamName,200)">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span style="font-size:18px;">✏️</span>
+          <div>
+            <div style="font-family:var(--fd);font-size:15px;font-weight:700;color:var(--ink);text-transform:uppercase;">Edit Team Name</div>
+            <div style="font-size:12px;color:var(--ink3);">Change your team name for this league</div>
+          </div>
+        </div>
+        <span style="color:var(--ink3);font-size:18px;">›</span>
+      </div>
     </div>
 
     <!-- Change password -->
