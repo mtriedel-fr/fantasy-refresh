@@ -4410,7 +4410,7 @@ function loadSalaryStatus(){
   if(!sel || !sel.value) return;
   var week = sel.value;
 
-  fetch(FR.paths.url(FR.paths.salaries()) + '/week' + week + '/meta.json')
+  fetch(FR.FB_DB_URL + FR.paths.salaries() + '/week' + week + '/meta.json')
     .then(function(r){ return r.json(); })
     .then(function(meta){
       if(!meta || meta === null){
@@ -4451,7 +4451,7 @@ function generateSalaries(){
   var week = parseInt(sel.value);
 
   // Check not locked
-  fetch(FR.paths.url(FR.paths.salaries()) + '/week' + week + '/meta.json')
+  fetch(FR.FB_DB_URL + FR.paths.salaries() + '/week' + week + '/meta.json')
     .then(function(r){ return r.json(); })
     .then(function(meta){
       if(meta && meta.locked){
