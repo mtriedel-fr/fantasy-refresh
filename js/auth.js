@@ -1,20 +1,85 @@
 // ── Fantasy Refresh — Auth Module ─────────────────────────────
 // Single source of truth for all auth operations.
 // Include on every page: <script src="/js/auth.js"></script>
-// Depends on: league-context.js (for FR.fb, FR.saveContext)
 
 (function(global) {
 
   // ── CONSTANTS ───────────────────────────────────────────────
-  var SEASON       = '2026';
-  var STORAGE_KEY  = 'fr_user_2026';
-  var FB_API_KEY   = 'AIzaSyA-2hcf2hzThk7MuEm9DAvRICK95koE9gM';
-  var FB_DB_URL    = 'https://fantasy-refresh-default-rtdb.firebaseio.com';
+  var SEASON        = '2026';
+  var STORAGE_KEY   = 'fr_user_2026';
+  var FB_API_KEY    = 'AIzaSyA-2hcf2hzThk7MuEm9DAvRICK95koE9gM';
+  var FB_DB_URL     = 'https://fantasy-refresh-default-rtdb.firebaseio.com';
   var FIREBASE_AUTH = 'https://identitytoolkit.googleapis.com/v1/accounts:';
+  var FIREBASE_TOKEN = 'https://securetoken.googleapis.com/v1/token?key=';
+
+  // ── TOKEN MANAGEMENT ────────────────────────────────────────
+  // Token stored in memory only — never persisted to localStorage
+  var _idToken        = null;
+  var _refreshToken   = null;
+  var _tokenExpiry    = 0;
+  var _refreshTimer   = null;
+
+  function getToken() { return _idToken; }
+
+  function setTokens(idToken, refreshToken, expiresIn) {
+    _idToken      = idToken;
+    _refreshToken = refreshToken;
+    _tokenExpiry  = Date.now() + ((parseInt(expiresIn) || 3600) - 60) * 1000;
+    scheduleTokenRefresh(((parseInt(expiresIn) || 3600) - 120) * 1000);
+  }
+
+  function clearTokens() {
+    _idToken = null;
+    _refreshToken = null;
+    _tokenExpiry = 0;
+    if (_refreshTimer) { clearTimeout(_refreshTimer); _refreshTimer = null; }
+  }
+
+  function scheduleTokenRefresh(ms) {
+    if (_refreshTimer) clearTimeout(_refreshTimer);
+    _refreshTimer = setTimeout(refreshToken, ms);
+  }
+
+  function refreshToken() {
+    if (!_refreshToken) return;
+    fetch(FIREBASE_TOKEN + FB_API_KEY, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'grant_type=refresh_token&refresh_token=' + encodeURIComponent(_refreshToken)
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.id_token) {
+        setTokens(data.id_token, data.refresh_token, data.expires_in);
+      }
+    })
+    .catch(function() {});
+  }
+
+  // Get a valid token — refreshes if needed
+  function ensureToken() {
+    if (_idToken && Date.now() < _tokenExpiry) {
+      return Promise.resolve(_idToken);
+    }
+    if (!_refreshToken) return Promise.resolve(null);
+    return fetch(FIREBASE_TOKEN + FB_API_KEY, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'grant_type=refresh_token&refresh_token=' + encodeURIComponent(_refreshToken)
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.id_token) {
+        setTokens(data.id_token, data.refresh_token, data.expires_in);
+        return data.id_token;
+      }
+      return null;
+    })
+    .catch(function() { return null; });
+  }
 
   // ── USER STORAGE ────────────────────────────────────────────
 
-  // Get current user from localStorage. Returns null if not signed in.
   function getUser() {
     try {
       var raw = localStorage.getItem(STORAGE_KEY);
@@ -22,7 +87,7 @@
     } catch(e) { return null; }
   }
 
-  // Save user to localStorage. Only stores safe fields — no tokens.
+  // Save user — safe fields only, no tokens
   function setUser(user) {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
@@ -30,29 +95,26 @@
         email:       user.email       || '',
         displayName: user.displayName || '',
         teamName:    user.teamName    || '',
-        team2026:    user.teamName    || '', // legacy compat
+        team2026:    user.teamName    || '',
         dk2025:      user.dk2025      || null
       }));
     } catch(e) {}
   }
 
-  // Clear all auth and league state. Used on sign out.
   function clearUser() {
     try {
       localStorage.removeItem(STORAGE_KEY);
       localStorage.removeItem('fr_league_ctx');
       localStorage.removeItem('fr_myteam');
-      // Clear per-league team name caches
       Object.keys(localStorage).forEach(function(k) {
         if (k.indexOf('fr_teamname_') === 0) localStorage.removeItem(k);
       });
     } catch(e) {}
+    clearTokens();
   }
 
   // ── ROUTE GUARDS ────────────────────────────────────────────
 
-  // Call at top of any page that requires sign-in.
-  // Redirects to welcome.html if no user found.
   function requireAuth() {
     if (!getUser()) {
       window.location.href = '/welcome.html';
@@ -61,16 +123,11 @@
     return true;
   }
 
-  // Call at top of league.html.
-  // Redirects to home.html if no league context is set.
   function requireLeague() {
     if (!requireAuth()) return false;
     try {
       var ctx = localStorage.getItem('fr_league_ctx');
-      if (!ctx) {
-        window.location.href = '/home.html';
-        return false;
-      }
+      if (!ctx) { window.location.href = '/home.html'; return false; }
     } catch(e) {
       window.location.href = '/home.html';
       return false;
@@ -78,8 +135,6 @@
     return true;
   }
 
-  // Call at top of welcome.html.
-  // Redirects signed-in users to home.html.
   function redirectIfSignedIn() {
     if (getUser()) {
       window.location.href = '/home.html';
@@ -88,7 +143,7 @@
     return false;
   }
 
-  // ── FIREBASE AUTH API ────────────────────────────────────────
+  // ── FIREBASE HELPERS ─────────────────────────────────────────
 
   function firebasePost(endpoint, body) {
     return fetch(FIREBASE_AUTH + endpoint + '?key=' + FB_API_KEY, {
@@ -98,31 +153,38 @@
     }).then(function(r) { return r.json(); });
   }
 
+  // Read — no auth needed (public rules)
   function dbGet(path) {
     return fetch(FB_DB_URL + path + '.json')
       .then(function(r) { return r.json(); });
   }
 
+  // Authenticated write — PUT
   function dbSet(path, data) {
-    return fetch(FB_DB_URL + path + '.json', {
-      method:  'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(data)
-    }).then(function(r) { return r.json(); });
+    return ensureToken().then(function(token) {
+      var url = FB_DB_URL + path + '.json' + (token ? '?auth=' + token : '');
+      return fetch(url, {
+        method:  'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(data)
+      }).then(function(r) { return r.json(); });
+    });
   }
 
+  // Authenticated write — PATCH
   function dbPatch(path, data) {
-    return fetch(FB_DB_URL + path + '.json', {
-      method:  'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(data)
-    }).then(function(r) { return r.json(); });
+    return ensureToken().then(function(token) {
+      var url = FB_DB_URL + path + '.json' + (token ? '?auth=' + token : '');
+      return fetch(url, {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(data)
+      }).then(function(r) { return r.json(); });
+    });
   }
 
   // ── SIGN IN ──────────────────────────────────────────────────
 
-  // Signs in with email/password.
-  // Returns promise resolving to { user, leagueId } or throws error.
   function signIn(email, password) {
     return firebasePost('signInWithPassword', {
       email:             email,
@@ -131,18 +193,17 @@
     }).then(function(data) {
       if (data.error) {
         var msg = data.error.message || 'Sign in failed';
-        if (msg.indexOf('INVALID') >= 0 || msg.indexOf('WRONG') >= 0) {
+        if (msg.indexOf('INVALID') >= 0 || msg.indexOf('WRONG') >= 0)
           throw new Error('Incorrect email or password');
-        }
-        if (msg.indexOf('TOO_MANY') >= 0) {
+        if (msg.indexOf('TOO_MANY') >= 0)
           throw new Error('Too many attempts — try again later');
-        }
         throw new Error(msg);
       }
 
-      var uid = data.localId;
+      // Store tokens in memory
+      setTokens(data.idToken, data.refreshToken, data.expiresIn);
 
-      // Load member record to get teamName
+      var uid = data.localId;
       return dbGet('/leagues/fr_refresh26/members/' + uid)
         .then(function(member) {
           var user = {
@@ -156,7 +217,6 @@
           return { user: user, leagueId: 'fr_refresh26' };
         })
         .catch(function() {
-          // Member record not found — still sign in
           var user = { uid: uid, email: data.email, displayName: '', teamName: '', dk2025: null };
           setUser(user);
           return { user: user, leagueId: null };
@@ -166,8 +226,6 @@
 
   // ── SIGN UP ──────────────────────────────────────────────────
 
-  // Creates a new Firebase account.
-  // Returns promise resolving to { uid, email } or throws error.
   function signUp(email, password) {
     return firebasePost('signUp', {
       email:             email,
@@ -176,22 +234,20 @@
     }).then(function(data) {
       if (data.error) {
         var msg = data.error.message || 'Sign up failed';
-        if (msg.indexOf('EMAIL_EXISTS') >= 0) {
+        if (msg.indexOf('EMAIL_EXISTS') >= 0)
           throw new Error('Account already exists — sign in instead');
-        }
-        if (msg.indexOf('WEAK_PASSWORD') >= 0) {
+        if (msg.indexOf('WEAK_PASSWORD') >= 0)
           throw new Error('Password must be at least 6 characters');
-        }
         throw new Error(msg);
       }
+      // Store tokens
+      setTokens(data.idToken, data.refreshToken, data.expiresIn);
       return { uid: data.localId, email: data.email };
     });
   }
 
   // ── JOIN LEAGUE ──────────────────────────────────────────────
 
-  // Looks up a league by join code.
-  // Returns promise resolving to league settings object or throws error.
   function lookupJoinCode(code) {
     return dbGet('/joinCodes/' + code.toUpperCase())
       .then(function(leagueId) {
@@ -204,7 +260,6 @@
       });
   }
 
-  // Writes a member record to a league.
   function joinLeague(leagueId, uid, email, displayName, teamName) {
     return dbSet('/leagues/' + leagueId + '/members/' + uid, {
       uid:         uid,
@@ -220,7 +275,6 @@
 
   // ── COMMISSIONER CHECK ───────────────────────────────────────
 
-  // Returns promise resolving to { isComm, isCreator }
   function checkCommissioner(uid, leagueId) {
     return Promise.all([
       dbGet('/leagues/' + leagueId + '/commissioners/' + uid),
@@ -253,9 +307,8 @@
     });
   }
 
-  // ── LEAGUE CONTEXT HELPERS ───────────────────────────────────
+  // ── LEAGUE CONTEXT ───────────────────────────────────────────
 
-  // Set active league context and cache team name.
   function enterLeague(leagueId, settings, teamName) {
     if (typeof FR !== 'undefined' && FR.saveContext) {
       FR.saveContext({
@@ -273,7 +326,6 @@
     }
   }
 
-  // Get active league context.
   function getLeagueCtx() {
     try {
       var raw = localStorage.getItem('fr_league_ctx');
@@ -281,9 +333,8 @@
     } catch(e) { return null; }
   }
 
-  // ── THEME HELPER ─────────────────────────────────────────────
+  // ── THEME ────────────────────────────────────────────────────
 
-  // Apply saved theme on page load. Call once at top of each page.
   function applyTheme() {
     try {
       var t = localStorage.getItem('fr_theme');
@@ -305,33 +356,37 @@
   // ── EXPOSE GLOBAL ────────────────────────────────────────────
   global.FRAuth = {
     // User
-    getUser:          getUser,
-    setUser:          setUser,
-    clearUser:        clearUser,
+    getUser:            getUser,
+    setUser:            setUser,
+    clearUser:          clearUser,
+
+    // Token
+    getToken:           getToken,
+    ensureToken:        ensureToken,
 
     // Route guards
-    requireAuth:      requireAuth,
-    requireLeague:    requireLeague,
+    requireAuth:        requireAuth,
+    requireLeague:      requireLeague,
     redirectIfSignedIn: redirectIfSignedIn,
 
     // Auth operations
-    signIn:           signIn,
-    signUp:           signUp,
-    signOut:          signOut,
-    resetPassword:    resetPassword,
+    signIn:             signIn,
+    signUp:             signUp,
+    signOut:            signOut,
+    resetPassword:      resetPassword,
 
     // League
-    lookupJoinCode:   lookupJoinCode,
-    joinLeague:       joinLeague,
-    enterLeague:      enterLeague,
-    getLeagueCtx:     getLeagueCtx,
-    checkCommissioner: checkCommissioner,
+    lookupJoinCode:     lookupJoinCode,
+    joinLeague:         joinLeague,
+    enterLeague:        enterLeague,
+    getLeagueCtx:       getLeagueCtx,
+    checkCommissioner:  checkCommissioner,
 
     // Theme
-    applyTheme:       applyTheme,
-    toggleTheme:      toggleTheme,
+    applyTheme:         applyTheme,
+    toggleTheme:        toggleTheme,
 
-    // Firebase helpers (available if needed directly)
+    // Firebase helpers
     db: { get: dbGet, set: dbSet, patch: dbPatch },
 
     // Constants
