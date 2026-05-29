@@ -4856,9 +4856,9 @@ function saveLeagueMessage(){
   var msg = inp.value.trim();
   var ctx = FRAuth.getLeagueCtx();
   if(!ctx) return;
+  status.style.color = 'var(--ink3)';
   status.textContent = 'Saving…';
-  // Use FR.fb.patch which goes through league-context.js with proper auth
-  FR.fb.patch('/leagues/' + ctx.leagueId + '/settings', { weekMessage: msg })
+  FRAuth.db.patch('/leagues/' + ctx.leagueId + '/settings', { weekMessage: msg })
     .then(function(r){
       if(r && r.error){
         status.style.color = 'var(--pk)';
@@ -4871,7 +4871,6 @@ function saveLeagueMessage(){
     }).catch(function(e){
       status.style.color = 'var(--pk)';
       status.textContent = '✗ Error saving';
-      console.error('Message save error:', e);
     });
 }
 
@@ -4882,7 +4881,7 @@ function clearLeagueMessage(){
   inp.value = '';
   var ctx = FRAuth.getLeagueCtx();
   if(!ctx) return;
-  FR.fb.patch('/leagues/' + ctx.leagueId + '/settings', { weekMessage: '' })
+  FRAuth.db.patch('/leagues/' + ctx.leagueId + '/settings', { weekMessage: '' })
     .then(function(){
       status.style.color = 'var(--or)';
       status.textContent = '✓ Cleared';
