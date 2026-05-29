@@ -790,7 +790,6 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
 <div class="wk-bar">
   <div class="wk-bar-league">
     <span class="wk-bar-league-name" id="wk-bar-season">OG King/Queen of Fantasy '26</span>
-    <button onclick="window.location.href='/home.html'" style="background:none;border:1px solid var(--bdr2);color:var(--ink3);font-family:var(--fd);font-size:11px;font-weight:700;padding:4px 10px;border-radius:6px;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;flex-shrink:0;margin-left:12px;">🏠</button>
   </div>
   <div class="wk-bar-controls">
     <select class="wk-select" id="wk-select" onchange="setWeekFromSelect(this.value)">
@@ -1184,9 +1183,15 @@ function confirmSignOut(){
 // ── THEME ─────────────────────────────────────────────────────────
 function toggleTheme(){
   var next = FRAuth.toggleTheme();
-  var btn = document.getElementById('theme-btn');
-  if(btn) btn.textContent = next === 'light' ? '☀️' : '🌙';
-  document.documentElement.setAttribute('data-theme', next);
+  // Update theme-btn in profile drawer
+  var icon = document.getElementById('pd-theme-icon');
+  var label = document.getElementById('pd-theme-label');
+  var toggle = document.getElementById('pd-theme-toggle');
+  var dot = document.getElementById('pd-toggle-dot');
+  if(icon) icon.textContent = next === 'light' ? '☀️' : '🌙';
+  if(label) label.textContent = next === 'light' ? 'Light mode' : 'Dark mode';
+  if(toggle) toggle.style.background = next === 'light' ? 'var(--or)' : 'var(--bdr2)';
+  if(dot){ dot.style.left = next === 'light' ? '22px' : '2px'; }
 }
 (function(){
   var t = FRAuth.applyTheme();
@@ -2206,8 +2211,14 @@ function showEmpty(){
   var now = new Date();
   var days = Math.ceil((seasonStart - now) / (1000 * 60 * 60 * 24));
   var msg = days > 0
-    ? '<div class="empty"><div class="empty-title" style="color:var(--or);font-size:22px;">' + days + ' days until kickoff</div><div class="empty-sub" style="font-family:var(--fd);font-size:12px;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-top:6px;">Season starts Sep 3, 2026</div></div>'
-    : '<div class="empty"><div class="empty-title">Season starting soon</div></div>';
+    ? '<div style="display:flex;justify-content:center;align-items:center;padding:48px 20px;">' +
+      '<div style="background:linear-gradient(135deg,rgba(0,229,212,.08),rgba(255,95,160,.08));border:1px solid rgba(0,229,212,.2);border-radius:20px;padding:28px 40px;text-align:center;max-width:280px;">' +
+      '<div style="font-family:var(--fd);font-size:13px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;">Season Starts</div>' +
+      '<div style="font-family:var(--fd);font-size:64px;font-weight:900;color:var(--or);line-height:1;margin-bottom:8px;">' + days + '</div>' +
+      '<div style="font-family:var(--fd);font-size:13px;font-weight:700;color:var(--pk);text-transform:uppercase;letter-spacing:1px;">days to kickoff</div>' +
+      '<div style="font-family:var(--fd);font-size:11px;color:var(--ink3);margin-top:10px;text-transform:uppercase;letter-spacing:.5px;">Sep 3, 2026</div>' +
+      '</div></div>'
+    : '<div style="display:flex;justify-content:center;padding:48px 20px;"><div style="font-family:var(--fd);font-size:18px;font-weight:800;color:var(--or);text-transform:uppercase;">Season starting soon</div></div>';
   ['sw','mw','wt','wf','wn','my-season-wrap'].forEach(function(id){
     var el = document.getElementById(id);
     if(el) el.innerHTML = msg;
