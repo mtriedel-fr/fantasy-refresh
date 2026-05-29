@@ -1066,7 +1066,12 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
 // ── AUTH ─────────────────────────────────────────────────────────
 // Route guards — two lines, no flags
 FRAuth.requireAuth();
-FRAuth.requireLeague();
+// Only require league context if not coming in via a special param
+(function(){
+  var search = window.location.search;
+  var hasSpecial = search.indexOf('comm=1') >= 0;
+  if(!hasSpecial) FRAuth.requireLeague();
+})();
 
 var myTeam = '';
 try{ myTeam = localStorage.getItem('fr_myteam') || ''; }catch(e){}
@@ -4648,9 +4653,7 @@ function removeCommissioner(uid){
   </div>
 </div>
 
-  <script>
-    if('serviceWorker' in navigator){
-
+<script>
 // ── LEAGUE SWITCHER ────────────────────────────────────────────────
 function initLeagueSwitcher(){
   var ctx = FR.ctx();

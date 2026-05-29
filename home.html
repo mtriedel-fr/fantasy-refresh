@@ -269,7 +269,10 @@ function openCommSettings(leagueId, e) {
       if (s && !s.error) FRAuth.enterLeague(leagueId, s, user ? user.teamName : '');
       window.location.href = '/league.html?comm=1';
     })
-    .catch(function() { window.location.href = '/league.html?comm=1'; });
+    .catch(function() {
+      try{ localStorage.setItem('fr_league_ctx', JSON.stringify({leagueId:leagueId,leagueName:leagueId,season:2026})); }catch(e2){}
+      window.location.href = '/league.html?comm=1';
+    });
 }
 
 // ── FORMAT HELPERS ───────────────────────────────────────────────
