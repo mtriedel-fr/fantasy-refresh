@@ -1085,17 +1085,7 @@ function updateUserBadge(){
   btn.textContent = '👤 ' + name;
 }
 
-// Call updateUserBadge whenever team name is applied
-var _origApplyTeamName = null;
-window.addEventListener('DOMContentLoaded', function(){
-  if(typeof applyTeamName === 'function'){
-    _origApplyTeamName = applyTeamName;
-    applyTeamName = function(name){
-      _origApplyTeamName(name);
-      updateUserBadge();
-    };
-  }
-});
+// Update header badge whenever team name is applied — handled inside applyTeamName now
 
 function confirmSignOut(){
   var user = FRAuth.getUser();
@@ -1122,6 +1112,26 @@ function toggleTheme(){
 })();
 
 // ── COMMISSIONER ACCESS ────────────────────────────────────────────
+// ── APPLY TEAM NAME ───────────────────────────────────────────────
+function applyTeamName(name){
+  myTeam = name;
+  try{ localStorage.setItem('fr_myteam', name); }catch(e){}
+  // Update team name display bar
+  var shown = document.getElementById('my-team-name-shown');
+  if(shown) shown.textContent = name || '—';
+  // Update input field
+  var inp = document.getElementById('my-team-input');
+  if(inp) inp.value = name || '';
+  // Update league context label
+  var ctx = FRAuth.getLeagueCtx();
+  var ctxLabel = document.getElementById('my-team-league-ctx');
+  if(ctxLabel) ctxLabel.textContent = ctx ? (ctx.leagueName || '') : '';
+  // Update header badge
+  updateUserBadge();
+  // Re-render to highlight user's row
+  if(typeof renderAll === 'function') renderAll();
+}
+
 // ── TEAM NAME ─────────────────────────────────────────────────────
 function loadTeamName(){
   var user = FRAuth.getUser();
@@ -2901,10 +2911,8 @@ function initCommissionerAccess(){
     FR.saveContext(Object.assign({}, FR.ctx(), {
       role: status.isCreator ? 'creator' : 'commissioner'
     }));
-    // Show comm button in header
     var btn = document.getElementById('comm-toggle');
     if(btn) btn.style.display = 'inline-flex';
-    // Show comm button in More menu
     var moreBtn = document.getElementById('more-comm-btn');
     if(moreBtn) moreBtn.style.removeProperty('display');
     try{ sessionStorage.setItem('fr_comm','1'); }catch(e){}
@@ -2912,26 +2920,50 @@ function initCommissionerAccess(){
 }
 
 function toggleComm(){
+  var p = document.getElementById('comm-panel');
+  if(!p) return;
+
   if(!commUnlocked){
-    // Try re-running init in case it hasn't completed yet
-    initCommissionerAccess();
-    setTimeout(function(){ if(commUnlocked) toggleComm(); }, 1500);
+    // Firebase check may not have completed — run it directly
+    var user = FRAuth.getUser();
+    if(!user) return;
+    var ctx = FRAuth.getLeagueCtx();
+    var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+    FRAuth.checkCommissioner(user.uid, leagueId).then(function(status){
+      if(!status.isComm && !status.isCreator){
+        showToast('Commissioner access only', true);
+        return;
+      }
+      commUnlocked = true;
+      var btn = document.getElementById('comm-toggle');
+      if(btn) btn.style.display = 'inline-flex';
+      var moreBtn = document.getElementById('more-comm-btn');
+      if(moreBtn) moreBtn.style.removeProperty('display');
+      openCommPanel();
+    });
     return;
   }
+  openCommPanel();
+}
+
+function openCommPanel(){
   var p = document.getElementById('comm-panel');
-  if(!p){ console.warn('comm-panel not found'); return; }
+  if(!p) return;
   var hidden = p.classList.contains('hidden');
   p.classList.toggle('hidden');
-  document.getElementById('comm-toggle').textContent = hidden ? '✕ Close' : '⚙ Commissioner';
+  var toggleBtn = document.getElementById('comm-toggle');
+  if(toggleBtn) toggleBtn.textContent = hidden ? '✕ Close' : '⚙ Commissioner';
   if(!hidden) return;
-  document.getElementById('comm-gate').classList.add('hidden');
-  document.getElementById('comm-tools').classList.remove('hidden');
+  var gate = document.getElementById('comm-gate');
+  var tools = document.getElementById('comm-tools');
+  if(gate) gate.classList.add('hidden');
+  if(tools) tools.classList.remove('hidden');
   renderHistory();
   renderUserPanel();
   loadLeagueMessage();
-renderCommissionerList();
-loadPoolStatus();
-initSalaryPanel();
+  renderCommissionerList();
+  loadPoolStatus();
+  initSalaryPanel();
   // Wire up drag and drop once
   var zone = document.getElementById('drop-zone');
   if(zone && !zone._dd){
