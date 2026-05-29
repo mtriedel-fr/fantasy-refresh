@@ -13,59 +13,52 @@
   var FIREBASE_TOKEN = 'https://securetoken.googleapis.com/v1/token?key=';
 
   // ── TOKEN MANAGEMENT ────────────────────────────────────────
-  // Token stored in memory only — never persisted to localStorage
+  // idToken stored in memory only — expires after 1 hour
+  // refreshToken stored in localStorage — safe, used only to get new idTokens
   var _idToken        = null;
-  var _refreshToken   = null;
   var _tokenExpiry    = 0;
   var _refreshTimer   = null;
+  var REFRESH_KEY     = 'fr_refresh_token';
 
   function getToken() { return _idToken; }
 
   function setTokens(idToken, refreshToken, expiresIn) {
-    _idToken      = idToken;
-    _refreshToken = refreshToken;
-    _tokenExpiry  = Date.now() + ((parseInt(expiresIn) || 3600) - 60) * 1000;
+    _idToken     = idToken;
+    _tokenExpiry = Date.now() + ((parseInt(expiresIn) || 3600) - 60) * 1000;
+    // Persist refresh token so it survives page reloads
+    if (refreshToken) {
+      try { localStorage.setItem(REFRESH_KEY, refreshToken); } catch(e) {}
+    }
     scheduleTokenRefresh(((parseInt(expiresIn) || 3600) - 120) * 1000);
   }
 
   function clearTokens() {
     _idToken = null;
-    _refreshToken = null;
     _tokenExpiry = 0;
+    try { localStorage.removeItem(REFRESH_KEY); } catch(e) {}
     if (_refreshTimer) { clearTimeout(_refreshTimer); _refreshTimer = null; }
   }
 
   function scheduleTokenRefresh(ms) {
     if (_refreshTimer) clearTimeout(_refreshTimer);
-    _refreshTimer = setTimeout(refreshToken, ms);
+    _refreshTimer = setTimeout(function() { ensureToken(); }, Math.max(ms, 30000));
   }
 
-  function refreshToken() {
-    if (!_refreshToken) return;
-    fetch(FIREBASE_TOKEN + FB_API_KEY, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: 'grant_type=refresh_token&refresh_token=' + encodeURIComponent(_refreshToken)
-    })
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      if (data.id_token) {
-        setTokens(data.id_token, data.refresh_token, data.expires_in);
-      }
-    })
-    .catch(function() {});
-  }
-
-  // Get a valid token — refreshes if needed
+  // Get a valid token — refreshes automatically if expired or missing
   function ensureToken() {
+    // Already have a valid token
     if (_idToken && Date.now() < _tokenExpiry) {
       return Promise.resolve(_idToken);
     }
-    if (!_refreshToken) return Promise.resolve(null);
+    // Try refresh token from localStorage
+    var storedRefresh = null;
+    try { storedRefresh = localStorage.getItem(REFRESH_KEY); } catch(e) {}
+    if (!storedRefresh) return Promise.resolve(null);
+
     return fetch(FIREBASE_TOKEN + FB_API_KEY, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: 'grant_type=refresh_token&refresh_token=' + encodeURIComponent(_refreshToken)
+      body: 'grant_type=refresh_token&refresh_token=' + encodeURIComponent(storedRefresh)
     })
     .then(function(r) { return r.json(); })
     .then(function(data) {
@@ -73,10 +66,24 @@
         setTokens(data.id_token, data.refresh_token, data.expires_in);
         return data.id_token;
       }
+      // Refresh token expired — clear it
+      clearTokens();
       return null;
     })
     .catch(function() { return null; });
   }
+
+  // Auto-restore token on page load if user is signed in
+  (function() {
+    try {
+      var user = localStorage.getItem('fr_user_2026');
+      var refresh = localStorage.getItem(REFRESH_KEY);
+      if (user && refresh) {
+        // Silently get a fresh token in the background
+        ensureToken();
+      }
+    } catch(e) {}
+  })();
 
   // ── USER STORAGE ────────────────────────────────────────────
 
@@ -110,7 +117,7 @@
         if (k.indexOf('fr_teamname_') === 0) localStorage.removeItem(k);
       });
     } catch(e) {}
-    clearTokens();
+    clearTokens(); // also removes REFRESH_KEY
   }
 
   // ── ROUTE GUARDS ────────────────────────────────────────────
