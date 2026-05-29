@@ -170,7 +170,6 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
 
   <div class="greeting">
     <div class="greeting-name" id="greeting-name">—<span>'s Refresh!</span></div>
-    <div class="greeting-message" id="greeting-message"></div>
   </div>
 
   <div class="week-pill" id="week-pill">
@@ -325,7 +324,8 @@ function buildCard(l) {
       + '</div>'
     : '';
 
-  return '<div class="league-card" onclick="enterLeague(\'' + l.leagueId + '\')">'
+  var cardId = 'card-msg-' + l.leagueId;
+  var card = '<div class="league-card" onclick="enterLeague(\'' + l.leagueId + '\')">'
     + '<div class="card-top-bar ' + bar + '"></div>'
     + '<div class="card-inner">'
     + '<div class="card-row1">'
@@ -334,7 +334,7 @@ function buildCard(l) {
     + '<div class="card-badges">' + formatBadge(s) + commBadge + '</div>'
     + '</div>'
     + '<div class="card-actions">' + gearBtn
-    + '<div class="enter-btn"><svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></div>'
+    + '<div class="enter-btn"><svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 19"/></svg></div>'
     + '</div>'
     + '</div>'
     + '<div class="card-team-row">'
@@ -346,8 +346,22 @@ function buildCard(l) {
     + '<div class="stat"><div class="stat-label">Score</div><div class="stat-val score">' + score + '</div></div>'
     + '<div class="stat"><div class="stat-label">Wks Left</div><div class="stat-val neutral">' + (typeof wksLeft === 'number' ? wksLeft : '—') + '</div></div>'
     + '</div>'
+    + '<div id="' + cardId + '" style="font-size:13px;color:var(--ink2);font-style:italic;padding:10px 0 2px;min-height:0;line-height:1.4;"></div>'
     + '</div>'
     + '</div>';
+
+  // Load message for this league async
+  fetch(FB_DB_URL + '/leagues/' + l.leagueId + '/settings/weekMessage.json')
+    .then(function(r){ return r.json(); })
+    .then(function(msg){
+      var el = document.getElementById(cardId);
+      if(el && msg && typeof msg === 'string' && msg.trim()){
+        el.textContent = '“' + msg.trim() + '”';
+        el.style.paddingTop = '10px';
+      }
+    }).catch(function(){});
+
+  return card;
 }
 
 // ── LOAD LEAGUES ─────────────────────────────────────────────────
@@ -355,13 +369,13 @@ function loadLeagues() {
   if (!user) return;
 
   var uid         = user.uid;
-  var displayName = user.displayName || user.teamName || user.email || 'Coach';
+  var displayName = user.displayName || user.email || 'Coach';
 
   // Update greeting and header
   var greet = document.getElementById('greeting-name');
   if (greet) greet.innerHTML = displayName + '<span>\'s Refresh!</span>';
   var badge = document.getElementById('hdr-user');
-  if (badge) badge.textContent = '👤 ' + (user.displayName || user.teamName || user.email || '—');
+  if (badge) badge.textContent = '👤 ' + (user.displayName || user.email || '—');
 
   // Collect league IDs to check
   var leagueIds = ['fr_refresh26'];
@@ -422,21 +436,7 @@ function renderCards(leagueIds, uid) {
 
     wrap.innerHTML = mine.map(buildCard).join('');
 
-    // Load commissioner message for primary league
-    var primaryLeague = mine[0];
-    if(primaryLeague){
-      // weekMessage is in settings which is publicly readable
-      fetch(FB_DB_URL + '/leagues/' + primaryLeague.leagueId + '/settings/weekMessage.json')
-        .then(function(r){ return r.json(); })
-        .then(function(msg){
-          var el = document.getElementById('greeting-message');
-          if(el && msg && typeof msg === 'string' && msg.trim()){
-            el.textContent = '“' + msg.trim() + '”';
-          } else if(el){
-            el.textContent = '';
-          }
-        }).catch(function(){});
-    }
+
   })
   .catch(function() {
     wrap.innerHTML = '<div class="empty-state">'
