@@ -2901,11 +2901,12 @@ function initCommissionerAccess(){
     FR.saveContext(Object.assign({}, FR.ctx(), {
       role: status.isCreator ? 'creator' : 'commissioner'
     }));
+    // Show comm button in header
     var btn = document.getElementById('comm-toggle');
     if(btn) btn.style.display = 'inline-flex';
+    // Show comm button in More menu
     var moreBtn = document.getElementById('more-comm-btn');
-    if(moreBtn) moreBtn.style.display = '';
-    updateMoreCommBtn();
+    if(moreBtn) moreBtn.style.removeProperty('display');
     try{ sessionStorage.setItem('fr_comm','1'); }catch(e){}
   }).catch(function(){});
 }
@@ -4795,7 +4796,7 @@ document.addEventListener('DOMContentLoaded', function(){
       <div style="font-size:20px;margin-bottom:4px;">🌟</div>
       <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink2);text-transform:uppercase;">Wrap</div>
     </button>
-    <button onclick="toggleComm();toggleMoreMenu()" style="background:rgba(255,230,32,.08);border:1px solid rgba(255,230,32,.2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;" id="more-comm-btn" style="display:none;">
+    <button onclick="toggleComm();toggleMoreMenu()" id="more-comm-btn" style="display:none;background:rgba(255,230,32,.08);border:1px solid rgba(255,230,32,.2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;">
       <div style="font-size:20px;margin-bottom:4px;">⚙️</div>
       <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:#FFE620;text-transform:uppercase;">Comm</div>
     </button>
