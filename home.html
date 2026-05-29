@@ -69,10 +69,10 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
 .badge-format{background:rgba(0,229,212,.1);color:var(--or);border:1px solid rgba(0,229,212,.25);}
 .badge-guillotine{background:rgba(255,95,160,.1);color:var(--pk);border:1px solid rgba(255,95,160,.25);}
 .badge-h2h{background:rgba(155,109,255,.1);color:var(--pu);border:1px solid rgba(155,109,255,.25);}
-.badge-comm{background:rgba(255,230,32,.1);color:#FFE620;border:1px solid rgba(255,230,32,.25);}
+.badge-comm{background:rgba(0,229,212,.1);color:var(--or);border:1px solid rgba(0,229,212,.25);}
 .card-actions{display:flex;align-items:center;gap:6px;flex-shrink:0;}
-.gear-btn{background:rgba(255,230,32,.08);border:1px solid rgba(255,230,32,.2);color:#FFE620;width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s;flex-shrink:0;}
-.gear-btn:hover{background:rgba(255,230,32,.18);}
+.gear-btn{background:rgba(0,229,212,.08);border:1px solid rgba(0,229,212,.2);color:var(--or);width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s;flex-shrink:0;}
+.gear-btn:hover{background:rgba(0,229,212,.15);}
 .gear-btn svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
 .enter-btn{background:var(--or);color:#050808;width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .15s;}
 .enter-btn:hover{background:var(--or2,#33EDE0);}
@@ -372,19 +372,6 @@ function loadLeagues() {
     }
   } catch(e) {}
 
-  // Load commissioner message for active league
-  var ctx = FRAuth.getLeagueCtx();
-  if(ctx && ctx.leagueId){
-    fetch(FB_DB_URL + '/leagues/' + ctx.leagueId + '/settings/weekMessage.json')
-      .then(function(r){ return r.json(); })
-      .then(function(msg){
-        var el = document.getElementById('greeting-message');
-        if(el && msg && typeof msg === 'string'){
-          el.textContent = '“' + msg + '”';
-        }
-      }).catch(function(){});
-  }
-
   // Try user profile for additional leagues (non-blocking)
   fetch(FB_DB_URL + '/users/' + uid + '.json')
     .then(function(r) { return r.json(); })
@@ -434,6 +421,19 @@ function renderCards(leagueIds, uid) {
     }
 
     wrap.innerHTML = mine.map(buildCard).join('');
+
+    // Load commissioner message for primary league
+    var primaryLeague = mine[0];
+    if(primaryLeague){
+      fetch(FB_DB_URL + '/leagues/' + primaryLeague.leagueId + '/settings/weekMessage.json')
+        .then(function(r){ return r.json(); })
+        .then(function(msg){
+          var el = document.getElementById('greeting-message');
+          if(el && msg && typeof msg === 'string' && msg.trim()){
+            el.textContent = '“' + msg.trim() + '”';
+          }
+        }).catch(function(){});
+    }
   })
   .catch(function() {
     wrap.innerHTML = '<div class="empty-state">'
