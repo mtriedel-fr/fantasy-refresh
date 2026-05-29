@@ -425,12 +425,15 @@ function renderCards(leagueIds, uid) {
     // Load commissioner message for primary league
     var primaryLeague = mine[0];
     if(primaryLeague){
+      // weekMessage is in settings which is publicly readable
       fetch(FB_DB_URL + '/leagues/' + primaryLeague.leagueId + '/settings/weekMessage.json')
         .then(function(r){ return r.json(); })
         .then(function(msg){
           var el = document.getElementById('greeting-message');
           if(el && msg && typeof msg === 'string' && msg.trim()){
             el.textContent = '“' + msg.trim() + '”';
+          } else if(el){
+            el.textContent = '';
           }
         }).catch(function(){});
     }
