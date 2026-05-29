@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Fantasy Refresh — Playoffs 2025</title>
+<script src="/js/auth.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -27,7 +28,7 @@
   --ink:#0A1818;--ink2:#1A6060;--ink3:#3A8888;
   --bdr:#B8E8E0;--bdr2:#90D8D0;--red:#E8337A;--grn:#00A898;
 }
-body{background:#091414;min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:24px 16px;font-family:var(--fb);}
+body{background:var(--bg);min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:24px 16px 80px;font-family:var(--fb);}
 .wrap{width:100%;max-width:960px;border-radius:16px;overflow:hidden;border:1px solid #0A2A2A;box-shadow:0 24px 80px rgba(0,0,0,.6);}
 
 /* HEADER */
@@ -39,7 +40,7 @@ body{background:#091414;min-height:100vh;display:flex;align-items:flex-start;jus
 .logo-txt span{color:var(--pk);}
 .logo-sub{font-family:var(--fd);font-size:11px;font-weight:600;color:#1A5A5A;letter-spacing:2px;text-transform:uppercase;margin-top:2px;}
 .hdr-r{text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:6px;}
-.back-btn{background:transparent;border:1px solid #0A2A2A;color:#1A5A5A;font-family:var(--fd);font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;padding:4px 12px;border-radius:6px;cursor:pointer;transition:all .15s;text-decoration:none;display:inline-block;}
+.back-btn{background:transparent;border:1px solid var(--bdr2);color:var(--ink3);font-family:var(--fd);font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;padding:4px 12px;border-radius:6px;cursor:pointer;transition:all .15s;text-decoration:none;display:inline-block;}
 .back-btn:hover{border-color:var(--or);color:var(--or);}
 .playoff-badge{background:rgba(200,152,0,.12);color:var(--gold);font-family:var(--fd);font-size:11px;font-weight:700;padding:4px 13px;border-radius:20px;letter-spacing:1.2px;text-transform:uppercase;border:1px solid rgba(200,152,0,.35);}
 .hdr-sub{color:#1A5A5A;font-size:11px;font-family:var(--fd);letter-spacing:.8px;text-transform:uppercase;}
@@ -145,7 +146,7 @@ html[data-theme="light"] body{background:#D8F0EE;}
   <div class="hdr-r">
     <div class="playoff-badge">🏆 Playoffs</div>
     <div class="hdr-sub" id="hdr-sub">Loading...</div>
-    <a id="back-btn" href="index.html" class="back-btn">← Back to Standings</a>
+    <button onclick="window.location.href='/league.html'" class="back-btn">← League</button>
     <button class="back-btn theme-toggle" onclick="toggleTheme()" id="theme-btn" title="Toggle light/dark">🌙</button>
   </div>
 </div>
@@ -163,6 +164,13 @@ html[data-theme="light"] body{background:#D8F0EE;}
 <div class="toast" id="toast"></div>
 
 <script>
+// ── AUTH CHECK ─────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function(){
+  if(typeof FRAuth !== 'undefined' && !FRAuth.getUser()){
+    window.location.href = '/welcome.html';
+  }
+});
+
 // ── FIREBASE CONFIG ────────────────────────────────────────────
 var FB_DB_URL   = 'https://fantasy-refresh-default-rtdb.firebaseio.com';
 var TIER_LOCK_WEEK = 15;
@@ -180,9 +188,8 @@ function teamLink(name){
 function loadFromCloud(){
   document.getElementById('hdr-sub').textContent = 'Loading...';
   var urlSeason = (new URLSearchParams(window.location.search)).get('season') || '2026';
-  var backLink  = urlSeason === '2025' ? 'archive2025.html' : 'index.html';
-  var backBtn   = document.getElementById('back-btn');
-  if(backBtn) backBtn.href = backLink;
+  var backBtn = document.getElementById('back-btn-href');
+  if(backBtn) backBtn.href = urlSeason === '2025' ? '/archive2025.html' : '/league.html';
   console.log('playoffs loading season:', urlSeason);
   fetch(FB_DB_URL + '/season' + urlSeason + '.json')
     .then(function(r){ return r.json(); })
@@ -431,5 +438,12 @@ function toggleTheme(){
 })();
 
 </script>
+<!-- BACK BAR -->
+<div style="position:fixed;bottom:0;left:0;right:0;background:var(--hdr);border-top:1px solid var(--bdr);padding:12px 20px;padding-bottom:calc(12px + env(safe-area-inset-bottom));display:flex;align-items:center;justify-content:space-between;z-index:50;">
+  <button onclick="window.location.href='/league.html'" style="display:flex;align-items:center;gap:6px;background:none;border:1px solid var(--bdr2);color:var(--ink2);font-family:var(--fd);font-size:13px;font-weight:700;padding:8px 16px;border-radius:8px;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;">
+    ← Back to League
+  </button>
+  <div style="font-family:var(--fd);font-size:12px;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;">Playoffs</div>
+</div>
 </body>
 </html>
