@@ -2,7 +2,7 @@ name: Auto Scoring
 
 on:
   schedule:
-    # Every 5 min Thursday night (TNF)
+    # Every 5 min Thursday night (TNF) — UTC
     - cron: '*/5 23 * * 4'
     - cron: '*/5 0-4 * * 5'
     # Every 5 min Sunday (all day games + SNF)
@@ -14,6 +14,8 @@ on:
     # International games Fri/Sat
     - cron: '*/5 12-20 * * 5'
     - cron: '*/5 12-20 * * 6'
+    # Preseason — same windows August only (cron can't filter by month,
+    # the script detects season type automatically)
     # Tuesday 9am ET (13:00 UTC) — lock final scores
     - cron: '0 13 * * 2'
   workflow_dispatch:
@@ -21,10 +23,18 @@ on:
       week:
         description: 'Week number (leave blank for auto-detect)'
         required: false
+      season_type:
+        description: 'Season type: Regular or Preseason (leave blank for auto-detect)'
+        required: false
+        default: ''
       lock_scores:
         description: 'Set to "true" to lock scores immediately'
         required: false
         default: 'false'
+      league_id:
+        description: 'Specific league ID to score (leave blank for all active leagues)'
+        required: false
+        default: ''
 
 jobs:
   score-lineups:
@@ -33,18 +43,22 @@ jobs:
       - name: Calculate and write fantasy scores
         env:
           FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
           TANK01_KEY: ${{ secrets.TANK01_KEY }}
           FR_SEASON: "2026"
           MANUAL_WEEK: ${{ inputs.week }}
+          MANUAL_SEASON_TYPE: ${{ inputs.season_type }}
           LOCK_SCORES: ${{ inputs.lock_scores }}
+          MANUAL_LEAGUE: ${{ inputs.league_id }}
         run: |
           node << 'SCRIPT'
           const https = require('https');
 
-          const FB_URL   = process.env.FIREBASE_DB_URL;
-          const T01_KEY  = process.env.TANK01_KEY;
-          const SEASON   = process.env.FR_SEASON || '2026';
-          const T01_HOST = 'tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com';
+          const FB_URL      = process.env.FIREBASE_DB_URL;
+          const FB_TOKEN    = process.env.FIREBASE_AUTH_TOKEN;
+          const T01_KEY     = process.env.TANK01_KEY;
+          const SEASON      = process.env.FR_SEASON || '2026';
+          const T01_HOST    = 'tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com';
           const IS_LOCK_RUN = process.env.LOCK_SCORES === 'true' ||
                               new Date().getUTCDay() === 2; // Tuesday
 
@@ -52,24 +66,19 @@ jobs:
           function calcDKPoints(p, pos) {
             if (!p) return 0;
             let pts = 0;
-            // Passing
             pts += (parseFloat(p.passYds)  || 0) * 0.04;
             pts += (parseFloat(p.passTD)   || 0) * 4;
             pts += (parseFloat(p.passInt)  || 0) * -1;
-            pts += (parseFloat(p.pass300)  || 0) * 3;  // 300+ yd bonus
-            // Rushing
+            pts += (parseFloat(p.pass300)  || 0) * 3;
             pts += (parseFloat(p.rushYds)  || 0) * 0.1;
             pts += (parseFloat(p.rushTD)   || 0) * 6;
-            pts += (parseFloat(p.rush100)  || 0) * 3;  // 100+ yd bonus
-            // Receiving
-            pts += (parseFloat(p.rec)      || 0) * 1;  // PPR
+            pts += (parseFloat(p.rush100)  || 0) * 3;
+            pts += (parseFloat(p.rec)      || 0) * 1;
             pts += (parseFloat(p.recYds)   || 0) * 0.1;
             pts += (parseFloat(p.recTD)    || 0) * 6;
-            pts += (parseFloat(p.rec100)   || 0) * 3;  // 100+ yd bonus
-            // Misc
+            pts += (parseFloat(p.rec100)   || 0) * 3;
             pts += (parseFloat(p.fumbLost) || 0) * -1;
             pts += (parseFloat(p.twoPt)    || 0) * 2;
-            // Defense
             if (pos === 'DEF') {
               pts += (parseFloat(p.sacks)   || 0) * 1;
               pts += (parseFloat(p.defInt)  || 0) * 2;
@@ -79,13 +88,13 @@ jobs:
               pts += (parseFloat(p.blkKick) || 0) * 2;
               const pa = parseFloat(p.ptsAllowed || p.pointsAllowed) || null;
               if (pa !== null) {
-                if      (pa === 0)       pts += 10;
-                else if (pa <= 6)        pts += 7;
-                else if (pa <= 13)       pts += 4;
-                else if (pa <= 20)       pts += 1;
-                else if (pa <= 27)       pts += 0;
-                else if (pa <= 34)       pts -= 1;
-                else                     pts -= 4;
+                if      (pa === 0)  pts += 10;
+                else if (pa <= 6)   pts += 7;
+                else if (pa <= 13)  pts += 4;
+                else if (pa <= 20)  pts += 1;
+                else if (pa <= 27)  pts += 0;
+                else if (pa <= 34)  pts -= 1;
+                else                pts -= 4;
               }
             }
             return Math.round(pts * 100) / 100;
@@ -103,10 +112,17 @@ jobs:
             });
           }
 
+          // Firebase write — appends ?auth=token for authentication
+          function fbAuth(path) {
+            const sep = path.includes('?') ? '&' : '?';
+            return FB_TOKEN ? `${path}${sep}auth=${FB_TOKEN}` : path;
+          }
+
           function firebasePut(path, payload) {
             return new Promise((resolve, reject) => {
               const body = JSON.stringify(payload);
-              const u = new URL(FB_URL + path);
+              const fullPath = fbAuth(FB_URL + path);
+              const u = new URL(fullPath);
               const req = https.request({
                 hostname: u.hostname, path: u.pathname + u.search, method: 'PUT',
                 headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
@@ -119,7 +135,8 @@ jobs:
           function firebasePatch(path, payload) {
             return new Promise((resolve, reject) => {
               const body = JSON.stringify(payload);
-              const u = new URL(FB_URL + path);
+              const fullPath = fbAuth(FB_URL + path);
+              const u = new URL(fullPath);
               const req = https.request({
                 hostname: u.hostname, path: u.pathname + u.search, method: 'PATCH',
                 headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
@@ -139,20 +156,150 @@ jobs:
             });
           }
 
-          // ── Get current week ───────────────────────────────────
-          async function getCurrentWeek() {
-            if (process.env.MANUAL_WEEK) return parseInt(process.env.MANUAL_WEEK);
+          // ── Auto-detect season type ───────────────────────────
+          // Returns { week, seasonType } — detects preseason automatically
+          async function getCurrentWeekInfo() {
+            // Manual override from workflow_dispatch
+            if (process.env.MANUAL_WEEK) {
+              const seasonType = process.env.MANUAL_SEASON_TYPE || 'Regular';
+              return { week: parseInt(process.env.MANUAL_WEEK), seasonType };
+            }
+
             try {
+              // Try regular season first
               const d = await t01('/getNFLCurrentWeek');
-              return d.body ? parseInt(d.body.week) : 1;
-            } catch(e) { return 1; }
+              if (d.body && d.body.week) {
+                const week = parseInt(d.body.week);
+                const seasonType = d.body.seasonType || 'Regular';
+                console.log(`Tank01 current week: ${week} (${seasonType})`);
+                return { week, seasonType };
+              }
+            } catch(e) {
+              console.log('Could not detect current week:', e.message);
+            }
+
+            // Check if we're in preseason window (Aug 1 - Sep 8)
+            const now = new Date();
+            const month = now.getUTCMonth() + 1; // 1-based
+            const day = now.getUTCDate();
+            if (month === 8 || (month === 9 && day <= 8)) {
+              // Estimate preseason week based on date
+              // Preseason Week 1 typically starts ~Aug 7
+              const aug1 = new Date(`${now.getUTCFullYear()}-08-01`);
+              const daysSinceAug1 = Math.floor((now - aug1) / (1000 * 60 * 60 * 24));
+              const psWeek = Math.min(4, Math.max(1, Math.floor(daysSinceAug1 / 7) + 1));
+              console.log(`Preseason detected — estimated week ${psWeek}`);
+              return { week: psWeek, seasonType: 'Preseason' };
+            }
+
+            return { week: 1, seasonType: 'Regular' };
           }
 
-          // ── LOCK RUN — Tuesday 9am ─────────────────────────────
-          async function lockScores(week) {
-            console.log(`Locking scores for Week ${week}...`);
-            const scores = await firebaseGet(`/leagues/fr_refresh26/season/${SEASON}/${week}.json`).catch(() => null);
-            if (!scores) { console.log('No scores to lock.'); return; }
+          // ── Get all active leagues ─────────────────────────────
+          async function getActiveLeagues() {
+            // If manually specified, use that
+            if (process.env.MANUAL_LEAGUE) {
+              return [process.env.MANUAL_LEAGUE];
+            }
+
+            try {
+              const leagues = await firebaseGet('/leagues.json?shallow=true');
+              if (!leagues || leagues.error) {
+                console.log('Could not fetch leagues, falling back to fr_refresh26');
+                return ['fr_refresh26'];
+              }
+              const leagueIds = Object.keys(leagues);
+              console.log(`Found ${leagueIds.length} league(s): ${leagueIds.join(', ')}`);
+
+              // Filter to active leagues only
+              const active = [];
+              for (const id of leagueIds) {
+                try {
+                  const settings = await firebaseGet(`/leagues/${id}/settings.json`);
+                  if (settings && settings.active !== false && settings.season == SEASON) {
+                    active.push(id);
+                  }
+                } catch(e) {
+                  // Skip leagues we can't read
+                }
+              }
+              return active.length ? active : ['fr_refresh26'];
+            } catch(e) {
+              console.log('Error fetching leagues:', e.message);
+              return ['fr_refresh26'];
+            }
+          }
+
+          // ── Score a single league ──────────────────────────────
+          async function scoreLeague(leagueId, week, seasonType, activeGames, allFinal, playerStats) {
+            console.log(`\n--- Scoring league: ${leagueId} ---`);
+
+            // Load lineups
+            const lineups = await firebaseGet(`/leagues/${leagueId}/lineups/${SEASON}/week${week}.json`).catch(() => null);
+            if (!lineups) {
+              console.log(`  No lineups for ${leagueId} week ${week}`);
+              return;
+            }
+
+            // Load existing scores to preserve locked ones
+            const existingScores = await firebaseGet(`/leagues/${leagueId}/season/${SEASON}/${week}.json`).catch(() => ({}));
+            const scoreUpdates = {};
+
+            for (const [uid, lineup] of Object.entries(lineups)) {
+              if (!lineup || !lineup.slots) continue;
+
+              const existing = existingScores && existingScores[uid];
+              if (existing && existing.locked) {
+                console.log(`  ⏭️  ${lineup.team || uid}: locked`);
+                continue;
+              }
+
+              let totalPts = 0;
+              const slotPts = {};
+
+              for (const [slotId, player] of Object.entries(lineup.slots)) {
+                if (!player) continue;
+                let stats = playerStats[player.id] || playerStats[(player.name || '').toLowerCase()];
+                let pts = 0;
+                if (stats) {
+                  pts = parseFloat(stats.fantasyPoints || stats.fantasy_points || 0);
+                  if (!pts) pts = calcDKPoints(stats, player.pos);
+                }
+                slotPts[slotId] = Math.round(pts * 100) / 100;
+                totalPts += pts;
+              }
+
+              totalPts = Math.round(totalPts * 100) / 100;
+              scoreUpdates[uid] = {
+                uid,
+                team:      lineup.team || uid,
+                week,
+                score:     totalPts,
+                slotPts,
+                status:    allFinal ? 'final' : 'live',
+                updatedAt: Date.now(),
+                locked:    false
+              };
+              console.log(`  ${allFinal ? '✅' : '📡'} ${lineup.team || uid}: ${totalPts} pts`);
+            }
+
+            if (Object.keys(scoreUpdates).length) {
+              await firebasePatch(`/leagues/${leagueId}/season/${SEASON}/${week}.json`, scoreUpdates);
+              console.log(`  ✅ Wrote ${Object.keys(scoreUpdates).length} scores`);
+            }
+
+            // Update week meta
+            await firebasePut(`/leagues/${leagueId}/season/${SEASON}/meta.json`, {
+              week, lastScored: Date.now(), allFinal,
+              gamesActive: activeGames.length
+            });
+          }
+
+          // ── Lock scores for a league ───────────────────────────
+          async function lockLeague(leagueId, week) {
+            console.log(`Locking ${leagueId} week ${week}...`);
+            const scores = await firebaseGet(`/leagues/${leagueId}/season/${SEASON}/${week}.json`).catch(() => null);
+            if (!scores) { console.log('  No scores to lock.'); return; }
 
             const updates = {};
             Object.entries(scores).forEach(([uid, entry]) => {
@@ -162,30 +309,40 @@ jobs:
             });
 
             if (Object.keys(updates).length) {
-              await firebasePatch(`/leagues/fr_refresh26/season/${SEASON}/${week}.json`, updates);
-              console.log(`✅ Locked ${Object.keys(updates).length} scores for Week ${week}`);
+              await firebasePatch(`/leagues/${leagueId}/season/${SEASON}/${week}.json`, updates);
+              console.log(`  ✅ Locked ${Object.keys(updates).length} scores`);
             } else {
-              console.log('All scores already locked.');
+              console.log('  All scores already locked.');
             }
           }
 
-          // ── MAIN SCORING RUN ───────────────────────────────────
+          // ── MAIN ───────────────────────────────────────────────
           async function main() {
-            const week = await getCurrentWeek();
-            console.log(`\n=== Auto-Scoring Week ${week} | ${new Date().toISOString()} ===`);
+            const { week, seasonType } = await getCurrentWeekInfo();
+            const leagues = await getActiveLeagues();
+
+            console.log(`\n=== Auto-Scoring | Week ${week} | ${seasonType} | ${new Date().toISOString()} ===`);
+            console.log(`Leagues to score: ${leagues.join(', ')}`);
 
             // Lock run (Tuesday 9am)
             if (IS_LOCK_RUN) {
-              await lockScores(week);
+              for (const leagueId of leagues) {
+                await lockLeague(leagueId, week);
+              }
               return;
             }
 
-            // Get this week's games
-            const gamesData = await t01(`/getNFLGamesForWeek?week=${week}&seasonType=Regular&season=${SEASON}`);
+            // Get games for this week
+            const gamesData = await t01(`/getNFLGamesForWeek?week=${week}&seasonType=${seasonType}&season=${SEASON}`);
             const games = Array.isArray(gamesData.body)
               ? gamesData.body : Object.values(gamesData.body || {});
 
-            // Filter to games in progress or final
+            if (!games.length) {
+              console.log(`No ${seasonType} games found for week ${week} — nothing to score.`);
+              return;
+            }
+
+            // Filter to active/final games
             const activeGames = games.filter(g => {
               const s = (g.gameStatus || g.status || '').toLowerCase();
               return s.includes('progress') || s.includes('final') ||
@@ -197,9 +354,8 @@ jobs:
               return;
             }
 
-            console.log(`Found ${activeGames.length} active/final game(s)`);
+            console.log(`Found ${activeGames.length} active/final game(s) of ${games.length} total`);
 
-            // Check if all games are final
             const allFinal = games.every(g => {
               const s = (g.gameStatus || g.status || '').toLowerCase();
               return s.includes('final') || s.includes('completed');
@@ -214,101 +370,31 @@ jobs:
                 const bs = await t01(`/getNFLBoxScore?gameID=${gameId}&fantasyPoints=true&PPRScoring=true`);
                 if (bs.body) {
                   boxScores[gameId] = bs.body;
-                  const playerCount = Object.keys(bs.body.playerStats || {}).length;
-                  console.log(`  📊 ${gameId}: ${playerCount} player stats`);
+                  console.log(`  📊 ${gameId}: ${Object.keys(bs.body.playerStats || {}).length} player stats`);
                 }
               } catch(e) {
                 console.error(`  ❌ Failed box score ${gameId}:`, e.message);
               }
             }
 
-            // Build player stats lookup by player ID and name
+            // Build player stats lookup
             const playerStats = {};
             Object.values(boxScores).forEach(bs => {
               Object.entries(bs.playerStats || {}).forEach(([pid, stats]) => {
                 playerStats[pid] = stats;
-                // Also index by name for matching
                 const name = (stats.longName || stats.playerName || '').toLowerCase();
                 if (name) playerStats[name] = stats;
               });
             });
 
-            // Load all submitted lineups for this week
-            const lineups = await firebaseGet(`/leagues/fr_refresh26/lineups/${SEASON}/week${week}.json`).catch(() => null);
-            if (!lineups) { console.log('No lineups submitted yet.'); return; }
-
-            console.log(`\nScoring ${Object.keys(lineups).length} lineup(s)...`);
-
-            // Load existing scores to preserve locked ones
-            const existingScores = await firebaseGet(`/leagues/fr_refresh26/season/${SEASON}/${week}.json`).catch(() => ({}));
-
-            const scoreUpdates = {};
-
-            for (const [uid, lineup] of Object.entries(lineups)) {
-              if (!lineup || !lineup.slots) continue;
-
-              // Skip if already locked
-              const existing = existingScores && existingScores[uid];
-              if (existing && existing.locked) {
-                console.log(`  ⏭️  ${lineup.team || uid}: score locked, skipping`);
-                continue;
+            // Score all leagues
+            for (const leagueId of leagues) {
+              try {
+                await scoreLeague(leagueId, week, seasonType, activeGames, allFinal, playerStats);
+              } catch(e) {
+                console.error(`Failed scoring ${leagueId}:`, e.message);
               }
-
-              let totalPts  = 0;
-              const slotPts = {};
-
-              for (const [slotId, player] of Object.entries(lineup.slots)) {
-                if (!player) continue;
-
-                // Find player stats — try by ID first, then name
-                let stats = playerStats[player.id]
-                  || playerStats[(player.name || '').toLowerCase()];
-
-                let pts = 0;
-                if (stats) {
-                  // Use Tank01's pre-calculated fantasy points if available
-                  pts = parseFloat(stats.fantasyPoints || stats.fantasy_points || 0);
-                  // Fall back to manual calculation
-                  if (!pts) pts = calcDKPoints(stats, player.pos);
-                } else {
-                  // Player's game hasn't started or no stats yet → 0
-                  pts = 0;
-                }
-
-                slotPts[slotId] = Math.round(pts * 100) / 100;
-                totalPts += pts;
-              }
-
-              totalPts = Math.round(totalPts * 100) / 100;
-
-              scoreUpdates[uid] = {
-                uid,
-                team:      lineup.team || uid,
-                week,
-                score:     totalPts,
-                slotPts,
-                status:    allFinal ? 'final' : 'live',
-                updatedAt: Date.now(),
-                locked:    false
-              };
-
-              console.log(`  ${allFinal ? '✅' : '📡'} ${lineup.team || uid}: ${totalPts} pts ${allFinal ? '(FINAL)' : '(live)'}`);
             }
-
-            // Write all scores in one PATCH
-            if (Object.keys(scoreUpdates).length) {
-              await firebasePatch(`/leagues/fr_refresh26/season/${SEASON}/${week}.json`, scoreUpdates);
-              console.log(`\n✅ Wrote ${Object.keys(scoreUpdates).length} scores to Firebase`);
-            }
-
-            // Update week meta
-            await firebasePut(`/leagues/fr_refresh26/season/${SEASON}/meta.json`, {
-              week,
-              lastScored:  Date.now(),
-              allFinal,
-              gamesActive: activeGames.length,
-              gamesTotal:  games.length
-            });
           }
 
           main().catch(e => {
