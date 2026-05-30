@@ -651,6 +651,7 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
 <div class="wrap">
 
 <!-- HEADER -->
+<div id="hdr-sub" style="display:none;"></div>
 <div style="background:var(--hdr);border-bottom:2px solid var(--pk);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;">
   <div style="display:flex;align-items:center;gap:10px;">
     <svg style="width:34px;height:34px;flex-shrink:0;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
@@ -928,7 +929,7 @@ function loadFromCloud(){
 }
 
 function setLoading(on){
-  document.getElementById('hdr-sub').textContent = on ? 'Loading season data...' : '';
+  var sub = document.getElementById('hdr-sub'); if(sub) sub.textContent = on ? 'Loading...' : '';
 }
 
 // ── BOOT ───────────────────────────────────────────────────────
@@ -1003,7 +1004,7 @@ function renderAll(){
 
   if(!weeks.length){
     showEmpty();
-    document.getElementById('hdr-sub').textContent = 'Import Week 1 to get started';
+    var sub2 = document.getElementById('hdr-sub'); if(sub2) sub2.textContent = '';
     document.getElementById('s-left').textContent = WEEKS;
     return;
   }
