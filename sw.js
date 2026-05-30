@@ -1,7 +1,7 @@
 // Fantasy Refresh — Service Worker
 // Caches static assets for fast loads and offline support
-const CACHE_NAME    = 'fr-v2';
-const CACHE_STATIC  = 'fr-static-v2';
+const CACHE_NAME    = 'fr-v3';
+const CACHE_STATIC  = 'fr-static-v3';
 
 // Files to pre-cache on install
 const PRECACHE = [
@@ -22,7 +22,7 @@ const PRECACHE = [
 const BYPASS_PATTERNS = [
   'googleapis.com',
   'identitytoolkit',
-  'securetoken',
+  'securetoken.googleapis',
   'firebaseio.com',
   'firebaseapp.com',
   'tank01',
