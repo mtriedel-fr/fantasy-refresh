@@ -9,6 +9,7 @@
 <meta http-equiv="Expires" content="0">
 <title>Fantasy Refresh — 2025 Season Archive</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='50' fill='%23050808'/><!-- top arc teal with arrowhead --><path d='M80 50 C80 28 66 14 50 14 C34 14 20 28 20 50' fill='none' stroke='%2300E5D4' stroke-width='7' stroke-linecap='round'/><!-- teal arrowhead at top tip --><line x1='50' y1='14' x2='42' y2='24' stroke='%2300E5D4' stroke-width='7' stroke-linecap='round'/><line x1='50' y1='14' x2='58' y2='24' stroke='%2300E5D4' stroke-width='7' stroke-linecap='round'/><!-- bottom arc pink with arrowhead --><path d='M20 50 C20 72 34 86 50 86 C66 86 80 72 80 50' fill='none' stroke='%23FF5FA0' stroke-width='7' stroke-linecap='round'/><!-- pink arrowhead at bottom tip --><line x1='50' y1='86' x2='42' y2='76' stroke='%23FF5FA0' stroke-width='7' stroke-linecap='round'/><line x1='50' y1='86' x2='58' y2='76' stroke='%23FF5FA0' stroke-width='7' stroke-linecap='round'/><!-- lace seam --><line x1='35' y1='50' x2='65' y2='50' stroke='%23F0FAFA' stroke-width='2' stroke-linecap='round'/><!-- lace stitches --><line x1='46' y1='44' x2='46' y2='56' stroke='%23F0FAFA' stroke-width='2' stroke-linecap='round'/><line x1='54' y1='44' x2='54' y2='56' stroke='%23F0FAFA' stroke-width='2' stroke-linecap='round'/></svg>">
+<script src="/js/auth.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -33,7 +34,7 @@
   --ink:#0A1818;--ink2:#1A6060;--ink3:#3A8888;
   --bdr:#B8E8E0;--bdr2:#90D8D0;--red:#E8337A;--grn:#00A898;
 }
-body{background:var(--bg);min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:24px 16px;font-family:var(--fb);}
+body{background:var(--bg);padding-bottom:72px;padding-bottom:72px;min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:24px 16px;font-family:var(--fb);}
 .wrap{width:100%;max-width:960px;border-radius:16px;overflow:hidden;border:1px solid #0A2A2A;box-shadow:0 24px 80px rgba(0,210,200,.08);}
 
 /* HEADER */
@@ -638,44 +639,55 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
 
 </style>
 </head>
+<script>
+// Auth check
+(function(){
+  if(typeof FRAuth !== 'undefined' && !FRAuth.getUser()){
+    window.location.href = '/welcome.html';
+  }
+})();
+</script>
 <body>
 <div class="wrap">
 
-<div style="background:#3A0018;padding:8px 20px;font-family:var(--fd);font-size:12px;font-weight:700;color:var(--pk);text-transform:uppercase;letter-spacing:1px;text-align:center;border-bottom:1px solid var(--pk);">📦 2025 Season Archive — Read Only · <a href="/league.html" style="color:var(--or);text-decoration:none;">Go to 2026 Season →</a></div>
-<div class="hdr">
-  <div class="logo">
-    <div class="logo-box">
-      <svg viewBox="0 0 24 24"><path d="M1 4v6h6"/><path d="M23 20v-6h-6"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
-    </div>
-    <div>
-      <div class="logo-txt">Fantasy <span>Refresh</span></div>
-      <div class="logo-sub">Weekly Salary Cap League</div>
-    </div>
+<!-- HEADER -->
+<div style="background:var(--hdr);border-bottom:2px solid var(--pk);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;">
+  <div style="display:flex;align-items:center;gap:10px;">
+    <svg style="width:34px;height:34px;flex-shrink:0;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
+      <defs>
+        <linearGradient id="tlg" x1="100%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#00E5D4"/><stop offset="100%" stop-color="#00E5D4" stop-opacity="0.6"/></linearGradient>
+        <linearGradient id="plg" x1="0%" y1="100%" x2="100%" y2="0%"><stop offset="0%" stop-color="#FF5FA0"/><stop offset="100%" stop-color="#FF5FA0" stop-opacity="0.6"/></linearGradient>
+      </defs>
+      <rect x="25" y="25" width="350" height="350" rx="70" fill="#050808"/>
+      <g transform="translate(200,200) scale(3.79) translate(-475.5,-241.6)">
+        <path fill="url(#tlg)" d="M504.547,265.443h-9.019a30.964,30.964,0,0,0-29.042-52.733,1.5,1.5,0,1,0,.792,2.894,27.955,27.955,0,0,1,25.512,48.253l0-10.169h-.011a1.493,1.493,0,0,0-2.985,0h0v13.255a1.5,1.5,0,0,0,1.5,1.5h13.256a1.5,1.5,0,1,0,0-3Z"/>
+        <path fill="url(#plg)" d="M485.389,267.995a27.956,27.956,0,0,1-25.561-48.213l0,10.2h.015a1.491,1.491,0,0,0,2.978,0h.007V216.791a1.484,1.484,0,0,0-1.189-1.532l-.018-.005a1.533,1.533,0,0,0-.223-.022c-.024,0-.046-.007-.07-.007H448.071a1.5,1.5,0,0,0,0,3h8.995a30.963,30.963,0,0,0,29.115,52.664,1.5,1.5,0,0,0-.792-2.894Z"/>
+      </g>
+    </svg>
+    <div style="font-family:var(--fd);font-size:22px;font-weight:800;color:var(--ink);text-transform:uppercase;letter-spacing:.5px;">Fantasy <span style="color:var(--pk);">Refresh</span></div>
   </div>
-  <div class="hdr-r">
-    <div class="hdr-sub" id="hdr-sub">Ready to import</div>
-    <div style="display:flex;gap:6px;align-items:center;justify-content:flex-end;">
-      <button class="comm-btn" onclick="toggleComm()" id="comm-toggle" style="display:none">⚙ Commissioner</button>
-      <button class="comm-btn theme-toggle" onclick="toggleTheme()" id="theme-btn" title="Toggle light/dark mode">🌙</button>
-    </div>
+  <div style="display:flex;align-items:center;gap:6px;">
+    <div style="font-family:var(--fd);font-size:11px;font-weight:700;color:var(--pk);background:rgba(255,95,160,.1);border:1px solid rgba(255,95,160,.25);padding:4px 10px;border-radius:12px;text-transform:uppercase;letter-spacing:.5px;">📦 2025 Archive</div>
+    <button onclick="toggleTheme()" id="theme-btn" style="background:transparent;border:1px solid var(--bdr2);color:var(--ink3);font-size:15px;width:34px;height:34px;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;">🌙</button>
   </div>
 </div>
 
-<div class="wk-bar">
-  <div class="wk-bar-label">
-    <span id="wk-bar-season">2025 Archive</span>
+<div style="background:var(--hdr2);border-bottom:1px solid var(--pk);">
+  <div style="background:var(--hdr);border-bottom:1px solid var(--bdr);padding:9px 20px;display:flex;align-items:center;justify-content:space-between;">
+    <span style="font-family:var(--fd);font-size:15px;font-weight:800;color:var(--or);text-transform:uppercase;letter-spacing:.3px;">OG King/Queen of Fantasy</span>
+    <span style="font-family:var(--fd);font-size:11px;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;">2025 Season</span>
   </div>
-  <select class="wk-select" id="wk-select" onchange="setWeekFromSelect(this.value)">
-  </select>
-  <select class="season-select" id="season-select" onchange="switchSeason(this.value)" title="Switch season" style="margin-left:auto;">
-    <option value="2026">2026</option>
-    <option value="2025" selected>2025</option>
-  </select>
+  <div style="padding:8px 20px;display:flex;align-items:center;justify-content:center;gap:16px;">
+    <select class="wk-select" id="wk-select" onchange="setWeekFromSelect(this.value)"></select>
+    <select class="season-select" id="season-select" onchange="switchSeason(this.value)" title="Switch season">
+      <option value="2026">2026</option>
+      <option value="2025" selected>2025</option>
+    </select>
+  </div>
 </div>
 
 <!-- YOUR TEAM — directly below week bar -->
 <div class="my-team-bar">
-  <span class="my-team-lbl">Your team:</span>
   <input type="text" id="my-team-input" placeholder="Type your team name to highlight your row..." oninput="setMyTeam(this.value)">
 </div>
 
@@ -702,8 +714,8 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
   </div>
 </div>
 
-<!-- PRIMARY NAV TAB BAR -->
-<div class="nav-tab-bar" id="nav-tab-bar">
+<!-- PRIMARY NAV TAB BAR - hidden, replaced by bottom nav -->
+<div class="nav-tab-bar" id="nav-tab-bar" style="display:none;">
   <div class="nav-tab active" id="navtab-yourweek" onclick="handleNav('yourweek')">
     <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
     <span>Your Week</span>
@@ -3227,6 +3239,25 @@ function switchSeason(val){
   }
 }
 
+function switchBotNav(tab, btnId){
+  handleNav(tab);
+  document.querySelectorAll('nav button').forEach(function(b){
+    var lbl = b.querySelector('span:last-child');
+    if(lbl) lbl.style.color = 'var(--ink3)';
+  });
+  var btn = document.getElementById(btnId);
+  if(btn){ var lbl = btn.querySelector('span:last-child'); if(lbl) lbl.style.color = 'var(--or)'; }
+  var more = document.getElementById('more-menu');
+  if(more) more.style.display = 'none';
+}
+var moreOpen = false;
+function toggleMoreMenu(){
+  var menu = document.getElementById('more-menu');
+  if(!menu) return;
+  moreOpen = !moreOpen;
+  menu.style.display = moreOpen ? 'block' : 'none';
+}
+
 function toggleTheme(){
   var html = document.documentElement;
   var isDark = html.getAttribute('data-theme') !== 'light';
@@ -3473,12 +3504,46 @@ function showToast(msg, isErr){
 
 
 </script>
-<!-- BACK BAR -->
-<div style="position:fixed;bottom:0;left:0;right:0;background:var(--hdr);border-top:1px solid var(--bdr);padding:12px 20px;padding-bottom:calc(12px + env(safe-area-inset-bottom));display:flex;align-items:center;justify-content:space-between;z-index:50;">
-  <button onclick="window.location.href='/league.html'" style="display:flex;align-items:center;gap:6px;background:none;border:1px solid var(--bdr2);color:var(--ink2);font-family:var(--fd);font-size:13px;font-weight:700;padding:8px 16px;border-radius:8px;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;">
-    ← Back to League
+<!-- BOTTOM NAV -->
+<nav style="position:fixed;bottom:0;left:0;right:0;background:var(--hdr);border-top:1px solid var(--bdr);display:flex;align-items:center;z-index:100;padding-bottom:env(safe-area-inset-bottom);">
+  <button style="flex:1;display:flex;flex-direction:column;align-items:center;padding:10px 0 8px;gap:3px;cursor:pointer;background:transparent;border:none;" onclick="window.location.href='/league.html'">
+    <span style="font-size:18px;">🏠</span>
+    <span style="font-family:var(--fd);font-size:9px;text-transform:uppercase;letter-spacing:.5px;font-weight:700;color:var(--ink3);">Home</span>
   </button>
-  <div style="font-family:var(--fd);font-size:12px;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;">2025 Archive</div>
+  <button id="bn-week" style="flex:1;display:flex;flex-direction:column;align-items:center;padding:10px 0 8px;gap:3px;cursor:pointer;background:transparent;border:none;" onclick="switchBotNav('yourweek','bn-week')">
+    <span style="font-size:18px;">📊</span>
+    <span style="font-family:var(--fd);font-size:9px;text-transform:uppercase;letter-spacing:.5px;font-weight:700;color:var(--or);">My Week</span>
+  </button>
+  <button id="bn-season" style="flex:1;display:flex;flex-direction:column;align-items:center;padding:10px 0 8px;gap:3px;cursor:pointer;background:transparent;border:none;" onclick="switchBotNav('yourseason','bn-season')">
+    <span style="font-size:18px;">📅</span>
+    <span style="font-family:var(--fd);font-size:9px;text-transform:uppercase;letter-spacing:.5px;font-weight:700;color:var(--ink3);">Season</span>
+  </button>
+  <button id="bn-standings" style="flex:1;display:flex;flex-direction:column;align-items:center;padding:10px 0 8px;gap:3px;cursor:pointer;background:transparent;border:none;" onclick="switchBotNav('seasonwrap','bn-standings')">
+    <span style="font-size:18px;">🏆</span>
+    <span style="font-family:var(--fd);font-size:9px;text-transform:uppercase;letter-spacing:.5px;font-weight:700;color:var(--ink3);">Wrap</span>
+  </button>
+  <button id="bn-more" style="flex:1;display:flex;flex-direction:column;align-items:center;padding:10px 0 8px;gap:3px;cursor:pointer;background:transparent;border:none;" onclick="toggleMoreMenu()">
+    <span style="font-size:18px;">⚡</span>
+    <span style="font-family:var(--fd);font-size:9px;text-transform:uppercase;letter-spacing:.5px;font-weight:700;color:var(--ink3);">More</span>
+  </button>
+</nav>
+
+<!-- MORE MENU -->
+<div id="more-menu" style="display:none;position:fixed;bottom:60px;left:0;right:0;background:var(--bg2);border-top:1px solid var(--bdr2);padding:16px;z-index:99;">
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">
+    <button onclick="switchBotNav('guillotine','bn-more');toggleMoreMenu()" style="background:var(--bg3);border:1px solid var(--bdr2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;">
+      <div style="font-size:20px;margin-bottom:4px;">☠️</div>
+      <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink2);text-transform:uppercase;">Guillotine</div>
+    </button>
+    <button onclick="switchBotNav('playoffs','bn-more');toggleMoreMenu()" style="background:var(--bg3);border:1px solid var(--bdr2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;">
+      <div style="font-size:20px;margin-bottom:4px;">🎯</div>
+      <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink2);text-transform:uppercase;">Playoffs</div>
+    </button>
+    <button onclick="window.location.href='/league.html'" style="background:var(--bg3);border:1px solid var(--bdr2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;">
+      <div style="font-size:20px;margin-bottom:4px;">🏈</div>
+      <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink2);text-transform:uppercase;">2026</div>
+    </button>
+  </div>
 </div>
 </body>
 </html>
