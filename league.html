@@ -3770,19 +3770,17 @@ function switchSeason(val){
 }
 
 function toggleTheme(){
-  var html = document.documentElement;
-  var isDark = html.getAttribute('data-theme') !== 'light';
-  html.setAttribute('data-theme', isDark ? 'light' : 'dark');
-  document.getElementById('theme-btn').textContent = isDark ? '☀️' : '🌙';
-  try{ localStorage.setItem('fr_theme', isDark ? 'light' : 'dark'); }catch(e){}
+  var next = FRAuth.toggleTheme();
+  var icon = document.getElementById('pd-theme-icon');
+  var label = document.getElementById('pd-theme-label');
+  var toggle = document.getElementById('pd-theme-toggle');
+  var dot = document.getElementById('pd-toggle-dot');
+  if(icon) icon.textContent = next === 'light' ? '☀️' : '🌙';
+  if(label) label.textContent = next === 'light' ? 'Light mode' : 'Dark mode';
+  if(toggle) toggle.style.background = next === 'light' ? 'var(--or)' : 'var(--bdr2)';
+  if(dot){ dot.style.left = next === 'light' ? '22px' : '2px'; }
 }
-// Load saved theme
-(function(){
-  try{
-    var t = localStorage.getItem('fr_theme');
-    if(t){ document.documentElement.setAttribute('data-theme', t); }
-  }catch(e){}
-})();
+// Theme applied at boot via FRAuth.applyTheme() earlier in the file
 
 function setMyTeam(val){
   myTeam = val.trim();
@@ -5029,7 +5027,11 @@ document.addEventListener('DOMContentLoaded', function(){
       <div style="font-size:20px;margin-bottom:4px;">🌟</div>
       <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink2);text-transform:uppercase;">Wrap</div>
     </button>
-    <button onclick="toggleComm();toggleMoreMenu()" id="more-comm-btn" style="display:none;background:rgba(255,230,32,.08);border:1px solid rgba(255,230,32,.2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;">
+    <button onclick="window.location.href='/archive2025.html'" style="background:var(--bg3);border:1px solid var(--bdr2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;">
+      <div style="font-size:20px;margin-bottom:4px;">📦</div>
+      <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink2);text-transform:uppercase;">2025</div>
+    </button>
+    <button onclick="toggleComm();toggleMoreMenu()" id="more-comm-btn" style="display:none;background:rgba(0,229,212,.08);border:1px solid rgba(0,229,212,.2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;">
       <div style="font-size:20px;margin-bottom:4px;">⚙️</div>
       <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--or);text-transform:uppercase;">Comm</div>
     </button>
