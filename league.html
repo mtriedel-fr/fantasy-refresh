@@ -1203,7 +1203,54 @@ function toggleTheme(){
 })();
 
 // ── COMMISSIONER ACCESS ────────────────────────────────────────────
-// ── APPLY TEAM NAME ───────────────────────────────────────────────
+// ── TEAM NAME EDIT ────────────────────────────────────────────────
+function editTeamName(){
+  var disp = document.getElementById('my-team-display');
+  var edit = document.getElementById('my-team-edit');
+  var inp  = document.getElementById('my-team-input');
+  if(disp) disp.style.display = 'none';
+  if(edit) edit.style.display = 'flex';
+  if(inp){  inp.value = myTeam || ''; inp.focus(); }
+}
+
+function cancelTeamEdit(){
+  var disp = document.getElementById('my-team-display');
+  var edit = document.getElementById('my-team-edit');
+  if(disp) disp.style.display = 'flex';
+  if(edit) edit.style.display = 'none';
+}
+
+function confirmTeamName(){
+  var inp  = document.getElementById('my-team-input');
+  var name = inp ? inp.value.trim() : '';
+  if(!name){ cancelTeamEdit(); return; }
+
+  var user = FRAuth.getUser();
+  if(!user) return;
+
+  var ctx      = FRAuth.getLeagueCtx();
+  var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+
+  // Optimistic update
+  applyTeamName(name);
+  cancelTeamEdit();
+
+  // Write to Firebase
+  FR.fb.patch(FR.paths.member(user.uid), { teamName: name })
+    .then(function(){
+      // Update user object
+      user.teamName = name;
+      user.team2026 = name;
+      FRAuth.setUser(user);
+      try{ localStorage.setItem('fr_teamname_' + leagueId, name); }catch(e){}
+      showToast('Team name updated ✓');
+    })
+    .catch(function(){
+      showToast('Could not save — try again', true);
+    });
+}
+
+
 function applyTeamName(name){
   myTeam = name;
   try{ localStorage.setItem('fr_myteam', name); }catch(e){}
@@ -4778,7 +4825,7 @@ function removeCommissioner(uid){
 
     <!-- Edit Team Name -->
     <div style="border-top:1px solid var(--bdr);">
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 24px;cursor:pointer;" onclick="closeProfileDrawer();setTimeout(function(){ var disp=document.getElementById('my-team-display'); var edit=document.getElementById('my-team-edit'); if(disp) disp.style.display='none'; if(edit){ edit.style.display='flex'; var inp=document.getElementById('my-team-input'); if(inp){ inp.value=myTeam||''; inp.focus(); } } },200)">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 24px;cursor:pointer;" onclick="closeProfileDrawer();setTimeout(editTeamName,200)">
         <div style="display:flex;align-items:center;gap:12px;">
           <span style="font-size:18px;">✏️</span>
           <div>
