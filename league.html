@@ -4778,7 +4778,7 @@ function removeCommissioner(uid){
 
     <!-- Edit Team Name -->
     <div style="border-top:1px solid var(--bdr);">
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 24px;cursor:pointer;" onclick="closeProfileDrawer();setTimeout(editTeamName,200)">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 24px;cursor:pointer;" onclick="closeProfileDrawer();setTimeout(function(){ var disp=document.getElementById('my-team-display'); var edit=document.getElementById('my-team-edit'); if(disp) disp.style.display='none'; if(edit){ edit.style.display='flex'; var inp=document.getElementById('my-team-input'); if(inp){ inp.value=myTeam||''; inp.focus(); } } },200)">
         <div style="display:flex;align-items:center;gap:12px;">
           <span style="font-size:18px;">✏️</span>
           <div>
@@ -5026,10 +5026,6 @@ document.addEventListener('DOMContentLoaded', function(){
     <button onclick="switchBottomNav('season','bn-more');toggleMoreMenu()" style="background:var(--bg3);border:1px solid var(--bdr2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;">
       <div style="font-size:20px;margin-bottom:4px;">🌟</div>
       <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink2);text-transform:uppercase;">Wrap</div>
-    </button>
-    <button onclick="window.location.href='/archive2025.html'" style="background:var(--bg3);border:1px solid var(--bdr2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;">
-      <div style="font-size:20px;margin-bottom:4px;">📦</div>
-      <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink2);text-transform:uppercase;">2025</div>
     </button>
     <button onclick="toggleComm();toggleMoreMenu()" id="more-comm-btn" style="display:none;background:rgba(0,229,212,.08);border:1px solid rgba(0,229,212,.2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;">
       <div style="font-size:20px;margin-bottom:4px;">⚙️</div>

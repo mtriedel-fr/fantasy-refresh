@@ -242,7 +242,6 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
   <h1 class="hero-title" style="font-size:clamp(72px,18vw,148px);margin-bottom:18px;"><span class="pk">PROVE IT!</span></h1>
   <p class="hero-sub">Fresh roster every week. Salary cap every week. 18 chances to prove you're better than everyone else — no luck, no excuses.</p>
   <div class="hero-btns">
-    <button class="btn-primary" onclick="goTo('auth.html?mode=signup')">Create Account →</button>
     <button class="btn-secondary" onclick="scrollToHow()">How It Works</button>
   </div>
 
@@ -427,7 +426,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
 <!-- FOOTER -->
 <footer class="footer">
   <div class="footer-logo">Fantasy<span>Refresh</span></div>
-  <div class="footer-text">Fantasy Refresh · Est. 2026</div>
+  <div class="footer-text" style="text-align:center;margin-top:4px;">Est. 2026</div>
 </footer>
 
 <script>
@@ -441,7 +440,11 @@ function toggleTheme() {
   document.getElementById('theme-toggle').textContent = next === 'light' ? '☀️' : '🌙';
 }
 (function() {
-  var t = FRAuth.applyTheme();
+  // Default to dark — only respect saved preference if explicitly set
+  var saved = null;
+  try { saved = localStorage.getItem('fr_theme'); } catch(e) {}
+  var t = saved || 'dark';
+  document.documentElement.setAttribute('data-theme', t);
   window.addEventListener('DOMContentLoaded', function() {
     var btn = document.getElementById('theme-toggle');
     if (btn) btn.textContent = t === 'light' ? '☀️' : '🌙';
