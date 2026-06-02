@@ -812,7 +812,7 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
   <!-- Edit mode (hidden by default, triggered from profile drawer) -->
   <div id="my-team-edit" style="display:none;flex:1;align-items:center;gap:6px;">
     <input type="text" id="my-team-input" placeholder="Your team name..." maxlength="30"
-      style="flex:1;max-width:240px;"
+      style="flex:1;max-width:240px;font-size:16px;"
       oninput="setMyTeam(this.value)"
       onkeydown="if(event.key==='Enter')confirmTeamName();if(event.key==='Escape')cancelTeamEdit()">
     <button onclick="confirmTeamName()" style="background:var(--or);border:none;border-radius:6px;padding:4px 12px;font-family:var(--fd);font-size:11px;font-weight:800;color:#050808;cursor:pointer;text-transform:uppercase;">Save</button>
@@ -1234,6 +1234,8 @@ function confirmTeamName(){
   // Optimistic update
   applyTeamName(name);
   cancelTeamEdit();
+  // Blur any focused element to dismiss keyboard and reset zoom on iOS
+  if(document.activeElement) document.activeElement.blur();
 
   // Write to Firebase
   FR.fb.patch(FR.paths.member(user.uid), { teamName: name })
