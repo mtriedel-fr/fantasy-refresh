@@ -2312,6 +2312,7 @@ function renderPreseasonRoster(){
 }
 
 // ── SHOW EMPTY ────────────────────────────────────────────────────
+function showEmpty(){
   var seasonStart = new Date('2026-09-03');
   var now = new Date();
   var days = Math.ceil((seasonStart - now) / (1000 * 60 * 60 * 24));
