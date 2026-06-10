@@ -879,13 +879,10 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
 <!-- YOUR WEEK — My Lineup / Weekly Standing / Weekly Numbers -->
 <div id="tab-yourweek" class="content">
   <div class="sub-tabs-scroll">
-    <div class="sub-tabs" style="display:flex;align-items:center;justify-content:space-between;">
-      <div style="display:flex;">
-        <div class="sub-tab active" onclick="showSubTab(this,'mylineup','yourweek')">👤 My Lineup</div>
-        <div class="sub-tab" onclick="showSubTab(this,'weeklystanding','yourweek')">📊 Weekly Standing</div>
-        <div class="sub-tab" onclick="showSubTab(this,'numbers','yourweek')">🔢 Weekly Numbers</div>
-      </div>
-      <a href="/draft.html" style="font-family:var(--fd);font-size:11px;font-weight:800;color:var(--or);text-decoration:none;background:rgba(0,229,212,.1);border:1px solid rgba(0,229,212,.25);padding:5px 12px;border-radius:8px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;margin-right:8px;">📋 Draft</a>
+    <div class="sub-tabs">
+      <div class="sub-tab active" onclick="showSubTab(this,'mylineup','yourweek')">👤 My Lineup</div>
+      <div class="sub-tab" onclick="showSubTab(this,'weeklystanding','yourweek')">📊 Weekly Standing</div>
+      <div class="sub-tab" onclick="showSubTab(this,'numbers','yourweek')">🔢 Weekly Numbers</div>
     </div>
   </div>
   <div id="sub-mylineup"><div id="wt"></div></div>
@@ -2319,8 +2316,9 @@ function showEmpty(){
       + '</div>';
   }).join('');
   var lineupHtml = '<div style="background:var(--bg2);border-radius:12px;border:1px solid var(--bdr);overflow:hidden;margin:12px 0;">'
-    + '<div style="padding:10px 16px;border-bottom:1px solid var(--bdr);">'
-    + '<span style="font-family:var(--fd);font-size:13px;font-weight:700;color:var(--ink2);text-transform:uppercase;letter-spacing:.5px;">Week 1 Lineup — Not yet drafted</span>'
+    + '<div style="padding:10px 16px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;">'
+    + '<span style="font-family:var(--fd);font-size:13px;font-weight:700;color:var(--ink2);text-transform:uppercase;letter-spacing:.5px;">Week 1 Lineup</span>'
+    + '<a href="/draft.html" style="font-family:var(--fd);font-size:11px;font-weight:800;color:var(--or);text-decoration:none;background:rgba(0,229,212,.1);border:1px solid rgba(0,229,212,.25);padding:5px 12px;border-radius:8px;text-transform:uppercase;letter-spacing:.5px;">📋 Draft</a>'
     + '</div>' + slotRows + '</div>';
 
   // Countdown for season/other views
@@ -3548,7 +3546,7 @@ function renderMyTeam(sorted, curEntries, prevRank, curMap){
     + '<div class="myteam-stat"><div class="myteam-stat-lbl">Movement</div><div class="myteam-stat-val ' + moveClass + '">' + moveStr + '</div></div>'
     + '</div>'
     + dotPlot
-    + (players.length ? '<div class="myteam-lineup"><div class="myteam-lineup-title">Your lineup · League start % shown</div><div class="lineup-grid">' + lineupSlots + '</div></div>' : '')
+    + (players.length ? '<div class="myteam-lineup"><div class="myteam-lineup-title" style="display:flex;align-items:center;justify-content:space-between;"><span>Your lineup · League start % shown</span><a href="/draft.html" style="font-family:var(--fd);font-size:11px;font-weight:800;color:var(--or);text-decoration:none;background:rgba(0,229,212,.1);border:1px solid rgba(0,229,212,.25);padding:4px 10px;border-radius:8px;text-transform:uppercase;letter-spacing:.5px;">📋 Draft</a></div><div class="lineup-grid">' + lineupSlots + '</div></div>' : '')
     + '</div></div>';
 }
 
