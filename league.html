@@ -2289,24 +2289,11 @@ function renderPreseasonRoster(){
         + '<th class="rk">#</th><th>Team</th><th>Wk Pts</th><th>Season</th><th></th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table>';
 
-      // Show in standings and weekly standing panels
+      // Show in standings panels only — not My Lineup
       var sw = document.getElementById('sw');
       var wf = document.getElementById('wf');
-      var wt = document.getElementById('wt');
       if(sw) sw.innerHTML = html;
       if(wf) wf.innerHTML = html;
-      // Also show in my lineup panel as member list
-      if(wt) wt.innerHTML = '<div style="padding:12px 16px 4px;font-family:var(--fd);font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;">'
-        + memberCount + ' members registered</div>'
-        + '<table class="st-table"><thead><tr><th class="rk">#</th><th>Team</th></tr></thead><tbody>'
-        + Object.values(members).filter(function(m){ return m && m.teamName && m.active !== false; })
-          .sort(function(a,b){ return (a.teamName||'').localeCompare(b.teamName||''); })
-          .map(function(m, i){
-            var isMe = myTeam && m.teamName && m.teamName.toLowerCase() === myTeam.toLowerCase();
-            return '<tr' + (isMe ? ' class="my-team"' : '') + '><td class="rk">' + (i+1) + '</td>'
-              + '<td style="font-family:var(--fd);font-size:14px;font-weight:700;color:' + (isMe ? 'var(--or)' : 'var(--ink)') + ';">' + m.teamName + '</td></tr>';
-          }).join('')
-        + '</tbody></table>';
     })
     .catch(function(){});
 }
@@ -2325,7 +2312,8 @@ function showEmpty(){
       '<div style="font-family:var(--fd);font-size:11px;color:var(--ink3);margin-top:10px;text-transform:uppercase;letter-spacing:.5px;">Sep 3, 2026</div>' +
       '</div></div>'
     : '<div style="display:flex;justify-content:center;padding:48px 20px;"><div style="font-family:var(--fd);font-size:18px;font-weight:800;color:var(--or);text-transform:uppercase;">Season starting soon</div></div>';
-  ['sw','mw','wt','wf','wn','my-season-wrap'].forEach(function(id){
+  // Show countdown in week panels only — standings handled by renderPreseasonRoster
+  ['wt','wf','wn','my-season-wrap'].forEach(function(id){
     var el = document.getElementById(id);
     if(el) el.innerHTML = msg;
   });
