@@ -1629,22 +1629,25 @@ function renderAll(){
 
 // ── GUILLOTINE ────────────────────────────────────────────────
 function buildElimSchedule(totalTeams, totalWeeks){
-  // Eliminate down to 3 teams by END of week 17
-  // Week 18 is the finale — 1st/2nd determined by week 18 score
-  var weeksToElim = totalWeeks - 1; // weeks 1-17
+  // Eliminate down to 3 teams by END of week 16
+  // Week 17 is the finale — 1st/2nd/3rd determined by week 17 score
+  var finaleWeek = 17;
+  var weeksToElim = finaleWeek - 1; // weeks 1-16
   var toElim = totalTeams - 3;
   var base = Math.floor(toElim / weeksToElim);
   var extra = toElim % weeksToElim;
   var schedule = [];
   var remaining = totalTeams;
   for(var w = 1; w <= totalWeeks; w++){
-    if(w < totalWeeks){
+    if(w < finaleWeek){
       var elim = base + (w <= extra ? 1 : 0);
       remaining -= elim;
       schedule.push({week: w, eliminate: elim, remaining: remaining, finale: false});
-    } else {
-      // Week 18: finale — no eliminations, just rank by score
+    } else if(w === finaleWeek){
       schedule.push({week: w, eliminate: 0, remaining: remaining, finale: true});
+    } else {
+      // weeks 18+ not used in guillotine
+      schedule.push({week: w, eliminate: 0, remaining: remaining, finale: false});
     }
   }
   return schedule;
@@ -1665,7 +1668,7 @@ function renderGuillotine(){
     FR.fb.get('/leagues/' + leagueId + '/members')
       .then(function(members){
         var total = members ? Object.values(members).filter(function(m){ return m && m.teamName && m.active !== false; }).length : 0;
-        var playWeeks = 17; // weeks 1-17 have eliminations, week 18 is finale
+        var playWeeks = 16; // weeks 1-16 have eliminations, week 17 is finale
         var perWeek = total > 0 ? (total - 3) / playWeeks : 1; // 3 survive to finale
         var elimPerWeek = Math.max(1, Math.round(perWeek));
 
@@ -1693,7 +1696,7 @@ function renderGuillotine(){
           + (total > 0 ? '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--bdr);border-radius:12px;overflow:hidden;margin-bottom:16px;">'
           + '<div style="background:var(--bg2);padding:14px 8px;text-align:center;"><div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;">Teams</div><div style="font-family:var(--fd);font-size:26px;font-weight:900;color:var(--or);">' + total + '</div></div>'
           + '<div style="background:var(--bg2);padding:14px 8px;text-align:center;"><div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;">Avg/Week</div><div style="font-family:var(--fd);font-size:26px;font-weight:900;color:var(--pk);">-' + elimPerWeek + '</div></div>'
-          + '<div style="background:var(--bg2);padding:14px 8px;text-align:center;"><div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;">Finale</div><div style="font-family:var(--fd);font-size:26px;font-weight:900;color:var(--pu);">Wk 18</div></div>'
+          + '<div style="background:var(--bg2);padding:14px 8px;text-align:center;"><div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;">Finale</div><div style="font-family:var(--fd);font-size:26px;font-weight:900;color:var(--pu);">Wk 17</div></div>'
           + '</div>' : '')
 
           // Rules
@@ -1701,15 +1704,15 @@ function renderGuillotine(){
           + '<div style="font-family:var(--fd);font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">How It Works</div>'
           + '<div style="display:flex;gap:10px;margin-bottom:10px;"><span style="font-size:16px;flex-shrink:0;">📋</span><div style="font-size:13px;color:var(--ink2);line-height:1.5;">Draft your lineup every week like normal — salary cap applies.</div></div>'
           + '<div style="display:flex;gap:10px;margin-bottom:10px;"><span style="font-size:16px;flex-shrink:0;">☠️</span><div style="font-size:13px;color:var(--ink2);line-height:1.5;">After scores lock Tuesday, the lowest scorer is eliminated for good.</div></div>'
-          + '<div style="display:flex;gap:10px;margin-bottom:10px;"><span style="font-size:16px;flex-shrink:0;">📉</span><div style="font-size:13px;color:var(--ink2);line-height:1.5;">More teams are cut in later weeks as the field gets smaller.</div></div>'
-          + '<div style="display:flex;gap:10px;"><span style="font-size:16px;flex-shrink:0;">🏆</span><div style="font-size:13px;color:var(--ink2);line-height:1.5;">Week 18 is the finale — the last 3 surviving teams compete for 1st, 2nd, and 3rd.</div></div>'
+          + '<div style="display:flex;gap:10px;margin-bottom:10px;"><span style="font-size:16px;flex-shrink:0;">📉</span><div style="font-size:13px;color:var(--ink2);line-height:1.5;">The same number of teams are eliminated each week, spread as evenly as possible across 16 weeks.</div></div>'
+          + '<div style="display:flex;gap:10px;"><span style="font-size:16px;flex-shrink:0;">🏆</span><div style="font-size:13px;color:var(--ink2);line-height:1.5;">Week 17 is the finale — the last surviving teams compete for 1st, 2nd, and 3rd.</div></div>'
           + '</div>'
 
           // Schedule preview
           + (schedule.length > 0 ? '<div style="background:var(--bg2);border-radius:12px;border:1px solid var(--bdr);padding:16px;">'
           + '<div style="font-family:var(--fd);font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Elimination Schedule (first 6 weeks)</div>'
           + schedRows
-          + '<div style="font-family:var(--fd);font-size:11px;color:var(--ink3);text-align:center;padding-top:10px;text-transform:uppercase;letter-spacing:.5px;">Full schedule starts after Week 1 data is imported</div>'
+          + '<div style="font-family:var(--fd);font-size:11px;color:var(--ink3);text-align:center;padding-top:10px;text-transform:uppercase;letter-spacing:.5px;">Full schedule visible after Week 1 data is imported · Finale: Week 17</div>'
           + '</div>' : '')
 
           + '</div>';
