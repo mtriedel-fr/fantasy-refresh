@@ -1659,9 +1659,68 @@ function renderGuillotine(){
   }).map(Number).sort(function(a,b){ return a-b; });
 
   if(!weeks.length){
-    el.innerHTML = '<div class="sw-locked"><div class="sw-locked-icon">⚔️</div>'
-      + '<div class="sw-locked-title">No data imported yet</div>'
-      + '<div class="sw-locked-sub">Import Week 1 to start the Guillotine.</div></div>';
+    // Load member count for the explainer
+    var ctx = FRAuth.getLeagueCtx();
+    var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+    FR.fb.get('/leagues/' + leagueId + '/members')
+      .then(function(members){
+        var total = members ? Object.values(members).filter(function(m){ return m && m.teamName && m.active !== false; }).length : 0;
+        var playWeeks = 17; // weeks 1-17 have eliminations, week 18 is finale
+        var perWeek = total > 0 ? (total - 3) / playWeeks : 1; // 3 survive to finale
+        var elimPerWeek = Math.max(1, Math.round(perWeek));
+
+        // Build elimination schedule preview
+        var schedule = total > 0 ? buildElimSchedule(total, 18) : [];
+        var schedRows = schedule.filter(function(s){ return !s.finale; }).slice(0, 6).map(function(s){
+          return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--bdr);">'
+            + '<span style="font-family:var(--fd);font-size:13px;font-weight:700;color:var(--ink2);">Week ' + s.week + '</span>'
+            + '<span style="font-family:var(--fd);font-size:12px;color:var(--pk);">-' + s.eliminate + ' eliminated</span>'
+            + '<span style="font-family:var(--fd);font-size:12px;color:var(--ink3);">' + s.remaining + ' survive</span>'
+            + '</div>';
+        }).join('');
+
+        el.innerHTML = ''
+          + '<div style="padding:16px;">'
+
+          // Header
+          + '<div style="background:linear-gradient(135deg,rgba(255,95,160,.08),rgba(155,109,255,.08));border:1px solid rgba(255,95,160,.2);border-radius:16px;padding:20px;margin-bottom:16px;text-align:center;">'
+          + '<div style="font-size:36px;margin-bottom:8px;">☠️</div>'
+          + '<div style="font-family:var(--fd);font-size:22px;font-weight:900;color:var(--pk);text-transform:uppercase;letter-spacing:.3px;margin-bottom:6px;">Guillotine Mode</div>'
+          + '<div style="font-size:13px;color:var(--ink2);line-height:1.6;max-width:300px;margin:0 auto;">Every week the lowest scorer gets cut. No second chances. Last team standing wins.</div>'
+          + '</div>'
+
+          // Stats row
+          + (total > 0 ? '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--bdr);border-radius:12px;overflow:hidden;margin-bottom:16px;">'
+          + '<div style="background:var(--bg2);padding:14px 8px;text-align:center;"><div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;">Teams</div><div style="font-family:var(--fd);font-size:26px;font-weight:900;color:var(--or);">' + total + '</div></div>'
+          + '<div style="background:var(--bg2);padding:14px 8px;text-align:center;"><div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;">Avg/Week</div><div style="font-family:var(--fd);font-size:26px;font-weight:900;color:var(--pk);">-' + elimPerWeek + '</div></div>'
+          + '<div style="background:var(--bg2);padding:14px 8px;text-align:center;"><div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;">Finale</div><div style="font-family:var(--fd);font-size:26px;font-weight:900;color:var(--pu);">Wk 18</div></div>'
+          + '</div>' : '')
+
+          // Rules
+          + '<div style="background:var(--bg2);border-radius:12px;border:1px solid var(--bdr);padding:16px;margin-bottom:16px;">'
+          + '<div style="font-family:var(--fd);font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">How It Works</div>'
+          + '<div style="display:flex;gap:10px;margin-bottom:10px;"><span style="font-size:16px;flex-shrink:0;">📋</span><div style="font-size:13px;color:var(--ink2);line-height:1.5;">Draft your lineup every week like normal — salary cap applies.</div></div>'
+          + '<div style="display:flex;gap:10px;margin-bottom:10px;"><span style="font-size:16px;flex-shrink:0;">☠️</span><div style="font-size:13px;color:var(--ink2);line-height:1.5;">After scores lock Tuesday, the lowest scorer is eliminated for good.</div></div>'
+          + '<div style="display:flex;gap:10px;margin-bottom:10px;"><span style="font-size:16px;flex-shrink:0;">📉</span><div style="font-size:13px;color:var(--ink2);line-height:1.5;">More teams are cut in later weeks as the field gets smaller.</div></div>'
+          + '<div style="display:flex;gap:10px;"><span style="font-size:16px;flex-shrink:0;">🏆</span><div style="font-size:13px;color:var(--ink2);line-height:1.5;">Week 18 is the finale — the last 3 surviving teams compete for 1st, 2nd, and 3rd.</div></div>'
+          + '</div>'
+
+          // Schedule preview
+          + (schedule.length > 0 ? '<div style="background:var(--bg2);border-radius:12px;border:1px solid var(--bdr);padding:16px;">'
+          + '<div style="font-family:var(--fd);font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Elimination Schedule (first 6 weeks)</div>'
+          + schedRows
+          + '<div style="font-family:var(--fd);font-size:11px;color:var(--ink3);text-align:center;padding-top:10px;text-transform:uppercase;letter-spacing:.5px;">Full schedule starts after Week 1 data is imported</div>'
+          + '</div>' : '')
+
+          + '</div>';
+      })
+      .catch(function(){
+        el.innerHTML = '<div style="padding:32px;text-align:center;">'
+          + '<div style="font-size:36px;margin-bottom:12px;">☠️</div>'
+          + '<div style="font-family:var(--fd);font-size:18px;font-weight:800;color:var(--pk);text-transform:uppercase;">Guillotine Mode</div>'
+          + '<div style="font-size:13px;color:var(--ink3);margin-top:8px;line-height:1.6;">Every week the lowest scorer is eliminated. Season data will show here once Week 1 is imported.</div>'
+          + '</div>';
+      });
     return;
   }
 
