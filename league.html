@@ -1535,6 +1535,10 @@ function renderAll(){
     return;
   }
 
+  // Update Season tab label based on completion
+  var bnSeason = document.getElementById('bn-season');
+  if(bnSeason){ var lbl = bnSeason.querySelector('.bn-label'); if(lbl) lbl.textContent = weeks.length >= WEEKS ? 'Wrap' : 'Season'; }
+
   // Cumulative totals
   var totals = {};
   weeks.forEach(function(w){
@@ -4139,8 +4143,31 @@ function handleNav(val){
   if(val === 'league'){ document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); }); document.getElementById('tab-league').classList.remove('hidden'); document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); }); document.getElementById('navtab-league').classList.add('active'); return; }
   if(val === 'playoffs'){ window.location.href = 'playoffs.html'; return; }
   if(val === 'guillotine'){ document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); }); document.getElementById('tab-guillotine').classList.remove('hidden'); document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); }); document.getElementById('navtab-guillotine').classList.add('active'); renderGuillotine(); return; }
-  // Hide all content
-  document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); });
+  if(val === 'yourseason'){
+    // Check if season is complete — if so show Season Wrap instead
+    var completedWeeks = Object.keys(seasonData).filter(function(k){
+      return !isNaN(Number(k)) && seasonData[k] && seasonData[k].length > 0;
+    }).length;
+    if(completedWeeks >= WEEKS){
+      // Season complete — show wrap
+      document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); });
+      document.getElementById('tab-seasonwrap').classList.remove('hidden');
+      document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); });
+      document.getElementById('navtab-seasonwrap').classList.add('active');
+      renderSeasonWrap();
+      // Update bottom nav label
+      var bnSeason = document.getElementById('bn-season');
+      if(bnSeason){ var lbl = bnSeason.querySelector('.bn-label'); if(lbl) lbl.textContent = 'Wrap'; }
+      return;
+    }
+    // Season in progress — show normal season view
+    document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); });
+    document.getElementById('tab-yourseason').classList.remove('hidden');
+    document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); });
+    document.getElementById('navtab-yourseason').classList.add('active');
+    updateSeasonStats();
+    return;
+  }
   var panel = document.getElementById('tab-' + val);
   if(panel) panel.classList.remove('hidden');
   // Update tab bar active state
@@ -5195,10 +5222,6 @@ document.addEventListener('DOMContentLoaded', function(){
     <button onclick="switchBottomNav('playoffs','bn-more');toggleMoreMenu()" style="background:var(--bg3);border:1px solid var(--bdr2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;">
       <div style="font-size:20px;margin-bottom:4px;">🎯</div>
       <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink2);text-transform:uppercase;">Playoffs</div>
-    </button>
-    <button onclick="switchBottomNav('seasonwrap','bn-more');toggleMoreMenu()" style="background:var(--bg3);border:1px solid var(--bdr2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;">
-      <div style="font-size:20px;margin-bottom:4px;">🌟</div>
-      <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink2);text-transform:uppercase;">Wrap</div>
     </button>
     <button onclick="window.location.href='/archive2025.html'" style="background:var(--bg3);border:1px solid var(--bdr2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;">
       <div style="font-size:20px;margin-bottom:4px;">📦</div>
