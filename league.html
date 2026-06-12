@@ -5319,6 +5319,13 @@ function switchBottomNav(tabName, btnId, subTab){
 }
 
 var moreMenuOpen = false;
+function closeMoreMenu(){
+  var menu = document.getElementById('more-menu');
+  if(menu) menu.style.display = 'none';
+  moreMenuOpen = false;
+  var btn = document.getElementById('bn-more');
+  if(btn) btn.classList.remove('active');
+}
 function toggleMoreMenu(){
   var menu = document.getElementById('more-menu');
   if(!menu) return;
@@ -5371,15 +5378,15 @@ document.addEventListener('DOMContentLoaded', function(){
 
 <!-- BOTTOM NAV -->
 <nav class="bottom-nav" id="bottom-nav">
-  <button class="bn-item" onclick="window.location.href='/home.html'">
+  <button class="bn-item" onclick="closeMoreMenu();window.location.href='/home.html'">
     <span class="bn-icon">🏠</span>
     <span class="bn-label">Home</span>
   </button>
-  <button class="bn-item active" id="bn-week" onclick="switchBottomNav('yourweek','bn-week','mylineup')">
+  <button class="bn-item active" id="bn-week" onclick="closeMoreMenu();switchBottomNav('yourweek','bn-week','mylineup')">
     <span class="bn-icon">📊</span>
     <span class="bn-label">My Week</span>
   </button>
-  <button class="bn-item" id="bn-season" onclick="switchBottomNav('yourseason','bn-season','standings')">
+  <button class="bn-item" id="bn-season" onclick="closeMoreMenu();switchBottomNav('yourseason','bn-season','standings')">
     <span class="bn-icon">📅</span>
     <span class="bn-label">Season</span>
   </button>
