@@ -2325,69 +2325,170 @@ function renderSeasonWrap(){
 
 
 // ── LEAGUE INFO PAGE ──────────────────────────────────────────────
+// ── LEAGUE INFO PAGE ──────────────────────────────────────────────
 function renderLeague(){
   var el = document.getElementById('wleague');
   if(!el) return;
 
-  var ctx    = FRAuth.getLeagueCtx();
+  var ctx      = FRAuth.getLeagueCtx();
   var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
 
   FR.fb.get('/leagues/' + leagueId + '/settings')
     .then(function(s){
       if(!s) return;
 
-      var format     = s.format || 'cumulative';
-      var cap        = s.cap || 60000;
-      var guillotine = s.guillotine !== false;
       var name       = s.name || 'Fantasy Refresh';
       var season     = s.season || 2026;
+      var cap        = s.cap || 60000;
+      var format     = s.format || 'cumulative';
+      var guillotine = s.guillotine !== false;
 
-      // Get member count
+      // Scoring — reads from settings.scoring, falls back to our defaults
+      var sc = s.scoring || {};
+      var passTD       = sc.passTD       !== undefined ? sc.passTD       : 4;
+      var passInt      = sc.passInt      !== undefined ? sc.passInt      : -2;
+      var passYds      = sc.passYds      !== undefined ? sc.passYds      : 0.04;
+      var pass300Bonus = sc.pass300Bonus !== undefined ? sc.pass300Bonus : 3;
+      var rushTD       = sc.rushTD       !== undefined ? sc.rushTD       : 6;
+      var rushYds      = sc.rushYds      !== undefined ? sc.rushYds      : 0.1;
+      var rush100Bonus = sc.rush100Bonus !== undefined ? sc.rush100Bonus : 3;
+      var rec          = sc.rec          !== undefined ? sc.rec          : 1;
+      var recTD        = sc.recTD        !== undefined ? sc.recTD        : 6;
+      var recYds       = sc.recYds       !== undefined ? sc.recYds       : 0.1;
+      var rec100Bonus  = sc.rec100Bonus  !== undefined ? sc.rec100Bonus  : 3;
+      var fumbLost     = sc.fumbLost     !== undefined ? sc.fumbLost     : -1;
+      var twoPt        = sc.twoPt        !== undefined ? sc.twoPt        : 2;
+      var defSack      = sc.defSack      !== undefined ? sc.defSack      : 1;
+      var defInt       = sc.defInt       !== undefined ? sc.defInt       : 2;
+      var defFumbRec   = sc.defFumbRec   !== undefined ? sc.defFumbRec   : 2;
+      var defTD        = sc.defTD        !== undefined ? sc.defTD        : 6;
+      var defSafety    = sc.defSafety    !== undefined ? sc.defSafety    : 2;
+      var defBlkKick   = sc.defBlkKick   !== undefined ? sc.defBlkKick   : 2;
+
+      // Playoff settings
+      var po          = s.playoffs || {};
+      var tiers       = po.tiers      || 3;
+      var playoffStart = po.startWeek || 15;
+      var finaleWeek  = po.finaleWeek || 18;
+
+      // Helpers
+      function pts(v){
+        var n = parseFloat(v);
+        var str = n >= 0 ? '+' + n : '' + n;
+        return '<span style="font-family:var(--fd);font-size:13px;font-weight:800;color:' + (n >= 0 ? 'var(--or)' : 'var(--pk)') + ';">' + str + ' pts</span>';
+      }
+      function yds(v){
+        var ydsPer = Math.round(1 / parseFloat(v));
+        return '<span style="font-family:var(--fd);font-size:13px;font-weight:800;color:var(--or);">+1 pt / ' + ydsPer + ' yds</span>';
+      }
+      function row(label, val){
+        return '<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--bdr);">'
+          + '<span style="font-size:12px;color:var(--ink2);">' + label + '</span>' + val + '</div>';
+      }
+      function sectionHdr(txt){
+        return '<div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;margin:12px 0 6px;">' + txt + '</div>';
+      }
+
       FR.fb.get('/leagues/' + leagueId + '/members')
         .then(function(members){
-          var total = members ? Object.values(members).filter(function(m){ return m && m.teamName && m.active !== false; }).length : 0;
+          var total        = members ? Object.values(members).filter(function(m){ return m && m.teamName && m.active !== false; }).length : 0;
           var elimSchedule = total > 0 ? buildElimSchedule(total, 18) : [];
           var elimPerWeek  = elimSchedule.length ? elimSchedule[0].eliminate : 1;
+          var tierSize     = total > 0 ? Math.floor(total / tiers) : '—';
+
+          // Winners
+          var winnersHtml = '';
+          for(var t = 1; t <= tiers; t++){
+            var tierColor = t === 1 ? 'var(--or)' : t === 2 ? 'var(--pu)' : 'var(--ink2)';
+            winnersHtml += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">'
+              + '<span style="font-family:var(--fd);font-size:11px;font-weight:700;color:' + tierColor + ';text-transform:uppercase;min-width:52px;background:rgba(255,255,255,.05);padding:2px 6px;border-radius:4px;">Tier ' + t + '</span>'
+              + '<span style="font-size:12px;color:var(--ink2);">1st · 2nd · 3rd</span>'
+              + '</div>';
+          }
+          winnersHtml += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">'
+            + '<span style="font-family:var(--fd);font-size:11px;font-weight:700;color:var(--or);text-transform:uppercase;min-width:52px;background:rgba(0,229,212,.08);padding:2px 6px;border-radius:4px;">Season</span>'
+            + '<span style="font-size:12px;color:var(--ink2);">Highest Cumulative Score</span></div>';
+          if(guillotine){
+            winnersHtml += '<div style="display:flex;align-items:center;gap:8px;">'
+              + '<span style="font-family:var(--fd);font-size:11px;font-weight:700;color:var(--pk);text-transform:uppercase;min-width:52px;background:rgba(255,95,160,.08);padding:2px 6px;border-radius:4px;">Guillo.</span>'
+              + '<span style="font-size:12px;color:var(--ink2);">Last Team Standing</span></div>';
+          }
 
           el.innerHTML = '<div style="padding:16px;">'
 
-            // League header
+            // Header
             + '<div style="background:linear-gradient(135deg,rgba(0,229,212,.08),rgba(255,95,160,.06));border:1px solid rgba(0,229,212,.2);border-radius:16px;padding:20px;margin-bottom:16px;text-align:center;">'
-            + '<div style="font-family:var(--fd);font-size:24px;font-weight:900;color:var(--or);text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px;">' + name + '</div>'
-            + '<div style="font-family:var(--fd);font-size:12px;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;">' + season + ' Season</div>'
+            + '<div style="font-family:var(--fd);font-size:22px;font-weight:900;color:var(--or);text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px;">' + name + '</div>'
+            + '<div style="font-family:var(--fd);font-size:11px;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;">' + season + ' Season</div>'
             + '</div>'
 
-            // Settings grid
+            // Stats strip
             + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--bdr);border-radius:12px;overflow:hidden;margin-bottom:16px;">'
-            + '<div style="background:var(--bg2);padding:14px 8px;text-align:center;"><div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;">Teams</div><div style="font-family:var(--fd);font-size:26px;font-weight:900;color:var(--or);">' + total + '</div></div>'
-            + '<div style="background:var(--bg2);padding:14px 8px;text-align:center;"><div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;">Salary Cap</div><div style="font-family:var(--fd);font-size:20px;font-weight:900;color:var(--or);">$' + (cap/1000).toFixed(0) + 'K</div></div>'
-            + '<div style="background:var(--bg2);padding:14px 8px;text-align:center;"><div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;">Format</div><div style="font-family:var(--fd);font-size:14px;font-weight:800;color:var(--or);text-transform:uppercase;">' + (format === 'cumulative' ? 'Cumul.' : format) + '</div></div>'
+            + '<div style="background:var(--bg2);padding:12px 8px;text-align:center;"><div style="font-family:var(--fd);font-size:9px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:3px;">Teams</div><div style="font-family:var(--fd);font-size:24px;font-weight:900;color:var(--or);">' + (total||'—') + '</div></div>'
+            + '<div style="background:var(--bg2);padding:12px 8px;text-align:center;"><div style="font-family:var(--fd);font-size:9px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:3px;">Salary Cap</div><div style="font-family:var(--fd);font-size:22px;font-weight:900;color:var(--or);">$' + (cap/1000).toFixed(0) + 'K</div></div>'
+            + '<div style="background:var(--bg2);padding:12px 8px;text-align:center;"><div style="font-family:var(--fd);font-size:9px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:3px;">Format</div><div style="font-family:var(--fd);font-size:13px;font-weight:800;color:var(--or);text-transform:uppercase;">' + (format === 'cumulative' ? 'Cumulative' : format) + '</div></div>'
             + '</div>'
 
-            // How scoring works
+            // Scoring
             + '<div style="background:var(--bg2);border-radius:12px;border:1px solid var(--bdr);padding:16px;margin-bottom:12px;">'
-            + '<div style="font-family:var(--fd);font-size:13px;font-weight:800;color:var(--or);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">📋 How It Works</div>'
-            + '<div style="display:flex;gap:10px;margin-bottom:10px;"><span style="font-size:16px;flex-shrink:0;">💰</span><div><div style="font-family:var(--fd);font-size:13px;font-weight:700;color:var(--ink);text-transform:uppercase;margin-bottom:2px;">Weekly Salary Cap Draft</div><div style="font-size:12px;color:var(--ink3);line-height:1.5;">Every week you draft a fresh roster from the games on the schedule. Everyone gets the same $' + cap.toLocaleString() + ' cap — studs cost more.</div></div></div>'
-            + '<div style="display:flex;gap:10px;margin-bottom:10px;"><span style="font-size:16px;flex-shrink:0;">📊</span><div><div style="font-family:var(--fd);font-size:13px;font-weight:700;color:var(--ink);text-transform:uppercase;margin-bottom:2px;">DraftKings Scoring (PPR)</div><div style="font-size:12px;color:var(--ink3);line-height:1.5;">Points per reception scoring. Passing TDs = 4pts, Rushing/Receiving TDs = 6pts, 1pt per reception, 0.1pt per yard. 300+ yd bonus and 100+ yd bonuses apply.</div></div></div>'
-            + '<div style="display:flex;gap:10px;"><span style="font-size:16px;flex-shrink:0;">🏆</span><div><div style="font-family:var(--fd);font-size:13px;font-weight:700;color:var(--ink);text-transform:uppercase;margin-bottom:2px;">Cumulative Season Scoring</div><div style="font-size:12px;color:var(--ink3);line-height:1.5;">Your weekly scores add up across all 18 weeks. The team with the highest total at the end wins.</div></div></div>'
+            + '<div style="font-family:var(--fd);font-size:13px;font-weight:800;color:var(--or);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">📊 Scoring</div>'
+            + sectionHdr('Passing')
+            + row('Passing Touchdown', pts(passTD))
+            + row('Interception', pts(passInt))
+            + row('Passing Yards', yds(passYds))
+            + row('300+ Yard Bonus', pts(pass300Bonus))
+            + sectionHdr('Rushing')
+            + row('Rushing Touchdown', pts(rushTD))
+            + row('Rushing Yards', yds(rushYds))
+            + row('100+ Yard Bonus', pts(rush100Bonus))
+            + sectionHdr('Receiving')
+            + row('Receiving Touchdown', pts(recTD))
+            + row('Reception (PPR)', pts(rec))
+            + row('Receiving Yards', yds(recYds))
+            + row('100+ Yard Bonus', pts(rec100Bonus))
+            + sectionHdr('Misc')
+            + row('Fumble Lost', pts(fumbLost))
+            + row('2-Point Conversion', pts(twoPt))
+            + sectionHdr('Defense / Special Teams')
+            + row('Sack', pts(defSack))
+            + row('Interception', pts(defInt))
+            + row('Fumble Recovery', pts(defFumbRec))
+            + row('Defensive Touchdown', pts(defTD))
+            + row('Safety', pts(defSafety))
+            + row('Blocked Kick', pts(defBlkKick))
             + '</div>'
 
-            // Playoffs section
+            // Season
             + '<div style="background:var(--bg2);border-radius:12px;border:1px solid var(--bdr);padding:16px;margin-bottom:12px;">'
-            + '<div style="font-family:var(--fd);font-size:13px;font-weight:800;color:var(--pu);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">🎯 Playoffs</div>'
-            + '<div style="display:flex;gap:10px;margin-bottom:10px;"><span style="font-size:16px;flex-shrink:0;">📅</span><div><div style="font-family:var(--fd);font-size:13px;font-weight:700;color:var(--ink);text-transform:uppercase;margin-bottom:2px;">Weeks 15 – 17</div><div style="font-size:12px;color:var(--ink3);line-height:1.5;">The top teams by cumulative score at the end of Week 14 advance to the playoffs.</div></div></div>'
-            + '<div style="display:flex;gap:10px;margin-bottom:10px;"><span style="font-size:16px;flex-shrink:0;">⚔️</span><div><div style="font-family:var(--fd);font-size:13px;font-weight:700;color:var(--ink);text-transform:uppercase;margin-bottom:2px;">Head to Head Bracket</div><div style="font-size:12px;color:var(--ink3);line-height:1.5;">Playoff teams compete head-to-head each week. Higher weekly score advances. One loss and you\'re out.</div></div></div>'
-            + '<div style="display:flex;gap:10px;"><span style="font-size:16px;flex-shrink:0;">🥇</span><div><div style="font-family:var(--fd);font-size:13px;font-weight:700;color:var(--ink);text-transform:uppercase;margin-bottom:2px;">Championship Week 17</div><div style="font-size:12px;color:var(--ink3);line-height:1.5;">The two finalists face off in Week 17 for the championship. Best weekly score wins.</div></div></div>'
+            + '<div style="font-family:var(--fd);font-size:13px;font-weight:800;color:var(--or);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">📅 Season Scoring</div>'
+            + '<div style="font-size:12px;color:var(--ink2);line-height:1.6;">Weekly scores accumulate across all 18 weeks. Your cumulative total through Week ' + (playoffStart-1) + ' determines your playoff tier. Playoff weeks (' + playoffStart + '–' + finaleWeek + ') still count toward your season total.</div>'
             + '</div>'
 
-            // Guillotine section
-            + (guillotine ? '<div style="background:var(--bg2);border-radius:12px;border:1px solid rgba(255,95,160,.2);padding:16px;margin-bottom:12px;">'
-            + '<div style="font-family:var(--fd);font-size:13px;font-weight:800;color:var(--pk);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">☠️ Guillotine — Running Concurrently</div>'
-            + '<div style="font-size:12px;color:var(--ink3);line-height:1.6;margin-bottom:12px;">The Guillotine is a survival competition running alongside the main season for <strong style="color:var(--ink2);">every team</strong> — including playoff teams. It never stops.</div>'
-            + '<div style="display:flex;gap:10px;margin-bottom:10px;"><span style="font-size:16px;flex-shrink:0;">☠️</span><div><div style="font-family:var(--fd);font-size:13px;font-weight:700;color:var(--ink);text-transform:uppercase;margin-bottom:2px;">Every Week, Someone Goes Home</div><div style="font-size:12px;color:var(--ink3);line-height:1.5;">After scores lock each Tuesday, the lowest scorer is eliminated. No second chances.</div></div></div>'
-            + '<div style="display:flex;gap:10px;margin-bottom:10px;"><span style="font-size:16px;flex-shrink:0;">⚖️</span><div><div style="font-family:var(--fd);font-size:13px;font-weight:700;color:var(--ink);text-transform:uppercase;margin-bottom:2px;">Even Eliminations</div><div style="font-size:12px;color:var(--ink3);line-height:1.5;">With ' + total + ' teams, approximately ' + elimPerWeek + ' team' + (elimPerWeek !== 1 ? 's are' : ' is') + ' eliminated each week, spread evenly across 16 weeks.</div></div></div>'
-            + '<div style="display:flex;gap:10px;"><span style="font-size:16px;flex-shrink:0;">🏆</span><div><div style="font-family:var(--fd);font-size:13px;font-weight:700;color:var(--ink);text-transform:uppercase;margin-bottom:2px;">Finale Week 17</div><div style="font-size:12px;color:var(--ink3);line-height:1.5;">The last 3 surviving Guillotine teams compete in Week 17 for 1st, 2nd, and 3rd — separate from the playoffs.</div></div></div>'
-            + '</div>' : '')
+            // Playoffs
+            + '<div style="background:var(--bg2);border-radius:12px;border:1px solid var(--bdr);padding:16px;margin-bottom:12px;">'
+            + '<div style="font-family:var(--fd);font-size:13px;font-weight:800;color:var(--pu);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">🎯 Playoffs — Weeks ' + playoffStart + '–' + finaleWeek + '</div>'
+            + '<div style="font-size:12px;color:var(--ink2);line-height:1.6;margin-bottom:10px;">Everyone makes the playoffs. After Week ' + (playoffStart-1) + ', all ' + (total||'') + ' teams are split into ' + tiers + ' tiers based on cumulative score — top third, middle third, bottom third' + (total > 0 ? ' (~' + tierSize + ' teams each)' : '') + '.</div>'
+            + '<div style="display:flex;gap:8px;margin-bottom:8px;"><span style="font-size:15px;flex-shrink:0;">📊</span><div style="font-size:12px;color:var(--ink3);line-height:1.5;">Each week, the lowest scorer within each tier is eliminated. Everyone else survives to the next week.</div></div>'
+            + '<div style="display:flex;gap:8px;"><span style="font-size:15px;flex-shrink:0;">🏁</span><div style="font-size:12px;color:var(--ink3);line-height:1.5;">Week ' + finaleWeek + ' finale: remaining teams in each tier compete for 1st, 2nd, and 3rd within their tier.</div></div>'
+            + '</div>'
+
+            // Winners
+            + '<div style="background:var(--bg2);border-radius:12px;border:1px solid var(--bdr);padding:16px;margin-bottom:12px;">'
+            + '<div style="font-family:var(--fd);font-size:13px;font-weight:800;color:var(--or);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">🏆 Ways to Win</div>'
+            + winnersHtml
+            + '</div>'
+
+            // Guillotine
+            + (guillotine
+              ? '<div style="background:var(--bg2);border-radius:12px;border:1px solid rgba(255,95,160,.2);padding:16px;">'
+              + '<div style="font-family:var(--fd);font-size:13px;font-weight:800;color:var(--pk);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">☠️ Guillotine — Concurrent</div>'
+              + '<div style="font-size:12px;color:var(--ink2);line-height:1.6;margin-bottom:10px;">Running alongside the full season for every team — including playoff teams. The lowest weekly scorer is cut each week, no exceptions.</div>'
+              + '<div style="display:flex;align-items:center;justify-content:space-between;background:var(--bg3);border-radius:8px;padding:10px 14px;">'
+              + '<span style="font-family:var(--fd);font-size:11px;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;">~' + elimPerWeek + ' eliminated/week</span>'
+              + '<span style="font-family:var(--fd);font-size:11px;color:var(--pk);text-transform:uppercase;letter-spacing:.5px;">Finale: Week 17</span>'
+              + '</div>'
+              + '</div>'
+              : '')
 
             + '</div>';
         });
