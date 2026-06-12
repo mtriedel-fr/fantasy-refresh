@@ -4135,7 +4135,7 @@ function showSubTab(el, id, section){
 function handleNav(val){
   if(val === 'league'){ document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); }); document.getElementById('tab-league').classList.remove('hidden'); document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); }); document.getElementById('navtab-league').classList.add('active'); return; }
   if(val === 'playoffs'){ window.location.href = 'playoffs.html'; return; }
-  if(val === 'guillotine'){ document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); }); document.getElementById('tab-guillotine').classList.remove('hidden'); document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); }); document.getElementById('navtab-guillotine').classList.add('active'); return; }
+  if(val === 'guillotine'){ document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); }); document.getElementById('tab-guillotine').classList.remove('hidden'); document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); }); document.getElementById('navtab-guillotine').classList.add('active'); renderGuillotine(); return; }
   // Hide all content
   document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); });
   var panel = document.getElementById('tab-' + val);
