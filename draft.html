@@ -842,40 +842,46 @@ function pickPlayer(playerId){
     return;
   }
 
-  // Check cap (excluding current slot's player)
+  // Check cap (excluding current slot's player cost)
   var currentSlotCost = lineup[activeSlot] ? lineup[activeSlot].salary : 0;
   var spent = getSpent() - currentSlotCost;
   if(spent + p.salary > CAP){ showToast('Over cap!', true); return; }
 
-  // If player is in another slot, remove from there
+  // If player is already in another slot, remove from there first
   Object.keys(lineup).forEach(function(sid){
     if(lineup[sid] && lineup[sid].id === playerId) lineup[sid] = null;
   });
 
+  // Replace whatever is in the active slot directly — no removal step needed
+  var wasEmpty = !lineup[activeSlot];
+  var replaced = lineup[activeSlot] ? lineup[activeSlot].name : null;
   lineup[activeSlot] = p;
   renderRoster();
   updateCap();
 
-  // Find next empty slot of the same position type
-  var nextSlot = findNextEmptySlot(slot);
+  if(replaced){
+    showToast(replaced + ' replaced with ' + p.name + ' ✓');
+    renderPicker();
+    return;
+  }
 
+  // Only auto-advance to next empty slot if we filled an empty slot
+  var nextSlot = findNextEmptySlot(slot);
   if(nextSlot){
-    // Auto-advance to next slot of same type
     activeSlot = nextSlot.id;
     var color = POS_COLORS[nextSlot.pos] || 'var(--or)';
     var label = nextSlot.label === 'FLEX' ? 'FLEX (WR/RB/TE)' : nextSlot.label;
     document.getElementById('picker-slot-label').textContent = label;
     document.getElementById('picker-slot-label').style.color = color;
     renderPicker();
-    renderRoster(); // re-render to show new active slot
+    renderRoster();
   } else {
-    // No more slots for this position — close on mobile
     if(window.innerWidth <= 860){
       closePicker();
     } else {
       renderPicker();
     }
-    showToast(p.name+' added ✓');
+    showToast(p.name + ' added ✓');
   }
 }
 
