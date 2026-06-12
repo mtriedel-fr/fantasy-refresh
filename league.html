@@ -2356,7 +2356,7 @@ function renderLeague(){
       var recTD        = sc.recTD        !== undefined ? sc.recTD        : 6;
       var recYds       = sc.recYds       !== undefined ? sc.recYds       : 0.1;
       var rec100Bonus  = sc.rec100Bonus  !== undefined ? sc.rec100Bonus  : 3;
-      var fumbLost     = sc.fumbLost     !== undefined ? sc.fumbLost     : -1;
+      var fumbLost     = sc.fumbLost     !== undefined ? sc.fumbLost     : -2;
       var twoPt        = sc.twoPt        !== undefined ? sc.twoPt        : 2;
       var defSack      = sc.defSack      !== undefined ? sc.defSack      : 1;
       var defInt       = sc.defInt       !== undefined ? sc.defInt       : 2;
@@ -2458,19 +2458,25 @@ function renderLeague(){
             + row('Blocked Kick', pts(defBlkKick))
             + '</div>'
 
+
             // Season
             + '<div style="background:var(--bg2);border-radius:12px;border:1px solid var(--bdr);padding:16px;margin-bottom:12px;">'
-            + '<div style="font-family:var(--fd);font-size:13px;font-weight:800;color:var(--or);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">📅 Season Scoring</div>'
-            + '<div style="font-size:12px;color:var(--ink2);line-height:1.6;">Weekly scores accumulate across all 18 weeks. Your cumulative total through Week ' + (playoffStart-1) + ' determines your playoff tier. Playoff weeks (' + playoffStart + '–' + finaleWeek + ') still count toward your season total.</div>'
+            + '<div style="font-family:var(--fd);font-size:13px;font-weight:800;color:var(--or);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">📅 Cumulative Season Scoring</div>'
+            + '<div style="display:flex;gap:8px;margin-bottom:8px;"><span style="color:var(--or);font-weight:700;flex-shrink:0;">•</span><div style="font-size:12px;color:var(--ink2);line-height:1.5;">Every week your score is added to your running season total across all 18 weeks.</div></div>'
+            + '<div style="display:flex;gap:8px;margin-bottom:8px;"><span style="color:var(--or);font-weight:700;flex-shrink:0;">•</span><div style="font-size:12px;color:var(--ink2);line-height:1.5;">Your cumulative total through Week ' + (playoffStart-1) + ' determines your playoff tier placement.</div></div>'
+            + '<div style="display:flex;gap:8px;margin-bottom:8px;"><span style="color:var(--or);font-weight:700;flex-shrink:0;">•</span><div style="font-size:12px;color:var(--ink2);line-height:1.5;">Playoff weeks still count — every point matters all season long.</div></div>'
+            + '<div style="display:flex;gap:8px;"><span style="color:var(--or);font-weight:700;flex-shrink:0;">•</span><div style="font-size:12px;color:var(--ink2);line-height:1.5;">The highest cumulative season total wins the Season Scoring award, regardless of tier.</div></div>'
             + '</div>'
 
             // Playoffs
             + '<div style="background:var(--bg2);border-radius:12px;border:1px solid var(--bdr);padding:16px;margin-bottom:12px;">'
-            + '<div style="font-family:var(--fd);font-size:13px;font-weight:800;color:var(--pu);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">🎯 Playoffs — Weeks ' + playoffStart + '–' + finaleWeek + '</div>'
-            + '<div style="font-size:12px;color:var(--ink2);line-height:1.6;margin-bottom:10px;">Everyone makes the playoffs. After Week ' + (playoffStart-1) + ', all ' + (total||'') + ' teams are split into ' + tiers + ' tiers based on cumulative score — top third, middle third, bottom third' + (total > 0 ? ' (~' + tierSize + ' teams each)' : '') + '.</div>'
-            + '<div style="display:flex;gap:8px;margin-bottom:8px;"><span style="font-size:15px;flex-shrink:0;">📊</span><div style="font-size:12px;color:var(--ink3);line-height:1.5;">Each week, the lowest scorer within each tier is eliminated. Everyone else survives to the next week.</div></div>'
-            + '<div style="display:flex;gap:8px;"><span style="font-size:15px;flex-shrink:0;">🏁</span><div style="font-size:12px;color:var(--ink3);line-height:1.5;">Week ' + finaleWeek + ' finale: remaining teams in each tier compete for 1st, 2nd, and 3rd within their tier.</div></div>'
+            + '<div style="font-family:var(--fd);font-size:13px;font-weight:800;color:var(--pu);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">🎯 Playoffs — Weeks ' + playoffStart + '–17</div>'
+            + '<div style="display:flex;gap:8px;margin-bottom:8px;"><span style="color:var(--pu);font-weight:700;flex-shrink:0;">•</span><div style="font-size:12px;color:var(--ink2);line-height:1.5;">Everyone makes the playoffs. After Week ' + (playoffStart-1) + ', all teams split into ' + tiers + ' tiers by cumulative score' + (total > 0 ? ' (~' + tierSize + ' teams each)' : '') + '.</div></div>'
+            + '<div style="display:flex;gap:8px;margin-bottom:8px;"><span style="color:var(--pu);font-weight:700;flex-shrink:0;">•</span><div style="font-size:12px;color:var(--ink2);line-height:1.5;">Each playoff week, the lowest-scoring <strong style="color:var(--ink)">half of each tier</strong> is eliminated — e.g. 20 teams per tier in Week 15, bottom 10 go home. Scores still count toward your season total.</div></div>'
+            + '<div style="display:flex;gap:8px;margin-bottom:8px;"><span style="color:var(--pu);font-weight:700;flex-shrink:0;">•</span><div style="font-size:12px;color:var(--ink2);line-height:1.5;">Week 17 is the finale — surviving teams in each tier compete for 1st, 2nd, and 3rd.</div></div>'
+            + '<div style="display:flex;gap:8px;"><span style="color:var(--pu);font-weight:700;flex-shrink:0;">•</span><div style="font-size:12px;color:var(--ink2);line-height:1.5;">Tier placement locks after Week ' + (playoffStart-1) + ' — you play within your tier for the full playoffs.</div></div>'
             + '</div>'
+
 
             // Winners
             + '<div style="background:var(--bg2);border-radius:12px;border:1px solid var(--bdr);padding:16px;margin-bottom:12px;">'
@@ -5295,6 +5301,10 @@ function clearLeagueMessage(){
 
 // ── BOTTOM NAV ─────────────────────────────────────────────────────
 function switchBottomNav(tabName, btnId, subTab){
+  // Close more menu first
+  var more = document.getElementById('more-menu');
+  if(more) more.style.display = 'none';
+  moreMenuOpen = false;
   // Navigate to main tab
   handleNav(tabName);
   // Navigate to sub-tab if specified
@@ -5306,10 +5316,6 @@ function switchBottomNav(tabName, btnId, subTab){
   document.querySelectorAll('.bn-item').forEach(function(b){ b.classList.remove('active'); });
   var btn = document.getElementById(btnId);
   if(btn) btn.classList.add('active');
-  // Close more menu if open
-  var more = document.getElementById('more-menu');
-  if(more) more.style.display = 'none';
-  moreMenuOpen = false;
 }
 
 var moreMenuOpen = false;
