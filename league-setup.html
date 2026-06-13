@@ -234,18 +234,22 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
         <!-- Format -->
         <div class="form-group">
           <label class="form-label">League Format</label>
-          <div class="format-grid" style="grid-template-columns:1fr 1fr 1fr;">
+          <div class="format-grid" style="grid-template-columns:1fr 1fr;">
             <div class="format-opt selected" id="fmt-cumulative" onclick="selectFormat('cumulative')">
               <div class="format-opt-title">📊 Cumulative</div>
               <div class="format-opt-desc">Your scores stack up week over week. Highest total at season's end wins.</div>
             </div>
             <div class="format-opt" id="fmt-headtohead" onclick="selectFormat('headtohead')">
               <div class="format-opt-title">⚔️ Head to Head</div>
-              <div class="format-opt-desc">You face a different opponent each week. Best record makes the playoffs — just like the NFL.</div>
+              <div class="format-opt-desc">You face a different opponent each week. Best record makes the playoffs.</div>
             </div>
             <div class="format-opt" id="fmt-guillotine" onclick="selectFormat('guillotine')">
               <div class="format-opt-title">☠️ Guillotine</div>
               <div class="format-opt-desc">Lowest scorer gets knocked out every week. Survive longer than everyone else to win.</div>
+            </div>
+            <div class="format-opt" id="fmt-preseason" onclick="selectFormat('preseason')">
+              <div class="format-opt-title">🏈 Preseason</div>
+              <div class="format-opt-desc">Test league using preseason games. Temporary — delete after preseason ends.</div>
             </div>
           </div>
         </div>
@@ -680,11 +684,12 @@ function selectFormat(fmt){
   document.getElementById('fmt-cumulative').classList.toggle('selected', fmt==='cumulative');
   document.getElementById('fmt-headtohead').classList.toggle('selected', fmt==='headtohead');
   document.getElementById('fmt-guillotine').classList.toggle('selected', fmt==='guillotine');
+  document.getElementById('fmt-preseason').classList.toggle('selected', fmt==='preseason');
 
   // Show/hide cumulative and H2H settings panels
   var cumSettings = document.getElementById('cum-settings');
   var h2hSettings = document.getElementById('h2h-settings');
-  cumSettings.style.display = fmt === 'cumulative' ? 'block' : 'none';
+  cumSettings.style.display = (fmt === 'cumulative' || fmt === 'preseason') ? 'block' : 'none';
   h2hSettings.style.display = fmt === 'headtohead' ? 'block' : 'none';
 
   // Reset divisions dropdown when leaving H2H
@@ -840,10 +845,14 @@ function createLeague(){
     commissioners:       {[currentUser.uid]: true},
     created:             Date.now(),
     createdBy:           currentUser.uid,
-    maxMembers: h2hTeams || maxMembers,
+    maxMembers:          h2hTeams || maxMembers,
     entryFee:            0,
     prizePool:           0,
-    active:              true
+    active:              true,
+    // Preseason specific
+    seasonType:          selectedFmt === 'preseason' ? 'Preseason' : 'Regular',
+    weeks:               selectedFmt === 'preseason' ? 4 : 18,
+    isPreseason:         selectedFmt === 'preseason'
   };
 
   // Write settings

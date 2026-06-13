@@ -797,7 +797,6 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
     <div class="league-switcher">
       <select class="season-select" id="season-select" onchange="switchSeason(this.value)" title="Switch season">
         <option value="2026" selected>2026</option>
-        <option value="PS26">PS'26</option>
         <option value="2025">2025</option>
       </select>
     </div>
@@ -1020,6 +1019,7 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
         <div style="margin-top:20px;padding-top:16px;border-top:1px solid #060E0E;">
           <div class="csect">Danger zone</div>
           <button class="del-btn" style="width:100%;padding:9px;" onclick="resetAll()">Clear entire season</button>
+          <button class="del-btn" style="width:100%;padding:9px;margin-top:8px;background:rgba(255,50,50,.15);border-color:rgba(255,50,50,.4);color:#FF5050;" onclick="deleteLeague()">Delete this league</button>
         </div>
       </div>
     </div>
@@ -2323,6 +2323,29 @@ function renderSeasonWrap(){
     + '</div>';
 }
 
+
+// ── DELETE LEAGUE ─────────────────────────────────────────────────
+function deleteLeague(){
+  var ctx = FRAuth.getLeagueCtx();
+  var leagueName = ctx ? ctx.leagueName : 'this league';
+  if(!confirm('Delete "' + leagueName + '"?\n\nThis permanently removes all season data, lineups, scores, and member records. This cannot be undone.')) return;
+  var confirmed = prompt('Type the league name exactly to confirm:\n"' + leagueName + '"');
+  if(!confirmed || confirmed.trim().toLowerCase() !== leagueName.toLowerCase()){
+    showToast('Name did not match — deletion cancelled', true);
+    return;
+  }
+  var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+  showToast('Deleting league...');
+  FRAuth.db.set('/leagues/' + leagueId, null)
+    .then(function(){
+      try{ localStorage.removeItem('fr_league_ctx'); }catch(e){}
+      showToast('League deleted');
+      setTimeout(function(){ window.location.href = '/home.html'; }, 1500);
+    })
+    .catch(function(){
+      showToast('Error — check Firebase permissions', true);
+    });
+}
 
 // ── LEAGUE INFO PAGE ──────────────────────────────────────────────
 // ── LEAGUE INFO PAGE ──────────────────────────────────────────────
@@ -5410,10 +5433,6 @@ document.addEventListener('DOMContentLoaded', function(){
     <button onclick="switchBottomNav('playoffs','bn-more');toggleMoreMenu()" style="background:var(--bg3);border:1px solid var(--bdr2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;">
       <div style="font-size:20px;margin-bottom:4px;">🎯</div>
       <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink2);text-transform:uppercase;">Playoffs</div>
-    </button>
-    <button onclick="window.location.href='/archive2025.html'" style="background:var(--bg3);border:1px solid var(--bdr2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;">
-      <div style="font-size:20px;margin-bottom:4px;">📦</div>
-      <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink2);text-transform:uppercase;">2025</div>
     </button>
     <button onclick="toggleComm();toggleMoreMenu()" id="more-comm-btn" style="display:none;background:rgba(0,229,212,.08);border:1px solid rgba(0,229,212,.2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;">
       <div style="font-size:20px;margin-bottom:4px;">⚙️</div>
