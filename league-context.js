@@ -75,42 +75,72 @@
     url:            function(p)      { return FB_DB_URL + p + '.json'; }
   };
 
+  // ── TOKEN HELPER ────────────────────────────────────────────
+  // Gets auth token from FRAuth if available, returns null otherwise
+  function getToken() {
+    try {
+      if (typeof FRAuth !== 'undefined' && FRAuth.ensureToken) {
+        return FRAuth.ensureToken();
+      }
+    } catch(e) {}
+    return Promise.resolve(null);
+  }
+
+  // Appends ?auth=token to URL if token available
+  function authUrl(path, token) {
+    var url = FB_DB_URL + path + '.json';
+    if (token) url += '?auth=' + token;
+    return url;
+  }
+
   // ── FIREBASE HELPERS ────────────────────────────────────────
   var fb = {
+    // GET — no auth needed (public rules)
     get: function(path) {
       return fetch(FB_DB_URL + path + '.json')
         .then(function(r) { return r.json(); });
     },
+
+    // PUT — authenticated write
     put: function(path, data) {
-      return fetch(FB_DB_URL + path + '.json', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      }).then(function(r) { return r.json(); });
+      return getToken().then(function(token) {
+        return fetch(authUrl(path, token), {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        }).then(function(r) { return r.json(); });
+      });
     },
+
+    // PATCH — authenticated write
     patch: function(path, data) {
-      return fetch(FB_DB_URL + path + '.json', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      }).then(function(r) { return r.json(); });
+      return getToken().then(function(token) {
+        return fetch(authUrl(path, token), {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        }).then(function(r) { return r.json(); });
+      });
     },
+
+    // DELETE — authenticated write
     delete: function(path) {
-      return fetch(FB_DB_URL + path + '.json', { method: 'DELETE' })
-        .then(function(r) { return r.json(); });
+      return getToken().then(function(token) {
+        return fetch(authUrl(path, token), {
+          method: 'DELETE'
+        }).then(function(r) { return r.json(); });
+      });
     }
   };
 
   // ── COMMISSIONER CHECK ──────────────────────────────────────
-  // Checks /leagues/{leagueId}/commissioners/{uid} = true
-  // Returns promise resolving to { isComm: bool, isCreator: bool }
   function checkCommissionerStatus(uid) {
     if (!uid) return Promise.resolve({ isComm: false, isCreator: false });
     return Promise.all([
       fb.get(paths.commissioner(uid)),
       fb.get(paths.settings())
     ]).then(function(results) {
-      var commVal   = results[0];  // true | null
+      var commVal   = results[0];
       var settings  = results[1];
       var isComm    = commVal === true;
       var isCreator = settings && settings.creatorUid === uid;
@@ -120,7 +150,6 @@
     });
   }
 
-  // Legacy shim — keep old callers working
   function isCommissioner(uid) {
     return checkCommissionerStatus(uid).then(function(s) { return s.isComm; });
   }
@@ -171,7 +200,13 @@
   function switchLeague(leagueId) {
     return loadLeagueSettings(leagueId).then(function(settings) {
       var user = null;
-      try { user = JSON.parse(localStorage.getItem('fr_user_' + FR_SEASON)); } catch(e) {}
+      try {
+        if (typeof FRAuth !== 'undefined') {
+          user = FRAuth.getUser();
+        } else {
+          user = JSON.parse(localStorage.getItem('fr_user_' + FR_SEASON));
+        }
+      } catch(e) {}
       if (user && user.uid) {
         return fb.get('/leagues/' + leagueId + '/members/' + user.uid)
           .then(function(member) {
@@ -188,21 +223,21 @@
 
   // ── EXPOSE GLOBAL ───────────────────────────────────────────
   global.FR = {
-    ctx:                  loadContext,
-    saveContext:          saveContext,
-    clearContext:         clearContext,
-    paths:                paths,
-    fb:                   fb,
-    loadLeagueSettings:   loadLeagueSettings,
-    getUserLeagues:       getUserLeagues,
-    switchLeague:         switchLeague,
-    isCommissioner:       isCommissioner,
+    ctx:                     loadContext,
+    saveContext:             saveContext,
+    clearContext:            clearContext,
+    paths:                   paths,
+    fb:                      fb,
+    loadLeagueSettings:      loadLeagueSettings,
+    getUserLeagues:          getUserLeagues,
+    switchLeague:            switchLeague,
+    isCommissioner:          isCommissioner,
     checkCommissionerStatus: checkCommissionerStatus,
-    addCoCommissioner:    addCoCommissioner,
-    removeCoCommissioner: removeCoCommissioner,
-    FB_DB_URL:            FB_DB_URL,
-    FR_SEASON:            FR_SEASON,
-    DEFAULT_LEAGUE_ID:    DEFAULT_LEAGUE_ID
+    addCoCommissioner:       addCoCommissioner,
+    removeCoCommissioner:    removeCoCommissioner,
+    FB_DB_URL:               FB_DB_URL,
+    FR_SEASON:               FR_SEASON,
+    DEFAULT_LEAGUE_ID:       DEFAULT_LEAGUE_ID
   };
 
 })(window);
