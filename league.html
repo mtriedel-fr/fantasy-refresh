@@ -5344,16 +5344,20 @@ function switchBottomNav(tabName, btnId, subTab){
 var moreMenuOpen = false;
 function closeMoreMenu(){
   var menu = document.getElementById('more-menu');
+  var overlay = document.getElementById('more-overlay');
   if(menu) menu.style.display = 'none';
+  if(overlay) overlay.style.display = 'none';
   moreMenuOpen = false;
   var btn = document.getElementById('bn-more');
   if(btn) btn.classList.remove('active');
 }
 function toggleMoreMenu(){
   var menu = document.getElementById('more-menu');
+  var overlay = document.getElementById('more-overlay');
   if(!menu) return;
   moreMenuOpen = !moreMenuOpen;
   menu.style.display = moreMenuOpen ? 'block' : 'none';
+  if(overlay) overlay.style.display = moreMenuOpen ? 'block' : 'none';
   var btn = document.getElementById('bn-more');
   if(btn) btn.classList.toggle('active', moreMenuOpen);
 }
@@ -5419,8 +5423,11 @@ document.addEventListener('DOMContentLoaded', function(){
   </button>
 </nav>
 
+<!-- MORE MENU OVERLAY -->
+<div id="more-overlay" onclick="closeMoreMenu()" style="display:none;position:fixed;inset:0;z-index:98;"></div>
+
 <!-- MORE MENU (slides up) -->
-<div id="more-menu" style="display:none;position:fixed;bottom:60px;left:0;right:0;background:var(--bg2);border-top:1px solid var(--bdr2);padding:16px;z-index:99;">
+<div id="more-menu" style="display:none;position:fixed;bottom:60px;left:0;right:0;background:var(--bg2);border-top:1px solid var(--bdr2);padding:16px;z-index:99;" onclick="event.stopPropagation()">
   <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">
     <button onclick="switchBottomNav('guillotine','bn-more');toggleMoreMenu()" style="background:var(--bg3);border:1px solid var(--bdr2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;">
       <div style="font-size:20px;margin-bottom:4px;">☠️</div>
