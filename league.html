@@ -828,10 +828,18 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
   <div class="stat"><div class="stat-lbl">Weeks left</div><div class="stat-val" id="s-left">18</div></div>
 </div>
 <!-- GUILLOTINE STATS BAR -->
-<div class="stats hidden" id="stats-guillotine">
-  <div class="stat"><div class="stat-lbl">Teams Left</div><div class="stat-val" id="g-remaining" style="color:var(--or);">—</div></div>
-  <div class="stat"><div class="stat-lbl">Eliminated</div><div class="stat-val" id="g-eliminated" style="color:var(--pk);">—</div></div>
-  <div class="stat" id="g-status-stat"><div class="stat-lbl">Your Status</div><div class="stat-val" id="g-status" style="color:var(--or);">—</div></div>
+<div id="stats-guillotine" class="hidden">
+  <div class="stats">
+    <div class="stat"><div class="stat-lbl">Teams Left</div><div class="stat-val" id="g-remaining" style="color:var(--or);">—</div></div>
+    <div class="stat"><div class="stat-lbl">Eliminated</div><div class="stat-val" id="g-eliminated" style="color:var(--pk);">—</div></div>
+  </div>
+  <div style="display:flex;justify-content:center;padding:8px 0 6px;border-bottom:1px solid var(--bdr);background:var(--hdr2);">
+    <div style="text-align:center;">
+      <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Your Status</div>
+      <div id="g-status" style="font-family:var(--fd);font-size:20px;font-weight:900;color:var(--or);">—</div>
+      <div id="g-status-sub" style="font-family:var(--fd);font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-top:2px;"></div>
+    </div>
+  </div>
 </div>
 <div class="stats hidden" id="stats-season">
   <div class="stat"><div class="stat-lbl">Season leader</div><div class="stat-val" id="ss-leader">—</div><div class="stat-sub" id="ss-leader-name" style="font-family:var(--fd);font-size:11px;color:var(--ink3);letter-spacing:.5px;text-transform:uppercase;margin-top:2px"></div></div>
@@ -2364,7 +2372,7 @@ function setStatBoxes(mode){
   if(mode === 'normal'){
     if(weekly) weekly.classList.remove('hidden');
   } else if(mode === 'guillotine'){
-    if(guill) guill.classList.remove('hidden');
+    if(guill)  guill.classList.remove('hidden');
     updateGuillotineStatBar();
   }
   // mode === 'hidden': all stay hidden (League tab)
@@ -2383,14 +2391,26 @@ function updateGuillotineStatBar(){
       var user      = FRAuth.getUser();
       var myMember  = user ? all.find(function(m){ return m.uid === user.uid; }) : null;
       var isElim    = myMember ? myMember.eliminated === true : false;
-      var rEl = document.getElementById('g-remaining');
-      var eEl = document.getElementById('g-eliminated');
-      var sEl = document.getElementById('g-status');
+      var rEl  = document.getElementById('g-remaining');
+      var eEl  = document.getElementById('g-eliminated');
+      var sEl  = document.getElementById('g-status');
+      var subEl = document.getElementById('g-status-sub');
       if(rEl) rEl.textContent = remaining;
       if(eEl) eEl.textContent = elim;
       if(sEl){
-        sEl.textContent  = isElim ? 'CUT ☠️' : 'ALIVE ✓';
-        sEl.style.color  = isElim ? 'var(--pk)' : 'var(--or)';
+        if(isElim){
+          sEl.textContent = 'ELIMINATED ☠️';
+          sEl.style.color = 'var(--pk)';
+          if(subEl){
+            var elimWeek = myMember ? (myMember.eliminatedWeek || myMember.elimWeek || null) : null;
+            subEl.textContent = elimWeek ? 'Cut in Week ' + elimWeek : 'Cut this season';
+            subEl.style.color = 'var(--pk)';
+          }
+        } else {
+          sEl.textContent = 'STILL ALIVE ✓';
+          sEl.style.color = 'var(--or)';
+          if(subEl) subEl.textContent = remaining + ' teams remaining';
+        }
       }
     }).catch(function(){});
 }
