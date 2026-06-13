@@ -5778,7 +5778,13 @@ function updateMoreCommBtn(){
 // ── DRAFT URL HELPER ──────────────────────────────────────────────
 function getDraftUrl(){
   var ctx = FRAuth.getLeagueCtx();
-  if(ctx && (ctx.isPreseason || ctx.seasonType === 'Preseason' || ctx.format === 'preseason')){
+  var isPS = ctx && (
+    ctx.isPreseason === true ||
+    ctx.seasonType === 'Preseason' ||
+    ctx.format === 'preseason' ||
+    ctx.weeks === 4
+  );
+  if(isPS){
     return '/draft.html?mode=preseason&week=' + (currentWeek || 1);
   }
   return '/draft.html';
