@@ -827,6 +827,12 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
   <div class="stat"><div class="stat-lbl">Season move</div><div class="stat-val" id="s-mymovement">—</div><div class="stat-sub" id="s-mymovement-sub" style="font-family:var(--fd);font-size:11px;color:var(--ink3);letter-spacing:.5px;text-transform:uppercase;margin-top:2px"></div></div>
   <div class="stat"><div class="stat-lbl">Weeks left</div><div class="stat-val" id="s-left">18</div></div>
 </div>
+<!-- GUILLOTINE STATS BAR -->
+<div class="stats hidden" id="stats-guillotine">
+  <div class="stat"><div class="stat-lbl">Teams Left</div><div class="stat-val" id="g-remaining" style="color:var(--or);">—</div></div>
+  <div class="stat"><div class="stat-lbl">Eliminated</div><div class="stat-val" id="g-eliminated" style="color:var(--pk);">—</div></div>
+  <div class="stat" id="g-status-stat"><div class="stat-lbl">Your Status</div><div class="stat-val" id="g-status" style="color:var(--or);">—</div></div>
+</div>
 <div class="stats hidden" id="stats-season">
   <div class="stat"><div class="stat-lbl">Season leader</div><div class="stat-val" id="ss-leader">—</div><div class="stat-sub" id="ss-leader-name" style="font-family:var(--fd);font-size:11px;color:var(--ink3);letter-spacing:.5px;text-transform:uppercase;margin-top:2px"></div></div>
   <div class="stat"><div class="stat-lbl">Season avg</div><div class="stat-val" id="ss-avg">—</div></div>
@@ -2345,6 +2351,48 @@ function deleteLeague(){
     .catch(function(){
       showToast('Error — check Firebase permissions', true);
     });
+}
+
+// ── STAT BOX SWITCHER ─────────────────────────────────────────────
+function setStatBoxes(mode){
+  var weekly     = document.getElementById('stats-weekly');
+  var season     = document.getElementById('stats-season');
+  var guill      = document.getElementById('stats-guillotine');
+  if(weekly)  weekly.classList.add('hidden');
+  if(season)  season.classList.add('hidden');
+  if(guill)   guill.classList.add('hidden');
+  if(mode === 'normal'){
+    if(weekly) weekly.classList.remove('hidden');
+  } else if(mode === 'guillotine'){
+    if(guill) guill.classList.remove('hidden');
+    updateGuillotineStatBar();
+  }
+  // mode === 'hidden': all stay hidden (League tab)
+}
+
+function updateGuillotineStatBar(){
+  var ctx = FRAuth.getLeagueCtx();
+  var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+  FR.fb.get('/leagues/' + leagueId + '/members')
+    .then(function(members){
+      if(!members) return;
+      var all       = Object.values(members).filter(function(m){ return m && m.teamName; });
+      var total     = all.length;
+      var elim      = all.filter(function(m){ return m.eliminated === true; }).length;
+      var remaining = total - elim;
+      var user      = FRAuth.getUser();
+      var myMember  = user ? all.find(function(m){ return m.uid === user.uid; }) : null;
+      var isElim    = myMember ? myMember.eliminated === true : false;
+      var rEl = document.getElementById('g-remaining');
+      var eEl = document.getElementById('g-eliminated');
+      var sEl = document.getElementById('g-status');
+      if(rEl) rEl.textContent = remaining;
+      if(eEl) eEl.textContent = elim;
+      if(sEl){
+        sEl.textContent  = isElim ? 'CUT ☠️' : 'ALIVE ✓';
+        sEl.style.color  = isElim ? 'var(--pk)' : 'var(--or)';
+      }
+    }).catch(function(){});
 }
 
 // ── LEAGUE INFO PAGE ──────────────────────────────────────────────
@@ -4344,9 +4392,9 @@ function showSubTab(el, id, section){
 }
 
 function handleNav(val){
-  if(val === 'league'){ document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); }); document.getElementById('tab-league').classList.remove('hidden'); document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); }); document.getElementById('navtab-league').classList.add('active'); renderLeague(); return; }
+  if(val === 'league'){ document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); }); document.getElementById('tab-league').classList.remove('hidden'); document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); }); document.getElementById('navtab-league').classList.add('active'); setStatBoxes('hidden'); renderLeague(); return; }
   if(val === 'playoffs'){ window.location.href = 'playoffs.html'; return; }
-  if(val === 'guillotine'){ document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); }); document.getElementById('tab-guillotine').classList.remove('hidden'); document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); }); document.getElementById('navtab-guillotine').classList.add('active'); renderGuillotine(); return; }
+  if(val === 'guillotine'){ document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); }); document.getElementById('tab-guillotine').classList.remove('hidden'); document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); }); document.getElementById('navtab-guillotine').classList.add('active'); setStatBoxes('guillotine'); renderGuillotine(); return; }
   if(val === 'yourseason'){
     // Check if season is complete — if so show Season Wrap instead
     var completedWeeks = Object.keys(seasonData).filter(function(k){
@@ -5429,19 +5477,19 @@ document.addEventListener('DOMContentLoaded', function(){
 <!-- MORE MENU (slides up) -->
 <div id="more-menu" style="display:none;position:fixed;bottom:60px;left:0;right:0;background:var(--bg2);border-top:1px solid var(--bdr2);padding:16px;z-index:99;" onclick="event.stopPropagation()">
   <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">
-    <button onclick="switchBottomNav('guillotine','bn-more');toggleMoreMenu()" style="background:var(--bg3);border:1px solid var(--bdr2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;">
+    <button onclick="closeMoreMenu();switchBottomNav('guillotine','bn-more')" style="background:var(--bg3);border:1px solid var(--bdr2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;">
       <div style="font-size:20px;margin-bottom:4px;">☠️</div>
       <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink2);text-transform:uppercase;">Guillotine</div>
     </button>
-    <button onclick="switchBottomNav('league','bn-more');toggleMoreMenu()" style="background:var(--bg3);border:1px solid var(--bdr2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;">
+    <button onclick="closeMoreMenu();switchBottomNav('league','bn-more')" style="background:var(--bg3);border:1px solid var(--bdr2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;">
       <div style="font-size:20px;margin-bottom:4px;">🏈</div>
       <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink2);text-transform:uppercase;">League</div>
     </button>
-    <button onclick="switchBottomNav('playoffs','bn-more');toggleMoreMenu()" style="background:var(--bg3);border:1px solid var(--bdr2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;">
+    <button onclick="closeMoreMenu();switchBottomNav('playoffs','bn-more')" style="background:var(--bg3);border:1px solid var(--bdr2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;">
       <div style="font-size:20px;margin-bottom:4px;">🎯</div>
       <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink2);text-transform:uppercase;">Playoffs</div>
     </button>
-    <button onclick="toggleComm();toggleMoreMenu()" id="more-comm-btn" style="display:none;background:rgba(0,229,212,.08);border:1px solid rgba(0,229,212,.2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;">
+    <button onclick="closeMoreMenu();toggleComm()" id="more-comm-btn" style="display:none;background:rgba(0,229,212,.08);border:1px solid rgba(0,229,212,.2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;">
       <div style="font-size:20px;margin-bottom:4px;">⚙️</div>
       <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--or);text-transform:uppercase;">Comm</div>
     </button>
