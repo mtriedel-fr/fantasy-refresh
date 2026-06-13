@@ -818,10 +818,10 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
 
 <!-- CONTEXT-AWARE STATS BAR -->
 <div class="stats" id="stats-weekly">
-  <div class="stat"><div class="stat-lbl">Your score</div><div class="stat-val" id="s-myscore">—</div><div class="stat-sub" id="s-myscore-sub" style="font-family:var(--fd);font-size:11px;color:var(--ink3);letter-spacing:.5px;text-transform:uppercase;margin-top:2px"></div></div>
-  <div class="stat"><div class="stat-lbl">Your finish</div><div class="stat-val" id="s-myfinish">—</div><div class="stat-sub" id="s-myfinish-sub" style="font-family:var(--fd);font-size:11px;color:var(--ink3);letter-spacing:.5px;text-transform:uppercase;margin-top:2px"></div></div>
-  <div class="stat"><div class="stat-lbl">Season move</div><div class="stat-val" id="s-mymovement">—</div><div class="stat-sub" id="s-mymovement-sub" style="font-family:var(--fd);font-size:11px;color:var(--ink3);letter-spacing:.5px;text-transform:uppercase;margin-top:2px"></div></div>
-  <div class="stat"><div class="stat-lbl">Weeks left</div><div class="stat-val" id="s-left">18</div></div>
+  <div class="stat"><div class="stat-lbl">Score</div><div class="stat-val" id="s-myscore">—</div><div class="stat-sub" id="s-myscore-sub" style="font-family:var(--fd);font-size:11px;color:var(--ink3);letter-spacing:.5px;text-transform:uppercase;margin-top:2px"></div></div>
+  <div class="stat"><div class="stat-lbl" id="s-place-lbl">Current Place</div><div class="stat-val" id="s-myfinish">—</div><div class="stat-sub" id="s-myfinish-sub" style="font-family:var(--fd);font-size:11px;color:var(--ink3);letter-spacing:.5px;text-transform:uppercase;margin-top:2px"></div></div>
+  <!-- Hidden but kept for JS compatibility -->
+  <div style="display:none;"><div id="s-mymovement">—</div><div id="s-mymovement-sub"></div><div id="s-left">18</div></div>
 </div>
 <!-- GUILLOTINE STATS BAR -->
 <div id="stats-guillotine" class="hidden">
@@ -1616,6 +1616,14 @@ function renderAll(){
     el('s-myfinish').textContent = myWkRank ? '#' + myWkRank : '—';
     el('s-myfinish').style.color = myWkRank && myWkRank <= 3 ? 'var(--or)' : myWkRank && myWkRank > sortedEntries.length * 0.66 ? 'var(--pk)' : 'var(--ink)';
     el('s-myfinish-sub').textContent = myWkRank ? 'of ' + sortedEntries.length + ' teams' : '';
+    // Update label — Final Place if scores are locked, Current Place if still live
+    var placeLbl = el('s-place-lbl');
+    if(placeLbl){
+      var isLocked = myEntry && myEntry.locked;
+      var isLive   = myEntry && myEntry.status === 'live';
+      placeLbl.textContent = isLocked ? 'Final Place' : isLive ? 'Live Place' : 'Current Place';
+      placeLbl.style.color = isLocked ? 'var(--or)' : isLive ? '#FF9A3A' : '';
+    }
   }
   if(el('s-mymovement')){
     el('s-mymovement').textContent = myMove === null ? '—' : myMove > 0 ? '▲' + myMove : myMove < 0 ? '▼' + Math.abs(myMove) : '—';
