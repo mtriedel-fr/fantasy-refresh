@@ -3101,9 +3101,8 @@ function renderStandings(sorted, prevRank, curMap, wkHighName){
   }).join('');
 
   var tierNote = locked
-    ? '<div style="padding:10px 16px 6px;font-family:var(--fd);font-size:11px;color:var(--ink3);letter-spacing:.5px;text-transform:uppercase;background:var(--bg2);border-bottom:1px solid var(--bdr)">Playoff tiers locked after Week ' + TIER_LOCK_WEEK + ' · <a href="javascript:void(0)" onclick="handleNav('playoffs')" style="color:var(--or);text-decoration:none;">View Playoff Bracket →</a></div>'
+    ? '<div style="padding:10px 16px 6px;font-family:var(--fd);font-size:11px;color:var(--ink3);letter-spacing:.5px;text-transform:uppercase;background:var(--bg2);border-bottom:1px solid var(--bdr)">Playoff tiers locked after Week ' + TIER_LOCK_WEEK + ' &middot; <a href="#" onclick="handleNav(String.fromCharCode(112,108,97,121,111,102,102,115))" style="color:var(--or);text-decoration:none;">View Playoff Bracket &rarr;</a></div>'
     : '<div style="padding:10px 16px 6px;font-family:var(--fd);font-size:11px;color:var(--ink3);letter-spacing:.5px;text-transform:uppercase;background:var(--bg2);border-bottom:1px solid var(--bdr)">Playoff tiers lock after Week ' + TIER_LOCK_WEEK + ' · ' + (TIER_LOCK_WEEK - Object.keys(seasonData).filter(function(k){ return seasonData[k]&&seasonData[k].length; }).length) + ' weeks remaining</div>';
-
   document.getElementById('sw').innerHTML = tierNote + '<table><thead><tr>'
     + '<th style="width:40px">#</th><th>Team</th>'
     + '<th style="text-align:right">Total</th>'
