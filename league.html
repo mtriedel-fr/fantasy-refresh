@@ -907,6 +907,16 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
 <div id="tab-seasonwrap" class="content hidden"><div id="wsw"></div></div>
 <div id="tab-guillotine" class="content hidden"><div id="wg"></div></div>
 <div id="tab-league" class="content hidden"><div id="wleague"></div></div>
+<div id="tab-playoffs" class="content hidden">
+  <!-- Playoff round pills -->
+  <div style="display:flex;gap:8px;padding:12px 16px;background:var(--bg2);border-bottom:1px solid var(--bdr);overflow-x:auto;">
+    <div id="po-pill-16" class="round-pill upcoming">Wk 16</div>
+    <div id="po-pill-17" class="round-pill upcoming">Wk 17</div>
+    <div id="po-pill-18" class="round-pill upcoming">Wk 18</div>
+    <div id="po-status-note" style="margin-left:auto;font-family:var(--fd);font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;align-self:center;"></div>
+  </div>
+  <div id="wplayoffs"></div>
+</div>
 
 <div class="comm-panel hidden" id="comm-panel">
   <div id="comm-tools">
@@ -2401,6 +2411,274 @@ function updateGuillotineStatBar(){
       }
     }).catch(function(){});
 }
+
+// ── PLAYOFFS TAB ─────────────────────────────────────────────────
+
+
+
+// ── FIREBASE CONFIG ────────────────────────────────────────────
+
+
+
+
+
+
+function teamLink(name){
+  var isMe = myTeam && name.toLowerCase() === myTeam.toLowerCase();
+  return '<a class="t-link' + (isMe ? ' is-me' : '') + '" href="player.html?team=' + encodeURIComponent(name) + '">' + name + '</a>';
+}
+
+// ── LOAD ───────────────────────────────────────────────────────
+function loadFromCloud(){
+  var _hdrSub = document.getElementById('hdr-sub'); if(_hdrSub) _hdrSub.textContent = 'Loading...';
+  var urlSeason = (new URLSearchParams(window.location.search)).get('season') || '2026';
+  var backBtn = document.getElementById('back-btn-href');
+  if(backBtn) backBtn.href = urlSeason === '2025' ? '/archive2025.html' : '/league.html';
+  console.log('playoffs loading season:', urlSeason);
+  fetch(FB_DB_URL + '/season' + urlSeason + '.json')
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      console.log('playoffs data received, null?', data === null, 'keys:', data ? Object.keys(data).length : 0);
+      if(data && typeof data === 'object' && !data.error){
+        seasonData = data;
+      } else if(data === null){
+        // Empty season — try localStorage backup
+        try{ var d = localStorage.getItem('fr_'+urlSeason+'_backup'); if(d) seasonData = JSON.parse(d); }catch(e){}
+      }
+      renderPlayoffs();
+    })
+    .catch(function(err){
+      console.error('playoffs load error:', err);
+      try{ var d = localStorage.getItem('fr_'+urlSeason+'_backup'); if(d) seasonData = JSON.parse(d); }catch(e){}
+      renderPlayoffs();
+    });
+}
+
+// ── TIER CALCULATION ───────────────────────────────────────────
+function getCumulativeTotals(upToWeek){
+  var totals = {};
+  Object.keys(seasonData).forEach(function(w){
+    if(Number(w) > upToWeek) return;
+    (seasonData[w] || []).forEach(function(e){
+      totals[e.name] = (totals[e.name] || 0) + e.score;
+    });
+  });
+  return totals;
+}
+
+function splitTiers(sorted){
+  var n = sorted.length;
+  var top = Math.ceil(n / 3);
+  var mid = Math.ceil((n - top) / 2);
+  return {
+    elite: sorted.slice(0, top),
+    mid:   sorted.slice(top, top + mid),
+    low:   sorted.slice(top + mid)
+  };
+}
+
+function getWeeklyScores(week){
+  var map = {};
+  (seasonData[String(week)] || []).forEach(function(e){ map[e.name] = e.score; });
+  return map;
+}
+
+// ── SURVIVAL LOGIC ─────────────────────────────────────────────
+// Each week: bottom 50% eliminated, top 50% advance
+function applyRound(teams, weekScores){
+  if(!weekScores || !Object.keys(weekScores).length) return { advanced: teams, eliminated: [], scores: {} };
+  var scored = teams.map(function(t){
+    return { name: t.name || t, score: weekScores[t.name || t] || 0 };
+  }).sort(function(a,b){ return b.score - a.score; });
+  var cutoff = Math.ceil(scored.length / 2);
+  return {
+    advanced:   scored.slice(0, cutoff),
+    eliminated: scored.slice(cutoff),
+    scores:     weekScores
+  };
+}
+
+// ── RENDER ─────────────────────────────────────────────────────
+function renderPlayoffs(){
+  var weeks = Object.keys(seasonData).filter(function(k){ return seasonData[k] && seasonData[k].length; }).map(Number);
+  var maxWeek = weeks.length ? Math.max.apply(null, weeks) : 0;
+
+  var tiersLocked = maxWeek >= TIER_LOCK_WEEK;
+
+  if(!tiersLocked){
+    document.getElementById('wplayoffs').innerHTML = '<div class="empty">'
+      + '<div class="empty-icon">⏳</div>'
+      + '<div class="empty-title">Playoffs unlock after Week ' + TIER_LOCK_WEEK + '</div>'
+      + '<div class="empty-sub">Tiers are determined by cumulative scoring through Week ' + TIER_LOCK_WEEK + '.<br>'
+      + 'Currently through Week ' + maxWeek + ' — ' + (TIER_LOCK_WEEK - maxWeek) + ' week(s) remaining.</div>'
+      + '</div>';
+    var _hdrSub = document.getElementById('hdr-sub'); if(_hdrSub) _hdrSub.textContent = 'Locked after Wk ' + TIER_LOCK_WEEK + ' · ' + (TIER_LOCK_WEEK - maxWeek) + ' wks away';
+    return;
+  }
+
+  // Build tiers from week 15 totals
+  var totals = getCumulativeTotals(TIER_LOCK_WEEK);
+  var sorted = Object.keys(totals).map(function(name){ return { name: name, total: totals[name] }; })
+    .sort(function(a,b){ return b.total - a.total; });
+  var tiers = splitTiers(sorted);
+
+  // Get weekly scores for playoff weeks
+  var wk16 = getWeeklyScores(16);
+  var wk17 = getWeeklyScores(17);
+  var wk18 = getWeeklyScores(18);
+
+  var hasWk16 = Object.keys(wk16).length > 0;
+  var hasWk17 = Object.keys(wk17).length > 0;
+  var hasWk18 = Object.keys(wk18).length > 0;
+
+  // Update round pills
+  ['16','17','18'].forEach(function(w){
+    var pill = document.getElementById('po-pill-' + w);
+    var has = w === '16' ? hasWk16 : w === '17' ? hasWk17 : hasWk18;
+    var isCurrent = maxWeek === Number(w);
+    pill.className = 'round-pill' + (has ? ' done' : isCurrent ? ' active' : ' upcoming');
+  });
+
+  var statusText = hasWk18 ? 'Season Complete' : hasWk17 ? 'Championship — Wk 18' : hasWk16 ? 'Round 2 — Wk 17' : 'Round 1 — Wk 16';
+  var _sn = document.getElementById('po-status-note'); if(_sn) _sn.textContent = statusText;
+  var _hdrSub = document.getElementById('hdr-sub'); if(_hdrSub) _hdrSub.textContent = sorted.length + ' teams · 3 tiers';
+
+  var tierDefs = [
+    { key: 'elite', label: '🏆 Elite Tier', payouts: ['1st Place', '2nd Place', '3rd Place'] },
+    { key: 'mid',   label: '🥈 Mid Tier',   payouts: ['1st Place', '2nd Place', '3rd Place'] },
+    { key: 'low',   label: '🥉 Survivor Tier', payouts: ['1st Place', '2nd Place', '3rd Place'] }
+  ];
+
+  var html = '<div class="tiers">';
+
+  tierDefs.forEach(function(td){
+    var tierTeams = tiers[td.key];
+
+    // Run rounds
+    var r1 = applyRound(tierTeams, hasWk16 ? wk16 : null);
+    var r2 = applyRound(r1.advanced, hasWk17 ? wk17 : null);
+    var r3 = applyRound(r2.advanced, hasWk18 ? wk18 : null);
+
+    html += '<div class="tier-block">';
+
+    // Tier header
+    html += '<div class="tier-hdr ' + td.key + '">'
+      + '<div><div class="tier-title ' + td.key + '">' + td.label + '</div>'
+      + '<div class="tier-sub">' + tierTeams.length + ' teams · Survival format · Weeks 16–18</div></div>'
+      + '<div class="tier-count">' + (hasWk18 ? 'Complete' : hasWk16 ? (r1.advanced.length + ' remaining') : tierTeams.length + ' competing') + '</div>'
+      + '</div>';
+
+    // Rounds columns — wrapped for horizontal scroll on mobile
+    html += '<div class="rounds-scroll"><div class="rounds-inner">';
+
+    // Round 1 — Week 16
+    html += '<div class="round-col">';
+    html += '<div class="round-label">Round 1 — Week 16</div>';
+    if(!hasWk16){
+      html += '<div class="round-empty">Pending</div>';
+      tierTeams.forEach(function(t, i){
+        html += '<div class="team-row"><span class="t-rank">' + (i+1) + '</span><span class="t-name">' + teamLink(t.name) + '</span></div>';
+      });
+    } else {
+      var allR1 = r1.advanced.concat(r1.eliminated).sort(function(a,b){ return b.score - a.score; });
+      allR1.forEach(function(t, i){
+        var isElim = r1.eliminated.some(function(e){ return e.name === t.name; });
+        var isMe = myTeam && t.name.toLowerCase() === myTeam.toLowerCase();
+        html += '<div class="team-row' + (isElim ? ' eliminated' : ' advanced') + (isMe ? ' is-me' : '') + '">'
+          + '<span class="t-rank">' + (i+1) + '</span>'
+          + '<span class="t-name' + (isElim ? ' elim-line' : '') + '">' + teamLink(t.name) + '</span>'
+          + '<span class="t-score">' + (t.score > 0 ? t.score.toFixed(1) : '—') + '</span>'
+          + '<span class="t-status">' + (isElim ? '❌' : '✅') + '</span>'
+          + '</div>';
+      });
+    }
+    html += '</div>';
+
+    // Round 2 — Week 17
+    html += '<div class="round-col mid-col">';
+    html += '<div class="round-label">Round 2 — Week 17</div>';
+    if(!hasWk16){
+      html += '<div class="round-empty">After Wk 16</div>';
+    } else if(!hasWk17){
+      r1.advanced.forEach(function(t, i){
+        var isMe = myTeam && t.name.toLowerCase() === myTeam.toLowerCase();
+        html += '<div class="team-row' + (isMe ? ' is-me' : '') + '"><span class="t-rank">' + (i+1) + '</span><span class="t-name">' + teamLink(t.name) + '</span></div>';
+      });
+    } else {
+      var allR2 = r2.advanced.concat(r2.eliminated).sort(function(a,b){ return b.score - a.score; });
+      allR2.forEach(function(t, i){
+        var isElim = r2.eliminated.some(function(e){ return e.name === t.name; });
+        var isMe = myTeam && t.name.toLowerCase() === myTeam.toLowerCase();
+        html += '<div class="team-row' + (isElim ? ' eliminated' : ' advanced') + (isMe ? ' is-me' : '') + '">'
+          + '<span class="t-rank">' + (i+1) + '</span>'
+          + '<span class="t-name' + (isElim ? ' elim-line' : '') + '">' + teamLink(t.name) + '</span>'
+          + '<span class="t-score">' + (t.score > 0 ? t.score.toFixed(1) : '—') + '</span>'
+          + '<span class="t-status">' + (isElim ? '❌' : '✅') + '</span>'
+          + '</div>';
+      });
+    }
+    html += '</div>';
+
+    // Championship — Week 18
+    html += '<div class="round-col">';
+    html += '<div class="round-label">Championship — Week 18</div>';
+    if(!hasWk17){
+      html += '<div class="round-empty">After Wk 17</div>';
+    } else if(!hasWk18){
+      r2.advanced.forEach(function(t, i){
+        var isMe = myTeam && t.name.toLowerCase() === myTeam.toLowerCase();
+        html += '<div class="team-row' + (isMe ? ' is-me' : '') + '"><span class="t-rank">' + (i+1) + '</span><span class="t-name">' + teamLink(t.name) + '</span></div>';
+      });
+    } else {
+      var finals = r3.advanced.concat(r3.eliminated).sort(function(a,b){ return b.score - a.score; });
+      finals.forEach(function(t, i){
+        var crown = i === 0 ? '🏆' : i === 1 ? '🥈' : i === 2 ? '🥉' : '';
+        var isChamp = i === 0;
+        var isMe = myTeam && t.name.toLowerCase() === myTeam.toLowerCase();
+        html += '<div class="team-row' + (isChamp ? ' champion' : '') + (isMe ? ' is-me' : '') + '">'
+          + '<span class="t-rank">' + crown + '</span>'
+          + '<span class="t-name">' + teamLink(t.name) + '</span>'
+          + '<span class="t-score">' + (t.score > 0 ? t.score.toFixed(1) : '—') + '</span>'
+          + '</div>';
+      });
+    }
+    html += '</div>';
+
+    html += '</div></div>'; // close rounds-inner + rounds-scroll
+
+    // Payout legend
+    html += '<div class="payout-legend">'
+      + '<div class="payout-item">🏆 1st Place</div>'
+      + '<div class="payout-item">🥈 2nd Place</div>'
+      + '<div class="payout-item">🥉 3rd Place</div>'
+      + '</div>';
+
+    html += '</div>'; // tier-block
+  });
+
+  html += '</div>'; // tiers
+  document.getElementById('wplayoffs').innerHTML = html;
+}
+
+function showToast(msg, isError){
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast' + (isError ? ' error' : '') + ' show';
+  setTimeout(function(){ t.className = 'toast' + (isError ? ' error' : ''); }, 3000);
+}
+
+function toggleTheme(){
+  var html = document.documentElement;
+  var isDark = html.getAttribute('data-theme') !== 'light';
+  html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  var btn = document.getElementById('theme-btn');
+  if(btn) btn.textContent = isDark ? '☀️' : '🌙';
+  try{ localStorage.setItem('fr_theme', isDark ? 'light' : 'dark'); }catch(e){}
+}
+(function(){
+  try{ var t=localStorage.getItem('fr_theme'); if(t) document.documentElement.setAttribute('data-theme',t); }catch(e){}
+})();
+
 
 // ── LEAGUE INFO PAGE ──────────────────────────────────────────────
 // ── LEAGUE INFO PAGE ──────────────────────────────────────────────
