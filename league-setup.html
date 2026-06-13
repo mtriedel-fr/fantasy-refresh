@@ -900,7 +900,9 @@ function createLeague(){
         maxSalary:  maxSal,
         minSalary:  3700,
         role:       'commissioner',
-        teamName:   ''
+        teamName:   '',
+        isPreseason: selectedFmt === 'preseason',
+        seasonType:  selectedFmt === 'preseason' ? 'Preseason' : 'Regular'
       });
       // Show success screen
       showSuccess('create', name, code, selectedFmt, guillotine);
