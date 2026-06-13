@@ -791,17 +791,13 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
   <div class="wk-bar-league">
     <span class="wk-bar-league-name" id="wk-bar-season">OG King/Queen of Fantasy '26</span>
   </div>
-  <div class="wk-bar-controls">
-    <select class="wk-select" id="wk-select" onchange="setWeekFromSelect(this.value)">
-    </select>
-    <div class="league-switcher">
-      <select class="season-select" id="season-select" onchange="switchSeason(this.value)" title="Switch season">
-        <option value="2026" selected>2026</option>
-        <option value="2025">2025</option>
-      </select>
-    </div>
-  </div>
 </div>
+<!-- wk-select and season-select kept hidden for JS compatibility -->
+<select id="wk-select" onchange="setWeekFromSelect(this.value)" style="display:none;"></select>
+<select id="season-select" onchange="switchSeason(this.value)" style="display:none;">
+  <option value="2026" selected>2026</option>
+  <option value="2025">2025</option>
+</select>
 
 <!-- YOUR TEAM — directly below week bar -->
 <div class="my-team-bar" id="my-team-bar">
@@ -846,15 +842,6 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
   <div class="stat"><div class="stat-lbl">Season avg</div><div class="stat-val" id="ss-avg">—</div></div>
   <div class="stat"><div class="stat-lbl">Most consistent</div><div class="stat-val" id="ss-streak">—</div><div class="stat-sub" id="ss-streak-name" style="font-family:var(--fd);font-size:11px;color:var(--ink3);letter-spacing:.5px;text-transform:uppercase;margin-top:2px"></div></div>
   <div class="stat"><div class="stat-lbl">Weeks played</div><div class="stat-val" id="ss-weeks">—</div></div>
-</div>
-
-<!-- SEARCH BAR -->
-<div class="search-bar-row">
-  <div class="search-wrap">
-    <svg viewBox="0 0 24 24" class="search-icon"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-    <input type="text" id="player-search" placeholder="Search player profiles..." autocomplete="off" oninput="handleSearch(this.value)" onfocus="showDropdown()" onblur="hideDropdown()">
-    <div class="search-dropdown hidden" id="search-dropdown"></div>
-  </div>
 </div>
 
 <!-- PRIMARY NAV TAB BAR - hidden, replaced by bottom nav -->
