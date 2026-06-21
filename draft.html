@@ -417,7 +417,6 @@ function filterPlayersToSchedule(){
 var WORKER      = 'https://fantasy-refresh-news.mtriedel.workers.dev';
 var gameOdds    = {};
 var teamLocks   = {};
-var lockPollTimer = null;
 
 // ── HARDCODED 2026 PRESEASON SCHEDULE ──────────────────────────
 // Fallback used until Tank01 Pro is live (and as backup if API has gaps).
@@ -782,14 +781,14 @@ function renderRoster(){
     var isActive = activeSlot === s.id;
     var color   = POS_COLORS[s.pos] || 'var(--ink2)';
     var cls     = 'roster-slot' + (p ? ' filled' : '') + (isActive ? ' active' : '');
-    html += '<div class="'+cls+'" onclick="selectSlot(\''+s.id+'\')">';
+    html += '<div class="'+cls+'" data-slot-id="'+s.id+'">';
     html += '<div class="slot-hdr">';
     html += '<span class="slot-pos-tag" style="color:'+color+'">'+s.label+'</span>';
     if(p){
       html += '<span class="slot-player-name" style="font-family:var(--fd);font-size:15px;font-weight:700;flex:1;">'+p.name+'</span>';
       html += isPlayerLocked(p)
         ? '<span style="font-size:14px;margin-left:auto;">🔒</span>'
-        : '<button class="slot-remove-btn" onclick="event.stopPropagation();removePlayer(\''+s.id+'\')">Remove</button>';
+        : '<button class="slot-remove-btn" data-remove-slot="'+s.id+'">Remove</button>';
     } else {
       html += '<span class="slot-empty-lbl">— empty —</span>';
       html += '<span class="slot-tap-hint">tap to pick</span>';
@@ -808,6 +807,31 @@ function renderRoster(){
   document.getElementById('roster-slots').innerHTML = html;
   updateSubmitBtn();
 }
+
+// ── EVENT DELEGATION FOR ROSTER SLOTS ──────────────────────────
+// Single listener on the parent avoids re-firing/duplicate-touch issues
+// that can occur when innerHTML is rebuilt during a touch event on mobile.
+(function(){
+  var rosterContainer = document.getElementById('roster-slots');
+  if(!rosterContainer) return;
+  var lastHandledTime = 0;
+  rosterContainer.addEventListener('click', function(e){
+    var now = Date.now();
+    if(now - lastHandledTime < 150) return; // debounce rapid-fire duplicate events
+    lastHandledTime = now;
+
+    var removeBtn = e.target.closest('[data-remove-slot]');
+    if(removeBtn){
+      e.stopPropagation();
+      removePlayer(removeBtn.getAttribute('data-remove-slot'));
+      return;
+    }
+    var slotEl = e.target.closest('[data-slot-id]');
+    if(slotEl){
+      selectSlot(slotEl.getAttribute('data-slot-id'));
+    }
+  });
+})();
 
 // ── SLOT SELECTION ─────────────────────────────────────────────
 function selectSlot(slotId){
