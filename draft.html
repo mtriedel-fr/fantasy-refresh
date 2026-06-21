@@ -419,6 +419,74 @@ var gameOdds    = {};
 var teamLocks   = {};
 var lockPollTimer = null;
 
+// ── HARDCODED 2026 PRESEASON SCHEDULE ──────────────────────────
+// Fallback used until Tank01 Pro is live (and as backup if API has gaps).
+// Source: NFL.com official 2026 preseason schedule release (May 2026).
+var PRESEASON_SCHEDULE = {
+  // Week 1 = Hall of Fame Game (Aug 6)
+  1: [
+    { home:'ARI', away:'CAR', time:'2026-08-06T20:00:00-04:00' }
+  ],
+  // Week 2 = Preseason Week 1 (Aug 13-17)
+  2: [
+    { home:'ATL', away:'DEN', time:'2026-08-14T19:00:00-04:00' },
+    { home:'BAL', away:'PHI', time:'2026-08-14T19:00:00-04:00' },
+    { home:'BUF', away:'CAR', time:'2026-08-15T13:00:00-04:00' },
+    { home:'CHI', away:'CLE', time:'2026-08-15T13:00:00-04:00' },
+    { home:'CIN', away:'DET', time:'2026-08-13T19:00:00-04:00' },
+    { home:'HOU', away:'LAC', time:'2026-08-13T20:00:00-04:00' },
+    { home:'KC',  away:'LAR', time:'2026-08-15T16:00:00-04:00' },
+    { home:'LV',  away:'ARI', time:'2026-08-13T20:00:00-04:00' },
+    { home:'NE',  away:'IND', time:'2026-08-13T19:30:00-04:00' },
+    { home:'NO',  away:'JAX', time:'2026-08-15T16:00:00-04:00' },
+    { home:'NYG', away:'MIN', time:'2026-08-15T13:00:00-04:00' },
+    { home:'NYJ', away:'TB',  time:'2026-08-14T19:00:00-04:00' },
+    { home:'PIT', away:'GB',  time:'2026-08-13T19:00:00-04:00' },
+    { home:'SF',  away:'TEN', time:'2026-08-13T21:00:00-04:00' },
+    { home:'SEA', away:'DAL', time:'2026-08-15T20:00:00-04:00' },
+    { home:'WAS', away:'MIA', time:'2026-08-14T19:00:00-04:00' }
+  ],
+  // Week 3 = Preseason Week 2 (Aug 20-23)
+  3: [
+    { home:'HOU', away:'LV',  time:'2026-08-20T20:00:00-04:00' },
+    { home:'LAC', away:'SF',  time:'2026-08-20T22:00:00-04:00' },
+    { home:'PIT', away:'NYJ', time:'2026-08-21T19:00:00-04:00' },
+    { home:'JAX', away:'CAR', time:'2026-08-21T19:30:00-04:00' },
+    { home:'DEN', away:'GB',  time:'2026-08-21T21:00:00-04:00' },
+    { home:'DET', away:'WAS', time:'2026-08-22T12:00:00-04:00' },
+    { home:'CLE', away:'BUF', time:'2026-08-22T13:00:00-04:00' },
+    { home:'IND', away:'ATL', time:'2026-08-22T13:00:00-04:00' },
+    { home:'MIN', away:'BAL', time:'2026-08-22T13:00:00-04:00' },
+    { home:'LAR', away:'NO',  time:'2026-08-22T16:00:00-04:00' }
+  ],
+  // Week 4 = Preseason Week 3 (Aug 27-30)
+  4: [
+    { home:'BAL', away:'WAS', time:'2026-08-27T19:00:00-04:00' },
+    { home:'BUF', away:'PIT', time:'2026-08-27T19:00:00-04:00' },
+    { home:'CAR', away:'HOU', time:'2026-08-27T19:00:00-04:00' },
+    { home:'CLE', away:'NE',  time:'2026-08-27T20:00:00-04:00' },
+    { home:'DAL', away:'NO',  time:'2026-08-27T20:00:00-04:00' },
+    { home:'DEN', away:'MIN', time:'2026-08-28T19:00:00-04:00' },
+    { home:'GB',  away:'ARI', time:'2026-08-28T19:00:00-04:00' },
+    { home:'IND', away:'DET', time:'2026-08-28T19:00:00-04:00' },
+    { home:'JAX', away:'TB',  time:'2026-08-28T19:00:00-04:00' },
+    { home:'KC',  away:'SEA', time:'2026-08-28T19:00:00-04:00' },
+    { home:'LV',  away:'SF',  time:'2026-08-28T20:00:00-04:00' },
+    { home:'LAC', away:'LAR', time:'2026-08-28T20:00:00-04:00' },
+    { home:'MIA', away:'ATL', time:'2026-08-28T20:00:00-04:00' },
+    { home:'NYJ', away:'NYG', time:'2026-08-28T19:00:00-04:00' },
+    { home:'PHI', away:'CIN', time:'2026-08-28T19:00:00-04:00' },
+    { home:'TEN', away:'CHI', time:'2026-08-29T19:00:00-04:00' }
+  ]
+};
+
+function getHardcodedPreseasonSchedule(week){
+  var games = PRESEASON_SCHEDULE[week] || [];
+  return games.map(function(g){
+    return { home: g.home, away: g.away, time: g.time, teams: [g.home, g.away] };
+  });
+}
+
 function loadSchedule(){
   if(TEST_MODE){
     workerFetch('schedule').then(function(data){
@@ -471,6 +539,19 @@ function loadSchedule(){
       }
     })
     .catch(function(){
+      // API unavailable or no subscription — use hardcoded preseason schedule if applicable
+      if(PS_MODE){
+        var fallback = getHardcodedPreseasonSchedule(currentWeek);
+        if(fallback.length){
+          schedule = fallback;
+          buildGamesBar(schedule);
+          if(allPlayers.length){
+            filterPlayersToSchedule();
+            renderPool();
+          }
+          return;
+        }
+      }
       setTimeout(buildGamesBarFromPlayers, 500);
     });
 }
