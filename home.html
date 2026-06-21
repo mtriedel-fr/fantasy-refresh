@@ -261,7 +261,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
     <span class="bn-icon">🏈</span>
     <span class="bn-label">League</span>
   </button>
-  <button class="bn-item" onclick="window.location.href='/league-setup.html?mode=create'">
+  <button class="bn-item" onclick="handleCreateLeagueTap()">
     <span class="bn-icon">🏆</span>
     <span class="bn-label">Create</span>
   </button>
@@ -485,6 +485,37 @@ function sendPasswordReset(){
 }
 
 function confirmSignOut(){ FRAuth.signOut(); }
+
+// ── CREATE LEAGUE — SOFT LOCK ───────────────────────────────────
+// Only mtriedel@gmail.com can create leagues while in testing.
+// Everyone else sees the feature but gets a "coming soon" message.
+var ADMIN_EMAILS = ['mtriedel@gmail.com'];
+
+function handleCreateLeagueTap(){
+  var u = FRAuth.getUser();
+  var email = u ? (u.email || '').toLowerCase() : '';
+  if(ADMIN_EMAILS.indexOf(email) > -1){
+    window.location.href = '/league-setup.html?mode=create';
+    return;
+  }
+  showComingSoon();
+}
+
+function showComingSoon(){
+  var existing = document.getElementById('coming-soon-overlay');
+  if(existing){ existing.style.display = 'flex'; return; }
+  var div = document.createElement('div');
+  div.id = 'coming-soon-overlay';
+  div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:600;display:flex;align-items:center;justify-content:center;padding:20px;';
+  div.onclick = function(e){ if(e.target === div) div.style.display = 'none'; };
+  div.innerHTML = '<div style="background:var(--bg2);border-radius:16px;border-top:3px solid var(--or);border-bottom:3px solid var(--pk);max-width:340px;width:100%;padding:32px 24px;text-align:center;">'
+    + '<div style="font-size:40px;margin-bottom:12px;">🚧</div>'
+    + '<div style="font-family:var(--fd);font-size:22px;font-weight:900;color:var(--or);text-transform:uppercase;letter-spacing:.3px;margin-bottom:8px;">Coming Soon</div>'
+    + '<div style="font-size:14px;color:var(--ink2);line-height:1.6;margin-bottom:20px;">League creation is still being tested. Self-serve leagues open up soon \u2014 stay tuned!</div>'
+    + '<button onclick="document.getElementById(\'coming-soon-overlay\').style.display=\'none\'" style="width:100%;padding:12px;background:linear-gradient(135deg,var(--or),var(--pk));border:none;border-radius:10px;color:#050808;font-family:var(--fd);font-size:14px;font-weight:800;text-transform:uppercase;cursor:pointer;">Got It</button>'
+    + '</div>';
+  document.body.appendChild(div);
+}
 
 // ── LOAD LEAGUES ─────────────────────────────────────────────────
 function loadLeagues() {
