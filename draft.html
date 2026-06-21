@@ -739,22 +739,44 @@ function pickFromPreview(playerId){
   if(p.status === 'O' || p.status === 'IR'){ showToast(p.name+' is out', true); return; }
   if(isPlayerLocked(p)){ showToast(p.name+' is locked 🔒', true); return; }
 
-  // Find the best available slot for this player's position
-  var slot = null;
-  for(var i = 0; i < SLOT_DEFS.length; i++){
-    var s = SLOT_DEFS[i];
-    if(s.eligible.indexOf(p.pos) >= 0 && !lineup[s.id]){ slot = s; break; }
+  // If a slot is already active (selected before opening the game view),
+  // replace directly in that slot — same behavior as the normal picker.
+  var slot = activeSlot ? SLOT_DEFS.find(function(s){ return s.id === activeSlot; }) : null;
+  if(slot && slot.eligible.indexOf(p.pos) < 0) slot = null; // active slot wrong position — fall through to search
+
+  if(!slot){
+    // No active slot, or wrong position — find first slot eligible for this position,
+    // preferring an empty one but allowing replacement of a filled one if none are empty.
+    var emptySlot = null, filledSlot = null;
+    for(var i = 0; i < SLOT_DEFS.length; i++){
+      var s = SLOT_DEFS[i];
+      if(s.eligible.indexOf(p.pos) < 0) continue;
+      if(!lineup[s.id]){ emptySlot = s; break; }
+      if(!filledSlot && !isPlayerLocked(lineup[s.id])) filledSlot = s;
+    }
+    slot = emptySlot || filledSlot;
   }
   if(!slot){ showToast('No available slot for '+p.pos, true); return; }
 
-  // Check cap
-  if(getSpent() + p.salary > CAP){ showToast('Over cap!', true); return; }
+  // If this exact player is already in that slot — no-op
+  if(lineup[slot.id] && lineup[slot.id].id === playerId){ return; }
 
+  // Check cap, excluding the player currently occupying the target slot
+  var currentSlotCost = lineup[slot.id] ? lineup[slot.id].salary : 0;
+  var spent = getSpent() - currentSlotCost;
+  if(spent + p.salary > CAP){ showToast('Over cap!', true); return; }
+
+  // If this player is already in a different slot, clear that slot first
+  Object.keys(lineup).forEach(function(sid){
+    if(lineup[sid] && lineup[sid].id === playerId) lineup[sid] = null;
+  });
+
+  var replaced = lineup[slot.id] ? lineup[slot.id].name : null;
   lineup[slot.id] = p;
   renderRoster();
   updateCap();
   renderGamePreview(activeGame); // refresh preview to show selection
-  showToast(p.name+' → '+slot.label+' ✓');
+  showToast(replaced ? (replaced+' replaced with '+p.name+' ✓') : (p.name+' → '+slot.label+' ✓'));
 }
 
 function loadSubmitted(){
