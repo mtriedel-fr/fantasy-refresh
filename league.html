@@ -791,13 +791,14 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
   <div class="wk-bar-league">
     <span class="wk-bar-league-name" id="wk-bar-season">OG King/Queen of Fantasy '26</span>
   </div>
+  <div class="wk-bar-controls">
+    <select class="wk-select" id="wk-select" onchange="setWeekFromSelect(this.value)"></select>
+    <select class="season-select" id="season-select" onchange="switchSeason(this.value)" title="Switch season">
+      <option value="2026" selected>2026</option>
+      <option value="2025">2025</option>
+    </select>
+  </div>
 </div>
-<!-- wk-select and season-select kept hidden for JS compatibility -->
-<select id="wk-select" onchange="setWeekFromSelect(this.value)" style="display:none;"></select>
-<select id="season-select" onchange="switchSeason(this.value)" style="display:none;">
-  <option value="2026" selected>2026</option>
-  <option value="2025">2025</option>
-</select>
 
 <!-- YOUR TEAM — directly below week bar -->
 <div class="my-team-bar" id="my-team-bar">
@@ -2946,17 +2947,6 @@ function renderLeague(){
               + '<span style="font-family:var(--fd);font-size:11px;color:var(--pk);text-transform:uppercase;letter-spacing:.5px;">Finale: Week 17</span>'
               + '</div>'
               + '</div>'
-              : '')
-
-            // 2025 Archive — only for the OG league with prior-season history
-            + (!IS_PRESEASON_LEAGUE
-              ? '<a href="/archive2025.html" style="display:flex;align-items:center;justify-content:space-between;background:var(--bg2);border-radius:12px;border:1px solid var(--bdr);padding:16px;text-decoration:none;">'
-              + '<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:20px;">📦</span><div>'
-              + '<div style="font-family:var(--fd);font-size:13px;font-weight:800;color:var(--ink);text-transform:uppercase;letter-spacing:.5px;">2025 Season Archive</div>'
-              + '<div style="font-size:11px;color:var(--ink3);">View last year\u2019s standings and results</div>'
-              + '</div></div>'
-              + '<span style="color:var(--or);font-size:18px;">→</span>'
-              + '</a>'
               : '')
 
             + '</div>';
@@ -5838,14 +5828,12 @@ loadTeamName();
 loadFromCloud();
 checkFirstRun();
 
-// Preseason leagues: hide formats that don't apply (Guillotine, Playoffs, 2025 Archive)
+// Preseason leagues: hide formats that don't apply (Guillotine, Playoffs)
 if(IS_PRESEASON_LEAGUE){
   var gBtn = document.getElementById('more-guillotine-btn');
   var pBtn = document.getElementById('more-playoffs-btn');
-  var aBtn = document.getElementById('more-archive-btn');
   if(gBtn) gBtn.style.display = 'none';
   if(pBtn) pBtn.style.display = 'none';
-  if(aBtn) aBtn.style.display = 'none';
   // Reflow grid to 2 columns since only League + Comm remain visible by default
   var moreGrid = document.querySelector('#more-menu > div');
   if(moreGrid) moreGrid.style.gridTemplateColumns = 'repeat(2,1fr)';
@@ -5918,10 +5906,6 @@ document.addEventListener('DOMContentLoaded', function(){
     <button onclick="closeMoreMenu();toggleComm()" id="more-comm-btn" style="display:none;background:rgba(0,229,212,.08);border:1px solid rgba(0,229,212,.2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;">
       <div style="font-size:20px;margin-bottom:4px;">⚙️</div>
       <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--or);text-transform:uppercase;">Comm</div>
-    </button>
-    <button id="more-archive-btn" onclick="closeMoreMenu();window.location.href='/archive2025.html'" style="background:var(--bg3);border:1px solid var(--bdr2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;">
-      <div style="font-size:20px;margin-bottom:4px;">📦</div>
-      <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink2);text-transform:uppercase;">2025</div>
     </button>
   </div>
 </div>
