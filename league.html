@@ -1339,7 +1339,19 @@ function checkFirstRun(){
 }
 
 // ── CONSTANTS ──────────────────────────────────────────────────
-var WEEKS = 18;
+var WEEKS = (function(){
+  try{
+    var ctx = FRAuth.getLeagueCtx();
+    if(ctx && ctx.weeks) return ctx.weeks;
+  }catch(e){}
+  return 18;
+})();
+var IS_PRESEASON_LEAGUE = (function(){
+  try{
+    var ctx = FRAuth.getLeagueCtx();
+    return !!(ctx && (ctx.isPreseason || ctx.seasonType === 'Preseason' || ctx.format === 'preseason' || ctx.weeks === 4));
+  }catch(e){ return false; }
+})();
 var MED = ['🥇','🥈','🥉'];
 var AUP = '<svg style="width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round" viewBox="0 0 24 24"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>';
 var ADN = '<svg style="width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>';
@@ -2769,7 +2781,7 @@ function renderLeague(){
       var season     = s.season || 2026;
       var cap        = s.cap || 60000;
       var format     = s.format || 'cumulative';
-      var guillotine = s.guillotine !== false;
+      var guillotine = s.guillotine !== false && format !== 'preseason' && !IS_PRESEASON_LEAGUE;
 
       // Scoring — reads from settings.scoring, falls back to our defaults
       var sc = s.scoring || {};
@@ -2854,7 +2866,7 @@ function renderLeague(){
             + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--bdr);border-radius:12px;overflow:hidden;margin-bottom:16px;">'
             + '<div style="background:var(--bg2);padding:12px 8px;text-align:center;"><div style="font-family:var(--fd);font-size:9px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:3px;">Teams</div><div style="font-family:var(--fd);font-size:24px;font-weight:900;color:var(--or);">' + (total||'—') + '</div></div>'
             + '<div style="background:var(--bg2);padding:12px 8px;text-align:center;"><div style="font-family:var(--fd);font-size:9px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:3px;">Salary Cap</div><div style="font-family:var(--fd);font-size:22px;font-weight:900;color:var(--or);">$' + (cap/1000).toFixed(0) + 'K</div></div>'
-            + '<div style="background:var(--bg2);padding:12px 8px;text-align:center;"><div style="font-family:var(--fd);font-size:9px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:3px;">Format</div><div style="font-family:var(--fd);font-size:13px;font-weight:800;color:var(--or);text-transform:uppercase;">' + (format === 'cumulative' ? 'Cumulative' : format) + '</div></div>'
+            + '<div style="background:var(--bg2);padding:12px 8px;text-align:center;"><div style="font-family:var(--fd);font-size:9px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:3px;">Format</div><div style="font-family:var(--fd);font-size:13px;font-weight:800;color:var(--or);text-transform:uppercase;">' + (IS_PRESEASON_LEAGUE ? 'Preseason' : format === 'cumulative' ? 'Cumulative' : format) + '</div></div>'
             + '</div>'
 
             // Scoring
@@ -2887,32 +2899,44 @@ function renderLeague(){
             + '</div>'
 
 
-            // Season
-            + '<div style="background:var(--bg2);border-radius:12px;border:1px solid var(--bdr);padding:16px;margin-bottom:12px;">'
-            + '<div style="font-family:var(--fd);font-size:13px;font-weight:800;color:var(--or);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">📅 Cumulative Season Scoring</div>'
-            + '<div style="display:flex;gap:8px;margin-bottom:8px;"><span style="color:var(--or);font-weight:700;flex-shrink:0;">•</span><div style="font-size:12px;color:var(--ink2);line-height:1.5;">Every week your score is added to your running season total across all 18 weeks.</div></div>'
-            + '<div style="display:flex;gap:8px;margin-bottom:8px;"><span style="color:var(--or);font-weight:700;flex-shrink:0;">•</span><div style="font-size:12px;color:var(--ink2);line-height:1.5;">Your cumulative total through Week ' + (playoffStart-1) + ' determines your playoff tier placement.</div></div>'
-            + '<div style="display:flex;gap:8px;margin-bottom:8px;"><span style="color:var(--or);font-weight:700;flex-shrink:0;">•</span><div style="font-size:12px;color:var(--ink2);line-height:1.5;">Playoff weeks still count — every point matters all season long.</div></div>'
-            + '<div style="display:flex;gap:8px;"><span style="color:var(--or);font-weight:700;flex-shrink:0;">•</span><div style="font-size:12px;color:var(--ink2);line-height:1.5;">The highest cumulative season total wins the Season Scoring award, regardless of tier.</div></div>'
-            + '</div>'
+            // Season — different copy for preseason test leagues
+            + (IS_PRESEASON_LEAGUE
+              ? '<div style="background:var(--bg2);border-radius:12px;border:1px solid var(--bdr);padding:16px;margin-bottom:12px;">'
+                + '<div style="font-family:var(--fd);font-size:13px;font-weight:800;color:var(--or);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">📅 Preseason Test League</div>'
+                + '<div style="display:flex;gap:8px;margin-bottom:8px;"><span style="color:var(--or);font-weight:700;flex-shrink:0;">•</span><div style="font-size:12px;color:var(--ink2);line-height:1.5;">4 weeks: Hall of Fame Game, Preseason Wk 1, Wk 2, and Wk 3.</div></div>'
+                + '<div style="display:flex;gap:8px;margin-bottom:8px;"><span style="color:var(--or);font-weight:700;flex-shrink:0;">•</span><div style="font-size:12px;color:var(--ink2);line-height:1.5;">Your scores accumulate across all 4 weeks — highest total wins.</div></div>'
+                + '<div style="display:flex;gap:8px;"><span style="color:var(--or);font-weight:700;flex-shrink:0;">•</span><div style="font-size:12px;color:var(--ink2);line-height:1.5;">This league is for testing the app before the real season — no playoffs or guillotine.</div></div>'
+                + '</div>'
+              : '<div style="background:var(--bg2);border-radius:12px;border:1px solid var(--bdr);padding:16px;margin-bottom:12px;">'
+                + '<div style="font-family:var(--fd);font-size:13px;font-weight:800;color:var(--or);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">📅 Cumulative Season Scoring</div>'
+                + '<div style="display:flex;gap:8px;margin-bottom:8px;"><span style="color:var(--or);font-weight:700;flex-shrink:0;">•</span><div style="font-size:12px;color:var(--ink2);line-height:1.5;">Every week your score is added to your running season total across all 18 weeks.</div></div>'
+                + '<div style="display:flex;gap:8px;margin-bottom:8px;"><span style="color:var(--or);font-weight:700;flex-shrink:0;">•</span><div style="font-size:12px;color:var(--ink2);line-height:1.5;">Your cumulative total through Week ' + (playoffStart-1) + ' determines your playoff tier placement.</div></div>'
+                + '<div style="display:flex;gap:8px;margin-bottom:8px;"><span style="color:var(--or);font-weight:700;flex-shrink:0;">•</span><div style="font-size:12px;color:var(--ink2);line-height:1.5;">Playoff weeks still count — every point matters all season long.</div></div>'
+                + '<div style="display:flex;gap:8px;"><span style="color:var(--or);font-weight:700;flex-shrink:0;">•</span><div style="font-size:12px;color:var(--ink2);line-height:1.5;">The highest cumulative season total wins the Season Scoring award, regardless of tier.</div></div>'
+                + '</div>')
 
-            // Playoffs
-            + '<div style="background:var(--bg2);border-radius:12px;border:1px solid var(--bdr);padding:16px;margin-bottom:12px;">'
-            + '<div style="font-family:var(--fd);font-size:13px;font-weight:800;color:var(--pu);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">🎯 Playoffs — Weeks ' + playoffStart + '–17</div>'
-            + '<div style="display:flex;gap:8px;margin-bottom:8px;"><span style="color:var(--pu);font-weight:700;flex-shrink:0;">•</span><div style="font-size:12px;color:var(--ink2);line-height:1.5;">Everyone makes the playoffs. After Week ' + (playoffStart-1) + ', all teams split into ' + tiers + ' tiers by cumulative score' + (total > 0 ? ' (~' + tierSize + ' teams each)' : '') + '.</div></div>'
-            + '<div style="display:flex;gap:8px;margin-bottom:8px;"><span style="color:var(--pu);font-weight:700;flex-shrink:0;">•</span><div style="font-size:12px;color:var(--ink2);line-height:1.5;">Each playoff week, the lowest-scoring <strong style="color:var(--ink)">half of each tier</strong> is eliminated — e.g. 20 teams per tier in Week 15, bottom 10 go home. Scores still count toward your season total.</div></div>'
-            + '<div style="display:flex;gap:8px;margin-bottom:8px;"><span style="color:var(--pu);font-weight:700;flex-shrink:0;">•</span><div style="font-size:12px;color:var(--ink2);line-height:1.5;">Week 17 is the finale — surviving teams in each tier compete for 1st, 2nd, and 3rd.</div></div>'
-            + '<div style="display:flex;gap:8px;"><span style="color:var(--pu);font-weight:700;flex-shrink:0;">•</span><div style="font-size:12px;color:var(--ink2);line-height:1.5;">Tier placement locks after Week ' + (playoffStart-1) + ' — you play within your tier for the full playoffs.</div></div>'
-            + '</div>'
+            // Playoffs — skipped entirely for preseason leagues
+            + (IS_PRESEASON_LEAGUE ? '' :
+              '<div style="background:var(--bg2);border-radius:12px;border:1px solid var(--bdr);padding:16px;margin-bottom:12px;">'
+              + '<div style="font-family:var(--fd);font-size:13px;font-weight:800;color:var(--pu);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">🎯 Playoffs — Weeks ' + playoffStart + '–17</div>'
+              + '<div style="display:flex;gap:8px;margin-bottom:8px;"><span style="color:var(--pu);font-weight:700;flex-shrink:0;">•</span><div style="font-size:12px;color:var(--ink2);line-height:1.5;">Everyone makes the playoffs. After Week ' + (playoffStart-1) + ', all teams split into ' + tiers + ' tiers by cumulative score' + (total > 0 ? ' (~' + tierSize + ' teams each)' : '') + '.</div></div>'
+              + '<div style="display:flex;gap:8px;margin-bottom:8px;"><span style="color:var(--pu);font-weight:700;flex-shrink:0;">•</span><div style="font-size:12px;color:var(--ink2);line-height:1.5;">Each playoff week, the lowest-scoring <strong style="color:var(--ink)">half of each tier</strong> is eliminated — e.g. 20 teams per tier in Week 15, bottom 10 go home. Scores still count toward your season total.</div></div>'
+              + '<div style="display:flex;gap:8px;margin-bottom:8px;"><span style="color:var(--pu);font-weight:700;flex-shrink:0;">•</span><div style="font-size:12px;color:var(--ink2);line-height:1.5;">Week 17 is the finale — surviving teams in each tier compete for 1st, 2nd, and 3rd.</div></div>'
+              + '<div style="display:flex;gap:8px;"><span style="color:var(--pu);font-weight:700;flex-shrink:0;">•</span><div style="font-size:12px;color:var(--ink2);line-height:1.5;">Tier placement locks after Week ' + (playoffStart-1) + ' — you play within your tier for the full playoffs.</div></div>'
+              + '</div>')
 
+            // Winners — simplified for preseason leagues (no tiers/guillotine)
+            + (IS_PRESEASON_LEAGUE
+              ? '<div style="background:var(--bg2);border-radius:12px;border:1px solid var(--bdr);padding:16px;margin-bottom:12px;">'
+                + '<div style="font-family:var(--fd);font-size:13px;font-weight:800;color:var(--or);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">🏆 Way to Win</div>'
+                + '<div style="display:flex;align-items:center;gap:8px;"><span style="font-family:var(--fd);font-size:11px;font-weight:700;color:var(--or);text-transform:uppercase;min-width:52px;background:rgba(0,229,212,.08);padding:2px 6px;border-radius:4px;">Champ</span><span style="font-size:12px;color:var(--ink2);">Highest 4-Week Total</span></div>'
+                + '</div>'
+              : '<div style="background:var(--bg2);border-radius:12px;border:1px solid var(--bdr);padding:16px;margin-bottom:12px;">'
+                + '<div style="font-family:var(--fd);font-size:13px;font-weight:800;color:var(--or);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">🏆 Ways to Win</div>'
+                + winnersHtml
+                + '</div>')
 
-            // Winners
-            + '<div style="background:var(--bg2);border-radius:12px;border:1px solid var(--bdr);padding:16px;margin-bottom:12px;">'
-            + '<div style="font-family:var(--fd);font-size:13px;font-weight:800;color:var(--or);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">🏆 Ways to Win</div>'
-            + winnersHtml
-            + '</div>'
-
-            // Guillotine
+            // Guillotine — skipped for preseason leagues
             + (guillotine
               ? '<div style="background:var(--bg2);border-radius:12px;border:1px solid rgba(255,95,160,.2);padding:16px;">'
               + '<div style="font-family:var(--fd);font-size:13px;font-weight:800;color:var(--pk);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">☠️ Guillotine — Concurrent</div>'
@@ -2975,7 +2999,9 @@ function renderPreseasonRoster(){
 
 // ── SHOW EMPTY ────────────────────────────────────────────────────
 function showEmpty(){
-  var seasonStart = new Date('2026-09-03');
+  var seasonStart = IS_PRESEASON_LEAGUE ? new Date('2026-08-06') : new Date('2026-09-03');
+  var seasonStartLabel = IS_PRESEASON_LEAGUE ? 'Aug 6, 2026' : 'Sep 3, 2026';
+  var startLabel = IS_PRESEASON_LEAGUE ? 'Preseason Starts' : 'Season Starts';
   var now = new Date();
   var days = Math.ceil((seasonStart - now) / (1000 * 60 * 60 * 24));
 
@@ -2998,8 +3024,8 @@ function showEmpty(){
 
   // Countdown for season/other views
   var countdownHtml = days > 0
-    ? '<div style="display:flex;justify-content:center;align-items:center;padding:48px 20px;"><div style="background:linear-gradient(135deg,rgba(0,229,212,.08),rgba(255,95,160,.08));border:1px solid rgba(0,229,212,.2);border-radius:20px;padding:28px 40px;text-align:center;max-width:280px;"><div style="font-family:var(--fd);font-size:13px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;">Season Starts</div><div style="font-family:var(--fd);font-size:64px;font-weight:900;color:var(--or);line-height:1;margin-bottom:8px;">' + days + '</div><div style="font-family:var(--fd);font-size:13px;font-weight:700;color:var(--pk);text-transform:uppercase;letter-spacing:1px;">days to kickoff</div><div style="font-family:var(--fd);font-size:11px;color:var(--ink3);margin-top:10px;text-transform:uppercase;letter-spacing:.5px;">Sep 3, 2026</div></div></div>'
-    : '<div style="display:flex;justify-content:center;padding:48px 20px;"><div style="font-family:var(--fd);font-size:18px;font-weight:800;color:var(--or);text-transform:uppercase;">Season starting soon</div></div>';
+    ? '<div style="display:flex;justify-content:center;align-items:center;padding:48px 20px;"><div style="background:linear-gradient(135deg,rgba(0,229,212,.08),rgba(255,95,160,.08));border:1px solid rgba(0,229,212,.2);border-radius:20px;padding:28px 40px;text-align:center;max-width:280px;"><div style="font-family:var(--fd);font-size:13px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;">' + startLabel + '</div><div style="font-family:var(--fd);font-size:64px;font-weight:900;color:var(--or);line-height:1;margin-bottom:8px;">' + days + '</div><div style="font-family:var(--fd);font-size:13px;font-weight:700;color:var(--pk);text-transform:uppercase;letter-spacing:1px;">days to kickoff</div><div style="font-family:var(--fd);font-size:11px;color:var(--ink3);margin-top:10px;text-transform:uppercase;letter-spacing:.5px;">' + seasonStartLabel + '</div></div></div>'
+    : '<div style="display:flex;justify-content:center;padding:48px 20px;"><div style="font-family:var(--fd);font-size:18px;font-weight:800;color:var(--or);text-transform:uppercase;">' + (IS_PRESEASON_LEAGUE ? 'Preseason underway' : 'Season starting soon') + '</div></div>';
 
   // My Lineup = empty slots + draft link
   var wt = document.getElementById('wt');
@@ -5800,6 +5826,18 @@ initLeagueSwitcher();
 loadTeamName();
 loadFromCloud();
 checkFirstRun();
+
+// Preseason leagues: hide formats that don't apply (Guillotine, Playoffs)
+if(IS_PRESEASON_LEAGUE){
+  var gBtn = document.getElementById('more-guillotine-btn');
+  var pBtn = document.getElementById('more-playoffs-btn');
+  if(gBtn) gBtn.style.display = 'none';
+  if(pBtn) pBtn.style.display = 'none';
+  // Reflow grid to 2 columns since only League + Comm remain visible by default
+  var moreGrid = document.querySelector('#more-menu > div');
+  if(moreGrid) moreGrid.style.gridTemplateColumns = 'repeat(2,1fr)';
+}
+
 // Run commissioner check after a short delay to ensure Firebase is ready
 setTimeout(function(){ initCommissionerAccess(); }, 800);
 // Also run on DOMContentLoaded as backup
@@ -5852,7 +5890,7 @@ document.addEventListener('DOMContentLoaded', function(){
 <!-- MORE MENU (slides up) -->
 <div id="more-menu" style="display:none;position:fixed;bottom:60px;left:0;right:0;background:var(--bg2);border-top:1px solid var(--bdr2);padding:16px;z-index:99;" onclick="event.stopPropagation()">
   <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">
-    <button onclick="closeMoreMenu();switchBottomNav('guillotine','bn-more')" style="background:var(--bg3);border:1px solid var(--bdr2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;">
+    <button id="more-guillotine-btn" onclick="closeMoreMenu();switchBottomNav('guillotine','bn-more')" style="background:var(--bg3);border:1px solid var(--bdr2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;">
       <div style="font-size:20px;margin-bottom:4px;">☠️</div>
       <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink2);text-transform:uppercase;">Guillotine</div>
     </button>
@@ -5860,7 +5898,7 @@ document.addEventListener('DOMContentLoaded', function(){
       <div style="font-size:20px;margin-bottom:4px;">🏈</div>
       <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink2);text-transform:uppercase;">League</div>
     </button>
-    <button onclick="closeMoreMenu();switchBottomNav('playoffs','bn-more')" style="background:var(--bg3);border:1px solid var(--bdr2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;">
+    <button id="more-playoffs-btn" onclick="closeMoreMenu();switchBottomNav('playoffs','bn-more')" style="background:var(--bg3);border:1px solid var(--bdr2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;">
       <div style="font-size:20px;margin-bottom:4px;">🎯</div>
       <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink2);text-transform:uppercase;">Playoffs</div>
     </button>
