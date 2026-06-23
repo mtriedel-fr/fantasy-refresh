@@ -1316,6 +1316,60 @@ function confirmTeamName(){
   });
 }
 
+// ── FIRST-JOIN TEAM NAME PROMPT ──────────────────────────────────────
+// Called when a member has no team name set yet for this league.
+// Opens the existing (previously unwired) team-name-modal.
+function promptTeamName(leagueName){
+  var modal = document.getElementById('team-name-modal');
+  var label = document.getElementById('team-name-league-label');
+  var input = document.getElementById('team-name-inp');
+  if(!modal) return;
+  if(label) label.textContent = leagueName || '';
+  if(input) input.value = '';
+  var status = document.getElementById('team-name-status');
+  if(status) status.textContent = '';
+  modal.style.display = 'flex';
+  if(input) setTimeout(function(){ input.focus(); }, 100);
+}
+
+// Called by the "Set Team Name →" button inside the modal.
+function saveTeamName(){
+  var input = document.getElementById('team-name-inp');
+  var status = document.getElementById('team-name-status');
+  var name = input ? input.value.trim() : '';
+  if(!name){
+    if(status){ status.textContent = 'Enter a team name'; status.style.color = 'var(--pk)'; }
+    return;
+  }
+
+  var user = FRAuth.getUser();
+  if(!user) return;
+  var ctx = FRAuth.getLeagueCtx();
+  var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+
+  // Same duplicate-name guard used by the regular team-name editor —
+  // a first-time join shouldn't be exempt from this check.
+  FR.fb.get('/leagues/' + leagueId + '/members').then(function(members){
+    var taken = Object.keys(members || {}).some(function(uid){
+      if(uid === user.uid) return false;
+      var m = members[uid];
+      return m && m.teamName && teamMatch(m.teamName, name);
+    });
+    if(taken){
+      if(status){ status.textContent = 'That name is already taken in this league'; status.style.color = 'var(--pk)'; }
+      return;
+    }
+    var modal = document.getElementById('team-name-modal');
+    if(modal) modal.style.display = 'none';
+    saveTeamNameToFirebase(name, user, ctx, leagueId);
+  }).catch(function(){
+    // Fail open rather than blocking the first-join flow entirely
+    var modal = document.getElementById('team-name-modal');
+    if(modal) modal.style.display = 'none';
+    saveTeamNameToFirebase(name, user, ctx, leagueId);
+  });
+}
+
 function saveTeamNameToFirebase(name, user, ctx, leagueId){
   // Optimistic update
   applyTeamName(name);
@@ -7223,23 +7277,6 @@ document.addEventListener('DOMContentLoaded', function(){
 </script>
 
 <!-- TEAM NAME PROMPT MODAL -->
-<div id="team-name-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:600;align-items:center;justify-content:center;padding:20px;">
-  <div style="background:var(--bg2);border-radius:16px;border-top:3px solid var(--or);border-bottom:3px solid var(--pk);width:100%;max-width:420px;padding:32px;text-align:center;">
-    <div style="font-size:40px;margin-bottom:12px;">🏈</div>
-    <div style="font-family:var(--fd);font-size:24px;font-weight:900;color:var(--or);text-transform:uppercase;margin-bottom:4px;">Set Your Team Name</div>
-    <div id="team-name-league-label" style="font-family:var(--fd);font-size:12px;color:var(--pk);text-transform:uppercase;letter-spacing:.8px;margin-bottom:16px;"></div>
-    <p style="font-size:13px;color:var(--ink3);margin-bottom:20px;line-height:1.6;">Choose your team name for this league.</p>
-    <input type="text" id="team-name-inp" placeholder="e.g. Mahomes Alone" maxlength="30"
-      style="width:100%;padding:12px 14px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:10px;color:var(--or);font-family:var(--fd);font-size:18px;font-weight:700;outline:none;text-align:center;margin-bottom:8px;"
-      oninput="document.getElementById('team-name-counter').textContent=(30-this.value.length)+' chars left'"
-      onkeydown="if(event.key==='Enter')saveTeamName()">
-    <div id="team-name-counter" style="font-family:var(--fd);font-size:10px;color:var(--ink3);margin-bottom:16px;">30 chars left</div>
-    <button onclick="saveTeamName()" style="width:100%;padding:13px;background:linear-gradient(135deg,var(--or),var(--pk));border:none;border-radius:10px;color:#050808;font-family:var(--fd);font-size:15px;font-weight:900;text-transform:uppercase;cursor:pointer;">Set Team Name →</button>
-    <button onclick="document.getElementById('team-name-modal').style.display='none'" style="width:100%;padding:8px;background:none;border:none;color:var(--ink3);font-family:var(--fd);font-size:11px;cursor:pointer;margin-top:8px;text-transform:uppercase;">Skip for now</button>
-    <div id="team-name-status" style="font-family:var(--fd);font-size:11px;color:var(--pk);margin-top:8px;min-height:14px;text-transform:uppercase;"></div>
-  </div>
-</div>
-
 <!-- BOTTOM NAV -->
 <nav class="bottom-nav" id="bottom-nav">
   <button class="bn-item" onclick="closeMoreMenu();window.location.href='/home.html'">
