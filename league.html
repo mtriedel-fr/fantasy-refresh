@@ -1026,6 +1026,16 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
 
         <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--bdr);" id="h2h-schedule-section" class="hidden">
           <div class="csect">⚔️ Head-to-Head Schedule</div>
+
+          <!-- DIVISION ASSIGNMENT -->
+          <div id="h2h-division-block" style="display:none;margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--bdr);">
+            <div style="font-family:var(--fd);font-size:12px;font-weight:700;color:var(--ink2);text-transform:uppercase;margin-bottom:6px;">Division Assignment</div>
+            <div style="font-size:12px;color:var(--ink3);margin-bottom:10px;line-height:1.5;">Assign each team to a division before generating the schedule. Teams play within and across divisions.</div>
+            <div id="h2h-division-list"></div>
+            <button class="salary-btn secondary" style="margin-top:8px;" onclick="saveH2HDivisions()">💾 Save Divisions</button>
+            <div id="h2h-division-status" style="font-size:11px;color:var(--ink3);margin-top:6px;"></div>
+          </div>
+
           <div style="font-size:12px;color:var(--ink2);margin-bottom:10px;line-height:1.5;">
             Generates weekly matchups for all teams. Round-robin if no divisions, division-aware pairing if divisions are set. Run once before Week 1 — re-running replaces the full schedule.
           </div>
@@ -1035,6 +1045,30 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
             <button class="salary-btn secondary" onclick="previewH2HSchedule()">👁 Preview</button>
           </div>
           <div id="h2h-schedule-preview" style="margin-top:12px;"></div>
+
+          <!-- MANUAL MATCHUP EDITOR -->
+          <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--bdr);">
+            <div style="font-family:var(--fd);font-size:12px;font-weight:700;color:var(--ink2);text-transform:uppercase;margin-bottom:6px;">Edit a Matchup</div>
+            <div style="font-size:12px;color:var(--ink3);margin-bottom:10px;line-height:1.5;">Manually swap who plays whom in a specific week — useful for fixing a bye or correcting an error.</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px;">
+              <select id="h2h-edit-week" class="wk-select" style="width:auto;" onchange="loadH2HWeekForEdit(this.value)">
+                <option value="">Select week…</option>
+              </select>
+            </div>
+            <div id="h2h-edit-matchups"></div>
+          </div>
+
+          <!-- PLAYOFF BRACKET -->
+          <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--bdr);">
+            <div style="font-family:var(--fd);font-size:12px;font-weight:700;color:var(--pu);text-transform:uppercase;margin-bottom:6px;">🏆 Playoff Bracket</div>
+            <div style="font-size:12px;color:var(--ink3);margin-bottom:10px;line-height:1.5;">Seeds the top teams by record once the regular season ends, then generates single-elimination playoff matchups.</div>
+            <div id="h2h-playoff-status" style="font-size:12px;color:var(--ink3);margin-bottom:10px;">Checking playoff status…</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button class="salary-btn" id="h2h-playoff-seed-btn" onclick="seedH2HPlayoffs()">⚡ Seed Playoffs</button>
+              <button class="salary-btn secondary" onclick="previewH2HPlayoffBracket()">👁 Preview Bracket</button>
+            </div>
+            <div id="h2h-playoff-preview" style="margin-top:12px;"></div>
+          </div>
         </div>
 
         <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--bdr);">
@@ -1688,7 +1722,7 @@ function renderH2HMyMatchup(){
 
 // Compute full W-L-T standings across all weeks with a generated schedule
 function computeH2HStandings(){
-  var records = {}; // teamName: {wins, losses, ties, pointsFor, pointsAgainst}
+  var records = {}; // teamName: {wins, losses, ties, pointsFor, pointsAgainst, division}
 
   Object.keys(h2hMatchups).forEach(function(wk){
     var weekNum = wk.replace('week', '');
@@ -1698,8 +1732,8 @@ function computeH2HStandings(){
       var awayScore = m.awayName === 'BYE' ? null : getTeamScore(weekNum, m.awayName);
       if(homeScore === null) return; // week hasn't happened yet
 
-      if(!records[m.homeName]) records[m.homeName] = {wins:0, losses:0, ties:0, pf:0, pa:0};
-      if(m.awayName !== 'BYE' && !records[m.awayName]) records[m.awayName] = {wins:0, losses:0, ties:0, pf:0, pa:0};
+      if(!records[m.homeName]) records[m.homeName] = {wins:0, losses:0, ties:0, pf:0, pa:0, division: m.homeDivision || null};
+      if(m.awayName !== 'BYE' && !records[m.awayName]) records[m.awayName] = {wins:0, losses:0, ties:0, pf:0, pa:0, division: m.awayDivision || null};
 
       records[m.homeName].pf += homeScore;
       if(m.awayName === 'BYE' || awayScore === null) return;
@@ -1716,11 +1750,30 @@ function computeH2HStandings(){
 
   return Object.keys(records).map(function(name){
     var r = records[name];
-    return { name: name, wins: r.wins, losses: r.losses, ties: r.ties, pf: r.pf, pa: r.pa };
+    return { name: name, wins: r.wins, losses: r.losses, ties: r.ties, pf: r.pf, pa: r.pa, division: r.division };
   }).sort(function(a, b){
     if(b.wins !== a.wins) return b.wins - a.wins;
     return b.pf - a.pf;
   });
+}
+
+function buildStandingsTable(rows){
+  var bodyRows = rows.map(function(t, i){
+    var isMe = myTeam && teamMatch(t.name, myTeam);
+    return '<tr' + (isMe ? ' class="my-team"' : '') + '>'
+      + '<td class="rk' + (i < 3 ? ' top' : '') + '">' + (i+1) + '</td>'
+      + '<td style="font-family:var(--fd);font-size:14px;font-weight:700;color:' + (isMe ? 'var(--or)' : 'var(--ink)') + ';">' + t.name + '</td>'
+      + '<td style="text-align:center;font-family:var(--fd);font-weight:800;color:var(--or);">' + t.wins + '</td>'
+      + '<td style="text-align:center;font-family:var(--fd);font-weight:800;color:var(--pk);">' + t.losses + '</td>'
+      + '<td style="text-align:center;font-family:var(--fd);font-weight:700;color:var(--ink3);">' + t.ties + '</td>'
+      + '<td style="text-align:right;font-family:var(--fd);color:var(--ink2);">' + fmtScore(t.pf) + '</td>'
+      + '<td style="text-align:right;font-family:var(--fd);color:var(--ink3);">' + fmtScore(t.pa) + '</td>'
+      + '</tr>';
+  }).join('');
+
+  return '<table class="st-table"><thead><tr>'
+    + '<th class="rk">#</th><th>Team</th><th style="text-align:center;">W</th><th style="text-align:center;">L</th><th style="text-align:center;">T</th><th style="text-align:right;">PF</th><th style="text-align:right;">PA</th>'
+    + '</tr></thead><tbody>' + bodyRows + '</tbody></table>';
 }
 
 function renderH2HStandings(){
@@ -1735,25 +1788,57 @@ function renderH2HStandings(){
     return;
   }
 
-  var rows = standings.map(function(t, i){
-    var isMe = myTeam && teamMatch(t.name, myTeam);
-    return '<tr' + (isMe ? ' class="my-team"' : '') + '>'
-      + '<td class="rk' + (i < 3 ? ' top' : '') + '">' + (i+1) + '</td>'
-      + '<td style="font-family:var(--fd);font-size:14px;font-weight:700;color:' + (isMe ? 'var(--or)' : 'var(--ink)') + ';">' + t.name + '</td>'
-      + '<td style="text-align:center;font-family:var(--fd);font-weight:800;color:var(--or);">' + t.wins + '</td>'
-      + '<td style="text-align:center;font-family:var(--fd);font-weight:800;color:var(--pk);">' + t.losses + '</td>'
-      + '<td style="text-align:center;font-family:var(--fd);font-weight:700;color:var(--ink3);">' + t.ties + '</td>'
-      + '<td style="text-align:right;font-family:var(--fd);color:var(--ink2);">' + fmtScore(t.pf) + '</td>'
-      + '<td style="text-align:right;font-family:var(--fd);color:var(--ink3);">' + fmtScore(t.pa) + '</td>'
-      + '</tr>';
-  }).join('');
+  var hasDivisions = standings.some(function(t){ return t.division; });
+  var html;
 
-  var html = '<table class="st-table"><thead><tr>'
-    + '<th class="rk">#</th><th>Team</th><th style="text-align:center;">W</th><th style="text-align:center;">L</th><th style="text-align:center;">T</th><th style="text-align:right;">PF</th><th style="text-align:right;">PA</th>'
-    + '</tr></thead><tbody>' + rows + '</tbody></table>';
+  if(hasDivisions){
+    var byDivision = {};
+    standings.forEach(function(t){
+      var key = t.division || 'Unassigned';
+      if(!byDivision[key]) byDivision[key] = [];
+      byDivision[key].push(t);
+    });
+    var divKeys = Object.keys(byDivision).sort(function(a,b){
+      if(a === 'Unassigned') return 1;
+      if(b === 'Unassigned') return -1;
+      return parseInt(a) - parseInt(b);
+    });
+
+    html = '<div style="display:flex;gap:8px;padding:10px 16px;border-bottom:1px solid var(--bdr);overflow-x:auto;">'
+      + '<button class="div-tab-btn active" data-div="all" onclick="filterH2HDivision(this,\'all\')" style="font-family:var(--fd);font-size:11px;font-weight:700;color:var(--or);background:rgba(0,229,212,.1);border:1px solid rgba(0,229,212,.25);padding:5px 12px;border-radius:8px;text-transform:uppercase;cursor:pointer;white-space:nowrap;">All</button>'
+      + divKeys.map(function(dk){
+        var label = dk === 'Unassigned' ? 'Unassigned' : 'Division ' + dk;
+        return '<button class="div-tab-btn" data-div="' + dk + '" onclick="filterH2HDivision(this,\'' + dk + '\')" style="font-family:var(--fd);font-size:11px;font-weight:700;color:var(--ink3);background:var(--bg2);border:1px solid var(--bdr);padding:5px 12px;border-radius:8px;text-transform:uppercase;cursor:pointer;white-space:nowrap;">' + label + '</button>';
+      }).join('')
+      + '</div>'
+      + '<div id="h2h-standings-content">' + buildStandingsTable(standings) + '</div>';
+
+    // Cache divisional groupings on window so the filter click handler can re-render without recomputing
+    window._h2hStandingsByDivision = byDivision;
+    window._h2hStandingsAll = standings;
+  } else {
+    html = buildStandingsTable(standings);
+  }
 
   if(sw) sw.innerHTML = html;
   if(wf) wf.innerHTML = html;
+}
+
+function filterH2HDivision(btn, divKey){
+  document.querySelectorAll('.div-tab-btn').forEach(function(b){
+    b.classList.remove('active');
+    b.style.color = 'var(--ink3)';
+    b.style.background = 'var(--bg2)';
+    b.style.borderColor = 'var(--bdr)';
+  });
+  btn.classList.add('active');
+  btn.style.color = 'var(--or)';
+  btn.style.background = 'rgba(0,229,212,.1)';
+  btn.style.borderColor = 'rgba(0,229,212,.25)';
+
+  var rows = divKey === 'all' ? window._h2hStandingsAll : (window._h2hStandingsByDivision[divKey] || []);
+  var content = document.getElementById('h2h-standings-content');
+  if(content) content.innerHTML = buildStandingsTable(rows);
 }
 
 function renderAll(){
@@ -5550,7 +5635,11 @@ var SAL_MIN = 3700;
 function initH2HVisibility(settings){
   var section = document.getElementById('h2h-schedule-section');
   if(section) section.classList.toggle('hidden', !IS_H2H_LEAGUE);
-  if(IS_H2H_LEAGUE) checkH2HScheduleStatus();
+  if(!IS_H2H_LEAGUE) return;
+  checkH2HScheduleStatus();
+  loadH2HDivisionAssignment();
+  populateH2HEditWeekDropdown();
+  checkH2HPlayoffStatus();
 }
 
 function checkH2HScheduleStatus(){
@@ -5572,6 +5661,79 @@ function checkH2HScheduleStatus(){
     .catch(function(){
       if(statusEl){ statusEl.textContent = 'No schedule generated yet.'; statusEl.style.color = 'var(--ink3)'; }
     });
+}
+
+// ── DIVISION ASSIGNMENT ──────────────────────────────────────────────
+function loadH2HDivisionAssignment(){
+  var ctx = FRAuth.getLeagueCtx();
+  var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+
+  Promise.all([
+    FR.fb.get('/leagues/' + leagueId + '/members'),
+    FR.fb.get('/leagues/' + leagueId + '/settings')
+  ]).then(function(results){
+    var members  = results[0] || {};
+    var settings = results[1] || {};
+    var divCount = settings.h2hDivisions || 0;
+    var block = document.getElementById('h2h-division-block');
+
+    if(divCount < 1){
+      if(block) block.style.display = 'none';
+      return;
+    }
+    if(block) block.style.display = 'block';
+
+    var teamList = Object.keys(members).filter(function(uid){
+      var m = members[uid];
+      return m && m.teamName && m.active !== false;
+    });
+
+    var divOptions = '';
+    for(var d = 1; d <= divCount; d++){
+      divOptions += '<option value="' + d + '">Division ' + d + '</option>';
+    }
+
+    var rows = teamList.map(function(uid, i){
+      var m = members[uid];
+      var currentDiv = m.division || ((i % divCount) + 1);
+      return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--bdr);">'
+        + '<span style="font-family:var(--fd);font-size:13px;font-weight:700;color:var(--ink);">' + m.teamName + '</span>'
+        + '<select class="wk-select" style="width:auto;" data-uid="' + uid + '" id="div-sel-' + uid + '">' + divOptions.replace('value="' + currentDiv + '"', 'value="' + currentDiv + '" selected') + '</select>'
+        + '</div>';
+    }).join('');
+
+    var listEl = document.getElementById('h2h-division-list');
+    if(listEl) listEl.innerHTML = rows;
+  }).catch(function(){});
+}
+
+function saveH2HDivisions(){
+  var ctx = FRAuth.getLeagueCtx();
+  var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+  var statusEl = document.getElementById('h2h-division-status');
+  var selects = document.querySelectorAll('#h2h-division-list select[data-uid]');
+
+  if(!selects.length){ return; }
+  statusEl.textContent = 'Saving…';
+  statusEl.style.color = 'var(--ink3)';
+
+  var updates = {};
+  selects.forEach(function(sel){
+    var uid = sel.getAttribute('data-uid');
+    updates[uid] = { division: parseInt(sel.value) };
+  });
+
+  var writes = Object.keys(updates).map(function(uid){
+    return FR.fb.patch('/leagues/' + leagueId + '/members/' + uid, updates[uid]);
+  });
+
+  Promise.all(writes).then(function(){
+    statusEl.textContent = '✓ Divisions saved.';
+    statusEl.style.color = 'var(--or)';
+  }).catch(function(){
+    statusEl.textContent = '✗ Error saving divisions.';
+    statusEl.style.color = 'var(--pk)';
+  });
 }
 
 // Round-robin pairing generator (circle method) — works for even or odd team counts
@@ -5656,13 +5818,20 @@ function generateH2HSchedule(){
     var hasDivisions = settings.h2hDivisions > 0;
 
     var schedule;
+    var divisionMap = {}; // uid -> divisionNumber, used to tag matchups for division standings
     if(hasDivisions){
-      // Group teams into divisions evenly (alternate assignment since we
-      // don't yet have explicit division membership stored per-member)
       var divCount = settings.h2hDivisions;
       var divisions = {};
       for(var d = 0; d < divCount; d++) divisions['Division ' + (d+1)] = [];
-      teamList.forEach(function(uid, i){ divisions['Division ' + ((i % divCount) + 1)].push(uid); });
+      teamList.forEach(function(uid, i){
+        // Use saved division from member record; fall back to alternating
+        // assignment only if the commissioner hasn't set it yet.
+        var divNum = members[uid].division || ((i % divCount) + 1);
+        divisionMap[uid] = divNum;
+        var key = 'Division ' + divNum;
+        if(!divisions[key]) divisions[key] = [];
+        divisions[key].push(uid);
+      });
       schedule = buildDivisionSchedule(divisions, regularWeeks);
     } else {
       schedule = buildRoundRobin(teamList).slice(0, regularWeeks);
@@ -5686,7 +5855,9 @@ function generateH2HSchedule(){
           home: pair[0],
           away: pair[1], // null = bye week for "home"
           homeName: pair[0] ? (members[pair[0]].teamName || '') : '',
-          awayName: pair[1] ? (members[pair[1]].teamName || '') : 'BYE'
+          awayName: pair[1] ? (members[pair[1]].teamName || '') : 'BYE',
+          homeDivision: pair[0] ? (divisionMap[pair[0]] || null) : null,
+          awayDivision: pair[1] ? (divisionMap[pair[1]] || null) : null
         };
       });
     });
@@ -5738,6 +5909,309 @@ function previewH2HSchedule(){
     .catch(function(){
       preview.innerHTML = '<div style="font-size:12px;color:var(--pk);">Could not load schedule.</div>';
     });
+}
+
+// ── MANUAL MATCHUP EDITOR ─────────────────────────────────────────────
+function populateH2HEditWeekDropdown(){
+  var sel = document.getElementById('h2h-edit-week');
+  if(!sel) return;
+  var ctx = FRAuth.getLeagueCtx();
+  var settings = {};
+  FR.fb.get('/leagues/' + (ctx ? ctx.leagueId : 'fr_refresh26') + '/settings').then(function(s){
+    var regularWeeks = (s && s.playoffStartWeek ? s.playoffStartWeek - 1 : 14);
+    var opts = '<option value="">Select week…</option>';
+    for(var w = 1; w <= regularWeeks; w++) opts += '<option value="' + w + '">Week ' + w + '</option>';
+    sel.innerHTML = opts;
+  }).catch(function(){});
+}
+
+function loadH2HWeekForEdit(week){
+  var container = document.getElementById('h2h-edit-matchups');
+  if(!week){ container.innerHTML = ''; return; }
+  var ctx = FRAuth.getLeagueCtx();
+  var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+
+  Promise.all([
+    FR.fb.get('/leagues/' + leagueId + '/matchups/' + (ctx.season || 2026) + '/week' + week),
+    FR.fb.get('/leagues/' + leagueId + '/members')
+  ]).then(function(results){
+    var matchups = results[0] || [];
+    var members  = results[1] || {};
+    var teamOptions = Object.keys(members)
+      .filter(function(uid){ return members[uid] && members[uid].teamName; })
+      .map(function(uid){ return { uid: uid, name: members[uid].teamName }; });
+
+    var optsHtml = teamOptions.map(function(t){ return '<option value="' + t.uid + '">' + t.name + '</option>'; }).join('');
+    var byeOpt = '<option value="">BYE</option>';
+
+    var rows = matchups.map(function(m, idx){
+      return '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--bdr);flex-wrap:wrap;">'
+        + '<select class="wk-select" style="width:auto;flex:1;min-width:140px;" id="edit-home-' + idx + '">' + optsHtml.replace('value="' + m.home + '"', 'value="' + m.home + '" selected') + '</select>'
+        + '<span style="color:var(--ink3);font-size:12px;">vs</span>'
+        + '<select class="wk-select" style="width:auto;flex:1;min-width:140px;" id="edit-away-' + idx + '">' + byeOpt.replace('value=""', m.away ? 'value=""' : 'value="" selected') + optsHtml.replace('value="' + (m.away||'') + '"', 'value="' + (m.away||'') + '" selected') + '</select>'
+        + '</div>';
+    }).join('');
+
+    container.innerHTML = rows + '<button class="salary-btn" style="margin-top:10px;" onclick="saveH2HWeekEdit(' + week + ', ' + matchups.length + ')">💾 Save Week ' + week + '</button>'
+      + '<div id="h2h-edit-status" style="font-size:11px;color:var(--ink3);margin-top:6px;"></div>';
+  }).catch(function(){
+    container.innerHTML = '<div style="font-size:12px;color:var(--pk);">Could not load matchups for this week.</div>';
+  });
+}
+
+function saveH2HWeekEdit(week, count){
+  var ctx = FRAuth.getLeagueCtx();
+  var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+  var statusEl = document.getElementById('h2h-edit-status');
+
+  FR.fb.get('/leagues/' + leagueId + '/members').then(function(members){
+    var updated = [];
+    for(var i = 0; i < count; i++){
+      var homeSel = document.getElementById('edit-home-' + i);
+      var awaySel = document.getElementById('edit-away-' + i);
+      var homeUid = homeSel ? homeSel.value : '';
+      var awayUid = awaySel ? awaySel.value : '';
+      updated.push({
+        home: homeUid,
+        away: awayUid || null,
+        homeName: homeUid && members[homeUid] ? members[homeUid].teamName : '',
+        awayName: awayUid && members[awayUid] ? members[awayUid].teamName : 'BYE'
+      });
+    }
+    return FR.fb.put('/leagues/' + leagueId + '/matchups/' + (ctx.season || 2026) + '/week' + week, updated);
+  }).then(function(){
+    if(statusEl){ statusEl.textContent = '✓ Week ' + week + ' updated.'; statusEl.style.color = 'var(--or)'; }
+    showToast('Matchups updated ✓');
+  }).catch(function(){
+    if(statusEl){ statusEl.textContent = '✗ Error saving.'; statusEl.style.color = 'var(--pk)'; }
+  });
+}
+
+// ── PLAYOFF SEEDING & BRACKET ─────────────────────────────────────────
+function checkH2HPlayoffStatus(){
+  var ctx = FRAuth.getLeagueCtx();
+  var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+  var statusEl = document.getElementById('h2h-playoff-status');
+  FR.fb.get('/leagues/' + leagueId + '/playoffs/' + (ctx.season || 2026))
+    .then(function(data){
+      if(!statusEl) return;
+      if(data && data.seeds && data.seeds.length){
+        statusEl.textContent = '✓ Playoffs seeded — ' + data.seeds.length + ' teams, round ' + (data.currentRound || 1) + '.';
+        statusEl.style.color = 'var(--or)';
+      } else {
+        statusEl.textContent = 'Playoffs not seeded yet — seed once the regular season ends.';
+        statusEl.style.color = 'var(--ink3)';
+      }
+    }).catch(function(){
+      if(statusEl){ statusEl.textContent = 'Playoffs not seeded yet.'; statusEl.style.color = 'var(--ink3)'; }
+    });
+}
+
+// Build single-elimination bracket pairings for a list of seeds (1 = best seed)
+// Standard bracket seeding: 1v8, 2v7, 3v6, 4v5 for an 8-team bracket, etc.
+function buildBracketPairings(seeds){
+  var n = seeds.length;
+  var pairs = [];
+  for(var i = 0; i < n / 2; i++){
+    pairs.push([seeds[i], seeds[n - 1 - i]]);
+  }
+  return pairs;
+}
+
+function seedH2HPlayoffs(){
+  var ctx = FRAuth.getLeagueCtx();
+  var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+  var statusEl = document.getElementById('h2h-playoff-status');
+  var btn = document.getElementById('h2h-playoff-seed-btn');
+
+  if(!confirm('Seed the playoffs now?\n\nThis uses current win-loss-points standings to set seeds and generates Round 1 matchups. Re-running will reset the bracket.')) return;
+
+  btn.disabled = true;
+  btn.textContent = 'Seeding…';
+
+  Promise.all([
+    FR.fb.get('/leagues/' + leagueId + '/settings'),
+    FR.fb.get('/leagues/' + leagueId + '/members')
+  ]).then(function(results){
+    var settings = results[0] || {};
+    var members  = results[1] || {};
+    var playoffTeams = settings.playoffTeams || 4;
+
+    // Use the already-loaded h2hMatchups + seasonData to compute standings.
+    // (h2hMatchups should already be loaded from the normal render pipeline;
+    // reload defensively in case the commissioner panel opened before that ran.)
+    loadH2HMatchups(function(){
+      var standings = computeH2HStandings();
+      if(standings.length < 2){
+        statusEl.textContent = '✗ Not enough completed matchups to seed playoffs yet.';
+        statusEl.style.color = 'var(--pk)';
+        btn.disabled = false;
+        btn.textContent = '⚡ Seed Playoffs';
+        return;
+      }
+
+      var seedCount = Math.min(playoffTeams, standings.length);
+      var topTeams = standings.slice(0, seedCount);
+
+      // Map team name back to uid for storage
+      var nameToUid = {};
+      Object.keys(members).forEach(function(uid){
+        if(members[uid] && members[uid].teamName) nameToUid[members[uid].teamName] = uid;
+      });
+
+      var seeds = topTeams.map(function(t, i){
+        return {
+          seed: i + 1,
+          uid: nameToUid[t.name] || null,
+          name: t.name,
+          wins: t.wins,
+          losses: t.losses,
+          ties: t.ties,
+          pf: t.pf
+        };
+      });
+
+      var round1Pairs = buildBracketPairings(seeds);
+      var playoffStart = settings.playoffStartWeek || 15;
+
+      var playoffData = {
+        seeds: seeds,
+        currentRound: 1,
+        playoffStartWeek: playoffStart,
+        rounds: {
+          round1: round1Pairs.map(function(pair){
+            return {
+              homeSeed: pair[0].seed, awaySeed: pair[1].seed,
+              homeUid: pair[0].uid, awayUid: pair[1].uid,
+              homeName: pair[0].name, awayName: pair[1].name,
+              winner: null
+            };
+          })
+        }
+      };
+
+      return FR.fb.put('/leagues/' + leagueId + '/playoffs/' + (ctx.season || 2026), playoffData);
+    }).then(function(){
+      statusEl.textContent = '✓ Playoffs seeded successfully.';
+      statusEl.style.color = 'var(--or)';
+      btn.disabled = false;
+      btn.textContent = '⚡ Seed Playoffs';
+      showToast('Playoffs seeded ✓');
+    }).catch(function(e){
+      statusEl.textContent = '✗ Error seeding playoffs.';
+      statusEl.style.color = 'var(--pk)';
+      btn.disabled = false;
+      btn.textContent = '⚡ Seed Playoffs';
+      console.error(e);
+    });
+  });
+}
+
+// Advances the bracket to the next round once a round's matchups have all
+// been decided (based on seasonData scores for the corresponding week).
+function advanceH2HPlayoffRound(){
+  var ctx = FRAuth.getLeagueCtx();
+  var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+
+  FR.fb.get('/leagues/' + leagueId + '/playoffs/' + (ctx.season || 2026)).then(function(data){
+    if(!data || !data.rounds) return;
+    var roundKey = 'round' + data.currentRound;
+    var round = data.rounds[roundKey];
+    if(!round) return;
+
+    var weekForRound = data.playoffStartWeek + (data.currentRound - 1);
+    var allDecided = true;
+
+    var updatedRound = round.map(function(m){
+      if(m.winner) return m; // already decided
+      if(!m.awayName || m.awayName === 'BYE'){ m.winner = m.homeUid; return m; }
+      var homeScore = getTeamScore(weekForRound, m.homeName);
+      var awayScore = getTeamScore(weekForRound, m.awayName);
+      if(homeScore === null || awayScore === null){ allDecided = false; return m; }
+      m.winner = homeScore >= awayScore ? m.homeUid : m.awayUid;
+      m.homeScore = homeScore;
+      m.awayScore = awayScore;
+      return m;
+    });
+
+    if(!allDecided){
+      // Save partial scores but don't advance yet
+      var partialUpdate = {};
+      partialUpdate['rounds/' + roundKey] = updatedRound;
+      FR.fb.patch('/leagues/' + leagueId + '/playoffs/' + (ctx.season || 2026), partialUpdate);
+      return;
+    }
+
+    // All matchups decided — build next round from winners
+    if(updatedRound.length === 1){
+      // This was the final — crown the champion
+      var champUid = updatedRound[0].winner;
+      var champSeed = data.seeds.find(function(s){ return s.uid === champUid; });
+      var finalUpdate = {};
+      finalUpdate['rounds/' + roundKey] = updatedRound;
+      finalUpdate['champion'] = champSeed ? champSeed.name : null;
+      FR.fb.patch('/leagues/' + leagueId + '/playoffs/' + (ctx.season || 2026), finalUpdate);
+      return;
+    }
+
+    var winners = updatedRound.map(function(m){
+      return data.seeds.find(function(s){ return s.uid === m.winner; });
+    }).filter(Boolean);
+
+    var nextPairs = buildBracketPairings(winners);
+    var nextRoundKey = 'round' + (data.currentRound + 1);
+    var nextRound = nextPairs.map(function(pair){
+      return {
+        homeSeed: pair[0].seed, awaySeed: pair[1].seed,
+        homeUid: pair[0].uid, awayUid: pair[1].uid,
+        homeName: pair[0].name, awayName: pair[1].name,
+        winner: null
+      };
+    });
+
+    var update = {};
+    update['rounds/' + roundKey] = updatedRound;
+    update['rounds/' + nextRoundKey] = nextRound;
+    update['currentRound'] = data.currentRound + 1;
+    FR.fb.patch('/leagues/' + leagueId + '/playoffs/' + (ctx.season || 2026), update);
+  }).catch(function(){});
+}
+
+function previewH2HPlayoffBracket(){
+  var ctx = FRAuth.getLeagueCtx();
+  var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+  var preview = document.getElementById('h2h-playoff-preview');
+  preview.innerHTML = '<div style="font-size:12px;color:var(--ink3);">Loading…</div>';
+
+  FR.fb.get('/leagues/' + leagueId + '/playoffs/' + (ctx.season || 2026)).then(function(data){
+    if(!data || !data.seeds || !data.seeds.length){
+      preview.innerHTML = '<div style="font-size:12px;color:var(--ink3);">Not seeded yet.</div>';
+      return;
+    }
+    var html = '<div style="font-family:var(--fd);font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;margin-bottom:6px;">Seeds</div>';
+    html += data.seeds.map(function(s){
+      return '<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;color:var(--ink2);">'
+        + '<span>#' + s.seed + ' ' + s.name + '</span><span style="color:var(--ink3);">' + s.wins + '-' + s.losses + (s.ties ? '-' + s.ties : '') + '</span></div>';
+    }).join('');
+
+    if(data.rounds){
+      Object.keys(data.rounds).sort().forEach(function(rk){
+        html += '<div style="font-family:var(--fd);font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;margin:10px 0 6px;">' + rk.replace('round', 'Round ') + '</div>';
+        html += data.rounds[rk].map(function(m){
+          var winLabel = m.winner ? (m.winner === m.homeUid ? ' ✓' : '') : '';
+          var winLabel2 = m.winner ? (m.winner === m.awayUid ? ' ✓' : '') : '';
+          return '<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;color:var(--ink2);">'
+            + '<span>' + m.homeName + winLabel + '</span><span style="color:var(--ink3);">vs</span><span>' + m.awayName + winLabel2 + '</span></div>';
+        }).join('');
+      });
+    }
+    if(data.champion){
+      html += '<div style="margin-top:10px;padding:10px;background:rgba(0,229,212,.08);border-radius:8px;text-align:center;font-family:var(--fd);font-size:13px;font-weight:800;color:var(--or);">🏆 Champion: ' + data.champion + '</div>';
+    }
+    preview.innerHTML = html;
+  }).catch(function(){
+    preview.innerHTML = '<div style="font-size:12px;color:var(--pk);">Could not load bracket.</div>';
+  });
 }
 
 function generateSalaries(){

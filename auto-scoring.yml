@@ -293,6 +293,48 @@ jobs:
               week, lastScored: Date.now(), allFinal,
               gamesActive: activeGames.length
             });
+
+            // ── HEAD-TO-HEAD: compute matchup results when this league uses that format ──
+            const settings = await firebaseGet(`/leagues/${leagueId}/settings.json`).catch(() => null);
+            if (settings && settings.format === 'headtohead' && allFinal) {
+              await computeH2HMatchupResults(leagueId, week, scoreUpdates, existingScores);
+            }
+          }
+
+          // Reads the week's matchup schedule, merges in newly written + existing
+          // scores, and tags each matchup with a winner — written back so the
+          // app's standings can read a server-confirmed result without recomputing
+          // from scratch every time, and so other automation (e.g. playoff
+          // advancement) can rely on it.
+          async function computeH2HMatchupResults(leagueId, week, scoreUpdates, existingScores) {
+            const matchups = await firebaseGet(`/leagues/${leagueId}/matchups/${SEASON}/week${week}.json`).catch(() => null);
+            if (!matchups || !Array.isArray(matchups)) {
+              console.log(`  No H2H schedule for week ${week} — skipping matchup results.`);
+              return;
+            }
+
+            const allScores = { ...existingScores, ...scoreUpdates };
+            const scoreByTeamName = {};
+            Object.values(allScores).forEach(entry => {
+              if (entry && entry.team) scoreByTeamName[entry.team] = entry.score;
+            });
+
+            const results = matchups.map(m => {
+              const homeScore = scoreByTeamName[m.homeName];
+              const awayScore = m.awayName === 'BYE' ? null : scoreByTeamName[m.awayName];
+              let winner = null;
+              if (homeScore !== undefined && awayScore !== undefined && awayScore !== null) {
+                if (homeScore > awayScore) winner = 'home';
+                else if (homeScore < awayScore) winner = 'away';
+                else winner = 'tie';
+              } else if (m.awayName === 'BYE') {
+                winner = 'home';
+              }
+              return { ...m, homeScore: homeScore ?? null, awayScore: awayScore ?? null, winner };
+            });
+
+            await firebasePut(`/leagues/${leagueId}/matchups/${SEASON}/week${week}.json`, results);
+            console.log(`  ⚔️  Computed ${results.length} H2H matchup result(s) for week ${week}`);
           }
 
           // ── Lock scores for a league ───────────────────────────
