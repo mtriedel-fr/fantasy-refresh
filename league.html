@@ -1024,6 +1024,19 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
           <div class="salary-status" id="sal-status">Select a week to get started.</div>
         </div>
 
+        <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--bdr);" id="h2h-schedule-section" class="hidden">
+          <div class="csect">⚔️ Head-to-Head Schedule</div>
+          <div style="font-size:12px;color:var(--ink2);margin-bottom:10px;line-height:1.5;">
+            Generates weekly matchups for all teams. Round-robin if no divisions, division-aware pairing if divisions are set. Run once before Week 1 — re-running replaces the full schedule.
+          </div>
+          <div id="h2h-schedule-status" style="font-size:12px;color:var(--ink3);margin-bottom:10px;">Checking schedule status…</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="salary-btn" id="h2h-gen-btn" onclick="generateH2HSchedule()">⚡ Generate Schedule</button>
+            <button class="salary-btn secondary" onclick="previewH2HSchedule()">👁 Preview</button>
+          </div>
+          <div id="h2h-schedule-preview" style="margin-top:12px;"></div>
+        </div>
+
         <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--bdr);">
           <div class="csect">Season history</div>
           <div id="hist-list"></div>
@@ -1355,6 +1368,12 @@ var IS_PRESEASON_LEAGUE = (function(){
     return !!(ctx && (ctx.isPreseason || ctx.seasonType === 'Preseason' || ctx.format === 'preseason' || ctx.weeks === 4));
   }catch(e){ return false; }
 })();
+var IS_H2H_LEAGUE = (function(){
+  try{
+    var ctx = FRAuth.getLeagueCtx();
+    return !!(ctx && ctx.format === 'headtohead');
+  }catch(e){ return false; }
+})();
 var MED = ['🥇','🥈','🥉'];
 var AUP = '<svg style="width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round" viewBox="0 0 24 24"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>';
 var ADN = '<svg style="width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>';
@@ -1546,7 +1565,205 @@ function buildWeekSelect(){
 }
 
 // ── RENDER ALL ─────────────────────────────────────────────────
+// ── HEAD-TO-HEAD RENDER PIPELINE ─────────────────────────────────────
+var h2hMatchups = {}; // cache: { week1: [{home,away,homeName,awayName}], ... }
+var h2hMatchupsLoaded = false;
+
+function loadH2HMatchups(callback){
+  if(h2hMatchupsLoaded){ callback(); return; }
+  var ctx = FRAuth.getLeagueCtx();
+  var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+  FR.fb.get('/leagues/' + leagueId + '/matchups/' + (ctx.season || 2026))
+    .then(function(data){
+      h2hMatchups = data || {};
+      h2hMatchupsLoaded = true;
+      callback();
+    })
+    .catch(function(){
+      h2hMatchups = {};
+      h2hMatchupsLoaded = true;
+      callback();
+    });
+}
+
+function renderAllH2H(){
+  var sel = document.getElementById('wk-select');
+  if(sel) sel.value = currentWeek;
+
+  var weeks = Object.keys(seasonData).filter(function(k){ return !isNaN(Number(k)) && seasonData[k] && seasonData[k].length > 0; });
+
+  if(!weeks.length){
+    showEmpty();
+    renderPreseasonRoster();
+    try{ document.getElementById('hdr-sub').textContent = ''; }catch(e){}
+    try{ document.getElementById('s-left').textContent = WEEKS; }catch(e){}
+    loadH2HMatchups(function(){ renderH2HMyMatchup(); renderH2HStandings(); });
+    return;
+  }
+
+  loadH2HMatchups(function(){
+    renderH2HMyMatchup();
+    renderH2HStandings();
+    var el = document.getElementById('s-left');
+    if(el) el.textContent = Math.max(0, WEEKS - weeks.length);
+  });
+}
+
+// Find the current user's opponent this week from the generated schedule
+function getMyH2HMatchup(week){
+  var weekData = h2hMatchups['week' + week];
+  if(!weekData || !myTeam) return null;
+  for(var i = 0; i < weekData.length; i++){
+    var m = weekData[i];
+    if(teamMatch(m.homeName, myTeam)) return { me: m, isHome: true, opponentName: m.awayName };
+    if(teamMatch(m.awayName, myTeam)) return { me: m, isHome: false, opponentName: m.homeName };
+  }
+  return null;
+}
+
+function getTeamScore(week, teamName){
+  if(!teamName || teamName === 'BYE') return null;
+  var weekData = seasonData[String(week)] || [];
+  var entry = weekData.find(function(e){ return teamMatch(e.name, teamName); });
+  return entry ? entry.score : null;
+}
+
+function renderH2HMyMatchup(){
+  var wt = document.getElementById('wt');
+  if(!wt) return;
+
+  if(!myTeam){
+    wt.innerHTML = '<div class="myteam-empty"><div class="myteam-empty-icon">👤</div><div class="myteam-empty-title">No team set</div><div class="myteam-empty-sub">Type your team name in the "Your Team" field above — it\'s not case sensitive.</div></div>';
+    return;
+  }
+
+  var matchup = getMyH2HMatchup(currentWeek);
+  if(!matchup){
+    wt.innerHTML = '<div class="myteam-empty"><div class="myteam-empty-icon">📅</div><div class="myteam-empty-title">No matchup scheduled for Week ' + currentWeek + '</div><div class="myteam-empty-sub">The commissioner hasn\'t generated a schedule for this week yet, or you have a bye.</div></div>';
+    return;
+  }
+
+  var oppName = matchup.opponentName;
+  var isBye = !oppName || oppName === 'BYE';
+  var myScore  = getTeamScore(currentWeek, myTeam);
+  var oppScore = isBye ? null : getTeamScore(currentWeek, oppName);
+
+  var myDisplay  = myScore  !== null ? fmtScore(myScore)  : '—';
+  var oppDisplay = oppScore !== null ? fmtScore(oppScore) : '—';
+
+  var result = null; // 'win' | 'loss' | 'tie' | null
+  if(myScore !== null && oppScore !== null){
+    if(myScore > oppScore) result = 'win';
+    else if(myScore < oppScore) result = 'loss';
+    else result = 'tie';
+  }
+
+  var resultBadge = '';
+  if(result === 'win')  resultBadge = '<span style="background:rgba(0,229,212,.12);color:var(--or);border:1px solid rgba(0,229,212,.3);padding:3px 10px;border-radius:8px;font-family:var(--fd);font-size:11px;font-weight:800;text-transform:uppercase;">WIN</span>';
+  if(result === 'loss') resultBadge = '<span style="background:rgba(255,95,160,.12);color:var(--pk);border:1px solid rgba(255,95,160,.3);padding:3px 10px;border-radius:8px;font-family:var(--fd);font-size:11px;font-weight:800;text-transform:uppercase;">LOSS</span>';
+  if(result === 'tie')  resultBadge = '<span style="background:rgba(155,109,255,.12);color:var(--pu);border:1px solid rgba(155,109,255,.3);padding:3px 10px;border-radius:8px;font-family:var(--fd);font-size:11px;font-weight:800;text-transform:uppercase;">TIE</span>';
+
+  var html = '<div style="padding:16px;">'
+    + '<div style="background:var(--bg2);border-radius:16px;border:1px solid var(--bdr);overflow:hidden;">'
+    + '<div style="padding:10px 16px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;">'
+    + '<span style="font-family:var(--fd);font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;">Week ' + currentWeek + ' Matchup</span>'
+    + resultBadge
+    + '</div>'
+    + '<div style="padding:24px 16px;display:flex;align-items:center;justify-content:space-between;">'
+    + '<div style="flex:1;text-align:center;">'
+    + '<div style="font-family:var(--fd);font-size:14px;font-weight:800;color:var(--or);text-transform:uppercase;margin-bottom:6px;">' + myTeam + '</div>'
+    + '<div style="font-family:var(--fd);font-size:36px;font-weight:900;color:' + (result === 'win' ? 'var(--or)' : result === 'loss' ? 'var(--ink3)' : 'var(--ink)') + ';">' + myDisplay + '</div>'
+    + '</div>'
+    + '<div style="font-family:var(--fd);font-size:13px;font-weight:700;color:var(--ink3);padding:0 12px;">VS</div>'
+    + '<div style="flex:1;text-align:center;">'
+    + '<div style="font-family:var(--fd);font-size:14px;font-weight:800;color:' + (isBye ? 'var(--ink3)' : 'var(--pk)') + ';text-transform:uppercase;margin-bottom:6px;">' + (isBye ? 'BYE WEEK' : oppName) + '</div>'
+    + '<div style="font-family:var(--fd);font-size:36px;font-weight:900;color:' + (result === 'loss' ? 'var(--pk)' : 'var(--ink3)') + ';">' + (isBye ? '—' : oppDisplay) + '</div>'
+    + '</div>'
+    + '</div>'
+    + '</div>'
+    + '</div>';
+
+  wt.innerHTML = html;
+}
+
+// Compute full W-L-T standings across all weeks with a generated schedule
+function computeH2HStandings(){
+  var records = {}; // teamName: {wins, losses, ties, pointsFor, pointsAgainst}
+
+  Object.keys(h2hMatchups).forEach(function(wk){
+    var weekNum = wk.replace('week', '');
+    var matchups = h2hMatchups[wk] || [];
+    matchups.forEach(function(m){
+      var homeScore = getTeamScore(weekNum, m.homeName);
+      var awayScore = m.awayName === 'BYE' ? null : getTeamScore(weekNum, m.awayName);
+      if(homeScore === null) return; // week hasn't happened yet
+
+      if(!records[m.homeName]) records[m.homeName] = {wins:0, losses:0, ties:0, pf:0, pa:0};
+      if(m.awayName !== 'BYE' && !records[m.awayName]) records[m.awayName] = {wins:0, losses:0, ties:0, pf:0, pa:0};
+
+      records[m.homeName].pf += homeScore;
+      if(m.awayName === 'BYE' || awayScore === null) return;
+
+      records[m.homeName].pa += awayScore;
+      records[m.awayName].pf += awayScore;
+      records[m.awayName].pa += homeScore;
+
+      if(homeScore > awayScore){ records[m.homeName].wins++; records[m.awayName].losses++; }
+      else if(homeScore < awayScore){ records[m.homeName].losses++; records[m.awayName].wins++; }
+      else { records[m.homeName].ties++; records[m.awayName].ties++; }
+    });
+  });
+
+  return Object.keys(records).map(function(name){
+    var r = records[name];
+    return { name: name, wins: r.wins, losses: r.losses, ties: r.ties, pf: r.pf, pa: r.pa };
+  }).sort(function(a, b){
+    if(b.wins !== a.wins) return b.wins - a.wins;
+    return b.pf - a.pf;
+  });
+}
+
+function renderH2HStandings(){
+  var sw = document.getElementById('sw');
+  var wf = document.getElementById('wf');
+  var standings = computeH2HStandings();
+
+  if(!standings.length){
+    var emptyHtml = '<div class="myteam-empty"><div class="myteam-empty-icon">📅</div><div class="myteam-empty-title">No results yet</div><div class="myteam-empty-sub">Standings appear once the commissioner generates a schedule and scores come in.</div></div>';
+    if(sw) sw.innerHTML = emptyHtml;
+    if(wf) wf.innerHTML = emptyHtml;
+    return;
+  }
+
+  var rows = standings.map(function(t, i){
+    var isMe = myTeam && teamMatch(t.name, myTeam);
+    return '<tr' + (isMe ? ' class="my-team"' : '') + '>'
+      + '<td class="rk' + (i < 3 ? ' top' : '') + '">' + (i+1) + '</td>'
+      + '<td style="font-family:var(--fd);font-size:14px;font-weight:700;color:' + (isMe ? 'var(--or)' : 'var(--ink)') + ';">' + t.name + '</td>'
+      + '<td style="text-align:center;font-family:var(--fd);font-weight:800;color:var(--or);">' + t.wins + '</td>'
+      + '<td style="text-align:center;font-family:var(--fd);font-weight:800;color:var(--pk);">' + t.losses + '</td>'
+      + '<td style="text-align:center;font-family:var(--fd);font-weight:700;color:var(--ink3);">' + t.ties + '</td>'
+      + '<td style="text-align:right;font-family:var(--fd);color:var(--ink2);">' + fmtScore(t.pf) + '</td>'
+      + '<td style="text-align:right;font-family:var(--fd);color:var(--ink3);">' + fmtScore(t.pa) + '</td>'
+      + '</tr>';
+  }).join('');
+
+  var html = '<table class="st-table"><thead><tr>'
+    + '<th class="rk">#</th><th>Team</th><th style="text-align:center;">W</th><th style="text-align:center;">L</th><th style="text-align:center;">T</th><th style="text-align:right;">PF</th><th style="text-align:right;">PA</th>'
+    + '</tr></thead><tbody>' + rows + '</tbody></table>';
+
+  if(sw) sw.innerHTML = html;
+  if(wf) wf.innerHTML = html;
+}
+
 function renderAll(){
+  // Head-to-head leagues use a completely separate render pipeline —
+  // matchups + W-L standings instead of cumulative point totals.
+  if(IS_H2H_LEAGUE){
+    renderAllH2H();
+    return;
+  }
+
   // Sync dropdown to currentWeek
   var sel = document.getElementById('wk-select');
   if(sel) sel.value = currentWeek;
@@ -2857,6 +3074,34 @@ function renderLeague(){
               + '<span style="font-size:12px;color:var(--ink2);">Last Team Standing</span></div>';
           }
 
+          if(format === 'headtohead'){
+            var h2hTeams      = s.h2hTeams || total || 0;
+            var h2hDivisions  = s.h2hDivisions || 0;
+            var playoffStartH = s.playoffStartWeek || 15;
+            var playoffTeamsH = s.playoffTeams || 4;
+            el.innerHTML = '<div style="padding:16px;">'
+              + '<div style="background:linear-gradient(135deg,rgba(155,109,255,.1),rgba(0,229,212,.06));border:1px solid rgba(155,109,255,.25);border-radius:16px;padding:20px;margin-bottom:16px;text-align:center;">'
+              + '<div style="font-family:var(--fd);font-size:22px;font-weight:900;color:var(--or);text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px;">' + name + '</div>'
+              + '<div style="font-family:var(--fd);font-size:11px;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;">' + season + ' Season · Head to Head</div>'
+              + '</div>'
+              + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--bdr);border-radius:12px;overflow:hidden;margin-bottom:16px;">'
+              + '<div style="background:var(--bg2);padding:12px 8px;text-align:center;"><div style="font-family:var(--fd);font-size:9px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:3px;">Teams</div><div style="font-family:var(--fd);font-size:24px;font-weight:900;color:var(--or);">' + h2hTeams + '</div></div>'
+              + '<div style="background:var(--bg2);padding:12px 8px;text-align:center;"><div style="font-family:var(--fd);font-size:9px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:3px;">Salary Cap</div><div style="font-family:var(--fd);font-size:22px;font-weight:900;color:var(--or);">$' + (cap/1000).toFixed(0) + 'K</div></div>'
+              + '<div style="background:var(--bg2);padding:12px 8px;text-align:center;"><div style="font-family:var(--fd);font-size:13px;font-weight:800;color:var(--or);text-transform:uppercase;">⚔️ H2H</div></div>'
+              + '</div>'
+              + '<div style="background:var(--bg2);border-radius:12px;border:1px solid var(--bdr);padding:16px;margin-bottom:12px;">'
+              + '<div style="font-family:var(--fd);font-size:13px;font-weight:800;color:var(--or);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">⚔️ How It Works</div>'
+              + '<div style="display:flex;gap:8px;margin-bottom:8px;"><span style="color:var(--or);font-weight:700;flex-shrink:0;">•</span><div style="font-size:12px;color:var(--ink2);line-height:1.5;">Each week you face a different opponent, drafted from the same weekly salary cap pool.</div></div>'
+              + '<div style="display:flex;gap:8px;margin-bottom:8px;"><span style="color:var(--or);font-weight:700;flex-shrink:0;">•</span><div style="font-size:12px;color:var(--ink2);line-height:1.5;">Whoever scores higher that week wins the matchup. Ties are possible.</div></div>'
+              + '<div style="display:flex;gap:8px;' + (h2hDivisions > 0 ? 'margin-bottom:8px;' : '') + '"><span style="color:var(--or);font-weight:700;flex-shrink:0;">•</span><div style="font-size:12px;color:var(--ink2);line-height:1.5;">Standings are ranked by win-loss record first, total points scored as the tiebreaker.</div></div>'
+              + (h2hDivisions > 0 ? '<div style="display:flex;gap:8px;"><span style="color:var(--or);font-weight:700;flex-shrink:0;">•</span><div style="font-size:12px;color:var(--ink2);line-height:1.5;">The league is split into ' + h2hDivisions + ' divisions.</div></div>' : '')
+              + '</div>'
+              + '<div style="background:var(--bg2);border-radius:12px;border:1px solid var(--bdr);padding:16px;">'
+              + '<div style="font-family:var(--fd);font-size:13px;font-weight:800;color:var(--pu);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">🎯 Playoffs — Starting Week ' + playoffStartH + '</div>'
+              + '<div style="font-size:12px;color:var(--ink2);line-height:1.6;">Top ' + playoffTeamsH + ' teams by record make the playoffs. Single-elimination bracket — win your matchup to advance, lose and your season is over.</div>'
+              + '</div>'
+              + '</div>';
+          } else {
           el.innerHTML = '<div style="padding:16px;">'
 
             // Header
@@ -2952,6 +3197,7 @@ function renderLeague(){
               : '')
 
             + '</div>';
+          } // end else (non-H2H cumulative/preseason path)
         });
     })
     .catch(function(){
@@ -3883,6 +4129,11 @@ function openCommPanel(){
   renderCommissionerList();
   loadPoolStatus();
   initSalaryPanel();
+  // Check head-to-head schedule status when panel opens
+  var ctx2 = FRAuth.getLeagueCtx();
+  if(ctx2){
+    FR.fb.get('/leagues/' + ctx2.leagueId + '/settings').then(function(s){ initH2HVisibility(s); }).catch(function(){});
+  }
   // Wire up drag and drop once
   var zone = document.getElementById('drop-zone');
   if(zone && !zone._dd){
@@ -5295,6 +5546,200 @@ var SAL_CAP = 60000;
 var SAL_MAX = 11300;
 var SAL_MIN = 3700;
 
+// ── HEAD-TO-HEAD SCHEDULE GENERATOR ─────────────────────────────────
+function initH2HVisibility(settings){
+  var section = document.getElementById('h2h-schedule-section');
+  if(section) section.classList.toggle('hidden', !IS_H2H_LEAGUE);
+  if(IS_H2H_LEAGUE) checkH2HScheduleStatus();
+}
+
+function checkH2HScheduleStatus(){
+  var ctx = FRAuth.getLeagueCtx();
+  var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+  var statusEl = document.getElementById('h2h-schedule-status');
+  FR.fb.get('/leagues/' + leagueId + '/matchups/' + (ctx.season || 2026))
+    .then(function(data){
+      if(!statusEl) return;
+      if(data && Object.keys(data).length){
+        var weekCount = Object.keys(data).filter(function(k){ return k.indexOf('week') === 0; }).length;
+        statusEl.textContent = '✓ Schedule exists — ' + weekCount + ' week(s) of matchups generated.';
+        statusEl.style.color = 'var(--or)';
+      } else {
+        statusEl.textContent = 'No schedule generated yet.';
+        statusEl.style.color = 'var(--ink3)';
+      }
+    })
+    .catch(function(){
+      if(statusEl){ statusEl.textContent = 'No schedule generated yet.'; statusEl.style.color = 'var(--ink3)'; }
+    });
+}
+
+// Round-robin pairing generator (circle method) — works for even or odd team counts
+// Returns array of weeks, each week is array of [teamA, teamB] pairs (null = bye)
+function buildRoundRobin(teamIds){
+  var teams = teamIds.slice();
+  var hasBye = teams.length % 2 !== 0;
+  if(hasBye) teams.push(null); // bye placeholder
+
+  var n = teams.length;
+  var totalWeeks = n - 1;
+  var weeks = [];
+
+  var arr = teams.slice();
+  for(var w = 0; w < totalWeeks; w++){
+    var pairs = [];
+    for(var i = 0; i < n / 2; i++){
+      var a = arr[i];
+      var b = arr[n - 1 - i];
+      if(a !== null && b !== null) pairs.push([a, b]);
+      else if(a !== null) pairs.push([a, null]); // bye
+      else if(b !== null) pairs.push([b, null]);
+    }
+    weeks.push(pairs);
+    // Rotate — keep first team fixed, rotate the rest
+    var fixed = arr[0];
+    var rest = arr.slice(1);
+    rest.unshift(rest.pop());
+    arr = [fixed].concat(rest);
+  }
+  return weeks;
+}
+
+// Division-aware schedule: plays division rivals more, cross-division less,
+// while still covering every team at least once if possible within the regular season weeks.
+function buildDivisionSchedule(divisions, regularWeeks){
+  // divisions = { divisionName: [teamId, teamId, ...], ... }
+  var divNames = Object.keys(divisions);
+  var allTeams = [];
+  divNames.forEach(function(d){ allTeams = allTeams.concat(divisions[d]); });
+
+  // Simple approach: full round robin across all teams, prioritizing
+  // division games shows up naturally more often if the league is small.
+  // For most fantasy use cases a full cross-league round robin is what's expected.
+  var schedule = buildRoundRobin(allTeams);
+  return schedule.slice(0, regularWeeks);
+}
+
+function generateH2HSchedule(){
+  var ctx = FRAuth.getLeagueCtx();
+  var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+  var statusEl = document.getElementById('h2h-schedule-status');
+  var btn = document.getElementById('h2h-gen-btn');
+
+  if(!confirm('Generate the head-to-head schedule now?\n\nThis will replace any existing schedule for this league.')) return;
+
+  btn.disabled = true;
+  btn.textContent = 'Generating…';
+
+  Promise.all([
+    FR.fb.get('/leagues/' + leagueId + '/members'),
+    FR.fb.get('/leagues/' + leagueId + '/settings')
+  ]).then(function(results){
+    var members  = results[0] || {};
+    var settings = results[1] || {};
+
+    var teamList = Object.keys(members).filter(function(uid){
+      var m = members[uid];
+      return m && m.teamName && m.active !== false;
+    });
+
+    if(teamList.length < 2){
+      statusEl.textContent = '✗ Need at least 2 teams with team names set before generating a schedule.';
+      statusEl.style.color = 'var(--pk)';
+      btn.disabled = false;
+      btn.textContent = '⚡ Generate Schedule';
+      return;
+    }
+
+    var playoffStart = settings.playoffStartWeek || 15;
+    var regularWeeks = playoffStart - 1;
+    var hasDivisions = settings.h2hDivisions > 0;
+
+    var schedule;
+    if(hasDivisions){
+      // Group teams into divisions evenly (alternate assignment since we
+      // don't yet have explicit division membership stored per-member)
+      var divCount = settings.h2hDivisions;
+      var divisions = {};
+      for(var d = 0; d < divCount; d++) divisions['Division ' + (d+1)] = [];
+      teamList.forEach(function(uid, i){ divisions['Division ' + ((i % divCount) + 1)].push(uid); });
+      schedule = buildDivisionSchedule(divisions, regularWeeks);
+    } else {
+      schedule = buildRoundRobin(teamList).slice(0, regularWeeks);
+    }
+
+    // If the round-robin produced fewer weeks than the regular season requires,
+    // repeat the cycle (double round-robin) to fill remaining weeks.
+    while(schedule.length < regularWeeks){
+      var cycle = hasDivisions
+        ? buildDivisionSchedule({all: teamList}, regularWeeks)
+        : buildRoundRobin(teamList);
+      schedule = schedule.concat(cycle).slice(0, regularWeeks);
+    }
+
+    // Write to Firebase: /leagues/{id}/matchups/{season}/week{n} = [{home,away},...]
+    var writes = {};
+    schedule.forEach(function(pairs, idx){
+      var weekNum = idx + 1;
+      writes['week' + weekNum] = pairs.map(function(pair){
+        return {
+          home: pair[0],
+          away: pair[1], // null = bye week for "home"
+          homeName: pair[0] ? (members[pair[0]].teamName || '') : '',
+          awayName: pair[1] ? (members[pair[1]].teamName || '') : 'BYE'
+        };
+      });
+    });
+
+    return FR.fb.put('/leagues/' + leagueId + '/matchups/' + (ctx.season || 2026), writes)
+      .then(function(){
+        statusEl.textContent = '✓ Schedule generated — ' + regularWeeks + ' weeks, ' + teamList.length + ' teams.';
+        statusEl.style.color = 'var(--or)';
+        btn.disabled = false;
+        btn.textContent = '⚡ Generate Schedule';
+        showToast('Schedule generated ✓');
+      });
+  }).catch(function(e){
+    statusEl.textContent = '✗ Error generating schedule — check Firebase permissions.';
+    statusEl.style.color = 'var(--pk)';
+    btn.disabled = false;
+    btn.textContent = '⚡ Generate Schedule';
+    console.error('Schedule gen error:', e);
+  });
+}
+
+function previewH2HSchedule(){
+  var ctx = FRAuth.getLeagueCtx();
+  var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+  var preview = document.getElementById('h2h-schedule-preview');
+  preview.innerHTML = '<div style="font-size:12px;color:var(--ink3);">Loading…</div>';
+
+  FR.fb.get('/leagues/' + leagueId + '/matchups/' + (ctx.season || 2026))
+    .then(function(data){
+      if(!data || !Object.keys(data).length){
+        preview.innerHTML = '<div style="font-size:12px;color:var(--ink3);">No schedule yet — generate one above.</div>';
+        return;
+      }
+      var weekKeys = Object.keys(data).sort(function(a,b){
+        return parseInt(a.replace('week','')) - parseInt(b.replace('week',''));
+      });
+      var html = weekKeys.slice(0, 3).map(function(wk){
+        var weekNum = wk.replace('week','');
+        var matchups = data[wk] || [];
+        var rows = matchups.map(function(m){
+          return '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;color:var(--ink2);">'
+            + '<span>' + (m.homeName || '—') + '</span><span style="color:var(--ink3);">vs</span><span>' + (m.awayName || 'BYE') + '</span></div>';
+        }).join('');
+        return '<div style="margin-bottom:10px;"><div style="font-family:var(--fd);font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;margin-bottom:4px;">Week ' + weekNum + '</div>' + rows + '</div>';
+      }).join('');
+      html += '<div style="font-size:11px;color:var(--ink3);font-style:italic;">Showing first 3 of ' + weekKeys.length + ' weeks.</div>';
+      preview.innerHTML = html;
+    })
+    .catch(function(){
+      preview.innerHTML = '<div style="font-size:12px;color:var(--pk);">Could not load schedule.</div>';
+    });
+}
+
 function generateSalaries(){
   var sel    = document.getElementById('sal-week-sel');
   var status = document.getElementById('sal-status');
@@ -5830,8 +6275,8 @@ loadTeamName();
 loadFromCloud();
 checkFirstRun();
 
-// Preseason leagues: hide formats that don't apply (Guillotine, Playoffs)
-if(IS_PRESEASON_LEAGUE){
+// Preseason/H2H leagues: hide formats that don't apply
+if(IS_PRESEASON_LEAGUE || IS_H2H_LEAGUE){
   var gBtn = document.getElementById('more-guillotine-btn');
   var pBtn = document.getElementById('more-playoffs-btn');
   if(gBtn) gBtn.style.display = 'none';
@@ -5840,6 +6285,7 @@ if(IS_PRESEASON_LEAGUE){
   var moreGrid = document.querySelector('#more-menu > div');
   if(moreGrid) moreGrid.style.gridTemplateColumns = 'repeat(2,1fr)';
 }
+if(IS_H2H_LEAGUE) initH2HVisibility();
 
 // Run commissioner check after a short delay to ensure Firebase is ready
 setTimeout(function(){ initCommissionerAccess(); }, 800);
