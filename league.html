@@ -1295,6 +1295,28 @@ function confirmTeamName(){
   var ctx      = FRAuth.getLeagueCtx();
   var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
 
+  // Guard against duplicate team names within the league — scoring and
+  // standings key off team name, so two teams sharing a name (even by
+  // case/whitespace) would silently merge their records together.
+  FR.fb.get('/leagues/' + leagueId + '/members').then(function(members){
+    var taken = Object.keys(members || {}).some(function(uid){
+      if(uid === user.uid) return false; // your own existing name doesn't count
+      var m = members[uid];
+      return m && m.teamName && teamMatch(m.teamName, name);
+    });
+    if(taken){
+      showToast('That team name is already taken in this league', true);
+      return;
+    }
+    saveTeamNameToFirebase(name, user, ctx, leagueId);
+  }).catch(function(){
+    // If the duplicate check itself fails, don't block saving — fail open
+    // rather than locking the commissioner out of their own league.
+    saveTeamNameToFirebase(name, user, ctx, leagueId);
+  });
+}
+
+function saveTeamNameToFirebase(name, user, ctx, leagueId){
   // Optimistic update
   applyTeamName(name);
   cancelTeamEdit();
@@ -5747,6 +5769,10 @@ function loadH2HDivisionAssignment(){
     var rows = teamList.map(function(uid, i){
       var m = members[uid];
       var currentDiv = m.division || ((i % divCount) + 1);
+      // Guard against a stale division value from before the commissioner
+      // reduced the division count — without this, the dropdown would
+      // silently show no selection and Save would write an unintended value.
+      if(currentDiv > divCount || currentDiv < 1) currentDiv = ((i % divCount) + 1);
       return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--bdr);">'
         + '<span style="font-family:var(--fd);font-size:13px;font-weight:700;color:var(--ink);">' + m.teamName + '</span>'
         + '<select class="wk-select" style="width:auto;" data-uid="' + uid + '" id="div-sel-' + uid + '">' + divOptions.replace('value="' + currentDiv + '"', 'value="' + currentDiv + '" selected') + '</select>'
@@ -6015,21 +6041,57 @@ function saveH2HWeekEdit(week, count){
   var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
   var statusEl = document.getElementById('h2h-edit-status');
 
-  FR.fb.get('/leagues/' + leagueId + '/members').then(function(members){
-    var updated = [];
-    for(var i = 0; i < count; i++){
-      var homeSel = document.getElementById('edit-home-' + i);
-      var awaySel = document.getElementById('edit-away-' + i);
-      var homeUid = homeSel ? homeSel.value : '';
-      var awayUid = awaySel ? awaySel.value : '';
-      updated.push({
-        home: homeUid,
-        away: awayUid || null,
-        homeName: homeUid && members[homeUid] ? members[homeUid].teamName : '',
-        awayName: awayUid && members[awayUid] ? members[awayUid].teamName : 'BYE'
-      });
+  var updated = [];
+  var usedUids = {};
+  var hasError = false;
+
+  for(var i = 0; i < count; i++){
+    var homeSel = document.getElementById('edit-home-' + i);
+    var awaySel = document.getElementById('edit-away-' + i);
+    var homeUid = homeSel ? homeSel.value : '';
+    var awayUid = awaySel ? awaySel.value : '';
+
+    // A team can't play itself
+    if(homeUid && awayUid && homeUid === awayUid){
+      statusEl.textContent = '✗ Matchup ' + (i+1) + ': a team can\'t play itself.';
+      statusEl.style.color = 'var(--pk)';
+      hasError = true;
+      break;
     }
-    return FR.fb.put('/leagues/' + leagueId + '/matchups/' + (ctx.season || 2026) + '/week' + week, updated);
+    // A team can only appear once in the week's schedule
+    if(homeUid){
+      if(usedUids[homeUid]){
+        statusEl.textContent = '✗ That team is already scheduled elsewhere this week — each team can only appear once.';
+        statusEl.style.color = 'var(--pk)';
+        hasError = true;
+        break;
+      }
+      usedUids[homeUid] = true;
+    }
+    if(awayUid){
+      if(usedUids[awayUid]){
+        statusEl.textContent = '✗ That team is already scheduled elsewhere this week — each team can only appear once.';
+        statusEl.style.color = 'var(--pk)';
+        hasError = true;
+        break;
+      }
+      usedUids[awayUid] = true;
+    }
+    updated.push({ home: homeUid, away: awayUid || null, _i: i });
+  }
+
+  if(hasError) return;
+
+  FR.fb.get('/leagues/' + leagueId + '/members').then(function(members){
+    var final = updated.map(function(m){
+      return {
+        home: m.home,
+        away: m.away,
+        homeName: m.home && members[m.home] ? members[m.home].teamName : '',
+        awayName: m.away && members[m.away] ? members[m.away].teamName : 'BYE'
+      };
+    });
+    return FR.fb.put('/leagues/' + leagueId + '/matchups/' + (ctx.season || 2026) + '/week' + week, final);
   }).then(function(){
     if(statusEl){ statusEl.textContent = '✓ Week ' + week + ' updated.'; statusEl.style.color = 'var(--or)'; }
     showToast('Matchups updated ✓');
@@ -6080,7 +6142,14 @@ function buildBracketPairings(seeds){
 //                         purely by overall record
 // standings must already be sorted by the league's tiebreaker rules.
 function selectPlayoffSeeds(standings, settings){
+  // Hard floor/parity guard — protects against leagues created before this
+  // validation existed, or settings edited directly in Firebase with a bad value.
   var playoffTeams = settings.playoffTeams || 4;
+  if(playoffTeams < 4) playoffTeams = 4;
+  if(playoffTeams > standings.length) playoffTeams = standings.length - (standings.length % 2);
+  if(playoffTeams % 2 !== 0) playoffTeams = playoffTeams - 1;
+  if(playoffTeams < 2) return []; // not enough teams to run any bracket at all
+
   var method = settings.seedMethod || 'record';
   var hasDivisions = (settings.h2hDivisions || 0) > 0;
 
@@ -6102,12 +6171,25 @@ function selectPlayoffSeeds(standings, settings){
     }
   });
 
+  // Guard: if there are more division winners than configured playoff
+  // spots (e.g. 5 divisions but playoffTeams set to 4), division winners
+  // themselves must be trimmed down to the best records among themselves —
+  // a misconfigured league should never produce a bracket bigger than
+  // what was actually configured.
+  if(divisionWinners.length > playoffTeams){
+    divisionWinners = divisionWinners.slice().sort(function(a, b){
+      if(b.wins !== a.wins) return b.wins - a.wins;
+      return b.pf - a.pf;
+    }).slice(0, playoffTeams);
+  }
+
   var winnerNames = {};
   divisionWinners.forEach(function(t){ winnerNames[t.name] = true; });
 
   var remainingSpots = Math.max(0, playoffTeams - divisionWinners.length);
   var wildcards = standings.filter(function(t){ return !winnerNames[t.name]; }).slice(0, remainingSpots);
 
+  var result;
   if(method === 'divwin-topseed'){
     // Division winners occupy the top seeds (sorted by their own record),
     // wildcards fill the remaining seeds below them (also sorted by record).
@@ -6115,18 +6197,25 @@ function selectPlayoffSeeds(standings, settings){
       if(b.wins !== a.wins) return b.wins - a.wins;
       return b.pf - a.pf;
     });
-    return sortedWinners.concat(wildcards);
+    result = sortedWinners.concat(wildcards);
+  } else {
+    // 'divwin-record' — division winners are guaranteed a spot, but the
+    // combined field (winners + wildcards) is re-sorted purely by record,
+    // so a winner with a weak record can end up seeded below a wildcard.
+    var combined = divisionWinners.concat(wildcards);
+    combined.sort(function(a, b){
+      if(b.wins !== a.wins) return b.wins - a.wins;
+      return b.pf - a.pf;
+    });
+    result = combined;
   }
 
-  // 'divwin-record' — division winners are guaranteed a spot, but the
-  // combined field (winners + wildcards) is re-sorted purely by record,
-  // so a winner with a weak record can end up seeded below a wildcard.
-  var combined = divisionWinners.concat(wildcards);
-  combined.sort(function(a, b){
-    if(b.wins !== a.wins) return b.wins - a.wins;
-    return b.pf - a.pf;
-  });
-  return combined;
+  // Final safety net: regardless of how the above math played out, never
+  // return an odd-length or oversized list — buildBracketPairings requires
+  // an even count, and a bracket bigger than configured is always a bug.
+  if(result.length > playoffTeams) result = result.slice(0, playoffTeams);
+  if(result.length % 2 !== 0) result = result.slice(0, result.length - 1);
+  return result;
 }
 
 function seedH2HPlayoffs(){
@@ -6162,6 +6251,14 @@ function seedH2HPlayoffs(){
 
       var topTeams = selectPlayoffSeeds(standings, settings);
 
+      if(!topTeams.length){
+        statusEl.textContent = '✗ Not enough teams to form a valid playoff bracket (need at least 4).';
+        statusEl.style.color = 'var(--pk)';
+        btn.disabled = false;
+        btn.textContent = '⚡ Seed Playoffs';
+        return;
+      }
+
       // Map team name back to uid for storage
       var nameToUid = {};
       Object.keys(members).forEach(function(uid){
@@ -6180,6 +6277,19 @@ function seedH2HPlayoffs(){
           division: t.division || null
         };
       });
+
+      // Refuse to seed if any team name couldn't be matched back to a real
+      // member — proceeding would risk two different teams colliding on a
+      // null uid downstream (advancement logic matches winners by uid, and
+      // two nulls would be indistinguishable from each other).
+      var unmatched = seeds.filter(function(s){ return !s.uid; });
+      if(unmatched.length){
+        statusEl.textContent = '✗ Could not match team(s) to members: ' + unmatched.map(function(s){ return s.name; }).join(', ') + '. Check for a team name mismatch and try again.';
+        statusEl.style.color = 'var(--pk)';
+        btn.disabled = false;
+        btn.textContent = '⚡ Seed Playoffs';
+        return;
+      }
 
       var round1Pairs = buildBracketPairings(seeds);
       var playoffStart = settings.playoffStartWeek || 15;

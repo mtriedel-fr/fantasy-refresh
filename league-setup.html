@@ -417,7 +417,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
               </div>
               <div class="form-group" style="margin:0;">
                 <label class="form-label">Playoff Teams</label>
-                <input type="number" class="form-input" id="h2h-playoff-teams" value="4" min="2" max="16" oninput="updateH2HCalc()">
+                <input type="number" class="form-input" id="h2h-playoff-teams" value="4" min="4" max="16" oninput="updateH2HCalc()">
               </div>
             </div>
             <div id="h2h-playoff-hint" style="font-size:11px;color:var(--ink3);">4 of 12 teams make playoffs</div>
@@ -808,11 +808,23 @@ function updateH2HCalc(){
     if(divWinRow) divWinRow.style.display = 'none';
   }
 
-  // Playoff validation
+  // Playoff validation — minimum 4 (need at least 2 first-round matchups),
+  // can't exceed total teams, and must be even for clean bracket pairing.
   if(playoffTeams > totalTeams){
-    document.getElementById('h2h-playoff-teams').value = totalTeams;
     playoffTeams = totalTeams;
   }
+  if(playoffTeams < 4){
+    playoffTeams = 4;
+  }
+  if(playoffTeams % 2 !== 0){
+    playoffTeams = playoffTeams + 1; // round up to keep brackets even
+  }
+  if(playoffTeams > totalTeams){
+    // totalTeams itself might be odd or below 4 — fall back to the largest
+    // valid even number that still fits within the league.
+    playoffTeams = totalTeams - (totalTeams % 2);
+  }
+  document.getElementById('h2h-playoff-teams').value = playoffTeams;
   if(playoffHint) playoffHint.textContent = playoffTeams + ' of ' + totalTeams + ' teams make playoffs';
 
   // Wild card breakdown — reflects the chosen seeding method
@@ -851,6 +863,15 @@ function createLeague(){
   var h2hDivisions = selectedFmt === 'headtohead' ? (parseInt(document.getElementById('h2h-divisions').value)||0) : 0;
   var playoffStart = selectedFmt === 'headtohead' ? (parseInt(document.getElementById('h2h-playoff-start').value)||15) : null;
   var playoffTeams = selectedFmt === 'headtohead' ? (parseInt(document.getElementById('h2h-playoff-teams').value)||4) : null;
+  // Hard clamp regardless of what the input field's live value was —
+  // protects against paste/autofill bypassing the oninput validation,
+  // and against the field never having fired oninput at all.
+  if(playoffTeams !== null){
+    if(playoffTeams < 4) playoffTeams = 4;
+    if(h2hTeams && playoffTeams > h2hTeams) playoffTeams = h2hTeams;
+    if(playoffTeams % 2 !== 0) playoffTeams = playoffTeams - 1; // round down to stay <= teams and even
+    if(playoffTeams < 4) playoffTeams = 4; // guard against teams<4 edge case
+  }
   var seedMethod   = selectedFmt === 'headtohead' && h2hDivisions > 0 ? selectedSeedMethod : 'record';
   var tiebreaker   = selectedFmt === 'headtohead' ? (document.getElementById('h2h-tiebreaker') ? document.getElementById('h2h-tiebreaker').value : 'h2h_then_pf') : 'h2h_then_pf';
   var cap        = parseInt(document.getElementById('adv-cap').value) || 63000;

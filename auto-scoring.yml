@@ -316,8 +316,14 @@ jobs:
 
             const allScores = { ...existingScores, ...scoreUpdates };
             const scoreByTeamName = {};
+            const seenTeamNames = new Set();
             Object.values(allScores).forEach(entry => {
-              if (entry && entry.team) scoreByTeamName[entry.team] = entry.score;
+              if (!entry || !entry.team) return;
+              if (seenTeamNames.has(entry.team)) {
+                console.warn(`  ⚠️  Duplicate team name detected: "${entry.team}" — scores may be merging incorrectly. Check for two members with the same team name.`);
+              }
+              seenTeamNames.add(entry.team);
+              scoreByTeamName[entry.team] = entry.score;
             });
 
             const results = matchups.map(m => {
