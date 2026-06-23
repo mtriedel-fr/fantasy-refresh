@@ -386,7 +386,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px;">
               <div class="form-group" style="margin:0;">
                 <label class="form-label">Total Teams</label>
-                <input type="number" class="form-input" id="h2h-teams" value="12" min="4" max="32" oninput="updateH2HCalc()">
+                <input type="number" class="form-input" id="h2h-teams" value="12" min="4" max="64" oninput="updateH2HCalc()">
               </div>
               <div class="form-group" style="margin:0;">
                 <label class="form-label">Divisions</label>
@@ -395,6 +395,10 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
                   <option value="2">2 Divisions</option>
                   <option value="3">3 Divisions</option>
                   <option value="4">4 Divisions</option>
+                  <option value="5">5 Divisions</option>
+                  <option value="6">6 Divisions</option>
+                  <option value="7">7 Divisions</option>
+                  <option value="8">8 Divisions</option>
                 </select>
               </div>
             </div>
@@ -417,12 +421,33 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
               </div>
               <div class="form-group" style="margin:0;">
                 <label class="form-label">Playoff Teams</label>
-                <input type="number" class="form-input" id="h2h-playoff-teams" value="4" min="4" max="16" oninput="updateH2HCalc()">
+                <select class="form-input" id="h2h-playoff-teams" onchange="updateH2HCalc()" style="color:var(--or);">
+                  <option value="4" selected>4 teams</option>
+                  <option value="6">6 teams</option>
+                  <option value="8">8 teams</option>
+                  <option value="10">10 teams</option>
+                  <option value="12">12 teams</option>
+                  <option value="16">16 teams</option>
+                </select>
               </div>
             </div>
             <div id="h2h-playoff-hint" style="font-size:11px;color:var(--ink3);">4 of 12 teams make playoffs</div>
             <div id="h2h-wildcard-info" style="display:none;font-size:12px;color:var(--ink3);background:var(--bg2);padding:8px 12px;border-radius:8px;border:1px solid var(--bdr);margin-top:8px;">
               <span id="h2h-wildcard-breakdown"></span>
+            </div>
+          </div>
+          <!-- Bracket format -->
+          <div style="padding:14px 16px;border-bottom:1px solid var(--bdr);">
+            <div style="font-family:var(--fd);font-size:11px;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;">🗂️ Bracket Format</div>
+            <div class="format-grid" style="grid-template-columns:1fr 1fr;gap:8px;">
+              <div class="format-opt selected" id="bracket-format-fixed" onclick="selectBracketFormat('fixed')">
+                <div class="format-opt-title">📋 Fixed Bracket</div>
+                <div class="format-opt-desc">NCAA tournament style. Pairings are locked at seeding — your bracket slot is set from round one and doesn't change based on other results.</div>
+              </div>
+              <div class="format-opt" id="bracket-format-reseed" onclick="selectBracketFormat('reseed')">
+                <div class="format-opt-title">🔄 Reseed Each Round</div>
+                <div class="format-opt-desc">NFL playoffs style. After every round, remaining teams are re-ranked and the best remaining seed always plays the worst remaining seed.</div>
+              </div>
             </div>
           </div>
           <!-- Division winner rules (shown only when divisions > 0) -->
@@ -592,6 +617,7 @@ var currentUser  = null;
 var selectedMode = null;   // 'create' | 'join'
 var selectedFmt  = 'cumulative';
 var selectedSeedMethod = 'record';
+var selectedBracketFormat = 'fixed';
 
 function selectSeedMethod(method){
   selectedSeedMethod = method;
@@ -599,6 +625,12 @@ function selectSeedMethod(method){
   document.getElementById('seed-method-divwin-topseed').classList.toggle('selected', method === 'divwin-topseed');
   document.getElementById('seed-method-divwin-record').classList.toggle('selected', method === 'divwin-record');
   updateH2HCalc();
+}
+
+function selectBracketFormat(fmt){
+  selectedBracketFormat = fmt;
+  document.getElementById('bracket-format-fixed').classList.toggle('selected', fmt === 'fixed');
+  document.getElementById('bracket-format-reseed').classList.toggle('selected', fmt === 'reseed');
 }
 var newLeagueId  = null;
 var newLeagueCode = null;
@@ -808,24 +840,30 @@ function updateH2HCalc(){
     if(divWinRow) divWinRow.style.display = 'none';
   }
 
-  // Playoff validation — minimum 4 (need at least 2 first-round matchups),
-  // can't exceed total teams, and must be even for clean bracket pairing.
-  if(playoffTeams > totalTeams){
-    playoffTeams = totalTeams;
+  // Playoff teams is now a dropdown — rebuild its options so only valid,
+  // even counts that fit within the league are selectable. This is the
+  // cleanest way to support leagues as small as 4 teams up to 64+ without
+  // ever letting an invalid bracket size get chosen in the first place.
+  var playoffSel = document.getElementById('h2h-playoff-teams');
+  var bracketSizes = [4, 6, 8, 10, 12, 16];
+  var validSizes = bracketSizes.filter(function(n){ return n <= totalTeams; });
+  if(!validSizes.length) validSizes = [Math.max(4, totalTeams - (totalTeams % 2))];
+
+  var prevSelection = playoffSel ? parseInt(playoffSel.value) : null;
+  if(playoffSel){
+    playoffSel.innerHTML = validSizes.map(function(n){ return '<option value="' + n + '">' + n + ' teams</option>'; }).join('');
+    // Keep the previous selection if it's still valid, otherwise default to
+    // the largest valid size that's <= totalTeams (most useful default as
+    // leagues grow, since commissioners typically want broad playoff access).
+    if(prevSelection && validSizes.indexOf(prevSelection) > -1){
+      playoffSel.value = prevSelection;
+    } else {
+      playoffSel.value = validSizes[validSizes.length - 1];
+    }
   }
-  if(playoffTeams < 4){
-    playoffTeams = 4;
-  }
-  if(playoffTeams % 2 !== 0){
-    playoffTeams = playoffTeams + 1; // round up to keep brackets even
-  }
-  if(playoffTeams > totalTeams){
-    // totalTeams itself might be odd or below 4 — fall back to the largest
-    // valid even number that still fits within the league.
-    playoffTeams = totalTeams - (totalTeams % 2);
-  }
-  document.getElementById('h2h-playoff-teams').value = playoffTeams;
-  if(playoffHint) playoffHint.textContent = playoffTeams + ' of ' + totalTeams + ' teams make playoffs';
+  var playoffTeamsFinal = playoffSel ? parseInt(playoffSel.value) : 4;
+  if(playoffHint) playoffHint.textContent = playoffTeamsFinal + ' of ' + totalTeams + ' teams make playoffs';
+  playoffTeams = playoffTeamsFinal; // keep downstream wildcard math in sync
 
   // Wild card breakdown — reflects the chosen seeding method
   if(numDivs > 0 && playoffTeams > 0){
@@ -874,6 +912,7 @@ function createLeague(){
   }
   var seedMethod   = selectedFmt === 'headtohead' && h2hDivisions > 0 ? selectedSeedMethod : 'record';
   var tiebreaker   = selectedFmt === 'headtohead' ? (document.getElementById('h2h-tiebreaker') ? document.getElementById('h2h-tiebreaker').value : 'h2h_then_pf') : 'h2h_then_pf';
+  var bracketFormat = selectedFmt === 'headtohead' ? selectedBracketFormat : 'fixed';
   var cap        = parseInt(document.getElementById('adv-cap').value) || 63000;
   var maxMembers = parseInt(document.getElementById('adv-members').value) || 20;
   var maxSal     = 11300; // fixed
@@ -928,6 +967,7 @@ function createLeague(){
     playoffTeams:        playoffTeams,
     seedMethod:          seedMethod,       // 'record' | 'divwin-topseed' | 'divwin-record'
     tiebreaker:          tiebreaker,       // 'h2h_then_pf' | 'pf_only' | 'pf_then_pa'
+    bracketFormat:       bracketFormat,    // 'fixed' | 'reseed'
     // Cumulative playoff
     ...cumPlayoff,
     visibility:          isPublic ? 'public' : 'private',

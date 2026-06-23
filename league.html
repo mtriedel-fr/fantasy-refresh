@@ -2879,6 +2879,13 @@ function applyRound(teams, weekScores){
 
 // ── RENDER ─────────────────────────────────────────────────────
 function renderPlayoffs(){
+  // Head-to-head leagues have a completely different playoff model
+  // (seeded bracket vs. tiered elimination) — branch to a dedicated view.
+  if(IS_H2H_LEAGUE){
+    renderH2HPlayoffsTab();
+    return;
+  }
+
   var weeks = Object.keys(seasonData).filter(function(k){ return seasonData[k] && seasonData[k].length; }).map(Number);
   var maxWeek = weeks.length ? Math.max.apply(null, weeks) : 0;
   var tiersLocked = maxWeek >= TIER_LOCK_WEEK;
@@ -6131,6 +6138,68 @@ function buildBracketPairings(seeds){
   return pairs;
 }
 
+// Standard tournament slot order for a fixed (NCAA-style) bracket. Each
+// number is a seed position (1-indexed); the array order is the actual
+// physical bracket layout so that round 2 always pairs the two teams
+// "above" each other in the same region, regardless of which seed numbers
+// those teams actually were. This is the industry-standard seeding order
+// used so that, e.g. in a 16-team bracket the 1 and 2 seeds can only meet
+// in the final, never before.
+var BRACKET_SLOT_ORDER = {
+  2:  [1, 2],
+  4:  [1, 4, 2, 3],
+  6:  [1, 6, 3, 4, 2, 5],
+  8:  [1, 8, 4, 5, 2, 7, 3, 6],
+  10: [1, 10, 5, 6, 3, 8, 2, 9, 4, 7],
+  12: [1, 12, 6, 7, 3, 10, 2, 11, 5, 8, 4, 9],
+  16: [1, 16, 8, 9, 4, 13, 5, 12, 2, 15, 7, 10, 3, 14, 6, 11]
+};
+
+// Assigns each seed a fixed bracket "slot" position based on the standard
+// ordering above. Slot order determines round-1 pairings AND which two
+// bracket halves feed into each later-round matchup, independent of the
+// actual seed numbers that survive. Falls back to simple best/worst
+// pairing for bracket sizes we don't have a defined slot order for.
+function assignFixedBracketSlots(seeds){
+  var order = BRACKET_SLOT_ORDER[seeds.length];
+  if(!order){
+    // No predefined order for this size — fall back to best-vs-worst,
+    // which is still a valid (if non-standard) fixed layout.
+    return seeds.map(function(s, i){ return Object.assign({}, s, { slot: i + 1 }); });
+  }
+  var bySeed = {};
+  seeds.forEach(function(s){ bySeed[s.seed] = s; });
+  return order.map(function(seedNum, i){
+    var team = bySeed[seedNum];
+    return team ? Object.assign({}, team, { slot: i + 1 }) : null;
+  }).filter(Boolean);
+}
+
+// Builds round-1 pairings for a fixed bracket from slot-assigned seeds —
+// slot 1 plays slot 2, slot 3 plays slot 4, etc. (adjacent slot pairs).
+function buildFixedRound1Pairs(slottedSeeds){
+  var pairs = [];
+  for(var i = 0; i < slottedSeeds.length; i += 2){
+    pairs.push([slottedSeeds[i], slottedSeeds[i + 1]]);
+  }
+  return pairs;
+}
+
+// For a fixed bracket, round 2+ pairings are determined by bracket slot
+// position, not by re-sorting seed numbers. Each pair of round-1 matchups
+// (slots 1-2 and 3-4, then 5-6 and 7-8, etc.) feeds into the next round
+// in that fixed order — exactly like an NCAA tournament bracket, so a
+// low seed that upsets its way through stays in its original bracket
+// region instead of jumping across the bracket to face the overall best
+// remaining seed.
+function buildFixedNextRoundPairs(winnersInSlotOrder){
+  var pairs = [];
+  for(var i = 0; i < winnersInSlotOrder.length; i += 2){
+    pairs.push([winnersInSlotOrder[i], winnersInSlotOrder[i + 1]]);
+  }
+  return pairs;
+}
+
 // Determines who makes the playoffs and in what seed order, based on the
 // league's configured seedMethod:
 //   'record'           — top N teams overall by record, divisions ignored
@@ -6291,12 +6360,27 @@ function seedH2HPlayoffs(){
         return;
       }
 
-      var round1Pairs = buildBracketPairings(seeds);
+      var bracketFormat = settings.bracketFormat || 'fixed';
+      var round1Pairs, slottedSeeds;
+
+      if(bracketFormat === 'fixed'){
+        // Assign each seed a fixed bracket slot so later rounds can advance
+        // by bracket position rather than by re-ranking survivors.
+        slottedSeeds = assignFixedBracketSlots(seeds);
+        round1Pairs = buildFixedRound1Pairs(slottedSeeds);
+      } else {
+        // Reseed mode — round 1 is identical to fixed (best vs worst), the
+        // difference only shows up starting round 2 in advanceH2HPlayoffRound.
+        slottedSeeds = seeds;
+        round1Pairs = buildBracketPairings(seeds);
+      }
+
       var playoffStart = settings.playoffStartWeek || 15;
 
       var playoffData = {
-        seeds: seeds,
+        seeds: slottedSeeds,
         seedMethod: settings.seedMethod || 'record',
+        bracketFormat: bracketFormat,
         currentRound: 1,
         playoffStartWeek: playoffStart,
         rounds: {
@@ -6305,6 +6389,7 @@ function seedH2HPlayoffs(){
               homeSeed: pair[0].seed, awaySeed: pair[1].seed,
               homeUid: pair[0].uid, awayUid: pair[1].uid,
               homeName: pair[0].name, awayName: pair[1].name,
+              homeSlot: pair[0].slot || null, awaySlot: pair[1].slot || null,
               winner: null
             };
           })
@@ -6375,17 +6460,45 @@ function advanceH2HPlayoffRound(){
       return;
     }
 
-    var winners = updatedRound.map(function(m){
-      return data.seeds.find(function(s){ return s.uid === m.winner; });
-    }).filter(Boolean).sort(function(a, b){ return a.seed - b.seed; });
+    var bracketFormat = data.bracketFormat || 'fixed';
+    var nextPairs;
 
-    var nextPairs = buildBracketPairings(winners);
+    if(bracketFormat === 'fixed'){
+      // Fixed bracket — advance by bracket slot position, NOT by re-ranking
+      // survivors. Each matchup carries homeSlot/awaySlot; the winner
+      // inherits whichever slot they advanced from, and slots stay in the
+      // same relative order they started in (1&2 feed into the first next-
+      // round game, 3&4 into the second, etc.) — exactly like an NCAA
+      // bracket where a low seed that upsets through stays in its own
+      // region instead of jumping to face the tournament's best survivor.
+      var winnersInSlotOrder = updatedRound.map(function(m){
+        var winnerSeed = data.seeds.find(function(s){ return s.uid === m.winner; });
+        if(!winnerSeed) return null;
+        // Winner inherits the slot of whichever side of the matchup they were
+        var winnerSlot = (m.winner === m.homeUid) ? m.homeSlot : m.awaySlot;
+        return Object.assign({}, winnerSeed, { slot: winnerSlot });
+      }).filter(Boolean);
+      // Matchups in `round` are already in bracket order (built that way at
+      // seeding time and preserved every round since), so winners come out
+      // in the correct adjacent-pair order for the next round automatically.
+      nextPairs = buildFixedNextRoundPairs(winnersInSlotOrder);
+    } else {
+      // Reseed mode — re-rank all surviving teams by their original overall
+      // seed number and re-pair best-remaining vs worst-remaining, exactly
+      // like NFL playoffs re-seeding each round.
+      var winners = updatedRound.map(function(m){
+        return data.seeds.find(function(s){ return s.uid === m.winner; });
+      }).filter(Boolean).sort(function(a, b){ return a.seed - b.seed; });
+      nextPairs = buildBracketPairings(winners);
+    }
+
     var nextRoundKey = 'round' + (data.currentRound + 1);
     var nextRound = nextPairs.map(function(pair){
       return {
         homeSeed: pair[0].seed, awaySeed: pair[1].seed,
         homeUid: pair[0].uid, awayUid: pair[1].uid,
         homeName: pair[0].name, awayName: pair[1].name,
+        homeSlot: pair[0].slot || null, awaySlot: pair[1].slot || null,
         winner: null
       };
     });
@@ -6396,6 +6509,120 @@ function advanceH2HPlayoffRound(){
     update['currentRound'] = data.currentRound + 1;
     FR.fb.patch('/leagues/' + leagueId + '/playoffs/' + (ctx.season || 2026), update);
   }).catch(function(){});
+}
+
+// ── H2H PLAYOFFS TAB (member-facing) ─────────────────────────────────
+function renderH2HPlayoffsTab(){
+  var ctx = FRAuth.getLeagueCtx();
+  var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+  var el = document.getElementById('wplayoffs');
+  if(!el) return;
+
+  Promise.all([
+    FR.fb.get('/leagues/' + leagueId + '/playoffs/' + (ctx.season || 2026)),
+    FR.fb.get('/leagues/' + leagueId + '/settings')
+  ]).then(function(results){
+    var data = results[0];
+    var settings = results[1] || {};
+
+    if(!data || !data.seeds || !data.seeds.length){
+      renderH2HPlayoffsPreSeed(el, settings);
+      return;
+    }
+    renderH2HBracketView(el, data, settings);
+  }).catch(function(){
+    el.innerHTML = '<div style="padding:32px;text-align:center;color:var(--ink3);">Could not load playoff data.</div>';
+  });
+}
+
+function renderH2HPlayoffsPreSeed(el, settings){
+  var playoffStart = settings.playoffStartWeek || 15;
+  var playoffTeams = settings.playoffTeams || 4;
+  var bracketFormat = settings.bracketFormat || 'fixed';
+  var weeks = Object.keys(seasonData).filter(function(k){ return seasonData[k] && seasonData[k].length; }).map(Number);
+  var maxWeek = weeks.length ? Math.max.apply(null, weeks) : 0;
+  var weeksLeft = Math.max(0, playoffStart - 1 - maxWeek);
+
+  el.innerHTML = '<div style="padding:16px;">'
+    + '<div style="background:linear-gradient(135deg,rgba(155,109,255,.1),rgba(0,229,212,.06));border:1px solid rgba(155,109,255,.25);border-radius:16px;padding:20px;margin-bottom:16px;text-align:center;">'
+    + '<div style="font-size:36px;margin-bottom:8px;">🏆</div>'
+    + '<div style="font-family:var(--fd);font-size:22px;font-weight:900;color:var(--pu);text-transform:uppercase;letter-spacing:.3px;margin-bottom:6px;">Playoffs</div>'
+    + '<div style="font-size:13px;color:var(--ink2);line-height:1.5;max-width:300px;margin:0 auto;">' + playoffTeams + '-team ' + (bracketFormat === 'reseed' ? 'reseeding' : 'fixed') + ' bracket. Starts Week ' + playoffStart + '.</div>'
+    + '</div>'
+    + (weeksLeft > 0
+      ? '<div style="background:var(--bg2);border-radius:12px;border:1px solid var(--bdr);padding:16px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;">'
+        + '<div><div style="font-family:var(--fd);font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Bracket Set After</div>'
+        + '<div style="font-family:var(--fd);font-size:18px;font-weight:900;color:var(--ink);">Week ' + (playoffStart - 1) + '</div></div>'
+        + '<div style="text-align:right;"><div style="font-family:var(--fd);font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Weeks Away</div>'
+        + '<div style="font-family:var(--fd);font-size:32px;font-weight:900;color:var(--or);line-height:1;">' + weeksLeft + '</div></div>'
+        + '</div>'
+      : '<div style="background:var(--bg2);border-radius:12px;border:1px solid var(--bdr);padding:16px;margin-bottom:16px;text-align:center;color:var(--ink3);font-size:13px;">Regular season complete — waiting for the commissioner to seed the bracket.</div>')
+    + '<div style="background:var(--bg2);border-radius:12px;border:1px solid var(--bdr);padding:16px;">'
+    + '<div style="font-family:var(--fd);font-size:13px;font-weight:800;color:var(--pu);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">📋 Format</div>'
+    + '<div style="font-size:12px;color:var(--ink2);line-height:1.6;">' + (bracketFormat === 'reseed'
+      ? 'After every round, remaining teams are re-ranked and the best remaining seed plays the worst remaining seed — just like the NFL playoffs.'
+      : 'Your bracket position is locked in once seeded. Win your matchup to advance to the next round in your bracket region — just like March Madness.') + '</div>'
+    + '</div>'
+    + '</div>';
+}
+
+function renderH2HBracketView(el, data, settings){
+  var roundKeys = Object.keys(data.rounds).sort(function(a, b){
+    return parseInt(a.replace('round','')) - parseInt(b.replace('round',''));
+  });
+
+  var roundsHtml = roundKeys.map(function(rk, idx){
+    var isLast = idx === roundKeys.length - 1;
+    var roundLabel = isLast && roundKeys.length > 1 ? 'Championship'
+      : data.rounds[rk].length === 1 ? 'Championship'
+      : 'Round ' + (idx + 1);
+
+    var matchupsHtml = data.rounds[rk].map(function(m){
+      var decided = !!m.winner;
+      var homeWon = decided && m.winner === m.homeUid;
+      var awayWon = decided && m.winner === m.awayUid;
+      var isBye = !m.awayName || m.awayName === 'BYE';
+
+      return '<div style="background:var(--bg3);border-radius:10px;border:1px solid var(--bdr);overflow:hidden;margin-bottom:8px;">'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;' + (decided && homeWon ? 'background:rgba(0,229,212,.08);' : '') + '">'
+        + '<div style="display:flex;align-items:center;gap:8px;min-width:0;">'
+        + '<span style="font-family:var(--fd);font-size:10px;font-weight:800;color:var(--ink3);flex-shrink:0;">#' + m.homeSeed + '</span>'
+        + '<span style="font-family:var(--fd);font-size:13px;font-weight:' + (decided && homeWon ? '800' : '600') + ';color:' + (decided && homeWon ? 'var(--or)' : 'var(--ink)') + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + m.homeName + '</span>'
+        + (decided && homeWon ? '<span style="color:var(--or);font-size:11px;">✓</span>' : '')
+        + '</div>'
+        + (m.homeScore !== undefined && m.homeScore !== null ? '<span style="font-family:var(--fd);font-size:13px;font-weight:800;color:var(--ink2);">' + fmtScore(m.homeScore) + '</span>' : '')
+        + '</div>'
+        + (isBye ? '<div style="padding:6px 12px;font-family:var(--fd);font-size:11px;color:var(--ink3);text-transform:uppercase;text-align:center;border-top:1px solid var(--bdr);">BYE — advances automatically</div>' :
+          '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-top:1px solid var(--bdr);' + (decided && awayWon ? 'background:rgba(0,229,212,.08);' : '') + '">'
+          + '<div style="display:flex;align-items:center;gap:8px;min-width:0;">'
+          + '<span style="font-family:var(--fd);font-size:10px;font-weight:800;color:var(--ink3);flex-shrink:0;">#' + m.awaySeed + '</span>'
+          + '<span style="font-family:var(--fd);font-size:13px;font-weight:' + (decided && awayWon ? '800' : '600') + ';color:' + (decided && awayWon ? 'var(--or)' : 'var(--ink)') + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + m.awayName + '</span>'
+          + (decided && awayWon ? '<span style="color:var(--or);font-size:11px;">✓</span>' : '')
+          + '</div>'
+          + (m.awayScore !== undefined && m.awayScore !== null ? '<span style="font-family:var(--fd);font-size:13px;font-weight:800;color:var(--ink2);">' + fmtScore(m.awayScore) + '</span>' : '')
+          + '</div>')
+        + '</div>';
+    }).join('');
+
+    return '<div style="margin-bottom:18px;">'
+      + '<div style="font-family:var(--fd);font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">' + roundLabel + '</div>'
+      + matchupsHtml
+      + '</div>';
+  }).join('');
+
+  el.innerHTML = '<div style="padding:16px;">'
+    + (data.champion
+      ? '<div style="background:linear-gradient(135deg,rgba(0,229,212,.12),rgba(255,95,160,.08));border:1px solid rgba(0,229,212,.3);border-radius:16px;padding:24px;margin-bottom:16px;text-align:center;">'
+        + '<div style="font-size:40px;margin-bottom:8px;">🏆</div>'
+        + '<div style="font-family:var(--fd);font-size:12px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Champion</div>'
+        + '<div style="font-family:var(--fd);font-size:24px;font-weight:900;color:var(--or);text-transform:uppercase;">' + data.champion + '</div>'
+        + '</div>'
+      : '<div style="background:linear-gradient(135deg,rgba(155,109,255,.08),rgba(0,229,212,.05));border:1px solid rgba(155,109,255,.2);border-radius:14px;padding:14px 16px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;">'
+        + '<span style="font-family:var(--fd);font-size:13px;font-weight:800;color:var(--pu);text-transform:uppercase;">Round ' + data.currentRound + '</span>'
+        + '<span style="font-family:var(--fd);font-size:11px;color:var(--ink3);text-transform:uppercase;">' + (data.bracketFormat === 'reseed' ? '🔄 Reseeding' : '📋 Fixed Bracket') + '</span>'
+        + '</div>')
+    + roundsHtml
+    + '</div>';
 }
 
 function previewH2HPlayoffBracket(){
@@ -6970,8 +7197,8 @@ loadTeamName();
 loadFromCloud();
 checkFirstRun();
 
-// Preseason/H2H leagues: hide formats that don't apply
-if(IS_PRESEASON_LEAGUE || IS_H2H_LEAGUE){
+// Preseason leagues: no playoffs or guillotine apply at all (4-week test format)
+if(IS_PRESEASON_LEAGUE){
   var gBtn = document.getElementById('more-guillotine-btn');
   var pBtn = document.getElementById('more-playoffs-btn');
   if(gBtn) gBtn.style.display = 'none';
@@ -6979,6 +7206,11 @@ if(IS_PRESEASON_LEAGUE || IS_H2H_LEAGUE){
   // Reflow grid to 2 columns since only League + Comm remain visible by default
   var moreGrid = document.querySelector('#more-menu > div');
   if(moreGrid) moreGrid.style.gridTemplateColumns = 'repeat(2,1fr)';
+} else if(IS_H2H_LEAGUE){
+  // H2H leagues: no guillotine game mode, but Playoffs now shows the
+  // seeded bracket — keep that one visible.
+  var gBtn2 = document.getElementById('more-guillotine-btn');
+  if(gBtn2) gBtn2.style.display = 'none';
 }
 if(IS_H2H_LEAGUE) initH2HVisibility();
 

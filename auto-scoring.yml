@@ -356,6 +356,27 @@ jobs:
             return pairs;
           }
 
+          // Same fixed-bracket "slot order" used client-side so the server-
+          // automated advancement produces identical results to a manual
+          // commissioner "Force Check" — keeps both code paths in lockstep.
+          const BRACKET_SLOT_ORDER = {
+            2:  [1, 2],
+            4:  [1, 4, 2, 3],
+            6:  [1, 6, 3, 4, 2, 5],
+            8:  [1, 8, 4, 5, 2, 7, 3, 6],
+            10: [1, 10, 5, 6, 3, 8, 2, 9, 4, 7],
+            12: [1, 12, 6, 7, 3, 10, 2, 11, 5, 8, 4, 9],
+            16: [1, 16, 8, 9, 4, 13, 5, 12, 2, 15, 7, 10, 3, 14, 6, 11]
+          };
+
+          function buildFixedNextRoundPairs(winnersInSlotOrder) {
+            const pairs = [];
+            for (let i = 0; i < winnersInSlotOrder.length; i += 2) {
+              pairs.push([winnersInSlotOrder[i], winnersInSlotOrder[i + 1]]);
+            }
+            return pairs;
+          }
+
           // Checks whether the league is currently in a playoff week, and if so,
           // whether every matchup in the active bracket round has a confirmed
           // winner. If yes, automatically builds and writes the next round —
@@ -440,19 +461,37 @@ jobs:
               return;
             }
 
-            // Build the next round from this round's winners, re-seeding by
-            // original seed number so a 1-seed who survives keeps bracket priority.
-            const winners = updatedRound
-              .map(m => playoffData.seeds.find(s => s.uid === m.winner))
-              .filter(Boolean)
-              .sort((a, b) => a.seed - b.seed);
+            const bracketFormat = playoffData.bracketFormat || 'fixed';
+            let nextPairs;
 
-            const nextPairs = buildBracketPairings(winners);
+            if (bracketFormat === 'fixed') {
+              // Fixed bracket — advance by bracket slot position, not by
+              // re-ranking survivors. Mirrors the client-side logic exactly
+              // so a commissioner's manual "Force Check" never disagrees
+              // with what the automated scoring run already decided.
+              const winnersInSlotOrder = updatedRound.map(m => {
+                const winnerSeed = playoffData.seeds.find(s => s.uid === m.winner);
+                if (!winnerSeed) return null;
+                const winnerSlot = (m.winner === m.homeUid) ? m.homeSlot : m.awaySlot;
+                return { ...winnerSeed, slot: winnerSlot };
+              }).filter(Boolean);
+              nextPairs = buildFixedNextRoundPairs(winnersInSlotOrder);
+            } else {
+              // Reseed mode — re-rank survivors by original seed number and
+              // re-pair best-remaining vs worst-remaining each round.
+              const winners = updatedRound
+                .map(m => playoffData.seeds.find(s => s.uid === m.winner))
+                .filter(Boolean)
+                .sort((a, b) => a.seed - b.seed);
+              nextPairs = buildBracketPairings(winners);
+            }
+
             const nextRoundKey = `round${playoffData.currentRound + 1}`;
             const nextRound = nextPairs.map(pair => ({
               homeSeed: pair[0].seed, awaySeed: pair[1].seed,
               homeUid: pair[0].uid, awayUid: pair[1].uid,
               homeName: pair[0].name, awayName: pair[1].name,
+              homeSlot: pair[0].slot || null, awaySlot: pair[1].slot || null,
               winner: null
             }));
 
