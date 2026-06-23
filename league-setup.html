@@ -426,20 +426,33 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
             </div>
           </div>
           <!-- Division winner rules (shown only when divisions > 0) -->
-          <div id="h2h-div-winner-row" style="display:none;padding:0 16px;">
-            <div class="toggle-row">
-              <div>
-                <div class="toggle-label">🏅 Division Winner Auto-Bid</div>
-                <div class="toggle-sub">Division winners automatically qualify for playoffs</div>
+          <div id="h2h-div-winner-row" style="display:none;padding:0 16px 14px;">
+            <div style="font-family:var(--fd);font-size:11px;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;">🌱 How Seeds Are Determined</div>
+            <div class="format-grid" style="grid-template-columns:1fr;gap:8px;">
+              <div class="format-opt selected" id="seed-method-record" onclick="selectSeedMethod('record')">
+                <div class="format-opt-title">📊 Pure Record</div>
+                <div class="format-opt-desc">Top teams overall make the playoffs and are seeded strictly by record. Divisions don't affect playoff seeding.</div>
               </div>
-              <label class="toggle"><input type="checkbox" id="tog-div-autobid" checked><span class="toggle-slider"></span></label>
+              <div class="format-opt" id="seed-method-divwin-topseed" onclick="selectSeedMethod('divwin-topseed')">
+                <div class="format-opt-title">🏅 Division Winners = Top Seeds</div>
+                <div class="format-opt-desc">Each division winner makes the playoffs and is guaranteed a top seed (ranked 1, 2, 3… by their own record among division winners). Remaining spots go to the best non-division-winner records as wildcards, seeded below.</div>
+              </div>
+              <div class="format-opt" id="seed-method-divwin-record" onclick="selectSeedMethod('divwin-record')">
+                <div class="format-opt-title">🏆 Division Winners Make It, Seeded by Record</div>
+                <div class="format-opt-desc">Each division winner is guaranteed a playoff spot, but seeding for everyone — division winners and wildcards alike — is based purely on overall record. A division winner with a worse record than a wildcard can be seeded lower.</div>
+              </div>
             </div>
-            <div class="toggle-row">
-              <div>
-                <div class="toggle-label">🌱 Division Winner Top Seed</div>
-                <div class="toggle-sub">Division winners are top seeds (seeded by record, no auto-bye)</div>
-              </div>
-              <label class="toggle"><input type="checkbox" id="tog-div-topseed" checked><span class="toggle-slider"></span></label>
+          </div>
+
+          <!-- Tiebreakers -->
+          <div style="padding:0 16px 14px;">
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Tiebreaker Order (when records are tied)</label>
+              <select class="form-input" id="h2h-tiebreaker" style="color:var(--or);">
+                <option value="h2h_then_pf">Head-to-head result, then total points scored</option>
+                <option value="pf_only">Total points scored only</option>
+                <option value="pf_then_pa">Total points scored, then fewest points against</option>
+              </select>
             </div>
           </div>
         </div>
@@ -578,6 +591,15 @@ var FR_SEASON = FRAuth.SEASON;
 var currentUser  = null;
 var selectedMode = null;   // 'create' | 'join'
 var selectedFmt  = 'cumulative';
+var selectedSeedMethod = 'record';
+
+function selectSeedMethod(method){
+  selectedSeedMethod = method;
+  document.getElementById('seed-method-record').classList.toggle('selected', method === 'record');
+  document.getElementById('seed-method-divwin-topseed').classList.toggle('selected', method === 'divwin-topseed');
+  document.getElementById('seed-method-divwin-record').classList.toggle('selected', method === 'divwin-record');
+  updateH2HCalc();
+}
 var newLeagueId  = null;
 var newLeagueCode = null;
 var joinTargetLeagueId = null;
@@ -793,17 +815,24 @@ function updateH2HCalc(){
   }
   if(playoffHint) playoffHint.textContent = playoffTeams + ' of ' + totalTeams + ' teams make playoffs';
 
-  // Wild card breakdown
+  // Wild card breakdown — reflects the chosen seeding method
   if(numDivs > 0 && playoffTeams > 0){
-    var autobid = document.getElementById('tog-div-autobid') && document.getElementById('tog-div-autobid').checked;
     var divWinners = Math.min(numDivs, playoffTeams);
     var wildcards = playoffTeams - divWinners;
-    if(wcBreak) wcBreak.textContent =
-      (autobid ? divWinners + ' division winner autobids' : divWinners + ' top-seeded division winners')
-      + (wildcards > 0 ? ' + ' + wildcards + ' wild card' + (wildcards > 1 ? 's' : '') : '');
-    if(wcInfo) wcInfo.style.display = 'block';
-  } else {
-    if(wcInfo) wcInfo.style.display = 'none';
+    var methodLabel = '';
+    if(selectedSeedMethod === 'record'){
+      methodLabel = 'Top ' + playoffTeams + ' teams by record — divisions don\'t affect seeding';
+    } else if(selectedSeedMethod === 'divwin-topseed'){
+      methodLabel = divWinners + ' division winner' + (divWinners > 1 ? 's' : '') + ' guaranteed top seed' + (divWinners > 1 ? 's' : '')
+        + (wildcards > 0 ? ' + ' + wildcards + ' wild card' + (wildcards > 1 ? 's' : '') + ' seeded below' : '');
+    } else if(selectedSeedMethod === 'divwin-record'){
+      methodLabel = divWinners + ' division winner' + (divWinners > 1 ? 's' : '') + ' guaranteed a spot'
+        + (wildcards > 0 ? ' + ' + wildcards + ' wild card' + (wildcards > 1 ? 's' : '') : '') + ' — all seeded by record';
+    }
+    if(wcBreak) wcBreak.textContent = methodLabel;
+    if(wcInfo) wcInfo.style.display = numDivs > 0 ? 'block' : 'none';
+  } else if(wcInfo){
+    wcInfo.style.display = 'none';
   }
 }
 
@@ -822,8 +851,8 @@ function createLeague(){
   var h2hDivisions = selectedFmt === 'headtohead' ? (parseInt(document.getElementById('h2h-divisions').value)||0) : 0;
   var playoffStart = selectedFmt === 'headtohead' ? (parseInt(document.getElementById('h2h-playoff-start').value)||15) : null;
   var playoffTeams = selectedFmt === 'headtohead' ? (parseInt(document.getElementById('h2h-playoff-teams').value)||4) : null;
-  var divAutobid   = selectedFmt === 'headtohead' && h2hDivisions > 0 ? document.getElementById('tog-div-autobid').checked : false;
-  var divTopSeed   = selectedFmt === 'headtohead' && h2hDivisions > 0 ? document.getElementById('tog-div-topseed').checked : false;
+  var seedMethod   = selectedFmt === 'headtohead' && h2hDivisions > 0 ? selectedSeedMethod : 'record';
+  var tiebreaker   = selectedFmt === 'headtohead' ? (document.getElementById('h2h-tiebreaker') ? document.getElementById('h2h-tiebreaker').value : 'h2h_then_pf') : 'h2h_then_pf';
   var cap        = parseInt(document.getElementById('adv-cap').value) || 63000;
   var maxMembers = parseInt(document.getElementById('adv-members').value) || 20;
   var maxSal     = 11300; // fixed
@@ -876,8 +905,8 @@ function createLeague(){
     h2hDivisions:        h2hDivisions,
     playoffStartWeek:    playoffStart,
     playoffTeams:        playoffTeams,
-    divisionAutobid:     divAutobid,
-    divisionTopSeed:     divTopSeed,
+    seedMethod:          seedMethod,       // 'record' | 'divwin-topseed' | 'divwin-record'
+    tiebreaker:          tiebreaker,       // 'h2h_then_pf' | 'pf_only' | 'pf_then_pa'
     // Cumulative playoff
     ...cumPlayoff,
     visibility:          isPublic ? 'public' : 'private',

@@ -1061,15 +1061,17 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
           <!-- PLAYOFF BRACKET -->
           <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--bdr);">
             <div style="font-family:var(--fd);font-size:12px;font-weight:700;color:var(--pu);text-transform:uppercase;margin-bottom:6px;">🏆 Playoff Bracket</div>
-            <div style="font-size:12px;color:var(--ink3);margin-bottom:10px;line-height:1.5;">Seeds the top teams by record once the regular season ends, then generates single-elimination playoff matchups.</div>
+            <div style="font-size:12px;color:var(--ink3);margin-bottom:10px;line-height:1.5;">Seed once the regular season ends. After that, rounds advance automatically — the scoring system checks each playoff week and moves the bracket forward on its own once every matchup is final.</div>
             <div id="h2h-playoff-status" style="font-size:12px;color:var(--ink3);margin-bottom:10px;">Checking playoff status…</div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;">
               <button class="salary-btn" id="h2h-playoff-seed-btn" onclick="seedH2HPlayoffs()">⚡ Seed Playoffs</button>
               <button class="salary-btn secondary" onclick="previewH2HPlayoffBracket()">👁 Preview Bracket</button>
+              <button class="salary-btn secondary" onclick="advanceH2HPlayoffRound();setTimeout(previewH2HPlayoffBracket,800);" title="Manually re-check and advance the bracket if it hasn't updated on its own">🔄 Force Check</button>
             </div>
             <div id="h2h-playoff-preview" style="margin-top:12px;"></div>
           </div>
         </div>
+
 
         <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--bdr);">
           <div class="csect">Season history</div>
@@ -1721,8 +1723,9 @@ function renderH2HMyMatchup(){
 }
 
 // Compute full W-L-T standings across all weeks with a generated schedule
-function computeH2HStandings(){
-  var records = {}; // teamName: {wins, losses, ties, pointsFor, pointsAgainst, division}
+function computeH2HStandings(tiebreaker){
+  tiebreaker = tiebreaker || 'h2h_then_pf';
+  var records = {}; // teamName: {wins, losses, ties, pointsFor, pointsAgainst, division, h2h}
 
   Object.keys(h2hMatchups).forEach(function(wk){
     var weekNum = wk.replace('week', '');
@@ -1732,8 +1735,8 @@ function computeH2HStandings(){
       var awayScore = m.awayName === 'BYE' ? null : getTeamScore(weekNum, m.awayName);
       if(homeScore === null) return; // week hasn't happened yet
 
-      if(!records[m.homeName]) records[m.homeName] = {wins:0, losses:0, ties:0, pf:0, pa:0, division: m.homeDivision || null};
-      if(m.awayName !== 'BYE' && !records[m.awayName]) records[m.awayName] = {wins:0, losses:0, ties:0, pf:0, pa:0, division: m.awayDivision || null};
+      if(!records[m.homeName]) records[m.homeName] = {wins:0, losses:0, ties:0, pf:0, pa:0, division: m.homeDivision || null, h2h:{}};
+      if(m.awayName !== 'BYE' && !records[m.awayName]) records[m.awayName] = {wins:0, losses:0, ties:0, pf:0, pa:0, division: m.awayDivision || null, h2h:{}};
 
       records[m.homeName].pf += homeScore;
       if(m.awayName === 'BYE' || awayScore === null) return;
@@ -1742,19 +1745,48 @@ function computeH2HStandings(){
       records[m.awayName].pf += awayScore;
       records[m.awayName].pa += homeScore;
 
-      if(homeScore > awayScore){ records[m.homeName].wins++; records[m.awayName].losses++; }
-      else if(homeScore < awayScore){ records[m.homeName].losses++; records[m.awayName].wins++; }
-      else { records[m.homeName].ties++; records[m.awayName].ties++; }
+      // Track head-to-head record between each pair of teams (used as a tiebreaker)
+      if(!records[m.homeName].h2h[m.awayName]) records[m.homeName].h2h[m.awayName] = {w:0,l:0,t:0};
+      if(!records[m.awayName].h2h[m.homeName]) records[m.awayName].h2h[m.homeName] = {w:0,l:0,t:0};
+
+      if(homeScore > awayScore){
+        records[m.homeName].wins++; records[m.awayName].losses++;
+        records[m.homeName].h2h[m.awayName].w++; records[m.awayName].h2h[m.homeName].l++;
+      } else if(homeScore < awayScore){
+        records[m.homeName].losses++; records[m.awayName].wins++;
+        records[m.homeName].h2h[m.awayName].l++; records[m.awayName].h2h[m.homeName].w++;
+      } else {
+        records[m.homeName].ties++; records[m.awayName].ties++;
+        records[m.homeName].h2h[m.awayName].t++; records[m.awayName].h2h[m.homeName].t++;
+      }
     });
   });
 
-  return Object.keys(records).map(function(name){
+  var list = Object.keys(records).map(function(name){
     var r = records[name];
-    return { name: name, wins: r.wins, losses: r.losses, ties: r.ties, pf: r.pf, pa: r.pa, division: r.division };
-  }).sort(function(a, b){
+    return { name: name, wins: r.wins, losses: r.losses, ties: r.ties, pf: r.pf, pa: r.pa, division: r.division, h2h: r.h2h };
+  });
+
+  list.sort(function(a, b){
     if(b.wins !== a.wins) return b.wins - a.wins;
+
+    if(tiebreaker === 'h2h_then_pf'){
+      var ab = a.h2h[b.name];
+      if(ab && (ab.w + ab.l + ab.t) > 0){
+        if(ab.w > ab.l) return -1; // a beat b head-to-head
+        if(ab.l > ab.w) return 1;  // b beat a head-to-head
+      }
+      return b.pf - a.pf;
+    }
+    if(tiebreaker === 'pf_then_pa'){
+      if(b.pf !== a.pf) return b.pf - a.pf;
+      return a.pa - b.pa; // fewer points against is better
+    }
+    // 'pf_only' and fallback
     return b.pf - a.pf;
   });
+
+  return list;
 }
 
 function buildStandingsTable(rows){
@@ -3164,6 +3196,24 @@ function renderLeague(){
             var h2hDivisions  = s.h2hDivisions || 0;
             var playoffStartH = s.playoffStartWeek || 15;
             var playoffTeamsH = s.playoffTeams || 4;
+            var seedMethodH   = s.seedMethod || 'record';
+            var tiebreakerH   = s.tiebreaker || 'h2h_then_pf';
+
+            var tiebreakerText = tiebreakerH === 'pf_only' ? 'total points scored'
+              : tiebreakerH === 'pf_then_pa' ? 'total points scored, then fewest points against'
+              : 'head-to-head result, then total points scored';
+
+            var seedMethodText;
+            if(!h2hDivisions){
+              seedMethodText = 'Top ' + playoffTeamsH + ' teams by record make the playoffs.';
+            } else if(seedMethodH === 'divwin-topseed'){
+              seedMethodText = 'Each division winner is guaranteed a playoff spot and a top seed. The remaining spots go to the best non-division-winner records as wildcards, seeded below the division winners.';
+            } else if(seedMethodH === 'divwin-record'){
+              seedMethodText = 'Each division winner is guaranteed a playoff spot, but everyone — division winners and wildcards alike — is seeded purely by overall record.';
+            } else {
+              seedMethodText = 'Top ' + playoffTeamsH + ' teams overall by record make the playoffs. Divisions don\'t affect seeding.';
+            }
+
             el.innerHTML = '<div style="padding:16px;">'
               + '<div style="background:linear-gradient(135deg,rgba(155,109,255,.1),rgba(0,229,212,.06));border:1px solid rgba(155,109,255,.25);border-radius:16px;padding:20px;margin-bottom:16px;text-align:center;">'
               + '<div style="font-family:var(--fd);font-size:22px;font-weight:900;color:var(--or);text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px;">' + name + '</div>'
@@ -3178,12 +3228,13 @@ function renderLeague(){
               + '<div style="font-family:var(--fd);font-size:13px;font-weight:800;color:var(--or);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">⚔️ How It Works</div>'
               + '<div style="display:flex;gap:8px;margin-bottom:8px;"><span style="color:var(--or);font-weight:700;flex-shrink:0;">•</span><div style="font-size:12px;color:var(--ink2);line-height:1.5;">Each week you face a different opponent, drafted from the same weekly salary cap pool.</div></div>'
               + '<div style="display:flex;gap:8px;margin-bottom:8px;"><span style="color:var(--or);font-weight:700;flex-shrink:0;">•</span><div style="font-size:12px;color:var(--ink2);line-height:1.5;">Whoever scores higher that week wins the matchup. Ties are possible.</div></div>'
-              + '<div style="display:flex;gap:8px;' + (h2hDivisions > 0 ? 'margin-bottom:8px;' : '') + '"><span style="color:var(--or);font-weight:700;flex-shrink:0;">•</span><div style="font-size:12px;color:var(--ink2);line-height:1.5;">Standings are ranked by win-loss record first, total points scored as the tiebreaker.</div></div>'
+              + '<div style="display:flex;gap:8px;' + (h2hDivisions > 0 ? 'margin-bottom:8px;' : '') + '"><span style="color:var(--or);font-weight:700;flex-shrink:0;">•</span><div style="font-size:12px;color:var(--ink2);line-height:1.5;">Standings rank by win-loss record first; ties are broken by ' + tiebreakerText + '.</div></div>'
               + (h2hDivisions > 0 ? '<div style="display:flex;gap:8px;"><span style="color:var(--or);font-weight:700;flex-shrink:0;">•</span><div style="font-size:12px;color:var(--ink2);line-height:1.5;">The league is split into ' + h2hDivisions + ' divisions.</div></div>' : '')
               + '</div>'
               + '<div style="background:var(--bg2);border-radius:12px;border:1px solid var(--bdr);padding:16px;">'
               + '<div style="font-family:var(--fd);font-size:13px;font-weight:800;color:var(--pu);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">🎯 Playoffs — Starting Week ' + playoffStartH + '</div>'
-              + '<div style="font-size:12px;color:var(--ink2);line-height:1.6;">Top ' + playoffTeamsH + ' teams by record make the playoffs. Single-elimination bracket — win your matchup to advance, lose and your season is over.</div>'
+              + '<div style="font-size:12px;color:var(--ink2);line-height:1.6;margin-bottom:8px;">' + seedMethodText + '</div>'
+              + '<div style="font-size:12px;color:var(--ink2);line-height:1.6;">Single-elimination bracket — win your matchup to advance, lose and your season is over.</div>'
               + '</div>'
               + '</div>';
           } else {
@@ -6018,13 +6069,73 @@ function buildBracketPairings(seeds){
   return pairs;
 }
 
+// Determines who makes the playoffs and in what seed order, based on the
+// league's configured seedMethod:
+//   'record'           — top N teams overall by record, divisions ignored
+//   'divwin-topseed'   — each division winner gets a top seed (ranked among
+//                         themselves by record), remaining spots filled by
+//                         the best non-division-winner records as wildcards
+//   'divwin-record'    — each division winner guaranteed a spot, but final
+//                         seed order for everyone (winners + wildcards) is
+//                         purely by overall record
+// standings must already be sorted by the league's tiebreaker rules.
+function selectPlayoffSeeds(standings, settings){
+  var playoffTeams = settings.playoffTeams || 4;
+  var method = settings.seedMethod || 'record';
+  var hasDivisions = (settings.h2hDivisions || 0) > 0;
+
+  if(!hasDivisions || method === 'record'){
+    return standings.slice(0, Math.min(playoffTeams, standings.length));
+  }
+
+  // Find each division's best record (the "division winner") —
+  // standings is already sorted, so the first team encountered per
+  // division is that division's winner.
+  var divisionWinners = [];
+  var seenDivisions = {};
+  standings.forEach(function(t){
+    var div = t.division;
+    if(div === null || div === undefined) return;
+    if(!seenDivisions[div]){
+      seenDivisions[div] = true;
+      divisionWinners.push(t);
+    }
+  });
+
+  var winnerNames = {};
+  divisionWinners.forEach(function(t){ winnerNames[t.name] = true; });
+
+  var remainingSpots = Math.max(0, playoffTeams - divisionWinners.length);
+  var wildcards = standings.filter(function(t){ return !winnerNames[t.name]; }).slice(0, remainingSpots);
+
+  if(method === 'divwin-topseed'){
+    // Division winners occupy the top seeds (sorted by their own record),
+    // wildcards fill the remaining seeds below them (also sorted by record).
+    var sortedWinners = divisionWinners.slice().sort(function(a, b){
+      if(b.wins !== a.wins) return b.wins - a.wins;
+      return b.pf - a.pf;
+    });
+    return sortedWinners.concat(wildcards);
+  }
+
+  // 'divwin-record' — division winners are guaranteed a spot, but the
+  // combined field (winners + wildcards) is re-sorted purely by record,
+  // so a winner with a weak record can end up seeded below a wildcard.
+  var combined = divisionWinners.concat(wildcards);
+  combined.sort(function(a, b){
+    if(b.wins !== a.wins) return b.wins - a.wins;
+    return b.pf - a.pf;
+  });
+  return combined;
+}
+
 function seedH2HPlayoffs(){
   var ctx = FRAuth.getLeagueCtx();
   var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
   var statusEl = document.getElementById('h2h-playoff-status');
   var btn = document.getElementById('h2h-playoff-seed-btn');
 
-  if(!confirm('Seed the playoffs now?\n\nThis uses current win-loss-points standings to set seeds and generates Round 1 matchups. Re-running will reset the bracket.')) return;
+  if(!confirm('Seed the playoffs now?\n\nThis uses current standings and your league\'s seeding rules to set seeds and generate Round 1 matchups. Re-running will reset the bracket.')) return;
 
   btn.disabled = true;
   btn.textContent = 'Seeding…';
@@ -6035,13 +6146,12 @@ function seedH2HPlayoffs(){
   ]).then(function(results){
     var settings = results[0] || {};
     var members  = results[1] || {};
-    var playoffTeams = settings.playoffTeams || 4;
 
     // Use the already-loaded h2hMatchups + seasonData to compute standings.
     // (h2hMatchups should already be loaded from the normal render pipeline;
     // reload defensively in case the commissioner panel opened before that ran.)
     loadH2HMatchups(function(){
-      var standings = computeH2HStandings();
+      var standings = computeH2HStandings(settings.tiebreaker);
       if(standings.length < 2){
         statusEl.textContent = '✗ Not enough completed matchups to seed playoffs yet.';
         statusEl.style.color = 'var(--pk)';
@@ -6050,8 +6160,7 @@ function seedH2HPlayoffs(){
         return;
       }
 
-      var seedCount = Math.min(playoffTeams, standings.length);
-      var topTeams = standings.slice(0, seedCount);
+      var topTeams = selectPlayoffSeeds(standings, settings);
 
       // Map team name back to uid for storage
       var nameToUid = {};
@@ -6067,7 +6176,8 @@ function seedH2HPlayoffs(){
           wins: t.wins,
           losses: t.losses,
           ties: t.ties,
-          pf: t.pf
+          pf: t.pf,
+          division: t.division || null
         };
       });
 
@@ -6076,6 +6186,7 @@ function seedH2HPlayoffs(){
 
       var playoffData = {
         seeds: seeds,
+        seedMethod: settings.seedMethod || 'record',
         currentRound: 1,
         playoffStartWeek: playoffStart,
         rounds: {
@@ -6156,7 +6267,7 @@ function advanceH2HPlayoffRound(){
 
     var winners = updatedRound.map(function(m){
       return data.seeds.find(function(s){ return s.uid === m.winner; });
-    }).filter(Boolean);
+    }).filter(Boolean).sort(function(a, b){ return a.seed - b.seed; });
 
     var nextPairs = buildBracketPairings(winners);
     var nextRoundKey = 'round' + (data.currentRound + 1);

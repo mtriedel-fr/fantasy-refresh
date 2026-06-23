@@ -298,6 +298,7 @@ jobs:
             const settings = await firebaseGet(`/leagues/${leagueId}/settings.json`).catch(() => null);
             if (settings && settings.format === 'headtohead' && allFinal) {
               await computeH2HMatchupResults(leagueId, week, scoreUpdates, existingScores);
+              await advancePlayoffsIfNeeded(leagueId, week, settings);
             }
           }
 
@@ -335,6 +336,126 @@ jobs:
 
             await firebasePut(`/leagues/${leagueId}/matchups/${SEASON}/week${week}.json`, results);
             console.log(`  ⚔️  Computed ${results.length} H2H matchup result(s) for week ${week}`);
+          }
+
+          // Standard single-elimination bracket pairing: best seed vs worst seed,
+          // 2nd vs 2nd-worst, etc. Mirrors the same logic used client-side when
+          // a commissioner first seeds the bracket.
+          function buildBracketPairings(seeds) {
+            const n = seeds.length;
+            const pairs = [];
+            for (let i = 0; i < n / 2; i++) {
+              pairs.push([seeds[i], seeds[n - 1 - i]]);
+            }
+            return pairs;
+          }
+
+          // Checks whether the league is currently in a playoff week, and if so,
+          // whether every matchup in the active bracket round has a confirmed
+          // winner. If yes, automatically builds and writes the next round —
+          // or crowns the champion if this was the final round. Runs after every
+          // scoring pass, so this fires the moment the last playoff game of the
+          // week goes final, with zero manual steps.
+          async function advancePlayoffsIfNeeded(leagueId, week, settings) {
+            const playoffData = await firebaseGet(`/leagues/${leagueId}/playoffs/${SEASON}.json`).catch(() => null);
+            if (!playoffData || !playoffData.seeds || !playoffData.rounds) {
+              return; // playoffs not seeded yet — nothing to advance
+            }
+            if (playoffData.champion) {
+              return; // already crowned, nothing left to do
+            }
+
+            const playoffStartWeek = playoffData.playoffStartWeek || settings.playoffStartWeek || 15;
+            const expectedWeekForCurrentRound = playoffStartWeek + (playoffData.currentRound - 1);
+
+            // Only act when the scoring run we just did corresponds to the
+            // week this round is actually being played in.
+            if (parseInt(week) !== expectedWeekForCurrentRound) return;
+
+            const roundKey = `round${playoffData.currentRound}`;
+            const round = playoffData.rounds[roundKey];
+            if (!round) return;
+
+            const matchups = await firebaseGet(`/leagues/${leagueId}/matchups/${SEASON}/week${week}.json`).catch(() => null);
+            const scoreByTeamName = {};
+            if (matchups) {
+              matchups.forEach(m => {
+                if (m.homeScore !== null && m.homeScore !== undefined) scoreByTeamName[m.homeName] = m.homeScore;
+                if (m.awayScore !== null && m.awayScore !== undefined) scoreByTeamName[m.awayName] = m.awayScore;
+              });
+            }
+            // Fall back to season scores directly if a playoff matchup
+            // wasn't part of the regular schedule writer (e.g. seeded fresh).
+            const seasonScores = await firebaseGet(`/leagues/${leagueId}/season/${SEASON}/${week}.json`).catch(() => ({}));
+            Object.values(seasonScores || {}).forEach(entry => {
+              if (entry && entry.team && scoreByTeamName[entry.team] === undefined) {
+                scoreByTeamName[entry.team] = entry.score;
+              }
+            });
+
+            let allDecided = true;
+            const updatedRound = round.map(m => {
+              if (m.winner) return m; // already decided in a prior run
+              if (!m.awayName || m.awayName === 'BYE') {
+                return { ...m, winner: m.homeUid };
+              }
+              const homeScore = scoreByTeamName[m.homeName];
+              const awayScore = scoreByTeamName[m.awayName];
+              if (homeScore === undefined || awayScore === undefined) {
+                allDecided = false;
+                return m;
+              }
+              return {
+                ...m,
+                homeScore, awayScore,
+                winner: homeScore >= awayScore ? m.homeUid : m.awayUid
+              };
+            });
+
+            if (!allDecided) {
+              // Save whichever scores we do have so the bracket UI shows live progress,
+              // but don't advance the round until every matchup is confirmed.
+              await firebasePatch(`/leagues/${leagueId}/playoffs/${SEASON}.json`, {
+                [`rounds/${roundKey}`]: updatedRound
+              });
+              console.log(`  🏆 Playoff round ${playoffData.currentRound} in progress — not all matchups final yet.`);
+              return;
+            }
+
+            if (updatedRound.length === 1) {
+              // Final round just finished — crown the champion.
+              const champUid = updatedRound[0].winner;
+              const champSeed = playoffData.seeds.find(s => s.uid === champUid);
+              await firebasePatch(`/leagues/${leagueId}/playoffs/${SEASON}.json`, {
+                [`rounds/${roundKey}`]: updatedRound,
+                champion: champSeed ? champSeed.name : null
+              });
+              console.log(`  🏆 Playoffs complete — champion: ${champSeed ? champSeed.name : champUid}`);
+              return;
+            }
+
+            // Build the next round from this round's winners, re-seeding by
+            // original seed number so a 1-seed who survives keeps bracket priority.
+            const winners = updatedRound
+              .map(m => playoffData.seeds.find(s => s.uid === m.winner))
+              .filter(Boolean)
+              .sort((a, b) => a.seed - b.seed);
+
+            const nextPairs = buildBracketPairings(winners);
+            const nextRoundKey = `round${playoffData.currentRound + 1}`;
+            const nextRound = nextPairs.map(pair => ({
+              homeSeed: pair[0].seed, awaySeed: pair[1].seed,
+              homeUid: pair[0].uid, awayUid: pair[1].uid,
+              homeName: pair[0].name, awayName: pair[1].name,
+              winner: null
+            }));
+
+            await firebasePatch(`/leagues/${leagueId}/playoffs/${SEASON}.json`, {
+              [`rounds/${roundKey}`]: updatedRound,
+              [`rounds/${nextRoundKey}`]: nextRound,
+              currentRound: playoffData.currentRound + 1
+            });
+            console.log(`  🏆 Playoff round ${playoffData.currentRound} complete — advanced to round ${playoffData.currentRound + 1}`);
           }
 
           // ── Lock scores for a league ───────────────────────────
