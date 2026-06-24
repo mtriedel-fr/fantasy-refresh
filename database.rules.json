@@ -1,0 +1,76 @@
+{
+  "rules": {
+    "leagues": {
+      "$leagueId": {
+        ".read": true,
+        ".write": "auth != null && (!data.exists() || root.child('leagues/' + $leagueId + '/settings/commissioners/' + auth.uid).val() === true || root.child('leagues/' + $leagueId + '/settings/createdBy').val() === auth.uid)",
+        "commissioners": {
+          ".read": true,
+          ".write": "auth != null && (root.child('leagues/' + $leagueId + '/settings/commissioners/' + auth.uid).val() === true || root.child('leagues/' + $leagueId + '/settings/createdBy').val() === auth.uid)"
+        },
+        "settings": {
+          ".read": true,
+          ".write": "auth != null && (!data.exists() || root.child('leagues/' + $leagueId + '/settings/commissioners/' + auth.uid).val() === true || root.child('leagues/' + $leagueId + '/settings/createdBy').val() === auth.uid)"
+        },
+        "members": {
+          ".read": true,
+          "$uid": {
+            ".write": true
+          }
+        },
+        "season": {
+          ".read": true,
+          ".write": "auth != null && root.child('leagues/' + $leagueId + '/settings/commissioners/' + auth.uid).val() === true"
+        },
+        "salaries": {
+          ".read": true,
+          ".write": "auth != null && root.child('leagues/' + $leagueId + '/settings/commissioners/' + auth.uid).val() === true"
+        },
+        "locks": {
+          ".read": true,
+          ".write": "auth != null && root.child('leagues/' + $leagueId + '/settings/commissioners/' + auth.uid).val() === true"
+        },
+        "lineups": {
+          ".read": true,
+          "$season": {
+            "$week": {
+              "$uid": {
+                ".write": "auth != null && auth.uid === $uid"
+              }
+            }
+          }
+        },
+        "reactions": {
+          ".read": true,
+          ".write": "auth != null"
+        },
+        "matchups": {
+          ".read": true,
+          ".write": "auth != null && root.child('leagues/' + $leagueId + '/settings/commissioners/' + auth.uid).val() === true"
+        }
+      }
+    },
+    "playerPool": {
+      ".read": true,
+      ".write": "auth != null && root.child('leagues/fr_refresh26/settings/commissioners/' + auth.uid).val() === true"
+    },
+    "users": {
+      ".read": true,
+      "$uid": {
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+    "teamNames2026": {
+      ".read": true,
+      ".write": "auth != null"
+    },
+    "joinCodes": {
+      ".read": true,
+      ".write": "auth != null"
+    },
+    "season2025": {
+      ".read": true,
+      ".write": false
+    }
+  }
+}
