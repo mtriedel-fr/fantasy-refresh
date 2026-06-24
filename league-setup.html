@@ -1087,18 +1087,23 @@ function joinLeague(){
 
   btn.disabled = true; btn.textContent = 'Joining…';
 
+  // Default team name so a member is never schedule-blocked while waiting
+  // for them to manually set one — they can still rename it any time.
+  var defaultName = (currentUser.displayName || (currentUser.email ? currentUser.email.split('@')[0] : 'Player')).trim();
+  var defaultTeamName = defaultName + "'s Team";
+
   FR.fb.get('/leagues/'+joinTargetLeagueId+'/settings')
     .then(function(settings){
       if(!settings) throw new Error('League not found');
       // Add member
       return FR.fb.put('/leagues/'+joinTargetLeagueId+'/members/'+currentUser.uid, {
-        uid: currentUser.uid, teamName: '', division: null,
+        uid: currentUser.uid, teamName: defaultTeamName, division: null,
         joined: Date.now(), active: true, eliminated: false, role: 'member'
       }).then(function(){
         // Update user profile
         return FR.fb.patch('/users/'+currentUser.uid+'/leagues', {
           [joinTargetLeagueId]: {
-            leagueName: settings.name, teamName: '', joined: Date.now(), role: 'member'
+            leagueName: settings.name, teamName: defaultTeamName, joined: Date.now(), role: 'member'
           }
         });
       }).then(function(){
@@ -1113,8 +1118,8 @@ function joinLeague(){
           maxSalary:  settings.maxSalary,
           minSalary:  settings.minSalary,
           role:       'member',
-          teamName:   '',
-          promptTeamName: true  // flag: show team name prompt on first load
+          teamName:   defaultTeamName,
+          promptTeamName: true  // flag: still offer to personalize on first load, but not blocking
         });
         showSuccess('join', settings.name, code, settings.format, settings.guillotine);
       });

@@ -1037,12 +1037,13 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
           </div>
 
           <div style="font-size:12px;color:var(--ink2);margin-bottom:10px;line-height:1.5;">
-            Generates weekly matchups for all teams. Round-robin if no divisions, division-aware pairing if divisions are set. Run once before Week 1 — re-running replaces the full schedule.
+            The schedule generates itself automatically as teams join — no action needed. Use these only if you want to manually regenerate or have made an edit you want to undo.
           </div>
           <div id="h2h-schedule-status" style="font-size:12px;color:var(--ink3);margin-bottom:10px;">Checking schedule status…</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <button class="salary-btn" id="h2h-gen-btn" onclick="generateH2HSchedule()">⚡ Generate Schedule</button>
+            <button class="salary-btn" id="h2h-gen-btn" onclick="generateH2HSchedule()">⚡ Regenerate Schedule</button>
             <button class="salary-btn secondary" onclick="previewH2HSchedule()">👁 Preview</button>
+            <button class="salary-btn secondary" id="h2h-unlock-btn" onclick="unlockH2HAutoSchedule()" style="display:none;">🔓 Re-enable Auto-Schedule</button>
           </div>
           <div id="h2h-schedule-preview" style="margin-top:12px;"></div>
 
@@ -5776,25 +5777,154 @@ function initH2HVisibility(settings){
   checkH2HPlayoffStatus();
 }
 
+// ── AUTO-SCHEDULE ON ROSTER CHANGE ───────────────────────────────────
+// Runs quietly for every member on every page load of an H2H league.
+// If the team count has changed since the schedule was last generated
+// (someone joined/left) and the commissioner hasn't manually edited the
+// schedule, regenerate it automatically — zero clicks required. A
+// commissioner can still generate manually any time, and any manual
+// matchup edit permanently locks this auto-behavior off for that league.
+function maybeAutoGenerateH2HSchedule(){
+  var ctx = FRAuth.getLeagueCtx();
+  var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+
+  Promise.all([
+    FR.fb.get('/leagues/' + leagueId + '/settings'),
+    FR.fb.get('/leagues/' + leagueId + '/members'),
+    FR.fb.get('/leagues/' + leagueId + '/matchups/' + (ctx.season || 2026) + '/meta')
+  ]).then(function(results){
+    var settings = results[0] || {};
+    var members  = results[1] || {};
+    var meta      = results[2] || null;
+
+    if(settings.scheduleLocked) return; // commissioner took manual control — never touch it
+
+    var activeTeamCount = Object.keys(members).filter(function(uid){
+      var m = members[uid];
+      return m && m.teamName && m.active !== false;
+    }).length;
+
+    if(activeTeamCount < 2) return; // not enough teams to schedule anything yet
+
+    var lastGeneratedCount = meta ? meta.teamCount : null;
+    if(lastGeneratedCount === activeTeamCount) return; // already up to date
+
+    // Simple lock to avoid two members both regenerating at the exact same
+    // moment — claim the right to regenerate by writing a timestamp first,
+    // then only proceed if we're still the most recent claim a moment later.
+    var claimTime = Date.now();
+    FR.fb.patch('/leagues/' + leagueId + '/matchups/' + (ctx.season || 2026) + '/meta', { regenClaim: claimTime })
+      .then(function(){
+        return new Promise(function(resolve){ setTimeout(resolve, 400); });
+      })
+      .then(function(){
+        return FR.fb.get('/leagues/' + leagueId + '/matchups/' + (ctx.season || 2026) + '/meta');
+      })
+      .then(function(latestMeta){
+        if(!latestMeta || latestMeta.regenClaim !== claimTime) return; // someone else won the race
+        generateH2HScheduleSilently(leagueId, ctx, settings, members, activeTeamCount);
+      })
+      .catch(function(){});
+  }).catch(function(){});
+}
+
+// Same generation logic as the commissioner's manual button, minus the
+// confirm dialog and status UI updates — written once and called from
+// both places so the two paths can never drift apart.
+function generateH2HScheduleSilently(leagueId, ctx, settings, members, activeTeamCount){
+  var teamList = Object.keys(members).filter(function(uid){
+    var m = members[uid];
+    return m && m.teamName && m.active !== false;
+  });
+
+  var playoffStart = settings.playoffStartWeek || 15;
+  var regularWeeks = playoffStart - 1;
+  var hasDivisions = settings.h2hDivisions > 0;
+
+  var schedule;
+  var divisionMap = {};
+  if(hasDivisions){
+    var divCount = settings.h2hDivisions;
+    var divisions = {};
+    for(var d = 0; d < divCount; d++) divisions['Division ' + (d+1)] = [];
+    teamList.forEach(function(uid, i){
+      var divNum = members[uid].division || ((i % divCount) + 1);
+      divisionMap[uid] = divNum;
+      var key = 'Division ' + divNum;
+      if(!divisions[key]) divisions[key] = [];
+      divisions[key].push(uid);
+    });
+    schedule = buildDivisionSchedule(divisions, regularWeeks);
+  } else {
+    schedule = buildRoundRobin(teamList).slice(0, regularWeeks);
+  }
+
+  while(schedule.length < regularWeeks){
+    var cycle = hasDivisions ? buildDivisionSchedule({all: teamList}, regularWeeks) : buildRoundRobin(teamList);
+    schedule = schedule.concat(cycle).slice(0, regularWeeks);
+  }
+
+  var writes = {};
+  schedule.forEach(function(pairs, idx){
+    var weekNum = idx + 1;
+    writes['week' + weekNum] = pairs.map(function(pair){
+      return {
+        home: pair[0],
+        away: pair[1],
+        homeName: pair[0] ? (members[pair[0]].teamName || '') : '',
+        awayName: pair[1] ? (members[pair[1]].teamName || '') : 'BYE',
+        homeDivision: pair[0] ? (divisionMap[pair[0]] || null) : null,
+        awayDivision: pair[1] ? (divisionMap[pair[1]] || null) : null
+      };
+    });
+  });
+  writes['meta'] = { teamCount: activeTeamCount, autoGenerated: true, generatedAt: Date.now() };
+
+  return FR.fb.put('/leagues/' + leagueId + '/matchups/' + (ctx.season || 2026), writes)
+    .then(function(){
+      console.log('Schedule generated for ' + activeTeamCount + ' teams.');
+      checkH2HScheduleStatus();
+    });
+}
+
 function checkH2HScheduleStatus(){
   var ctx = FRAuth.getLeagueCtx();
   var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
   var statusEl = document.getElementById('h2h-schedule-status');
-  FR.fb.get('/leagues/' + leagueId + '/matchups/' + (ctx.season || 2026))
-    .then(function(data){
-      if(!statusEl) return;
-      if(data && Object.keys(data).length){
-        var weekCount = Object.keys(data).filter(function(k){ return k.indexOf('week') === 0; }).length;
-        statusEl.textContent = '✓ Schedule exists — ' + weekCount + ' week(s) of matchups generated.';
-        statusEl.style.color = 'var(--or)';
-      } else {
-        statusEl.textContent = 'No schedule generated yet.';
-        statusEl.style.color = 'var(--ink3)';
-      }
+  Promise.all([
+    FR.fb.get('/leagues/' + leagueId + '/matchups/' + (ctx.season || 2026)),
+    FR.fb.get('/leagues/' + leagueId + '/settings/scheduleLocked')
+  ]).then(function(results){
+    var data = results[0];
+    var locked = results[1] === true;
+    var unlockBtn = document.getElementById('h2h-unlock-btn');
+    if(unlockBtn) unlockBtn.style.display = locked ? 'inline-block' : 'none';
+
+    if(!statusEl) return;
+    if(data && Object.keys(data).filter(function(k){ return k.indexOf('week') === 0; }).length){
+      var weekCount = Object.keys(data).filter(function(k){ return k.indexOf('week') === 0; }).length;
+      statusEl.textContent = '✓ Schedule exists — ' + weekCount + ' week(s)'
+        + (locked ? ' · 🔒 manually edited, auto-update off' : ' · auto-updates as teams join');
+      statusEl.style.color = 'var(--or)';
+    } else {
+      statusEl.textContent = 'No schedule yet — will generate automatically once 2+ teams have joined.';
+      statusEl.style.color = 'var(--ink3)';
+    }
+  }).catch(function(){
+    if(statusEl){ statusEl.textContent = 'No schedule yet.'; statusEl.style.color = 'var(--ink3)'; }
+  });
+}
+
+function unlockH2HAutoSchedule(){
+  var ctx = FRAuth.getLeagueCtx();
+  var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+  if(!confirm('Re-enable automatic scheduling?\n\nThe schedule will regenerate from scratch the next time anyone loads this league, discarding any manual edits.')) return;
+  FR.fb.patch('/leagues/' + leagueId + '/settings', { scheduleLocked: false })
+    .then(function(){
+      showToast('Auto-schedule re-enabled');
+      checkH2HScheduleStatus();
     })
-    .catch(function(){
-      if(statusEl){ statusEl.textContent = 'No schedule generated yet.'; statusEl.style.color = 'var(--ink3)'; }
-    });
+    .catch(function(){ showToast('Could not update — try again', true); });
 }
 
 // ── DIVISION ASSIGNMENT ──────────────────────────────────────────────
@@ -5926,7 +6056,7 @@ function generateH2HSchedule(){
   var statusEl = document.getElementById('h2h-schedule-status');
   var btn = document.getElementById('h2h-gen-btn');
 
-  if(!confirm('Generate the head-to-head schedule now?\n\nThis will replace any existing schedule for this league.')) return;
+  if(!confirm('Regenerate the head-to-head schedule now?\n\nThis replaces any existing schedule and clears the manual-edit lock, so the schedule will go back to auto-updating as teams join.')) return;
 
   btn.disabled = true;
   btn.textContent = 'Generating…';
@@ -5947,72 +6077,30 @@ function generateH2HSchedule(){
       statusEl.textContent = '✗ Need at least 2 teams with team names set before generating a schedule.';
       statusEl.style.color = 'var(--pk)';
       btn.disabled = false;
-      btn.textContent = '⚡ Generate Schedule';
+      btn.textContent = '⚡ Regenerate Schedule';
       return;
     }
 
-    var playoffStart = settings.playoffStartWeek || 15;
-    var regularWeeks = playoffStart - 1;
-    var hasDivisions = settings.h2hDivisions > 0;
-
-    var schedule;
-    var divisionMap = {}; // uid -> divisionNumber, used to tag matchups for division standings
-    if(hasDivisions){
-      var divCount = settings.h2hDivisions;
-      var divisions = {};
-      for(var d = 0; d < divCount; d++) divisions['Division ' + (d+1)] = [];
-      teamList.forEach(function(uid, i){
-        // Use saved division from member record; fall back to alternating
-        // assignment only if the commissioner hasn't set it yet.
-        var divNum = members[uid].division || ((i % divCount) + 1);
-        divisionMap[uid] = divNum;
-        var key = 'Division ' + divNum;
-        if(!divisions[key]) divisions[key] = [];
-        divisions[key].push(uid);
-      });
-      schedule = buildDivisionSchedule(divisions, regularWeeks);
-    } else {
-      schedule = buildRoundRobin(teamList).slice(0, regularWeeks);
-    }
-
-    // If the round-robin produced fewer weeks than the regular season requires,
-    // repeat the cycle (double round-robin) to fill remaining weeks.
-    while(schedule.length < regularWeeks){
-      var cycle = hasDivisions
-        ? buildDivisionSchedule({all: teamList}, regularWeeks)
-        : buildRoundRobin(teamList);
-      schedule = schedule.concat(cycle).slice(0, regularWeeks);
-    }
-
-    // Write to Firebase: /leagues/{id}/matchups/{season}/week{n} = [{home,away},...]
-    var writes = {};
-    schedule.forEach(function(pairs, idx){
-      var weekNum = idx + 1;
-      writes['week' + weekNum] = pairs.map(function(pair){
-        return {
-          home: pair[0],
-          away: pair[1], // null = bye week for "home"
-          homeName: pair[0] ? (members[pair[0]].teamName || '') : '',
-          awayName: pair[1] ? (members[pair[1]].teamName || '') : 'BYE',
-          homeDivision: pair[0] ? (divisionMap[pair[0]] || null) : null,
-          awayDivision: pair[1] ? (divisionMap[pair[1]] || null) : null
-        };
-      });
-    });
-
-    return FR.fb.put('/leagues/' + leagueId + '/matchups/' + (ctx.season || 2026), writes)
+    // Clear the manual-edit lock so this league goes back to auto-updating —
+    // a deliberate "Regenerate" click is an explicit reset, not an accident.
+    return FR.fb.patch('/leagues/' + leagueId + '/settings', { scheduleLocked: false })
       .then(function(){
-        statusEl.textContent = '✓ Schedule generated — ' + regularWeeks + ' weeks, ' + teamList.length + ' teams.';
+        return generateH2HScheduleSilently(leagueId, ctx, settings, members, teamList.length);
+      })
+      .then(function(){
+        statusEl.textContent = '✓ Schedule generated — ' + (settings.playoffStartWeek ? settings.playoffStartWeek - 1 : 14) + ' weeks, ' + teamList.length + ' teams.';
         statusEl.style.color = 'var(--or)';
         btn.disabled = false;
-        btn.textContent = '⚡ Generate Schedule';
+        btn.textContent = '⚡ Regenerate Schedule';
         showToast('Schedule generated ✓');
+        var unlockBtn = document.getElementById('h2h-unlock-btn');
+        if(unlockBtn) unlockBtn.style.display = 'none';
       });
   }).catch(function(e){
     statusEl.textContent = '✗ Error generating schedule — check Firebase permissions.';
     statusEl.style.color = 'var(--pk)';
     btn.disabled = false;
-    btn.textContent = '⚡ Generate Schedule';
+    btn.textContent = '⚡ Regenerate Schedule';
     console.error('Schedule gen error:', e);
   });
 }
@@ -6153,6 +6241,10 @@ function saveH2HWeekEdit(week, count){
       };
     });
     return FR.fb.put('/leagues/' + leagueId + '/matchups/' + (ctx.season || 2026) + '/week' + week, final);
+  }).then(function(){
+    // Mark the schedule as manually edited so auto-generation never
+    // silently overwrites a commissioner's deliberate change again.
+    return FR.fb.patch('/leagues/' + leagueId + '/settings', { scheduleLocked: true });
   }).then(function(){
     if(statusEl){ statusEl.textContent = '✓ Week ' + week + ' updated.'; statusEl.style.color = 'var(--or)'; }
     showToast('Matchups updated ✓');
@@ -7250,6 +7342,7 @@ initLeagueSwitcher();
 loadTeamName();
 loadFromCloud();
 checkFirstRun();
+if(IS_H2H_LEAGUE) maybeAutoGenerateH2HSchedule();
 
 // Preseason leagues: no playoffs or guillotine apply at all (4-week test format)
 if(IS_PRESEASON_LEAGUE){
