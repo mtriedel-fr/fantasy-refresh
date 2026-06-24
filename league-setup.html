@@ -993,10 +993,13 @@ function createLeague(){
       return FR.fb.put('/joinCodes/'+code, newLeagueId);
     })
     .then(function(){
-      // Add commissioner as first member
+      // Add commissioner as first member. Default the team name the same
+      // way the join flow does — a blank name was silently excluding the
+      // commissioner from their own H2H schedule and team counts.
+      var defaultTeamName = (currentUser.displayName || (currentUser.email ? currentUser.email.split('@')[0] : 'Player')).trim() + "'s Team";
       return FR.fb.put('/leagues/'+newLeagueId+'/members/'+currentUser.uid, {
         uid:       currentUser.uid,
-        teamName:  '',
+        teamName:  defaultTeamName,
         division:  null,
         joined:    Date.now(),
         active:    true,
@@ -1006,9 +1009,10 @@ function createLeague(){
     })
     .then(function(){
       // Add league to user's profile
+      var defaultTeamName = (currentUser.displayName || (currentUser.email ? currentUser.email.split('@')[0] : 'Player')).trim() + "'s Team";
       var leagueEntry = {
         leagueName: name,
-        teamName:   '',
+        teamName:   defaultTeamName,
         joined:     Date.now(),
         role:       'commissioner'
       };
@@ -1025,6 +1029,7 @@ function createLeague(){
     })
     .then(function(){
       // Set as active league context
+      var defaultTeamName = (currentUser.displayName || (currentUser.email ? currentUser.email.split('@')[0] : 'Player')).trim() + "'s Team";
       FR.saveContext({
         leagueId:   newLeagueId,
         leagueName: name,
@@ -1035,7 +1040,7 @@ function createLeague(){
         maxSalary:  maxSal,
         minSalary:  3700,
         role:       'commissioner',
-        teamName:   '',
+        teamName:   defaultTeamName,
         isPreseason: selectedFmt === 'preseason',
         seasonType:  selectedFmt === 'preseason' ? 'Preseason' : 'Regular'
       });

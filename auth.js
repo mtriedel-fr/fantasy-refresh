@@ -268,11 +268,12 @@
   }
 
   function joinLeague(leagueId, uid, email, displayName, teamName) {
+    var resolvedTeamName = teamName || ((displayName || (email ? email.split('@')[0] : 'Player')).trim() + "'s Team");
     return dbSet('/leagues/' + leagueId + '/members/' + uid, {
       uid:         uid,
       email:       email,
       displayName: displayName || '',
-      teamName:    teamName    || '',
+      teamName:    resolvedTeamName,
       joined:      Date.now(),
       role:        'member',
       active:      true,

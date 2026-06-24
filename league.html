@@ -1444,6 +1444,18 @@ function loadTeamName(){
         FRAuth.setUser(user);
         try{ localStorage.setItem(cacheKey, member.teamName); }catch(e){}
       } else if(!myTeam){
+        // Self-heal: this member (or the commissioner, who previously
+        // launched with teamName:'' from league creation) has no team name
+        // anywhere. A blank name silently excludes them from H2H team
+        // counts and the schedule itself, so default it now rather than
+        // leaving it blank while we wait for them to personalize it.
+        var defaultName = (user.displayName || (user.email ? user.email.split('@')[0] : 'Player')).trim() + "'s Team";
+        myTeam = defaultName;
+        applyTeamName(defaultName);
+        user.teamName = defaultName;
+        FRAuth.setUser(user);
+        try{ localStorage.setItem(cacheKey, defaultName); }catch(e){}
+        FR.fb.patch(FR.paths.member(user.uid), { teamName: defaultName }).catch(function(){});
         setTimeout(function(){
           promptTeamName(ctx ? ctx.leagueName : 'this league');
         }, 1500);
@@ -5787,45 +5799,58 @@ function initH2HVisibility(settings){
 function maybeAutoGenerateH2HSchedule(){
   var ctx = FRAuth.getLeagueCtx();
   var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+  var user = (typeof FRAuth !== 'undefined' && FRAuth.getUser) ? FRAuth.getUser() : null;
 
-  Promise.all([
-    FR.fb.get('/leagues/' + leagueId + '/settings'),
-    FR.fb.get('/leagues/' + leagueId + '/members'),
-    FR.fb.get('/leagues/' + leagueId + '/matchups/' + (ctx.season || 2026) + '/meta')
-  ]).then(function(results){
-    var settings = results[0] || {};
-    var members  = results[1] || {};
-    var meta      = results[2] || null;
+  if(!user || !user.uid){ return; }
 
-    if(settings.scheduleLocked) return; // commissioner took manual control — never touch it
+  // Firebase rules only allow the commissioner to write /matchups — writing
+  // from a regular member's session 401s every time. Rather than attempt the
+  // write and silently fail (which is exactly what was happening before:
+  // every non-commissioner page load quietly no-op'd and the schedule never
+  // got created), check commissioner status first and skip entirely if not.
+  FR.isCommissioner(user.uid).then(function(isComm){
+    if(!isComm) return;
 
-    var activeTeamCount = Object.keys(members).filter(function(uid){
-      var m = members[uid];
-      return m && m.teamName && m.active !== false;
-    }).length;
+    Promise.all([
+      FR.fb.get('/leagues/' + leagueId + '/settings'),
+      FR.fb.get('/leagues/' + leagueId + '/members'),
+      FR.fb.get('/leagues/' + leagueId + '/matchups/' + (ctx.season || 2026) + '/meta')
+    ]).then(function(results){
+      var settings = results[0] || {};
+      var members  = results[1] || {};
+      var meta      = results[2] || null;
 
-    if(activeTeamCount < 2) return; // not enough teams to schedule anything yet
+      if(settings.scheduleLocked) return; // commissioner took manual control — never touch it
 
-    var lastGeneratedCount = meta ? meta.teamCount : null;
-    if(lastGeneratedCount === activeTeamCount) return; // already up to date
+      var activeTeamCount = Object.keys(members).filter(function(uid){
+        var m = members[uid];
+        return m && m.teamName && m.active !== false;
+      }).length;
 
-    // Simple lock to avoid two members both regenerating at the exact same
-    // moment — claim the right to regenerate by writing a timestamp first,
-    // then only proceed if we're still the most recent claim a moment later.
-    var claimTime = Date.now();
-    FR.fb.patch('/leagues/' + leagueId + '/matchups/' + (ctx.season || 2026) + '/meta', { regenClaim: claimTime })
-      .then(function(){
-        return new Promise(function(resolve){ setTimeout(resolve, 400); });
-      })
-      .then(function(){
-        return FR.fb.get('/leagues/' + leagueId + '/matchups/' + (ctx.season || 2026) + '/meta');
-      })
-      .then(function(latestMeta){
-        if(!latestMeta || latestMeta.regenClaim !== claimTime) return; // someone else won the race
-        generateH2HScheduleSilently(leagueId, ctx, settings, members, activeTeamCount);
-      })
-      .catch(function(){});
-  }).catch(function(){});
+      if(activeTeamCount < 2) return; // not enough teams to schedule anything yet
+
+      var lastGeneratedCount = meta ? meta.teamCount : null;
+      if(lastGeneratedCount === activeTeamCount) return; // already up to date
+
+      // Simple lock to avoid two members both regenerating at the exact same
+      // moment — claim the right to regenerate by writing a timestamp first,
+      // then only proceed if we're still the most recent claim a moment later.
+      var claimTime = Date.now();
+      FR.fb.patch('/leagues/' + leagueId + '/matchups/' + (ctx.season || 2026) + '/meta', { regenClaim: claimTime })
+        .then(function(patchResult){
+          if(patchResult && patchResult.error){ console.error('Auto-schedule claim write denied:', patchResult.error); return; }
+          return new Promise(function(resolve){ setTimeout(resolve, 400); });
+        })
+        .then(function(){
+          return FR.fb.get('/leagues/' + leagueId + '/matchups/' + (ctx.season || 2026) + '/meta');
+        })
+        .then(function(latestMeta){
+          if(!latestMeta || latestMeta.regenClaim !== claimTime) return; // someone else won the race
+          generateH2HScheduleSilently(leagueId, ctx, settings, members, activeTeamCount);
+        })
+        .catch(function(e){ console.error('Auto-schedule generation failed:', e); });
+    }).catch(function(e){ console.error('Auto-schedule status check failed:', e); });
+  }).catch(function(e){ console.error('Commissioner check failed:', e); });
 }
 
 // Same generation logic as the commissioner's manual button, minus the
