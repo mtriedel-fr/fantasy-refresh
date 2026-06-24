@@ -140,6 +140,15 @@ tr:hover td{background:var(--or4);}
 .my-team-bar input::placeholder{color:var(--ink3);}
 .my-team-badge{font-family:var(--fd);font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:2px 7px;border-radius:8px;margin-left:6px;background:rgba(0,212,204,.15);color:var(--or);border:1px solid rgba(0,212,204,.4);}
 
+/* H2H WEEKLY MATCHUPS WIDGET — landing-page card, headtohead leagues only */
+.h2h-matchups-card{background:var(--bg3);border-bottom:1px solid var(--bdr);padding:12px 28px;}
+.h2h-matchups-hdr{font-family:var(--fd);font-size:11px;font-weight:800;color:var(--ink2);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;}
+.h2h-matchup-row{display:flex;align-items:center;justify-content:center;gap:10px;padding:6px 0;font-family:var(--fd);font-size:13px;font-weight:700;color:var(--ink);border-bottom:1px solid var(--bdr);}
+.h2h-matchup-row:last-child{border-bottom:none;}
+.h2h-matchup-row.mine{color:var(--or);}
+.h2h-matchup-vs{font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;}
+.h2h-matchup-bye{color:var(--ink3);font-style:italic;font-weight:400;}
+
 /* ACTION BAR — search left, nav dropdown right */
 .action-bar{background:var(--bg4);padding:10px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid var(--bdr);}
 .search-wrap{position:relative;flex:1;max-width:340px;}
@@ -844,6 +853,12 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
   <span id="my-team-league-ctx" style="font-family:var(--fd);font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-left:auto;"></span>
 </div>
 
+<!-- H2H WEEKLY MATCHUPS — shown only for head-to-head leagues -->
+<div class="h2h-matchups-card hidden" id="h2h-matchups-card">
+  <div class="h2h-matchups-hdr" id="h2h-matchups-hdr">Week 1 Matchups</div>
+  <div id="h2h-matchups-list"></div>
+</div>
+
 <!-- CONTEXT-AWARE STATS BAR -->
 <div class="stats" id="stats-weekly">
   <div class="stat"><div class="stat-lbl">Your score</div><div class="stat-val" id="s-myscore">—</div><div class="stat-sub" id="s-myscore-sub" style="font-family:var(--fd);font-size:11px;color:var(--ink3);letter-spacing:.5px;text-transform:uppercase;margin-top:2px"></div></div>
@@ -1222,6 +1237,56 @@ function setLoading(on){
   document.getElementById('hdr-sub').textContent = on ? 'Loading season data...' : '';
 }
 
+// ── H2H WEEKLY MATCHUPS WIDGET ──────────────────────────────────
+// Landing-page card showing the current week's matchups for
+// head-to-head leagues. Hidden entirely for cumulative/guillotine
+// leagues. Pulls directly from the matchups node — homeName/awayName
+// are already baked into each pairing by generateH2HScheduleSilently,
+// so no separate member lookup is needed.
+function escapeHtmlFR(s){
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+    return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];
+  });
+}
+
+function loadH2HMatchupsWidget(){
+  var ctx = (typeof FR !== 'undefined' && FR.ctx) ? FR.ctx() : null;
+  var card = document.getElementById('h2h-matchups-card');
+  if(!ctx || ctx.format !== 'headtohead'){
+    if(card) card.classList.add('hidden');
+    return;
+  }
+  var user = (typeof FRAuth !== 'undefined' && FRAuth.getUser) ? FRAuth.getUser() : null;
+  var myUid = user ? user.uid : null;
+
+  FR.fb.get(FR.paths.weekMatchups(currentWeek)).then(function(pairs){
+    if(!pairs || !pairs.length){
+      if(card) card.classList.add('hidden');
+      return;
+    }
+    var hdr = document.getElementById('h2h-matchups-hdr');
+    if(hdr) hdr.textContent = 'Week ' + currentWeek + ' Matchups';
+
+    var rows = pairs.map(function(p){
+      var mine = (p.home === myUid || p.away === myUid);
+      var awayLabel = (p.awayName === 'BYE')
+        ? '<span class="h2h-matchup-bye">BYE</span>'
+        : escapeHtmlFR(p.awayName || 'TBD');
+      return '<div class="h2h-matchup-row' + (mine ? ' mine' : '') + '">'
+        + '<span>' + escapeHtmlFR(p.homeName || 'TBD') + '</span>'
+        + '<span class="h2h-matchup-vs">vs</span>'
+        + '<span>' + awayLabel + '</span>'
+        + '</div>';
+    }).join('');
+
+    var listEl = document.getElementById('h2h-matchups-list');
+    if(listEl) listEl.innerHTML = rows;
+    if(card) card.classList.remove('hidden');
+  }).catch(function(){
+    if(card) card.classList.add('hidden');
+  });
+}
+
 // ── BOOT ───────────────────────────────────────────────────────
 function boot(){
   buildWeekBar();
@@ -1244,6 +1309,7 @@ function boot(){
   var activeTab = document.getElementById('navtab-yourweek');
   if(activeTab) activeTab.classList.add('active');
   initMyTeamInput();
+  loadH2HMatchupsWidget();
   renderAll();
   checkFirstRun();
 }

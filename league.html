@@ -1029,10 +1029,13 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
 
           <!-- DIVISION ASSIGNMENT -->
           <div id="h2h-division-block" style="display:none;margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--bdr);">
+            <div style="font-family:var(--fd);font-size:12px;font-weight:700;color:var(--ink2);text-transform:uppercase;margin-bottom:6px;">Division Names</div>
+            <div id="h2h-division-names" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;"></div>
+
             <div style="font-family:var(--fd);font-size:12px;font-weight:700;color:var(--ink2);text-transform:uppercase;margin-bottom:6px;">Division Assignment</div>
-            <div style="font-size:12px;color:var(--ink3);margin-bottom:10px;line-height:1.5;">Assign each team to a division before generating the schedule. Teams play within and across divisions.</div>
+            <div style="font-size:12px;color:var(--ink3);margin-bottom:10px;line-height:1.5;">Assign each team to a division, then save — the schedule regenerates automatically using the new assignments.</div>
             <div id="h2h-division-list"></div>
-            <button class="salary-btn secondary" style="margin-top:8px;" onclick="saveH2HDivisions()">💾 Save Divisions</button>
+            <button class="salary-btn secondary" style="margin-top:8px;" onclick="saveH2HDivisions()">💾 Save Divisions &amp; Regenerate Schedule</button>
             <div id="h2h-division-status" style="font-size:11px;color:var(--ink3);margin-top:6px;"></div>
           </div>
 
@@ -5972,6 +5975,16 @@ function loadH2HDivisionAssignment(){
     }
     if(block) block.style.display = 'block';
 
+    var divisionNames = settings.divisionNames || {};
+
+    var nameInputsHtml = '';
+    for(var dn = 1; dn <= divCount; dn++){
+      nameInputsHtml += '<input type="text" class="wk-select" data-div="' + dn + '" placeholder="Division ' + dn + '" value="'
+        + (divisionNames[dn] ? divisionNames[dn].replace(/"/g,'&quot;') : '') + '" style="width:auto;">';
+    }
+    var namesEl = document.getElementById('h2h-division-names');
+    if(namesEl) namesEl.innerHTML = nameInputsHtml;
+
     var teamList = Object.keys(members).filter(function(uid){
       var m = members[uid];
       return m && m.teamName && m.active !== false;
@@ -5979,7 +5992,8 @@ function loadH2HDivisionAssignment(){
 
     var divOptions = '';
     for(var d = 1; d <= divCount; d++){
-      divOptions += '<option value="' + d + '">Division ' + d + '</option>';
+      var label = divisionNames[d] || ('Division ' + d);
+      divOptions += '<option value="' + d + '">' + label + '</option>';
     }
 
     var rows = teamList.map(function(uid, i){
@@ -6005,25 +6019,56 @@ function saveH2HDivisions(){
   var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
   var statusEl = document.getElementById('h2h-division-status');
   var selects = document.querySelectorAll('#h2h-division-list select[data-uid]');
+  var nameInputs = document.querySelectorAll('#h2h-division-names input[data-div]');
 
   if(!selects.length){ return; }
   statusEl.textContent = 'Saving…';
   statusEl.style.color = 'var(--ink3)';
 
-  var updates = {};
+  var memberUpdates = {};
   selects.forEach(function(sel){
     var uid = sel.getAttribute('data-uid');
-    updates[uid] = { division: parseInt(sel.value) };
+    memberUpdates[uid] = { division: parseInt(sel.value) };
   });
 
-  var writes = Object.keys(updates).map(function(uid){
-    return FR.fb.patch('/leagues/' + leagueId + '/members/' + uid, updates[uid]);
+  var divisionNames = {};
+  nameInputs.forEach(function(inp){
+    var d = inp.getAttribute('data-div');
+    var val = inp.value.trim();
+    if(val) divisionNames[d] = val;
   });
+
+  var writes = Object.keys(memberUpdates).map(function(uid){
+    return FR.fb.patch('/leagues/' + leagueId + '/members/' + uid, memberUpdates[uid]);
+  });
+  writes.push(FR.fb.patch('/leagues/' + leagueId + '/settings', { divisionNames: divisionNames }));
 
   Promise.all(writes).then(function(){
-    statusEl.textContent = '✓ Divisions saved.';
+    statusEl.textContent = 'Saved — regenerating schedule…';
+    statusEl.style.color = 'var(--ink3)';
+
+    // Division changes alone don't move the team count, which is the only
+    // thing the silent auto-generator checks on page load — so without an
+    // explicit regenerate here, new assignments would be saved but never
+    // actually reach the schedule. Re-pull fresh data and rebuild directly.
+    return Promise.all([
+      FR.fb.get('/leagues/' + leagueId + '/settings'),
+      FR.fb.get('/leagues/' + leagueId + '/members')
+    ]);
+  }).then(function(results){
+    var freshSettings = results[0] || {};
+    var freshMembers  = results[1] || {};
+    var activeTeamCount = Object.keys(freshMembers).filter(function(uid){
+      var m = freshMembers[uid];
+      return m && m.teamName && m.active !== false;
+    }).length;
+    return generateH2HScheduleSilently(leagueId, ctx, freshSettings, freshMembers, activeTeamCount);
+  }).then(function(){
+    statusEl.textContent = '✓ Divisions saved and schedule regenerated.';
     statusEl.style.color = 'var(--or)';
-  }).catch(function(){
+    loadH2HDivisionAssignment();
+  }).catch(function(e){
+    console.error('Save divisions failed:', e);
     statusEl.textContent = '✗ Error saving divisions.';
     statusEl.style.color = 'var(--pk)';
   });
