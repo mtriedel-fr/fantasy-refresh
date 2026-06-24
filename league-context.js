@@ -45,7 +45,7 @@
   var paths = {
     league:         function()       { return '/leagues/' + ctx().leagueId; },
     settings:       function()       { return paths.league() + '/settings'; },
-    commissioners:  function()       { return paths.league() + '/commissioners'; },
+    commissioners:  function()       { return paths.league() + '/settings/commissioners'; },
     commissioner:   function(uid)    { return paths.commissioners() + '/' + uid; },
     members:        function()       { return paths.league() + '/members'; },
     member:         function(uid)    { return paths.members() + '/' + uid; },
@@ -143,7 +143,7 @@
       var commVal   = results[0];
       var settings  = results[1];
       var isComm    = commVal === true;
-      var isCreator = settings && settings.creatorUid === uid;
+      var isCreator = settings && settings.createdBy === uid;
       return { isComm: isComm || isCreator, isCreator: isCreator };
     }).catch(function() {
       return { isComm: false, isCreator: false };

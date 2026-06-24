@@ -285,8 +285,8 @@
 
   function checkCommissioner(uid, leagueId) {
     return Promise.all([
-      dbGet('/leagues/' + leagueId + '/commissioners/' + uid),
-      dbGet('/leagues/' + leagueId + '/settings/creatorUid')
+      dbGet('/leagues/' + leagueId + '/settings/commissioners/' + uid),
+      dbGet('/leagues/' + leagueId + '/settings/createdBy')
     ]).then(function(results) {
       var isComm    = results[0] === true;
       var isCreator = results[1] === uid;
