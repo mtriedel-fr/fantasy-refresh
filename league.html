@@ -4578,6 +4578,8 @@ function initCommissionerAccess(){
     if(btn) btn.style.display = 'inline-flex';
     var moreBtn = document.getElementById('more-comm-btn');
     if(moreBtn) moreBtn.style.removeProperty('display');
+    var pdRow = document.getElementById('pd-comm-row');
+    if(pdRow) pdRow.style.display = 'flex';
     try{ sessionStorage.setItem('fr_comm','1'); }catch(e){}
   }).catch(function(){});
 }
@@ -4602,6 +4604,8 @@ function toggleComm(){
       if(btn) btn.style.display = 'inline-flex';
       var moreBtn = document.getElementById('more-comm-btn');
       if(moreBtn) moreBtn.style.removeProperty('display');
+      var pdRow = document.getElementById('pd-comm-row');
+      if(pdRow) pdRow.style.display = 'flex';
       openCommPanel();
     });
     return;
@@ -5779,8 +5783,11 @@ function renderUserPanel(){
   if(!el) return;
   el.innerHTML = '<div style="color:var(--ink3);font-size:13px;padding:8px 0;">Loading…</div>';
 
-  fetch(FR.paths.url(FR.paths.members()))
-    .then(function(r){ return r.json(); })
+  var ctx = FRAuth.getLeagueCtx();
+  var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+  var myUid = (FRAuth.getUser() || {}).uid;
+
+  FR.fb.get('/leagues/' + leagueId + '/members')
     .then(function(data){
       if(!data){
         el.innerHTML = '<div style="color:var(--ink3);font-size:13px;padding:8px 0;">No registered players yet.<br><span style="font-size:11px;">Share the join code below to get started.</span></div>';
@@ -5788,39 +5795,44 @@ function renderUserPanel(){
         return;
       }
 
-      var users = Object.entries(data).map(function(kv){
-        return Object.assign({uid: kv[0]}, kv[1]);
+      var users = Object.keys(data).map(function(uid){
+        return Object.assign({uid: uid}, data[uid]);
       }).sort(function(a,b){
-        // Sort: team set first, then by team name
-        if(a.team2026 && !b.team2026) return -1;
-        if(!a.team2026 && b.team2026) return 1;
-        return (a.team2026||a.email||'').localeCompare(b.team2026||b.email||'');
+        // Team set first, then alphabetical
+        if(a.teamName && !b.teamName) return -1;
+        if(!a.teamName && b.teamName) return 1;
+        return (a.teamName||'').localeCompare(b.teamName||'');
       });
 
       var total   = users.length;
-      var active  = users.filter(function(u){ return !!u.team2026; }).length;
-      var pending = total - active;
+      var active  = users.filter(function(u){ return !!u.teamName && u.active !== false; }).length;
+      var pending = users.filter(function(u){ return !u.teamName && u.active !== false; }).length;
       updateUserStats(total, active, pending);
 
       var rows = users.map(function(u){
-        var created = u.created ? new Date(u.created).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '—';
-        var badge = u.team2026
-          ? '<span class="user-badge active">✓ Set</span>'
-          : '<span class="user-badge pending">Pending</span>';
-        return '<tr>'
-          + '<td>'+(u.team2026
-              ? '<span class="user-team-name">'+u.team2026+'</span>'
+        var created = u.joined ? new Date(u.joined).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '—';
+        var isInactive = u.active === false;
+        var badge = isInactive
+          ? '<span class="user-badge pending" style="color:var(--pk);">Removed</span>'
+          : (u.teamName ? '<span class="user-badge active">✓ Set</span>' : '<span class="user-badge pending">Pending</span>');
+        var roleTag = u.role === 'commissioner' ? ' <span style="font-size:10px;color:var(--or);">👑</span>' : '';
+        var removeBtn = (u.uid === myUid)
+          ? '<span style="font-size:11px;color:var(--ink3);">you</span>'
+          : '<button class="user-refresh-btn" style="color:var(--pk);border-color:rgba(255,95,160,.3);" data-uid="'+u.uid+'" data-team="'+encodeURIComponent(u.teamName||'')+'" data-active="'+(isInactive?'0':'1')+'" onclick="handleRemoveUser(this)">'+(isInactive ? '↺' : '✕')+'</button>';
+        return '<tr' + (isInactive ? ' style="opacity:.5;"' : '') + '>'
+          + '<td>'+(u.teamName
+              ? '<span class="user-team-name">'+escapeHtmlFR(u.teamName)+'</span>'+roleTag
               : '<span class="user-no-team">No team yet</span>')+'</td>'
-          + '<td><span class="user-email">'+(u.email||'—')+'</span></td>'
+          + '<td><span class="user-email">'+escapeHtmlFR(u.email||'—')+'</span></td>'
           + '<td>'+badge+'</td>'
           + '<td><span class="user-date">'+created+'</span></td>'
-          + '<td><button class="user-refresh-btn" style="color:var(--pk);border-color:rgba(255,95,160,.3);" data-uid="'+u.uid+'" data-team="'+encodeURIComponent(u.team2026||'')+'" onclick="handleRemoveUser(this)">✕</button></td>'
+          + '<td>'+removeBtn+'</td>'
           + '</tr>';
       }).join('');
 
       el.innerHTML = '<div style="overflow-x:auto;max-height:280px;overflow-y:auto;">'
         + '<table class="user-table"><thead><tr>'
-        + '<th>2026 Team</th><th>Email</th><th>Status</th><th>Joined</th><th></th>'
+        + '<th>Team</th><th>Email</th><th>Status</th><th>Joined</th><th></th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
     })
     .catch(function(){
@@ -5840,28 +5852,32 @@ function updateUserStats(total, active, pending){
 function handleRemoveUser(btn){
   var uid = btn.getAttribute('data-uid');
   var teamName = decodeURIComponent(btn.getAttribute('data-team')||'');
-  removeUser(uid, teamName);
+  var isCurrentlyActive = btn.getAttribute('data-active') === '1';
+  removeUser(uid, teamName, isCurrentlyActive);
 }
 
-function removeUser(uid, teamName){
-  var msg = teamName
-    ? 'Remove ' + teamName + ' from the league?\n\nThis will delete their account data but NOT their Firebase login.'
-    : 'Remove this pending account?';
+// Soft-removal (active:false) rather than a hard delete — preserves any
+// weeks already played (matchups/standings reference uid, not a live
+// member record) and is reversible. Excludes the team from future team
+// counts, so the schedule auto-regenerates around them on the next load.
+function removeUser(uid, teamName, isCurrentlyActive){
+  var msg = isCurrentlyActive
+    ? 'Remove ' + (teamName || 'this player') + ' from the league?\n\nThey\'ll be excluded from future weeks and the schedule will regenerate without them. This does not delete their account — you can restore them later.'
+    : 'Restore ' + (teamName || 'this player') + ' to the league?';
   if(!confirm(msg)) return;
 
-  var promises = [
-    fetch(FR.FB_DB_URL + '/users/' + uid + '.json', {method:'DELETE'})
-  ];
-  // Also unclaim their team name if set
-  if(teamName){
-    promises.push(fetch(FR.FB_DB_URL + FR.paths.members() + '/' + encodeURIComponent(teamName.toLowerCase()) + '.json', {method:'DELETE'}));
-  }
-  Promise.all(promises).then(function(){
-    showToast((teamName||'Account') + ' removed');
-    renderUserPanel();
-  }).catch(function(){
-    showToast('Could not remove — try again', true);
-  });
+  var ctx = FRAuth.getLeagueCtx();
+  var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+
+  FR.fb.patch('/leagues/' + leagueId + '/members/' + uid, { active: !isCurrentlyActive })
+    .then(function(){
+      showToast((teamName || 'Player') + (isCurrentlyActive ? ' removed' : ' restored'));
+      renderUserPanel();
+      if(IS_H2H_LEAGUE) maybeAutoGenerateH2HSchedule();
+    })
+    .catch(function(){
+      showToast('Could not update — try again', true);
+    });
 }
 
 
