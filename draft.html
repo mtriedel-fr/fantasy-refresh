@@ -1151,16 +1151,29 @@ function submitLineup(){
   btn.disabled=true; btn.textContent='Submitting…';
   var slots={};
   SLOT_DEFS.forEach(function(s){ if(lineup[s.id]) slots[s.id]=lineup[s.id]; });
-  fetch(FB_DB_URL+'/lineups'+FR_SEASON+'/week'+currentWeek+'/'+currentUser.uid+'.json',{
-    method:'PUT',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({uid:currentUser.uid,team:currentUser.team2026||currentUser.email,
-      week:currentWeek,slots:slots,totalSal:getSpent(),submitted:Date.now()})
+
+  var ctx = FRAuth.getLeagueCtx();
+  var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+
+  // This used to write to a legacy /lineups{year}/week{N}/{uid} path with
+  // no league scoping at all — left over from before multi-league support.
+  // Nothing else in the app (roster dropdowns, the Draft/Review button,
+  // kickoff-lock reveals) ever read from that path; they all read from
+  // /leagues/{id}/lineups/{season}/week{N}/{uid}. A submitted lineup was
+  // saving somewhere nothing else could ever find it.
+  FR.fb.get('/leagues/' + leagueId + '/members/' + currentUser.uid).then(function(member){
+    var teamName = (member && member.teamName) || (ctx && ctx.teamName) || currentUser.team2026 || currentUser.email;
+    return FR.fb.put('/leagues/' + leagueId + '/lineups/' + (ctx.season || FR_SEASON) + '/week' + currentWeek + '/' + currentUser.uid, {
+      uid: currentUser.uid, team: teamName,
+      week: currentWeek, slots: slots, totalSal: getSpent(), submitted: Date.now()
+    });
   }).then(function(){
     var msg=document.getElementById('submit-msg');
     msg.textContent='✓ Lineup submitted! Good luck.'; msg.className='submit-msg ok';
     btn.textContent='↑ Update Lineup'; btn.disabled=false;
     showToast('Lineup submitted! 🏈');
-  }).catch(function(){
+  }).catch(function(err){
+    console.error('Lineup submit failed:', err);
     document.getElementById('submit-msg').textContent='Submission failed — try again';
     document.getElementById('submit-msg').className='submit-msg err';
     btn.disabled=false; btn.textContent='Submit Lineup →';
