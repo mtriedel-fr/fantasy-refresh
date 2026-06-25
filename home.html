@@ -562,14 +562,16 @@ function renderCards(leagueIds, uid) {
     return Promise.all([
       fetch(FB_DB_URL + '/leagues/' + leagueId + '/settings.json').then(function(r) { return r.json(); }),
       fetch(FB_DB_URL + '/leagues/' + leagueId + '/members/' + uid + '.json').then(function(r) { return r.json(); }),
-      fetch(FB_DB_URL + '/leagues/' + leagueId + '/commissioners/' + uid + '.json').then(function(r) { return r.json(); }),
+      fetch(FB_DB_URL + '/leagues/' + leagueId + '/settings/commissioners/' + uid + '.json').then(function(r) { return r.json(); }),
       fetch(FB_DB_URL + '/leagues/' + leagueId + '/season/2026.json').then(function(r) { return r.json(); }).catch(function() { return null; })
     ]).then(function(res) {
+      var settings = res[0];
+      var isCreator = !!(settings && settings.createdBy === uid);
       return {
         leagueId:   leagueId,
-        settings:   res[0],
+        settings:   settings,
         member:     res[1],
-        isComm:     res[2] === true,
+        isComm:     res[2] === true || isCreator,
         seasonData: res[3]
       };
     }).catch(function() { return null; });

@@ -1290,7 +1290,13 @@ function updateUserBadge(){
   var user = FRAuth.getUser();
   var btn = document.getElementById('fr-sign-btn');
   if(!btn) return;
-  var name = (user && (user.displayName || user.teamName || user.email)) || '—';
+  // myTeam is always correct for the CURRENT league by the time this runs
+  // (applyTeamName sets it as its first line, before calling this) — unlike
+  // user.teamName, which is a global cached field that only gets corrected
+  // a few lines later in loadTeamName's Firebase callback. Reading
+  // user.teamName here was showing whichever league's team name happened
+  // to be set most recently, not the one actually being viewed.
+  var name = (user && user.displayName) || myTeam || (user && user.email) || '—';
   var initials = name.charAt(0).toUpperCase();
   var nameEl = document.getElementById('fr-sign-name');
   var avatarEl = document.getElementById('fr-avatar');
@@ -1498,11 +1504,14 @@ function loadTeamName(){
     .then(function(member){
       if(member && member.teamName){
         myTeam = member.teamName;
-        applyTeamName(member.teamName);
-        // Keep user object and cache in sync
+        // Keep user object and cache in sync BEFORE applyTeamName runs,
+        // so anything reading FRAuth.getUser() during that call (like
+        // updateUserBadge) sees the correct value instead of whatever
+        // league was entered most recently.
         user.teamName = member.teamName;
         FRAuth.setUser(user);
         try{ localStorage.setItem(cacheKey, member.teamName); }catch(e){}
+        applyTeamName(member.teamName);
       } else if(!myTeam){
         // Self-heal: this member (or the commissioner, who previously
         // launched with teamName:'' from league creation) has no team name
