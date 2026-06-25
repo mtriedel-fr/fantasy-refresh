@@ -408,13 +408,14 @@ function loadSalaries(){
         renderPool();
         return;
       }
-      if(PS_MODE){ loadFlatSalariesFromPool(); return; }
-      document.getElementById('picker-list').innerHTML =
-        '<div class="picker-empty"><div class="picker-empty-icon">⏳</div>'
-        +'<div class="picker-empty-title">Salaries Not Set</div>'
-        +'<div class="picker-empty-sub">Commissioner hasn\'t generated Week '+currentWeek+' salaries yet.</div></div>';
+      // Real salaries haven't been generated for this week yet — fall back
+      // to flat default pricing (the existing testing mechanism) rather
+      // than just showing an empty picker. This used to only apply during
+      // preseason; it's just as needed for a regular-season week before
+      // real pricing/projections exist.
+      loadFlatSalariesFromPool();
     })
-    .catch(function(){ if(PS_MODE) loadFlatSalariesFromPool(); });
+    .catch(function(){ loadFlatSalariesFromPool(); });
 }
 
 function loadFlatSalariesFromPool(){
