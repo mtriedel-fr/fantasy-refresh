@@ -1914,6 +1914,8 @@ function boot(){
 loadFromCloud();
 
 // ── WEEK BAR ───────────────────────────────────────────────────
+var H2H_LAST_WEEK = null; // set once playoff settings load, for any code that needs the real season-end week instead of the generic WEEKS default
+
 function buildWeekBar(){
   var sel = document.getElementById('wk-select');
   if(!sel) return;
@@ -1930,6 +1932,7 @@ function buildWeekBar(){
       if(!settings) return;
       var rounds = Math.max(1, Math.ceil(Math.log2(settings.playoffTeams || 4)));
       var lastWeek = (settings.playoffStartWeek || 15) + rounds - 1;
+      H2H_LAST_WEEK = lastWeek;
       buildWeekBarRange(sel, lastWeek);
     }).catch(function(){});
   }
@@ -5621,11 +5624,23 @@ function handleNav(val){
   if(val === 'playoffs'){ document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); }); document.getElementById('tab-playoffs').classList.remove('hidden'); document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); }); document.getElementById('navtab-playoffs').classList.add('active'); setStatBoxes('hidden'); renderPlayoffs(); return; }
   if(val === 'guillotine'){ document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); }); document.getElementById('tab-guillotine').classList.remove('hidden'); document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); }); document.getElementById('navtab-guillotine').classList.add('active'); setStatBoxes('guillotine'); renderGuillotine(); return; }
   if(val === 'yourseason'){
-    // Check if season is complete — if so show Season Wrap instead
     var completedWeeks = Object.keys(seasonData).filter(function(k){
       return !isNaN(Number(k)) && seasonData[k] && seasonData[k].length > 0;
     }).length;
-    if(completedWeeks >= WEEKS){
+
+    if(IS_H2H_LEAGUE){
+      // H2H has no "Season Wrap" of its own — that screen assumes the
+      // highest total scorer is the champion, which isn't how this format
+      // crowns one. The real finale is the seeded bracket under Playoffs,
+      // so redirect there once the season's actually over instead of
+      // falling into the cumulative wrap screen.
+      var h2hLastWeek = H2H_LAST_WEEK || WEEKS;
+      if(completedWeeks >= h2hLastWeek){
+        handleNav('playoffs');
+        return;
+      }
+      // Season still in progress — fall through to the normal view below.
+    } else if(completedWeeks >= WEEKS){
       // Season complete — show wrap
       document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); });
       document.getElementById('tab-seasonwrap').classList.remove('hidden');
@@ -6234,51 +6249,85 @@ function generateH2HScheduleSilently(leagueId, ctx, settings, members, activeTea
   var playoffStart = settings.playoffStartWeek || 15;
   var regularWeeks = playoffStart - 1;
   var hasDivisions = settings.h2hDivisions > 0;
+  var season = ctx.season || 2026;
 
-  var schedule;
-  var divisionMap = {};
-  if(hasDivisions){
-    var divCount = settings.h2hDivisions;
-    var divisions = {};
-    for(var d = 0; d < divCount; d++) divisions['Division ' + (d+1)] = [];
-    teamList.forEach(function(uid, i){
-      var divNum = members[uid].division || ((i % divCount) + 1);
-      divisionMap[uid] = divNum;
-      var key = 'Division ' + divNum;
-      if(!divisions[key]) divisions[key] = [];
-      divisions[key].push(uid);
+  // A roster change mid-season (someone joins, someone gets removed) used
+  // to trigger a full regenerate that rewrote EVERY week, including ones
+  // that already happened — the round-robin rotation shifts with a
+  // different team count, so a played week could come back assigned to
+  // different opponents than what actually happened, while the real score
+  // data for that week stayed put. Fetch what's already on the books first
+  // so any week with real scores recorded gets preserved exactly as-is;
+  // only weeks that haven't happened yet get rebuilt.
+  return Promise.all([
+    FR.fb.get('/leagues/' + leagueId + '/season/' + season),
+    FR.fb.get('/leagues/' + leagueId + '/matchups/' + season)
+  ]).then(function(results){
+    var allScores         = results[0] || {};
+    var existingMatchups  = results[1] || {};
+
+    var playedWeeks = {};
+    for(var w = 1; w <= regularWeeks; w++){
+      var weekScores = allScores[String(w)];
+      if(weekScores && Object.keys(weekScores).length){
+        playedWeeks[w] = true;
+      }
+    }
+
+    var schedule;
+    var divisionMap = {};
+    if(hasDivisions){
+      var divCount = settings.h2hDivisions;
+      var divisions = {};
+      for(var d = 0; d < divCount; d++) divisions['Division ' + (d+1)] = [];
+      teamList.forEach(function(uid, i){
+        var divNum = members[uid].division || ((i % divCount) + 1);
+        divisionMap[uid] = divNum;
+        var key = 'Division ' + divNum;
+        if(!divisions[key]) divisions[key] = [];
+        divisions[key].push(uid);
+      });
+      schedule = buildDivisionSchedule(divisions, regularWeeks);
+    } else {
+      schedule = buildRoundRobin(teamList).slice(0, regularWeeks);
+    }
+
+    while(schedule.length < regularWeeks){
+      var cycle = hasDivisions ? buildDivisionSchedule({all: teamList}, regularWeeks) : buildRoundRobin(teamList);
+      schedule = schedule.concat(cycle).slice(0, regularWeeks);
+    }
+
+    var writes = {};
+    var preservedCount = 0;
+    schedule.forEach(function(pairs, idx){
+      var weekNum = idx + 1;
+      var weekKey = 'week' + weekNum;
+
+      if(playedWeeks[weekNum] && existingMatchups[weekKey]){
+        writes[weekKey] = existingMatchups[weekKey]; // keep exactly what already happened
+        preservedCount++;
+        return;
+      }
+
+      writes[weekKey] = pairs.map(function(pair){
+        return {
+          home: pair[0],
+          away: pair[1],
+          homeName: pair[0] ? (members[pair[0]].teamName || '') : '',
+          awayName: pair[1] ? (members[pair[1]].teamName || '') : 'BYE',
+          homeDivision: pair[0] ? (divisionMap[pair[0]] || null) : null,
+          awayDivision: pair[1] ? (divisionMap[pair[1]] || null) : null
+        };
+      });
     });
-    schedule = buildDivisionSchedule(divisions, regularWeeks);
-  } else {
-    schedule = buildRoundRobin(teamList).slice(0, regularWeeks);
-  }
+    writes['meta'] = { teamCount: activeTeamCount, autoGenerated: true, generatedAt: Date.now(), preservedPlayedWeeks: preservedCount };
 
-  while(schedule.length < regularWeeks){
-    var cycle = hasDivisions ? buildDivisionSchedule({all: teamList}, regularWeeks) : buildRoundRobin(teamList);
-    schedule = schedule.concat(cycle).slice(0, regularWeeks);
-  }
-
-  var writes = {};
-  schedule.forEach(function(pairs, idx){
-    var weekNum = idx + 1;
-    writes['week' + weekNum] = pairs.map(function(pair){
-      return {
-        home: pair[0],
-        away: pair[1],
-        homeName: pair[0] ? (members[pair[0]].teamName || '') : '',
-        awayName: pair[1] ? (members[pair[1]].teamName || '') : 'BYE',
-        homeDivision: pair[0] ? (divisionMap[pair[0]] || null) : null,
-        awayDivision: pair[1] ? (divisionMap[pair[1]] || null) : null
-      };
-    });
+    return FR.fb.put('/leagues/' + leagueId + '/matchups/' + season, writes)
+      .then(function(){
+        console.log('Schedule generated for ' + activeTeamCount + ' teams (' + preservedCount + ' already-played week(s) preserved).');
+        checkH2HScheduleStatus();
+      });
   });
-  writes['meta'] = { teamCount: activeTeamCount, autoGenerated: true, generatedAt: Date.now() };
-
-  return FR.fb.put('/leagues/' + leagueId + '/matchups/' + (ctx.season || 2026), writes)
-    .then(function(){
-      console.log('Schedule generated for ' + activeTeamCount + ' teams.');
-      checkH2HScheduleStatus();
-    });
 }
 
 function checkH2HScheduleStatus(){
@@ -7790,10 +7839,13 @@ if(IS_PRESEASON_LEAGUE){
   var moreGrid = document.querySelector('#more-menu > div');
   if(moreGrid) moreGrid.style.gridTemplateColumns = 'repeat(2,1fr)';
 } else if(IS_H2H_LEAGUE){
-  // H2H leagues: no guillotine game mode, but Playoffs now shows the
-  // seeded bracket — keep that one visible.
+  // Guillotine is a separate flag a H2H league can also carry — match the
+  // same rule already used for the desktop nav tab (only show it when that
+  // flag is actually set) instead of hiding it for every H2H league
+  // unconditionally, which was wrong for H2H+guillotine combo leagues.
+  var ctxG = FRAuth.getLeagueCtx();
   var gBtn2 = document.getElementById('more-guillotine-btn');
-  if(gBtn2) gBtn2.style.display = 'none';
+  if(gBtn2) gBtn2.style.display = (ctxG && ctxG.guillotine) ? '' : 'none';
 }
 if(IS_H2H_LEAGUE) initH2HVisibility();
 
