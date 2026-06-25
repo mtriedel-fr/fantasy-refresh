@@ -1730,8 +1730,10 @@ function applyArchiveVisibility(){
   var ctx = FRAuth.getLeagueCtx();
   var isOgLeague = !ctx || ctx.leagueId === 'fr_refresh26';
   var opt = document.getElementById('season-opt-2025');
+  console.log('[archive-check] leagueId:', ctx && ctx.leagueId, '| isOgLeague:', isOgLeague, '| option found:', !!opt);
   if(!isOgLeague && opt && opt.parentNode){
     opt.parentNode.removeChild(opt);
+    console.log('[archive-check] removed 2025 option');
   }
 }
 
@@ -7759,6 +7761,7 @@ setTimeout(function(){ initCommissionerAccess(); }, 800);
 // Also run on DOMContentLoaded as backup
 document.addEventListener('DOMContentLoaded', function(){
   setTimeout(function(){ initCommissionerAccess(); }, 500);
+  setTimeout(function(){ applyArchiveVisibility(); }, 600);
 });
 </script>
 
