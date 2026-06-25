@@ -142,6 +142,47 @@ tr:hover td{background:var(--or4);}
 .my-team-bar input{flex:1;max-width:320px;padding:5px 10px;font-family:var(--fb);font-size:13px;background:var(--bg4);border:1px solid var(--bdr2);border-radius:6px;color:var(--ink);outline:none;}
 .my-team-bar input:focus{border-color:var(--or);}
 .my-team-bar input::placeholder{color:var(--ink3);}
+
+/* H2H PERSONAL MATCHUP BAND — replaces the Score/Current Place stats band */
+.h2h-matchup-band{display:flex;align-items:center;justify-content:center;gap:18px;padding:14px 20px;background:linear-gradient(135deg, rgba(0,212,204,.10), rgba(255,107,53,.06));border-bottom:1px solid var(--bdr);}
+.h2h-matchup-band-side{flex:1;max-width:170px;text-align:center;min-width:0;}
+.h2h-matchup-band-name{font-family:var(--fd);font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.h2h-matchup-band-side.mine .h2h-matchup-band-name{color:var(--or);}
+.h2h-matchup-band-score{font-family:var(--fd);font-size:30px;font-weight:900;color:var(--ink);line-height:1.15;margin-top:1px;}
+.h2h-matchup-band-mid{text-align:center;flex-shrink:0;}
+.h2h-matchup-band-wk{font-family:var(--fd);font-size:9px;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;}
+.h2h-matchup-band-vs-txt{font-family:var(--fd);font-size:13px;font-weight:800;color:var(--ink3);}
+.h2h-matchup-band-empty{padding:16px 20px;text-align:center;font-size:13px;color:var(--ink3);font-style:italic;background:var(--bg3);border-bottom:1px solid var(--bdr);}
+
+/* H2H HOME — standings + weekly matchups */
+.h2h-section{background:var(--bg3);border-bottom:1px solid var(--bdr);padding:14px 28px;}
+.h2h-section-hdr{font-family:var(--fd);font-size:11px;font-weight:800;color:var(--ink2);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;}
+.h2h-standings-grid{display:grid;grid-template-columns:1fr;gap:14px;}
+.h2h-standings-grid.two-up{grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));}
+@media (max-width:640px){ .h2h-standings-grid.two-up{grid-template-columns:1fr;} }
+.h2h-div-name{font-family:var(--fd);font-size:11px;font-weight:700;color:var(--or);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;}
+.h2h-standings-table{width:100%;border-collapse:collapse;font-family:var(--fb);font-size:13px;}
+.h2h-standings-table th{font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;text-align:left;padding:5px 6px;border-bottom:1px solid var(--bdr2);}
+.h2h-standings-table th.num,.h2h-standings-table td.num{text-align:right;}
+.h2h-standings-table td{padding:6px 6px;border-bottom:1px solid var(--bdr);color:var(--ink);}
+.h2h-standings-table tr.mine td{color:var(--or);font-weight:700;}
+.h2h-standings-table tr:last-child td{border-bottom:none;}
+.h2h-matchup{border:1px solid var(--bdr);border-radius:8px;margin-bottom:8px;overflow:hidden;cursor:pointer;background:var(--bg4);}
+.h2h-matchup-row{display:flex;align-items:center;gap:10px;padding:10px 12px;}
+.h2h-matchup-team{flex:1;display:flex;align-items:center;justify-content:space-between;gap:8px;font-family:var(--fd);font-size:13px;font-weight:700;color:var(--ink);}
+.h2h-matchup-team.mine{color:var(--or);}
+.h2h-matchup-score{font-family:var(--fd);font-size:15px;font-weight:800;color:var(--ink2);min-width:32px;text-align:right;}
+.h2h-matchup-at{font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;padding:0 4px;}
+.h2h-matchup-bye{color:var(--ink3);font-style:italic;font-weight:400;}
+.h2h-matchup-caret{font-size:10px;color:var(--ink3);margin-left:4px;transition:transform .15s;}
+.h2h-matchup.open .h2h-matchup-caret{transform:rotate(180deg);}
+.h2h-roster-drop{display:none;border-top:1px solid var(--bdr);padding:10px 12px;background:var(--bg2);}
+.h2h-matchup.open .h2h-roster-drop{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.h2h-roster-side-hdr{font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;}
+.h2h-roster-player{display:flex;justify-content:space-between;gap:8px;font-size:12px;padding:3px 0;color:var(--ink);}
+.h2h-roster-player .pos{color:var(--ink3);font-size:10px;text-transform:uppercase;margin-right:6px;}
+.h2h-roster-empty{font-size:12px;color:var(--ink3);font-style:italic;}
+.h2h-roster-pending{font-size:11px;color:var(--ink3);font-style:italic;margin-top:6px;padding-top:6px;border-top:1px dashed var(--bdr2);}
 .my-team-badge{font-family:var(--fd);font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:2px 7px;border-radius:8px;margin-left:6px;background:rgba(0,212,204,.15);color:var(--or);border:1px solid rgba(0,212,204,.4);}
 
 /* ACTION BAR — search left, nav dropdown right */
@@ -796,7 +837,7 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
       <select class="wk-select" id="wk-select" onchange="setWeekFromSelect(this.value)"></select>
       <select class="season-select" id="season-select" onchange="switchSeason(this.value)" title="Switch season">
         <option value="2026" selected>2026</option>
-        <option value="2025">2025</option>
+        <option value="2025" id="season-opt-2025">2025</option>
       </select>
     </div>
   </div>
@@ -817,6 +858,22 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
     <button onclick="cancelTeamEdit()" style="background:none;border:1px solid var(--bdr2);border-radius:6px;padding:4px 10px;font-family:var(--fd);font-size:11px;color:var(--ink3);cursor:pointer;text-transform:uppercase;">✕</button>
   </div>
   <span id="my-team-league-ctx" style="display:none;"></span>
+</div>
+
+<!-- H2H PERSONAL MATCHUP BAND — replaces the Score/Current Place stats
+     band for head-to-head leagues. First thing visible, no scrolling. -->
+<div class="h2h-matchup-band hidden" id="h2h-matchup-band"></div>
+
+<!-- H2H HOME — standings + weekly matchups, shown only for head-to-head leagues -->
+<div id="h2h-home" class="hidden">
+  <div class="h2h-section">
+    <div class="h2h-section-hdr">🏆 Standings</div>
+    <div id="h2h-standings-wrap"></div>
+  </div>
+  <div class="h2h-section">
+    <div class="h2h-section-hdr" id="h2h-matchups-hdr">Week 1 Matchups</div>
+    <div id="h2h-matchups-list"></div>
+  </div>
 </div>
 
 <!-- CONTEXT-AWARE STATS BAR -->
@@ -884,7 +941,7 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
   <div class="sub-tabs-scroll">
     <div class="sub-tabs">
       <div class="sub-tab active" onclick="showSubTab(this,'mylineup','yourweek')">👤 My Lineup</div>
-      <div class="sub-tab" onclick="showSubTab(this,'weeklystanding','yourweek')">📊 Weekly Standing</div>
+      <div class="sub-tab" id="subtab-weeklystanding" onclick="showSubTab(this,'weeklystanding','yourweek')">📊 Weekly Standing</div>
       <div class="sub-tab" onclick="showSubTab(this,'numbers','yourweek')">🔢 Weekly Numbers</div>
     </div>
   </div>
@@ -899,7 +956,7 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
     <div class="sub-tabs">
       <div class="sub-tab active" onclick="showSubTab(this,'myseason','yourseason')">📈 My Season</div>
       <div class="sub-tab" onclick="showSubTab(this,'standings','yourseason')">🏆 Seasonal Standings</div>
-      <div class="sub-tab" onclick="showSubTab(this,'movement','yourseason')">📉 Movement</div>
+      <div class="sub-tab" id="subtab-movement" onclick="showSubTab(this,'movement','yourseason')">📉 Movement</div>
     </div>
   </div>
   <div id="sub-myseason"><div id="my-season-wrap"></div></div>
@@ -1630,6 +1687,283 @@ function setLoading(on){
   document.getElementById('hdr-sub').textContent = on ? 'Loading season data...' : '';
 }
 
+// ── H2H HOME — matchup band + standings + weekly matchups ────────
+// This is the real landing page for head-to-head leagues (home.html
+// routes here, never to index.html). Reuses the IS_H2H_LEAGUE flag
+// already computed above for the schedule-generation logic.
+var h2hLastWeekScores = {};
+
+function escapeHtmlFR(s){
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+    return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];
+  });
+}
+
+function fmtH2HScore(s){
+  return (typeof s === 'number') ? s.toFixed(1) : '—';
+}
+
+function applyArchiveVisibility(){
+  // The 2025 archive only has data for the original league.
+  var ctx = FRAuth.getLeagueCtx();
+  var isOgLeague = !ctx || ctx.leagueId === 'fr_refresh26';
+  var opt = document.getElementById('season-opt-2025');
+  if(opt) opt.style.display = isOgLeague ? '' : 'none';
+}
+
+function renderH2HHomeView(){
+  var home = document.getElementById('h2h-home');
+  var band = document.getElementById('h2h-matchup-band');
+
+  if(!IS_H2H_LEAGUE){
+    if(home) home.classList.add('hidden');
+    if(band) band.classList.add('hidden');
+    return;
+  }
+  if(home) home.classList.remove('hidden');
+  if(band) band.classList.remove('hidden');
+
+  var wStats = document.getElementById('stats-weekly');
+  var sStats = document.getElementById('stats-season');
+  if(wStats) wStats.classList.add('hidden');
+  if(sStats) sStats.classList.add('hidden');
+  var subWeeklyStanding = document.getElementById('subtab-weeklystanding');
+  if(subWeeklyStanding) subWeeklyStanding.style.display = 'none';
+  var subMovement = document.getElementById('subtab-movement');
+  if(subMovement) subMovement.style.display = 'none';
+
+  var ctx = FRAuth.getLeagueCtx();
+  var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+  // Guillotine is a separate flag a H2H league can also carry.
+  var guillotineTab = document.getElementById('navtab-guillotine');
+  if(guillotineTab) guillotineTab.style.display = ctx.guillotine ? '' : 'none';
+
+  var hdr = document.getElementById('h2h-matchups-hdr');
+  if(hdr) hdr.textContent = 'Week ' + currentWeek + ' Matchups';
+
+  var user = (typeof FRAuth !== 'undefined' && FRAuth.getUser) ? FRAuth.getUser() : null;
+  var myUid = user ? user.uid : null;
+
+  Promise.all([
+    FR.fb.get('/leagues/' + leagueId + '/members'),
+    FR.fb.get('/leagues/' + leagueId + '/settings'),
+    FR.fb.get('/leagues/' + leagueId + '/matchups/' + (ctx.season || 2026)),
+    FR.fb.get('/leagues/' + leagueId + '/season/' + (ctx.season || 2026))
+  ]).then(function(results){
+    var members     = results[0] || {};
+    var settings    = results[1] || {};
+    var allMatchups = results[2] || {};
+    var allScores   = results[3] || {};
+
+    renderH2HMatchupBand(allMatchups, allScores, myUid);
+    renderH2HStandings(members, settings, allMatchups, allScores, myUid);
+    renderH2HMatchups(allMatchups, allScores, myUid);
+  }).catch(function(e){
+    console.error('H2H home render failed:', e);
+    if(home) home.classList.add('hidden');
+    if(band) band.classList.add('hidden');
+  });
+}
+
+function renderH2HMatchupBand(allMatchups, allScores, myUid){
+  var band = document.getElementById('h2h-matchup-band');
+  if(!band) return;
+
+  var pairs = allMatchups['week' + currentWeek] || [];
+  var mine = pairs.find(function(p){ return p.home === myUid || p.away === myUid; });
+
+  if(!mine){
+    band.innerHTML = '<div class="h2h-matchup-band-empty">No matchup found for Week ' + currentWeek + '.</div>';
+    return;
+  }
+
+  var weekScores = allScores[String(currentWeek)] || {};
+  var iAmHome = mine.home === myUid;
+  var myName  = iAmHome ? mine.homeName : mine.awayName;
+  var oppUid  = iAmHome ? mine.away : mine.home;
+  var oppName = iAmHome ? mine.awayName : mine.homeName;
+  var myScore = weekScores[myUid] ? weekScores[myUid].score : null;
+
+  if(!oppUid || oppName === 'BYE'){
+    band.innerHTML = '<div class="h2h-matchup-band-empty">🛌 Bye week — no matchup for ' + escapeHtmlFR(myName || 'you') + ' in Week ' + currentWeek + '.</div>';
+    return;
+  }
+
+  var oppScore = weekScores[oppUid] ? weekScores[oppUid].score : null;
+
+  band.innerHTML = '<div class="h2h-matchup-band-side mine"><div class="h2h-matchup-band-name">' + escapeHtmlFR(myName || 'You') + '</div><div class="h2h-matchup-band-score">' + fmtH2HScore(myScore) + '</div></div>'
+    + '<div class="h2h-matchup-band-mid"><div class="h2h-matchup-band-wk">Week ' + currentWeek + '</div><div class="h2h-matchup-band-vs-txt">VS</div></div>'
+    + '<div class="h2h-matchup-band-side"><div class="h2h-matchup-band-name">' + escapeHtmlFR(oppName || 'TBD') + '</div><div class="h2h-matchup-band-score">' + fmtH2HScore(oppScore) + '</div></div>';
+}
+
+function renderH2HStandings(members, settings, allMatchups, allScores, myUid){
+  var wrap = document.getElementById('h2h-standings-wrap');
+  if(!wrap) return;
+
+  var records = {};
+  var order = [];
+  Object.keys(members).forEach(function(uid){
+    var m = members[uid];
+    if(!m || !m.teamName || m.active === false) return;
+    records[uid] = { uid: uid, wins:0, losses:0, ties:0, pf:0, pa:0, teamName:m.teamName, division: m.division || null };
+    order.push(uid);
+  });
+
+  Object.keys(allMatchups).forEach(function(wk){
+    if(wk === 'meta') return;
+    var weekNum = parseInt(wk.replace('week',''), 10);
+    var weekScores = allScores[String(weekNum)] || {};
+    (allMatchups[wk] || []).forEach(function(p){
+      if(!p.home || !p.away || !records[p.home] || !records[p.away]) return;
+      var hs = weekScores[p.home] ? weekScores[p.home].score : null;
+      var as = weekScores[p.away] ? weekScores[p.away].score : null;
+      if(typeof hs !== 'number' || typeof as !== 'number') return;
+      records[p.home].pf += hs; records[p.home].pa += as;
+      records[p.away].pf += as; records[p.away].pa += hs;
+      if(hs > as){ records[p.home].wins++; records[p.away].losses++; }
+      else if(as > hs){ records[p.away].wins++; records[p.home].losses++; }
+      else { records[p.home].ties++; records[p.away].ties++; }
+    });
+  });
+
+  function sortFn(a,b){
+    var aG = a.wins+a.losses+a.ties, bG = b.wins+b.losses+b.ties;
+    var aWp = aG ? (a.wins + a.ties*0.5)/aG : 0;
+    var bWp = bG ? (b.wins + b.ties*0.5)/bG : 0;
+    if(bWp !== aWp) return bWp - aWp;
+    return b.pf - a.pf;
+  }
+
+  function table(rows){
+    var trs = rows.map(function(r){
+      return '<tr class="' + (r.uid === myUid ? 'mine' : '') + '">'
+        + '<td>' + escapeHtmlFR(r.teamName) + '</td>'
+        + '<td class="num">' + r.wins + '</td>'
+        + '<td class="num">' + r.losses + '</td>'
+        + '<td class="num">' + r.ties + '</td>'
+        + '<td class="num">' + r.pf.toFixed(1) + '</td>'
+        + '</tr>';
+    }).join('');
+    return '<table class="h2h-standings-table"><thead><tr>'
+      + '<th>Team</th><th class="num">W</th><th class="num">L</th><th class="num">T</th><th class="num">PF</th>'
+      + '</tr></thead><tbody>' + trs + '</tbody></table>';
+  }
+
+  var divCount = settings.h2hDivisions || 0;
+  var divisionNames = settings.divisionNames || {};
+
+  if(divCount > 0){
+    var byDiv = {};
+    for(var d=1; d<=divCount; d++) byDiv[d] = [];
+    order.forEach(function(uid, i){
+      var r = records[uid];
+      var d2 = (r.division && r.division <= divCount) ? r.division : ((i % divCount) + 1);
+      byDiv[d2].push(r);
+    });
+    var blocks = [];
+    for(var d3=1; d3<=divCount; d3++){
+      var label = divisionNames[d3] || ('Division ' + d3);
+      blocks.push('<div><div class="h2h-div-name">' + escapeHtmlFR(label) + '</div>' + table(byDiv[d3].sort(sortFn)) + '</div>');
+    }
+    wrap.innerHTML = '<div class="h2h-standings-grid two-up">' + blocks.join('') + '</div>';
+  } else {
+    var allRows = order.map(function(uid){ return records[uid]; }).sort(sortFn);
+    wrap.innerHTML = '<div class="h2h-standings-grid">' + table(allRows) + '</div>';
+  }
+}
+
+function renderH2HMatchups(allMatchups, allScores, myUid){
+  var listEl = document.getElementById('h2h-matchups-list');
+  if(!listEl) return;
+
+  var pairs = allMatchups['week' + currentWeek] || [];
+  var weekScores = allScores[String(currentWeek)] || {};
+  h2hLastWeekScores = weekScores;
+
+  if(!pairs.length){
+    listEl.innerHTML = '<div class="h2h-roster-empty">No matchups yet for this week.</div>';
+    return;
+  }
+
+  var rows = pairs.map(function(p, idx){
+    var isBye = (!p.away || p.awayName === 'BYE');
+    var homeEntry = p.home ? weekScores[p.home] : null;
+    var awayEntry = p.away ? weekScores[p.away] : null;
+    var canExpand = !isBye;
+
+    var rowHtml = '<div class="h2h-matchup-row">'
+      + '<span class="h2h-matchup-team' + (p.home === myUid ? ' mine' : '') + '">' + escapeHtmlFR(p.homeName || 'TBD') + '<span class="h2h-matchup-score">' + fmtH2HScore(homeEntry ? homeEntry.score : null) + '</span></span>'
+      + '<span class="h2h-matchup-at">vs</span>'
+      + (isBye
+          ? '<span class="h2h-matchup-bye">BYE</span>'
+          : '<span class="h2h-matchup-team' + (p.away === myUid ? ' mine' : '') + '">' + escapeHtmlFR(p.awayName || 'TBD') + '<span class="h2h-matchup-score">' + fmtH2HScore(awayEntry ? awayEntry.score : null) + '</span></span>')
+      + (canExpand ? '<span class="h2h-matchup-caret">▾</span>' : '')
+      + '</div>'
+      + '<div class="h2h-roster-drop" id="h2h-roster-' + idx + '"></div>';
+
+    return '<div class="h2h-matchup" data-idx="' + idx + '"'
+      + (canExpand ? ' onclick="toggleH2HRoster(' + idx + ',\'' + p.home + '\',\'' + p.away + '\')"' : ' style="cursor:default;"')
+      + '>' + rowHtml + '</div>';
+  }).join('');
+
+  listEl.innerHTML = rows;
+}
+
+// Players only reveal once their own NFL team's game has kicked off, per
+// /leagues/{id}/locks/{season}/week{w} (written by the kickoff-locks
+// GitHub Action). This is what makes the late-swap format work.
+function toggleH2HRoster(idx, homeUid, awayUid){
+  var matchupEl = document.querySelector('.h2h-matchup[data-idx="' + idx + '"]');
+  var dropEl = document.getElementById('h2h-roster-' + idx);
+  if(!matchupEl || !dropEl) return;
+
+  var wasOpen = matchupEl.classList.contains('open');
+  document.querySelectorAll('.h2h-matchup.open').forEach(function(el){ el.classList.remove('open'); });
+  if(wasOpen) return;
+
+  matchupEl.classList.add('open');
+  dropEl.innerHTML = '<div class="h2h-roster-empty">Loading…</div>';
+
+  var ctx = FRAuth.getLeagueCtx();
+  var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+  var homeScoreEntry = h2hLastWeekScores[homeUid] || null;
+  var awayScoreEntry = h2hLastWeekScores[awayUid] || null;
+
+  Promise.all([
+    FR.fb.get('/leagues/' + leagueId + '/lineups/' + (ctx.season || 2026) + '/week' + currentWeek + '/' + homeUid).catch(function(){ return null; }),
+    FR.fb.get('/leagues/' + leagueId + '/lineups/' + (ctx.season || 2026) + '/week' + currentWeek + '/' + awayUid).catch(function(){ return null; }),
+    FR.fb.get('/leagues/' + leagueId + '/locks/' + (ctx.season || 2026) + '/week' + currentWeek).catch(function(){ return {}; })
+  ]).then(function(results){
+    var locks = results[2] || {};
+    dropEl.innerHTML = rosterColumn(results[0], homeScoreEntry, locks) + rosterColumn(results[1], awayScoreEntry, locks);
+  });
+}
+
+function rosterColumn(lineup, scoreEntry, locks){
+  var teamLabel = (lineup && lineup.team) || '';
+  if(!lineup || !lineup.slots){
+    return '<div><div class="h2h-roster-side-hdr">' + escapeHtmlFR(teamLabel) + '</div><div class="h2h-roster-empty">No lineup set.</div></div>';
+  }
+  var slotPts = (scoreEntry && scoreEntry.slotPts) || {};
+  var startedRows = [];
+  var notStartedCount = 0;
+
+  Object.keys(lineup.slots).forEach(function(slotId){
+    var p = lineup.slots[slotId];
+    if(!p) return;
+    var hasStarted = !!(p.team && locks && locks[p.team]);
+    if(!hasStarted){ notStartedCount++; return; }
+    var pts = slotPts[slotId];
+    startedRows.push('<div class="h2h-roster-player"><span><span class="pos">' + escapeHtmlFR(p.pos || '') + '</span>' + escapeHtmlFR(p.name || '') + '</span><span>' + (typeof pts === 'number' ? pts.toFixed(1) : '0.0') + '</span></div>');
+  });
+
+  var body = startedRows.length ? startedRows.join('') : '<div class="h2h-roster-empty">No players have kicked off yet.</div>';
+  var footer = notStartedCount
+    ? '<div class="h2h-roster-pending">' + notStartedCount + ' more player' + (notStartedCount > 1 ? 's' : '') + ' not started yet — still swappable.</div>'
+    : '';
+  return '<div><div class="h2h-roster-side-hdr">' + escapeHtmlFR(teamLabel) + '</div>' + body + footer + '</div>';
+}
+
 // ── BOOT ───────────────────────────────────────────────────────
 function boot(){
   buildWeekBar();
@@ -1652,6 +1986,8 @@ function boot(){
   var activeTab = document.getElementById('navtab-yourweek');
   if(activeTab) activeTab.classList.add('active');
   initMyTeamInput();
+  applyArchiveVisibility();
+  renderH2HHomeView();
   renderAll();
   checkFirstRun();
 }
@@ -2815,7 +3151,7 @@ function setStatBoxes(mode){
   if(weekly)  weekly.classList.add('hidden');
   if(season)  season.classList.add('hidden');
   if(guill)   guill.classList.add('hidden');
-  if(mode === 'normal'){
+  if(mode === 'normal' && !IS_H2H_LEAGUE){
     if(weekly) weekly.classList.remove('hidden');
   } else if(mode === 'guillotine'){
     if(guill)  guill.classList.remove('hidden');
@@ -5307,8 +5643,8 @@ function handleNav(val){
   var isWeekly = (val === 'yourweek');
   var wStats = document.getElementById('stats-weekly');
   var sStats = document.getElementById('stats-season');
-  if(wStats) wStats.classList.toggle('hidden', !isWeekly);
-  if(sStats) sStats.classList.toggle('hidden', isWeekly);
+  if(wStats) wStats.classList.toggle('hidden', IS_H2H_LEAGUE || !isWeekly);
+  if(sStats) sStats.classList.toggle('hidden', IS_H2H_LEAGUE || isWeekly);
   // Update season stats if switching to season view
   if(!isWeekly) updateSeasonStats();
 }
