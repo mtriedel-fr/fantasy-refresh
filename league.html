@@ -2082,6 +2082,7 @@ function computeH2HStandings(tiebreaker){
   var records = {}; // teamName: {wins, losses, ties, pointsFor, pointsAgainst, division, h2h}
 
   Object.keys(h2hMatchups).forEach(function(wk){
+    if(wk === 'meta') return;
     var weekNum = wk.replace('week', '');
     var matchups = h2hMatchups[wk] || [];
     matchups.forEach(function(m){
@@ -6486,7 +6487,7 @@ function previewH2HSchedule(){
         preview.innerHTML = '<div style="font-size:12px;color:var(--ink3);">No schedule yet — generate one above.</div>';
         return;
       }
-      var weekKeys = Object.keys(data).sort(function(a,b){
+      var weekKeys = Object.keys(data).filter(function(k){ return k !== 'meta'; }).sort(function(a,b){
         return parseInt(a.replace('week','')) - parseInt(b.replace('week',''));
       });
       var html = weekKeys.slice(0, 3).map(function(wk){
