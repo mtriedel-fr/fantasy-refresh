@@ -876,7 +876,7 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
 <!-- DRAFT/REVIEW TEAM CTA — text and icon swap based on whether this
      week's lineup has already been set -->
 <div id="h2h-draft-cta" class="hidden" style="text-align:center;padding:0 16px 14px;">
-  <button id="h2h-draft-cta-btn" onclick="goToDraft()" style="background:linear-gradient(135deg,var(--or),var(--pk));border:none;border-radius:10px;padding:11px 28px;color:#050808;font-family:var(--fd);font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;cursor:pointer;box-shadow:0 3px 12px rgba(0,229,212,.25);">📝 Draft Your Team</button>
+  <button id="h2h-draft-cta-btn" onclick="goToDraft()" style="background:linear-gradient(135deg,var(--or),var(--pk));border:none;border-radius:10px;padding:13px 48px;color:#050808;font-family:var(--fd);font-size:14px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;cursor:pointer;box-shadow:0 3px 12px rgba(0,229,212,.25);width:100%;max-width:340px;">📝 Draft Your Team</button>
 </div>
 
 <!-- H2H HOME — standings + weekly matchups, shown only for head-to-head leagues -->
@@ -953,7 +953,7 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
 
 <!-- YOUR WEEK — My Lineup / Weekly Standing / Weekly Numbers -->
 <div id="tab-yourweek" class="content">
-  <div class="sub-tabs-scroll">
+  <div class="sub-tabs-scroll" id="yourweek-subtabs-scroll">
     <div class="sub-tabs">
       <div class="sub-tab active" onclick="showSubTab(this,'mylineup','yourweek')">👤 My Lineup</div>
       <div class="sub-tab" id="subtab-weeklystanding" onclick="showSubTab(this,'weeklystanding','yourweek')">📊 Weekly Standing</div>
@@ -1762,6 +1762,16 @@ function applyH2HChrome(){
   if(subWeeklyStanding) subWeeklyStanding.style.display = 'none';
   var subMovement = document.getElementById('subtab-movement');
   if(subMovement) subMovement.style.display = 'none';
+  // My Lineup used to live as its own sub-tab here, but the Draft/Review
+  // Team button on the matchup band now covers that job — so for H2H,
+  // skip the sub-tab switcher entirely and just show Weekly Numbers
+  // directly under Your Week.
+  var subTabsBar = document.getElementById('yourweek-subtabs-scroll');
+  if(subTabsBar) subTabsBar.style.display = 'none';
+  var mylineupPanel = document.getElementById('sub-mylineup');
+  if(mylineupPanel) mylineupPanel.classList.add('hidden');
+  var numbersPanel = document.getElementById('sub-numbers');
+  if(numbersPanel) numbersPanel.classList.remove('hidden');
 
   var ctx = FRAuth.getLeagueCtx();
   // Guillotine is a separate flag a H2H league can also carry.
@@ -1985,6 +1995,7 @@ function renderAllH2H(){
 
   var user = (typeof FRAuth !== 'undefined' && FRAuth.getUser) ? FRAuth.getUser() : null;
   var myUid = user ? user.uid : null;
+  var curEntries = seasonData[String(currentWeek)] || [];
 
   var weeks = Object.keys(seasonData).filter(function(k){ return !isNaN(Number(k)) && seasonData[k] && seasonData[k].length > 0; });
 
@@ -1993,6 +2004,7 @@ function renderAllH2H(){
     renderPreseasonRoster();
     try{ document.getElementById('hdr-sub').textContent = ''; }catch(e){}
     try{ document.getElementById('s-left').textContent = WEEKS; }catch(e){}
+    renderNumbers(curEntries);
     loadH2HMatchups(function(){
       renderH2HMyMatchup();
       renderH2HMyLineup();
@@ -2002,6 +2014,7 @@ function renderAllH2H(){
     return;
   }
 
+  renderNumbers(curEntries);
   loadH2HMatchups(function(){
     renderH2HMyMatchup();
     renderH2HMyLineup();
