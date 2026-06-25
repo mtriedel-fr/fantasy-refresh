@@ -1223,9 +1223,11 @@ function openProfileDrawer(){
   // Theme state
   updateDrawerTheme();
 
-  // Commissioner row
-  var commRow = document.getElementById('pd-comm-row');
-  if(commRow) commRow.style.display = commUnlocked ? 'flex' : 'none';
+  // Commissioner row visibility is owned entirely by initCommissionerAccess()
+  // (the actual Firebase-confirmed check) — deliberately not re-derived here
+  // from commUnlocked, since that flag isn't set yet if the drawer gets
+  // opened before that async check resolves, which was forcing this back
+  // to hidden every time regardless of the real, slightly-later answer.
 
   // Show drawer
   var overlay = document.getElementById('profile-overlay');
@@ -1710,11 +1712,16 @@ function escapeHtmlFR(s){
 }
 
 function applyArchiveVisibility(){
-  // The 2025 archive only has data for the original league.
+  // The 2025 archive only has data for the original league. Note: hiding
+  // an <option> via style.display is unreliable across browsers (several,
+  // including Safari, just ignore it for native selects) — removing the
+  // element outright is the only way that reliably works everywhere.
   var ctx = FRAuth.getLeagueCtx();
   var isOgLeague = !ctx || ctx.leagueId === 'fr_refresh26';
   var opt = document.getElementById('season-opt-2025');
-  if(opt) opt.style.display = isOgLeague ? '' : 'none';
+  if(!isOgLeague && opt && opt.parentNode){
+    opt.parentNode.removeChild(opt);
+  }
 }
 
 function applyH2HChrome(){
