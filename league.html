@@ -511,7 +511,9 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
 .bn-item:not(.active) .bn-label{color:var(--ink3);}
 .bn-item:not(.active) .bn-icon{opacity:.5;}
 
-.comm-panel{background:var(--hdr);border-top:2px solid var(--or);}
+.comm-panel{position:fixed;top:0;left:0;right:0;bottom:0;background:var(--hdr);border-top:2px solid var(--or);z-index:600;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+.comm-panel.hidden{display:none;}
+.comm-title-bar{position:sticky;top:0;background:var(--hdr);z-index:1;padding:16px 28px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;}
 .comm-inner{padding:24px 28px;}
 /* COMMISSIONER PASSWORD GATE */
 .comm-gate{padding:32px 28px;display:flex;align-items:center;justify-content:center;}
@@ -979,14 +981,15 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
 </div>
 
 <div class="comm-panel hidden" id="comm-panel">
+  <div class="comm-title-bar">
+    <span style="font-family:var(--fd);font-size:14px;font-weight:700;color:var(--or);text-transform:uppercase;letter-spacing:1px;">⚙ Commissioner Tools</span>
+    <span style="display:flex;gap:8px;align-items:center;">
+      <a href="runbook.html" target="_blank" style="font-family:var(--fd);font-size:11px;font-weight:700;color:var(--ink3);text-decoration:none;border:1px solid var(--bdr2);padding:3px 10px;border-radius:6px;text-transform:uppercase;letter-spacing:.5px;transition:all .15s;" onmouseover="this.style.color='var(--or)';this.style.borderColor='var(--or)'" onmouseout="this.style.color='var(--ink3)';this.style.borderColor='var(--bdr2)'">📋 Runbook</a>
+      <button onclick="toggleComm()" style="background:none;border:1px solid var(--bdr2);color:var(--ink3);font-size:13px;padding:3px 10px;border-radius:6px;cursor:pointer;font-family:var(--fd);">✕ Close</button>
+    </span>
+  </div>
   <div id="comm-tools">
   <div class="comm-inner">
-    <div class="comm-title">⚙ Commissioner Tools
-      <span style="float:right;display:flex;gap:8px;align-items:center;">
-        <a href="runbook.html" target="_blank" style="font-family:var(--fd);font-size:11px;font-weight:700;color:var(--ink3);text-decoration:none;border:1px solid var(--bdr2);padding:3px 10px;border-radius:6px;text-transform:uppercase;letter-spacing:.5px;transition:all .15s;" onmouseover="this.style.color='var(--or)';this.style.borderColor='var(--or)'" onmouseout="this.style.color='var(--ink3)';this.style.borderColor='var(--bdr2)'">📋 Runbook</a>
-        <button onclick="toggleComm()" style="background:none;border:1px solid var(--bdr2);color:var(--ink3);font-size:13px;padding:3px 10px;border-radius:6px;cursor:pointer;font-family:var(--fd);">✕ Close</button>
-      </span>
-    </div>
 
     <!-- LEAGUE MESSAGE -->
     <div style="margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid var(--bdr);">
@@ -4634,6 +4637,7 @@ function openCommPanel(){
   if(!p) return;
   var hidden = p.classList.contains('hidden');
   p.classList.toggle('hidden');
+  document.body.style.overflow = hidden ? 'hidden' : '';
   var toggleBtn = document.getElementById('comm-toggle');
   if(toggleBtn) toggleBtn.textContent = hidden ? '✕ Close' : '⚙ Commissioner';
   if(!hidden) return;
