@@ -520,6 +520,14 @@ tr.my-team:hover td{background:rgba(255,95,160,.18) !important;}
 
 .comm-panel{position:fixed;top:0;left:0;right:0;bottom:0;background:var(--hdr);border-top:2px solid var(--or);z-index:600;overflow-y:auto;-webkit-overflow-scrolling:touch;}
 .comm-panel.hidden{display:none;}
+
+/* TAB OVERLAY — same full-screen takeover pattern as the commissioner
+   panel, applied to Your Week / Your Season / Playoffs / Guillotine */
+.tab-overlay{position:fixed !important;top:0;left:0;right:0;bottom:0;background:var(--bg);z-index:550;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+.tab-overlay.hidden{display:none !important;}
+.tab-overlay-close-bar{position:sticky;top:0;background:var(--bg2);z-index:1;padding:14px 18px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;}
+.tab-overlay-close-bar-title{font-family:var(--fd);font-size:13px;font-weight:800;color:var(--or);text-transform:uppercase;letter-spacing:1px;}
+.tab-overlay-close-btn{background:none;border:1px solid var(--bdr2);color:var(--ink3);font-size:13px;padding:5px 14px;border-radius:6px;cursor:pointer;font-family:var(--fd);}
 .comm-title-bar{position:sticky;top:0;background:var(--hdr);z-index:1;padding:16px 28px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;}
 .comm-inner{padding:24px 28px;}
 /* COMMISSIONER PASSWORD GATE */
@@ -953,6 +961,10 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
 
 <!-- YOUR WEEK — My Lineup / Weekly Standing / Weekly Numbers -->
 <div id="tab-yourweek" class="content">
+  <div class="tab-overlay-close-bar hidden">
+    <span class="tab-overlay-close-bar-title">📅 Your Week</span>
+    <button class="tab-overlay-close-btn" onclick="closeH2HTabOverlay()">✕ Close</button>
+  </div>
   <div class="sub-tabs-scroll" id="yourweek-subtabs-scroll">
     <div class="sub-tabs">
       <div class="sub-tab active" onclick="showSubTab(this,'mylineup','yourweek')">👤 My Lineup</div>
@@ -967,6 +979,10 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
 
 <!-- YOUR SEASON — My Season / Seasonal Standings / Movement -->
 <div id="tab-yourseason" class="content hidden">
+  <div class="tab-overlay-close-bar hidden">
+    <span class="tab-overlay-close-bar-title">📈 Your Season</span>
+    <button class="tab-overlay-close-btn" onclick="closeH2HTabOverlay()">✕ Close</button>
+  </div>
   <div class="sub-tabs-scroll">
     <div class="sub-tabs">
       <div class="sub-tab active" onclick="showSubTab(this,'myseason','yourseason')">📈 My Season</div>
@@ -980,9 +996,19 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
 </div>
 
 <div id="tab-seasonwrap" class="content hidden"><div id="wsw"></div></div>
-<div id="tab-guillotine" class="content hidden"><div id="wg"></div></div>
+<div id="tab-guillotine" class="content hidden">
+  <div class="tab-overlay-close-bar hidden">
+    <span class="tab-overlay-close-bar-title">🔪 Guillotine</span>
+    <button class="tab-overlay-close-btn" onclick="closeH2HTabOverlay()">✕ Close</button>
+  </div>
+  <div id="wg"></div>
+</div>
 <div id="tab-league" class="content hidden"><div id="wleague"></div></div>
 <div id="tab-playoffs" class="content hidden">
+  <div class="tab-overlay-close-bar hidden">
+    <span class="tab-overlay-close-bar-title">🏆 Playoffs</span>
+    <button class="tab-overlay-close-btn" onclick="closeH2HTabOverlay()">✕ Close</button>
+  </div>
   <!-- Playoff round pills -->
   <div style="display:flex;gap:8px;padding:12px 16px;background:var(--bg2);border-bottom:1px solid var(--bdr);overflow-x:auto;">
     <div id="po-pill-16" class="round-pill upcoming">Wk 16</div>
@@ -1780,6 +1806,27 @@ function applyH2HChrome(){
 
   var hdr = document.getElementById('h2h-matchups-hdr');
   if(hdr) hdr.textContent = 'Week ' + currentWeek + ' Matchups';
+
+  // Your Week / Your Season / Playoffs / Guillotine become full-screen
+  // takeovers for H2H, same pattern as the commissioner panel — but this
+  // only applies here in JS, gated on IS_H2H_LEAGUE, so the cumulative OG
+  // league's tab behavior is completely untouched.
+  ['tab-yourweek','tab-yourseason','tab-guillotine','tab-playoffs'].forEach(function(id){
+    var t = document.getElementById(id);
+    if(t) t.classList.add('tab-overlay');
+  });
+  document.querySelectorAll('.tab-overlay-close-bar').forEach(function(b){ b.classList.remove('hidden'); });
+
+  // On first load only: keep the homepage (matchup band, standings,
+  // matchups) as the very first thing visible, with no tab open yet,
+  // instead of Your Week immediately covering it full-screen.
+  if(!h2hChromeInitialized){
+    h2hChromeInitialized = true;
+    var ywTab = document.getElementById('tab-yourweek');
+    if(ywTab) ywTab.classList.add('hidden');
+    document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); });
+    document.querySelectorAll('.bn-item').forEach(function(b){ b.classList.remove('active'); });
+  }
 }
 
 
@@ -1915,6 +1962,7 @@ loadFromCloud();
 
 // ── WEEK BAR ───────────────────────────────────────────────────
 var H2H_LAST_WEEK = null; // set once playoff settings load, for any code that needs the real season-end week instead of the generic WEEKS default
+var h2hChromeInitialized = false; // ensures the homepage-first default only gets forced on the very first render, not every re-render
 
 function buildWeekBar(){
   var sel = document.getElementById('wk-select');
@@ -4724,7 +4772,14 @@ function openCommPanel(){
   // Check head-to-head schedule status when panel opens
   var ctx2 = FRAuth.getLeagueCtx();
   if(ctx2){
-    FR.fb.get('/leagues/' + ctx2.leagueId + '/settings').then(function(s){ initH2HVisibility(s); }).catch(function(){});
+    FR.fb.get('/leagues/' + ctx2.leagueId + '/settings').then(function(s){
+      initH2HVisibility(s);
+      // This was hardcoded to a leftover placeholder ("REFRESH26") in the
+      // static HTML and never actually updated — every league showed the
+      // same wrong code regardless of its real join code in Firebase.
+      var joinCodeEl = document.getElementById('join-code-display');
+      if(joinCodeEl) joinCodeEl.textContent = (s && s.joinCode) ? s.joinCode : '—';
+    }).catch(function(){});
   }
   // Wire up drag and drop once
   var zone = document.getElementById('drop-zone');
@@ -5619,10 +5674,17 @@ function showSubTab(el, id, section){
   if(panel) panel.classList.remove('hidden');
 }
 
+function closeH2HTabOverlay(){
+  document.querySelectorAll('.tab-overlay').forEach(function(t){ t.classList.add('hidden'); });
+  document.body.style.overflow = '';
+  document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); });
+  document.querySelectorAll('.bn-item').forEach(function(b){ b.classList.remove('active'); });
+}
+
 function handleNav(val){
-  if(val === 'league'){ document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); }); document.getElementById('tab-league').classList.remove('hidden'); document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); }); document.getElementById('navtab-league').classList.add('active'); setStatBoxes('hidden'); renderLeague(); return; }
-  if(val === 'playoffs'){ document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); }); document.getElementById('tab-playoffs').classList.remove('hidden'); document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); }); document.getElementById('navtab-playoffs').classList.add('active'); setStatBoxes('hidden'); renderPlayoffs(); return; }
-  if(val === 'guillotine'){ document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); }); document.getElementById('tab-guillotine').classList.remove('hidden'); document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); }); document.getElementById('navtab-guillotine').classList.add('active'); setStatBoxes('guillotine'); renderGuillotine(); return; }
+  if(val === 'league'){ document.body.style.overflow = ''; document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); }); document.getElementById('tab-league').classList.remove('hidden'); document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); }); document.getElementById('navtab-league').classList.add('active'); setStatBoxes('hidden'); renderLeague(); return; }
+  if(val === 'playoffs'){ document.body.style.overflow = 'hidden'; document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); }); document.getElementById('tab-playoffs').classList.remove('hidden'); document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); }); document.getElementById('navtab-playoffs').classList.add('active'); setStatBoxes('hidden'); renderPlayoffs(); return; }
+  if(val === 'guillotine'){ document.body.style.overflow = 'hidden'; document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); }); document.getElementById('tab-guillotine').classList.remove('hidden'); document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); }); document.getElementById('navtab-guillotine').classList.add('active'); setStatBoxes('guillotine'); renderGuillotine(); return; }
   if(val === 'yourseason'){
     var completedWeeks = Object.keys(seasonData).filter(function(k){
       return !isNaN(Number(k)) && seasonData[k] && seasonData[k].length > 0;
@@ -5641,7 +5703,8 @@ function handleNav(val){
       }
       // Season still in progress — fall through to the normal view below.
     } else if(completedWeeks >= WEEKS){
-      // Season complete — show wrap
+      // Season complete — show wrap (not a full-screen overlay, so unlock scroll)
+      document.body.style.overflow = '';
       document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); });
       document.getElementById('tab-seasonwrap').classList.remove('hidden');
       document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); });
@@ -5653,6 +5716,7 @@ function handleNav(val){
       return;
     }
     // Season in progress — show normal season view
+    document.body.style.overflow = 'hidden';
     document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); });
     document.getElementById('tab-yourseason').classList.remove('hidden');
     document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); });
@@ -5660,6 +5724,7 @@ function handleNav(val){
     updateSeasonStats();
     return;
   }
+  document.body.style.overflow = (val === 'yourweek') ? 'hidden' : '';
   var panel = document.getElementById('tab-' + val);
   if(panel) panel.classList.remove('hidden');
   // Update tab bar active state
