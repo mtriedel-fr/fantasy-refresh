@@ -509,7 +509,7 @@ tr.my-team:hover td{background:rgba(255,95,160,.18) !important;}
 
 /* COMMISSIONER */
 /* BOTTOM NAV */
-.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:var(--hdr);border-top:1px solid var(--bdr);display:flex;align-items:center;z-index:100;padding-bottom:env(safe-area-inset-bottom);}
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:var(--hdr);border-top:1px solid var(--bdr);display:flex;align-items:center;z-index:560;padding-bottom:env(safe-area-inset-bottom);}
 .bn-item{flex:1;display:flex;flex-direction:column;align-items:center;padding:10px 0 8px;gap:3px;cursor:pointer;-webkit-tap-highlight-color:transparent;border:none;background:transparent;}
 .bn-icon{font-size:18px;line-height:1;}
 .bn-label{font-family:var(--fd);font-size:9px;text-transform:uppercase;letter-spacing:.5px;font-weight:700;}
@@ -523,7 +523,7 @@ tr.my-team:hover td{background:rgba(255,95,160,.18) !important;}
 
 /* TAB OVERLAY — same full-screen takeover pattern as the commissioner
    panel, applied to Your Week / Your Season / Playoffs / Guillotine */
-.tab-overlay{position:fixed !important;top:0;left:0;right:0;bottom:0;background:var(--bg);z-index:550;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+.tab-overlay{position:fixed !important;top:0;left:0;right:0;bottom:0;background:var(--bg);z-index:550;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:calc(76px + env(safe-area-inset-bottom));}
 .tab-overlay.hidden{display:none !important;}
 .tab-overlay-close-bar{position:sticky;top:0;background:var(--bg2);z-index:1;padding:14px 18px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;}
 .tab-overlay-close-bar-title{font-family:var(--fd);font-size:13px;font-weight:800;color:var(--or);text-transform:uppercase;letter-spacing:1px;}
