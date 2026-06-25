@@ -140,7 +140,16 @@ tr:hover td{background:var(--or4);}
 .my-team-bar input::placeholder{color:var(--ink3);}
 .my-team-badge{font-family:var(--fd);font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:2px 7px;border-radius:8px;margin-left:6px;background:rgba(0,212,204,.15);color:var(--or);border:1px solid rgba(0,212,204,.4);}
 
-/* H2H HOME — standings + weekly matchups, headtohead leagues only */
+/* H2H PERSONAL MATCHUP BAND — replaces the Score/Place stats band */
+.h2h-matchup-band{display:flex;align-items:center;justify-content:center;gap:18px;padding:14px 20px;background:linear-gradient(135deg, rgba(0,212,204,.10), rgba(255,107,53,.06));border-bottom:1px solid var(--bdr);}
+.h2h-matchup-band-side{flex:1;max-width:170px;text-align:center;min-width:0;}
+.h2h-matchup-band-name{font-family:var(--fd);font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.h2h-matchup-band-side.mine .h2h-matchup-band-name{color:var(--or);}
+.h2h-matchup-band-score{font-family:var(--fd);font-size:30px;font-weight:900;color:var(--ink);line-height:1.15;margin-top:1px;}
+.h2h-matchup-band-mid{text-align:center;flex-shrink:0;}
+.h2h-matchup-band-wk{font-family:var(--fd);font-size:9px;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;}
+.h2h-matchup-band-vs-txt{font-family:var(--fd);font-size:13px;font-weight:800;color:var(--ink3);}
+.h2h-matchup-band-empty{padding:16px 20px;text-align:center;font-size:13px;color:var(--ink3);font-style:italic;background:var(--bg3);border-bottom:1px solid var(--bdr);}
 .h2h-section{background:var(--bg3);border-bottom:1px solid var(--bdr);padding:14px 28px;}
 .h2h-section-hdr{font-family:var(--fd);font-size:11px;font-weight:800;color:var(--ink2);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;}
 
@@ -851,7 +860,7 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
     <select class="season-select" id="season-select" onchange="switchSeason(this.value)" title="Switch season">
       <option value="2026" selected>2026</option>
       <option value="PS26">PS'26</option>
-      <option value="2025">2025</option>
+      <option value="2025" id="season-opt-2025">2025</option>
     </select>
   </div>
 </div>
@@ -875,6 +884,10 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
   </div>
   <span id="my-team-league-ctx" style="font-family:var(--fd);font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-left:auto;"></span>
 </div>
+
+<!-- H2H PERSONAL MATCHUP BAND — replaces the Score/Place stats band for
+     head-to-head leagues. Sits right at the top, no scrolling required. -->
+<div class="h2h-matchup-band hidden" id="h2h-matchup-band"></div>
 
 <!-- H2H HOME — standings + weekly matchups, shown only for head-to-head leagues -->
 <div id="h2h-home" class="hidden">
@@ -1287,16 +1300,28 @@ function fmtH2HScore(s){
   return (typeof s === 'number') ? s.toFixed(1) : '—';
 }
 
+function applyArchiveVisibility(){
+  // The 2025 archive only has data for the original league — every league
+  // created since multi-league support landed has nothing there.
+  var ctx = (typeof FR !== 'undefined' && FR.ctx) ? FR.ctx() : null;
+  var isOgLeague = !ctx || ctx.leagueId === 'fr_refresh26';
+  var opt = document.getElementById('season-opt-2025');
+  if(opt) opt.style.display = isOgLeague ? '' : 'none';
+}
+
 function renderH2HHome(){
   var ctx = (typeof FR !== 'undefined' && FR.ctx) ? FR.ctx() : null;
   var home = document.getElementById('h2h-home');
+  var band = document.getElementById('h2h-matchup-band');
   IS_H2H_PAGE = !!(ctx && ctx.format === 'headtohead');
 
   if(!IS_H2H_PAGE){
     if(home) home.classList.add('hidden');
+    if(band) band.classList.add('hidden');
     return;
   }
   if(home) home.classList.remove('hidden');
+  if(band) band.classList.remove('hidden');
 
   // Hide cumulative-framed chrome that doesn't map onto H2H
   var wStats = document.getElementById('stats-weekly');
@@ -1329,13 +1354,52 @@ function renderH2HHome(){
     var allMatchups = results[2] || {};
     var allScores   = results[3] || {};
 
+    renderH2HMatchupBand(allMatchups, allScores, myUid);
     renderH2HStandings(members, settings, allMatchups, allScores, myUid);
     renderH2HMatchups(allMatchups, allScores, myUid);
   }).catch(function(e){
     console.error('H2H home render failed:', e);
     if(home) home.classList.add('hidden');
+    if(band) band.classList.add('hidden');
   });
 }
+
+// Compact "you vs your opponent" callout — always shows your own side on
+// the left labeled in orange, regardless of which side you're on in the
+// underlying home/away pairing. This is the very first thing visible on
+// the page, no scrolling required.
+function renderH2HMatchupBand(allMatchups, allScores, myUid){
+  var band = document.getElementById('h2h-matchup-band');
+  if(!band) return;
+
+  var pairs = allMatchups['week' + currentWeek] || [];
+  var mine = pairs.find(function(p){ return p.home === myUid || p.away === myUid; });
+
+  if(!mine){
+    band.innerHTML = '<div class="h2h-matchup-band-empty">No matchup found for Week ' + currentWeek + '.</div>';
+    return;
+  }
+
+  var weekScores = allScores[String(currentWeek)] || {};
+  var iAmHome = mine.home === myUid;
+  var myName  = iAmHome ? mine.homeName : mine.awayName;
+  var oppUid  = iAmHome ? mine.away : mine.home;
+  var oppName = iAmHome ? mine.awayName : mine.homeName;
+  var myScore = weekScores[myUid] ? weekScores[myUid].score : null;
+
+  if(!oppUid || oppName === 'BYE'){
+    band.innerHTML = '<div class="h2h-matchup-band-empty">🛌 Bye week — no matchup for ' + escapeHtmlFR(myName || 'you') + ' in Week ' + currentWeek + '.</div>';
+    return;
+  }
+
+  var oppScore = weekScores[oppUid] ? weekScores[oppUid].score : null;
+
+  band.innerHTML = '<div class="h2h-matchup-band-side mine"><div class="h2h-matchup-band-name">' + escapeHtmlFR(myName || 'You') + '</div><div class="h2h-matchup-band-score">' + fmtH2HScore(myScore) + '</div></div>'
+    + '<div class="h2h-matchup-band-mid"><div class="h2h-matchup-band-wk">Week ' + currentWeek + '</div><div class="h2h-matchup-band-vs-txt">VS</div></div>'
+    + '<div class="h2h-matchup-band-side"><div class="h2h-matchup-band-name">' + escapeHtmlFR(oppName || 'TBD') + '</div><div class="h2h-matchup-band-score">' + fmtH2HScore(oppScore) + '</div></div>';
+}
+
+
 
 function renderH2HStandings(members, settings, allMatchups, allScores, myUid){
   var wrap = document.getElementById('h2h-standings-wrap');
@@ -1528,6 +1592,7 @@ function boot(){
   var activeTab = document.getElementById('navtab-yourweek');
   if(activeTab) activeTab.classList.add('active');
   initMyTeamInput();
+  applyArchiveVisibility();
   renderH2HHome();
   renderAll();
   checkFirstRun();
