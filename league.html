@@ -156,7 +156,11 @@ tr:hover td{background:var(--or4);}
 .h2h-matchup-band-empty{margin:14px 16px;padding:18px 20px;text-align:center;font-size:13px;color:var(--ink3);font-style:italic;background:var(--bg3);border:1px solid var(--bdr2);border-radius:16px;}
 
 /* H2H HOME — standings + weekly matchups */
-.h2h-section{background:var(--bg3);border-bottom:1px solid var(--bdr);padding:14px 28px;}
+.h2h-section{background:var(--bg3);border-radius:14px;margin:0 16px 14px;padding:16px 18px;border:1px solid var(--bdr);border-top-width:3px;}
+.h2h-section-standings{border-top-color:#E8B84B;}
+.h2h-section-standings .h2h-section-hdr{color:#E8B84B;}
+.h2h-section-matchups{border-top-color:var(--or);}
+.h2h-section-matchups .h2h-section-hdr{color:var(--or);}
 .h2h-section-hdr{font-family:var(--fd);font-size:11px;font-weight:800;color:var(--ink2);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;text-align:center;}
 .h2h-standings-grid{display:grid;grid-template-columns:1fr;gap:14px;}
 .h2h-standings-grid.two-up{grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));}
@@ -221,8 +225,9 @@ tr:hover td{background:var(--or4);}
 /* SEASONAL STANDINGS + MOVEMENT pink hover, purple me-highlight */
 .season-name-link{color:inherit;text-decoration:none;font-family:var(--fd);font-weight:700;font-size:15px;}
 .season-name-link:hover{color:var(--pk);text-decoration:underline;}
-tr.my-team td{background:rgba(155,109,255,.10) !important;border-left:3px solid var(--pu);}
-tr.my-team:hover td{background:rgba(155,109,255,.18) !important;}
+tr.my-team td{background:rgba(255,95,160,.10) !important;}
+tr.my-team td:first-child{border-left:3px solid var(--pk);}
+tr.my-team:hover td{background:rgba(255,95,160,.18) !important;}
 .sub-tabs{display:flex;background:var(--bg2);min-width:max-content;padding:0 4px;}
 .sub-tab{padding:11px 18px;font-family:var(--fd);font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;color:var(--ink2);border-bottom:3px solid transparent;margin-bottom:-2px;transition:color .15s;white-space:nowrap;}
 .sub-tab.active{color:var(--pk);border-bottom:3px solid var(--pk);}
@@ -398,8 +403,9 @@ svg.chart{width:100%;height:100%;overflow:visible;}
 .num-stat{background:var(--bg4);border-radius:8px;padding:12px 14px;text-align:center;border:1px solid var(--bdr);}
 .num-stat-lbl{font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink2);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;}
 .num-stat-val{font-family:var(--fd);font-size:22px;font-weight:800;color:var(--pk);}
-tr.my-team td{background:rgba(0,212,204,.08) !important;border-left:3px solid var(--or);}
-tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
+tr.my-team td{background:rgba(255,95,160,.10) !important;}
+tr.my-team td:first-child{border-left:3px solid var(--pk);}
+tr.my-team:hover td{background:rgba(255,95,160,.18) !important;}
 .my-team-input{display:flex;align-items:center;gap:8px;padding:8px 16px;background:var(--bg4);border-bottom:1px solid var(--bdr);}
 .my-team-input input{flex:1;padding:6px 10px;font-family:var(--fb);font-size:13px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:6px;color:var(--ink);outline:none;}
 .my-team-input input:focus{border-color:var(--or);}
@@ -869,11 +875,11 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
 
 <!-- H2H HOME — standings + weekly matchups, shown only for head-to-head leagues -->
 <div id="h2h-home" class="hidden">
-  <div class="h2h-section">
+  <div class="h2h-section h2h-section-standings">
     <div class="h2h-section-hdr">🏆 Standings</div>
     <div id="h2h-standings-wrap"></div>
   </div>
-  <div class="h2h-section">
+  <div class="h2h-section h2h-section-matchups">
     <div class="h2h-section-hdr" id="h2h-matchups-hdr">Week 1 Matchups</div>
     <div id="h2h-matchups-list"></div>
   </div>
