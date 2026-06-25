@@ -144,16 +144,16 @@ tr:hover td{background:var(--or4);}
 .my-team-bar input::placeholder{color:var(--ink3);}
 
 /* H2H PERSONAL MATCHUP BAND — replaces the Score/Current Place stats band */
-.h2h-matchup-band{position:relative;display:flex;align-items:center;justify-content:center;gap:18px;padding:24px 20px 16px;background:linear-gradient(135deg, rgba(0,212,204,.14), rgba(255,107,53,.08));border-top:2px solid var(--or);border-bottom:2px solid var(--or);box-shadow:0 0 24px rgba(0,212,204,.12) inset;}
-.h2h-matchup-band::before{content:'YOUR MATCHUP';position:absolute;top:4px;left:50%;transform:translateX(-50%);font-family:var(--fd);font-size:9px;font-weight:800;color:var(--or);letter-spacing:1.5px;opacity:.85;}
+.h2h-matchup-band{position:relative;display:flex;align-items:center;justify-content:center;gap:18px;margin:14px 16px;padding:26px 20px 18px;background:linear-gradient(135deg, rgba(0,229,212,.24), rgba(255,61,130,.20));border:2px solid var(--or);border-radius:16px;box-shadow:0 6px 24px rgba(0,229,212,.28), 0 0 0 1px rgba(0,229,212,.15);}
+.h2h-matchup-band::before{content:'⚡ YOUR MATCHUP ⚡';position:absolute;top:-11px;left:50%;transform:translateX(-50%);font-family:var(--fd);font-size:10px;font-weight:900;color:#050808;letter-spacing:1.5px;background:var(--or);padding:3px 14px;border-radius:20px;white-space:nowrap;}
 .h2h-matchup-band-side{flex:1;max-width:170px;text-align:center;min-width:0;}
 .h2h-matchup-band-name{font-family:var(--fd);font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .h2h-matchup-band-side.mine .h2h-matchup-band-name{color:var(--or);}
-.h2h-matchup-band-score{font-family:var(--fd);font-size:30px;font-weight:900;color:var(--ink);line-height:1.15;margin-top:1px;}
+.h2h-matchup-band-score{font-family:var(--fd);font-size:34px;font-weight:900;color:var(--ink);line-height:1.1;margin-top:2px;}
 .h2h-matchup-band-mid{text-align:center;flex-shrink:0;}
 .h2h-matchup-band-wk{font-family:var(--fd);font-size:9px;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;}
 .h2h-matchup-band-vs-txt{font-family:var(--fd);font-size:13px;font-weight:800;color:var(--ink3);}
-.h2h-matchup-band-empty{padding:16px 20px;text-align:center;font-size:13px;color:var(--ink3);font-style:italic;background:var(--bg3);border-bottom:1px solid var(--bdr);}
+.h2h-matchup-band-empty{margin:14px 16px;padding:18px 20px;text-align:center;font-size:13px;color:var(--ink3);font-style:italic;background:var(--bg3);border:1px solid var(--bdr2);border-radius:16px;}
 
 /* H2H HOME — standings + weekly matchups */
 .h2h-section{background:var(--bg3);border-bottom:1px solid var(--bdr);padding:14px 28px;}
@@ -2083,6 +2083,25 @@ function computeH2HStandings(tiebreaker){
   tiebreaker = tiebreaker || 'h2h_then_pf';
   var records = {}; // teamName: {wins, losses, ties, pointsFor, pointsAgainst, division, h2h}
 
+  function ensureRecord(name, division){
+    if(!name || name === 'BYE') return;
+    if(!records[name]) records[name] = {wins:0, losses:0, ties:0, pf:0, pa:0, division: division || null, h2h:{}};
+    else if(division && !records[name].division) records[name].division = division;
+  }
+
+  // First pass: register every team that appears anywhere in the schedule,
+  // even before a single game has been scored — so standings show the full
+  // field at 0-0, grouped by division, instead of staying empty until the
+  // first result comes in.
+  Object.keys(h2hMatchups).forEach(function(wk){
+    if(wk === 'meta') return;
+    (h2hMatchups[wk] || []).forEach(function(m){
+      ensureRecord(m.homeName, m.homeDivision);
+      ensureRecord(m.awayName, m.awayDivision);
+    });
+  });
+
+  // Second pass: accumulate results for whichever weeks actually have scores
   Object.keys(h2hMatchups).forEach(function(wk){
     if(wk === 'meta') return;
     var weekNum = wk.replace('week', '');
@@ -2091,9 +2110,6 @@ function computeH2HStandings(tiebreaker){
       var homeScore = getTeamScore(weekNum, m.homeName);
       var awayScore = m.awayName === 'BYE' ? null : getTeamScore(weekNum, m.awayName);
       if(homeScore === null) return; // week hasn't happened yet
-
-      if(!records[m.homeName]) records[m.homeName] = {wins:0, losses:0, ties:0, pf:0, pa:0, division: m.homeDivision || null, h2h:{}};
-      if(m.awayName !== 'BYE' && !records[m.awayName]) records[m.awayName] = {wins:0, losses:0, ties:0, pf:0, pa:0, division: m.awayDivision || null, h2h:{}};
 
       records[m.homeName].pf += homeScore;
       if(m.awayName === 'BYE' || awayScore === null) return;
