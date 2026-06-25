@@ -144,7 +144,8 @@ tr:hover td{background:var(--or4);}
 .my-team-bar input::placeholder{color:var(--ink3);}
 
 /* H2H PERSONAL MATCHUP BAND — replaces the Score/Current Place stats band */
-.h2h-matchup-band{display:flex;align-items:center;justify-content:center;gap:18px;padding:14px 20px;background:linear-gradient(135deg, rgba(0,212,204,.10), rgba(255,107,53,.06));border-bottom:1px solid var(--bdr);}
+.h2h-matchup-band{position:relative;display:flex;align-items:center;justify-content:center;gap:18px;padding:24px 20px 16px;background:linear-gradient(135deg, rgba(0,212,204,.14), rgba(255,107,53,.08));border-top:2px solid var(--or);border-bottom:2px solid var(--or);box-shadow:0 0 24px rgba(0,212,204,.12) inset;}
+.h2h-matchup-band::before{content:'YOUR MATCHUP';position:absolute;top:4px;left:50%;transform:translateX(-50%);font-family:var(--fd);font-size:9px;font-weight:800;color:var(--or);letter-spacing:1.5px;opacity:.85;}
 .h2h-matchup-band-side{flex:1;max-width:170px;text-align:center;min-width:0;}
 .h2h-matchup-band-name{font-family:var(--fd);font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .h2h-matchup-band-side.mine .h2h-matchup-band-name{color:var(--or);}
@@ -156,7 +157,7 @@ tr:hover td{background:var(--or4);}
 
 /* H2H HOME — standings + weekly matchups */
 .h2h-section{background:var(--bg3);border-bottom:1px solid var(--bdr);padding:14px 28px;}
-.h2h-section-hdr{font-family:var(--fd);font-size:11px;font-weight:800;color:var(--ink2);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;}
+.h2h-section-hdr{font-family:var(--fd);font-size:11px;font-weight:800;color:var(--ink2);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;text-align:center;}
 .h2h-standings-grid{display:grid;grid-template-columns:1fr;gap:14px;}
 .h2h-standings-grid.two-up{grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));}
 @media (max-width:640px){ .h2h-standings-grid.two-up{grid-template-columns:1fr;} }
@@ -168,11 +169,11 @@ tr:hover td{background:var(--or4);}
 .h2h-standings-table tr.mine td{color:var(--or);font-weight:700;}
 .h2h-standings-table tr:last-child td{border-bottom:none;}
 .h2h-matchup{border:1px solid var(--bdr);border-radius:8px;margin-bottom:8px;overflow:hidden;cursor:pointer;background:var(--bg4);}
-.h2h-matchup-row{display:flex;align-items:center;gap:10px;padding:10px 12px;}
-.h2h-matchup-team{flex:1;display:flex;align-items:center;justify-content:space-between;gap:8px;font-family:var(--fd);font-size:13px;font-weight:700;color:var(--ink);}
+.h2h-matchup-row{display:flex;align-items:center;justify-content:center;gap:16px;padding:12px 14px;}
+.h2h-matchup-team{flex:0 1 150px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:3px;font-family:var(--fd);font-size:13px;font-weight:700;color:var(--ink);}
 .h2h-matchup-team.mine{color:var(--or);}
-.h2h-matchup-score{font-family:var(--fd);font-size:15px;font-weight:800;color:var(--ink2);min-width:32px;text-align:right;}
-.h2h-matchup-at{font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;padding:0 4px;}
+.h2h-matchup-score{font-family:var(--fd);font-size:16px;font-weight:800;color:var(--ink2);text-align:center;}
+.h2h-matchup-at{font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;padding:0 4px;flex-shrink:0;}
 .h2h-matchup-bye{color:var(--ink3);font-style:italic;font-weight:400;}
 .h2h-matchup-caret{font-size:10px;color:var(--ink3);margin-left:4px;transition:transform .15s;}
 .h2h-matchup.open .h2h-matchup-caret{transform:rotate(180deg);}
@@ -1090,6 +1091,7 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
           <!-- DIVISION ASSIGNMENT -->
           <div id="h2h-division-block" style="display:none;margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--bdr);">
             <div style="font-family:var(--fd);font-size:12px;font-weight:700;color:var(--ink2);text-transform:uppercase;margin-bottom:6px;">Division Names</div>
+            <div style="font-size:12px;color:var(--ink3);margin-bottom:10px;line-height:1.5;">Optional — give each division a real name (e.g. "AFC East"). Leave blank to keep the default "Division 1" / "Division 2" labels. Saved together with assignments below.</div>
             <div id="h2h-division-names" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;"></div>
 
             <div style="font-family:var(--fd);font-size:12px;font-weight:700;color:var(--ink2);text-transform:uppercase;margin-bottom:6px;">Division Assignment</div>
@@ -2147,19 +2149,18 @@ function computeH2HStandings(tiebreaker){
 function buildStandingsTable(rows){
   var bodyRows = rows.map(function(t, i){
     var isMe = myTeam && teamMatch(t.name, myTeam);
+    var record = t.wins + '-' + t.losses + (t.ties ? '-' + t.ties : '');
     return '<tr' + (isMe ? ' class="my-team"' : '') + '>'
       + '<td class="rk' + (i < 3 ? ' top' : '') + '">' + (i+1) + '</td>'
       + '<td style="font-family:var(--fd);font-size:14px;font-weight:700;color:' + (isMe ? 'var(--or)' : 'var(--ink)') + ';">' + t.name + '</td>'
-      + '<td style="text-align:center;font-family:var(--fd);font-weight:800;color:var(--or);">' + t.wins + '</td>'
-      + '<td style="text-align:center;font-family:var(--fd);font-weight:800;color:var(--pk);">' + t.losses + '</td>'
-      + '<td style="text-align:center;font-family:var(--fd);font-weight:700;color:var(--ink3);">' + t.ties + '</td>'
+      + '<td style="text-align:center;font-family:var(--fd);font-weight:800;color:var(--ink);">' + record + '</td>'
       + '<td style="text-align:right;font-family:var(--fd);color:var(--ink2);">' + fmtScore(t.pf) + '</td>'
       + '<td style="text-align:right;font-family:var(--fd);color:var(--ink3);">' + fmtScore(t.pa) + '</td>'
       + '</tr>';
   }).join('');
 
   return '<table class="st-table"><thead><tr>'
-    + '<th class="rk">#</th><th>Team</th><th style="text-align:center;">W</th><th style="text-align:center;">L</th><th style="text-align:center;">T</th><th style="text-align:right;">PF</th><th style="text-align:right;">PA</th>'
+    + '<th class="rk">#</th><th>Team</th><th style="text-align:center;">Record</th><th style="text-align:right;">PF</th><th style="text-align:right;">PA</th>'
     + '</tr></thead><tbody>' + bodyRows + '</tbody></table>';
 }
 
