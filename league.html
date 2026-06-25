@@ -873,6 +873,12 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
      band for head-to-head leagues. First thing visible, no scrolling. -->
 <div class="h2h-matchup-band hidden" id="h2h-matchup-band"></div>
 
+<!-- DRAFT/REVIEW TEAM CTA — text and icon swap based on whether this
+     week's lineup has already been set -->
+<div id="h2h-draft-cta" class="hidden" style="text-align:center;padding:0 16px 14px;">
+  <button id="h2h-draft-cta-btn" onclick="goToDraft()" style="background:linear-gradient(135deg,var(--or),var(--pk));border:none;border-radius:10px;padding:11px 28px;color:#050808;font-family:var(--fd);font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;cursor:pointer;box-shadow:0 3px 12px rgba(0,229,212,.25);">📝 Draft Your Team</button>
+</div>
+
 <!-- H2H HOME — standings + weekly matchups, shown only for head-to-head leagues -->
 <div id="h2h-home" class="hidden">
   <div class="h2h-section h2h-section-standings">
@@ -1736,14 +1742,17 @@ function applyArchiveVisibility(){
 function applyH2HChrome(){
   var home = document.getElementById('h2h-home');
   var band = document.getElementById('h2h-matchup-band');
+  var cta = document.getElementById('h2h-draft-cta');
 
   if(!IS_H2H_LEAGUE){
     if(home) home.classList.add('hidden');
     if(band) band.classList.add('hidden');
+    if(cta) cta.classList.add('hidden');
     return;
   }
   if(home) home.classList.remove('hidden');
   if(band) band.classList.remove('hidden');
+  if(cta) cta.classList.remove('hidden');
 
   var wStats = document.getElementById('stats-weekly');
   var sStats = document.getElementById('stats-season');
@@ -2078,6 +2087,10 @@ function renderH2HMyLineup(){
     var lineup = results[0];
     var weekScores = results[1] || {};
     var myEntry = weekScores[user.uid] || null;
+
+    var hasAnyPlayer = !!(lineup && lineup.slots && Object.keys(lineup.slots).some(function(k){ return !!lineup.slots[k]; }));
+    var ctaBtn = document.getElementById('h2h-draft-cta-btn');
+    if(ctaBtn) ctaBtn.textContent = hasAnyPlayer ? '✏️ Review Team' : '📝 Draft Your Team';
 
     if(!lineup || !lineup.slots){
       wt.innerHTML = '<div class="myteam-empty"><div class="myteam-empty-icon">📋</div><div class="myteam-empty-title">No lineup set for Week ' + currentWeek + '</div><div class="myteam-empty-sub">Head to the Draft tab to set your roster for this week.</div></div>';
