@@ -1687,20 +1687,17 @@ function setLoading(on){
   document.getElementById('hdr-sub').textContent = on ? 'Loading season data...' : '';
 }
 
-// ── H2H HOME — matchup band + standings + weekly matchups ────────
-// This is the real landing page for head-to-head leagues (home.html
-// routes here, never to index.html). Reuses the IS_H2H_LEAGUE flag
-// already computed above for the schedule-generation logic.
+// ── H2H CHROME — hides cumulative-framed UI for head-to-head leagues ──
+// Folded into the EXISTING renderAllH2H() pipeline below rather than a
+// separate boot path. h2hMatchups / loadH2HMatchups / getMyH2HMatchup /
+// computeH2HStandings already existed before this session's changes —
+// reused here instead of duplicated.
 var h2hLastWeekScores = {};
 
 function escapeHtmlFR(s){
   return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
     return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];
   });
-}
-
-function fmtH2HScore(s){
-  return (typeof s === 'number') ? s.toFixed(1) : '—';
 }
 
 function applyArchiveVisibility(){
@@ -1711,7 +1708,7 @@ function applyArchiveVisibility(){
   if(opt) opt.style.display = isOgLeague ? '' : 'none';
 }
 
-function renderH2HHomeView(){
+function applyH2HChrome(){
   var home = document.getElementById('h2h-home');
   var band = document.getElementById('h2h-matchup-band');
 
@@ -1733,180 +1730,59 @@ function renderH2HHomeView(){
   if(subMovement) subMovement.style.display = 'none';
 
   var ctx = FRAuth.getLeagueCtx();
-  var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
   // Guillotine is a separate flag a H2H league can also carry.
   var guillotineTab = document.getElementById('navtab-guillotine');
-  if(guillotineTab) guillotineTab.style.display = ctx.guillotine ? '' : 'none';
+  if(guillotineTab) guillotineTab.style.display = (ctx && ctx.guillotine) ? '' : 'none';
 
   var hdr = document.getElementById('h2h-matchups-hdr');
   if(hdr) hdr.textContent = 'Week ' + currentWeek + ' Matchups';
-
-  var user = (typeof FRAuth !== 'undefined' && FRAuth.getUser) ? FRAuth.getUser() : null;
-  var myUid = user ? user.uid : null;
-
-  Promise.all([
-    FR.fb.get('/leagues/' + leagueId + '/members'),
-    FR.fb.get('/leagues/' + leagueId + '/settings'),
-    FR.fb.get('/leagues/' + leagueId + '/matchups/' + (ctx.season || 2026)),
-    FR.fb.get('/leagues/' + leagueId + '/season/' + (ctx.season || 2026))
-  ]).then(function(results){
-    var members     = results[0] || {};
-    var settings    = results[1] || {};
-    var allMatchups = results[2] || {};
-    var allScores   = results[3] || {};
-
-    renderH2HMatchupBand(allMatchups, allScores, myUid);
-    renderH2HStandings(members, settings, allMatchups, allScores, myUid);
-    renderH2HMatchups(allMatchups, allScores, myUid);
-  }).catch(function(e){
-    console.error('H2H home render failed:', e);
-    if(home) home.classList.add('hidden');
-    if(band) band.classList.add('hidden');
-  });
 }
 
-function renderH2HMatchupBand(allMatchups, allScores, myUid){
-  var band = document.getElementById('h2h-matchup-band');
-  if(!band) return;
 
-  var pairs = allMatchups['week' + currentWeek] || [];
-  var mine = pairs.find(function(p){ return p.home === myUid || p.away === myUid; });
-
-  if(!mine){
-    band.innerHTML = '<div class="h2h-matchup-band-empty">No matchup found for Week ' + currentWeek + '.</div>';
-    return;
-  }
-
-  var weekScores = allScores[String(currentWeek)] || {};
-  var iAmHome = mine.home === myUid;
-  var myName  = iAmHome ? mine.homeName : mine.awayName;
-  var oppUid  = iAmHome ? mine.away : mine.home;
-  var oppName = iAmHome ? mine.awayName : mine.homeName;
-  var myScore = weekScores[myUid] ? weekScores[myUid].score : null;
-
-  if(!oppUid || oppName === 'BYE'){
-    band.innerHTML = '<div class="h2h-matchup-band-empty">🛌 Bye week — no matchup for ' + escapeHtmlFR(myName || 'you') + ' in Week ' + currentWeek + '.</div>';
-    return;
-  }
-
-  var oppScore = weekScores[oppUid] ? weekScores[oppUid].score : null;
-
-  band.innerHTML = '<div class="h2h-matchup-band-side mine"><div class="h2h-matchup-band-name">' + escapeHtmlFR(myName || 'You') + '</div><div class="h2h-matchup-band-score">' + fmtH2HScore(myScore) + '</div></div>'
-    + '<div class="h2h-matchup-band-mid"><div class="h2h-matchup-band-wk">Week ' + currentWeek + '</div><div class="h2h-matchup-band-vs-txt">VS</div></div>'
-    + '<div class="h2h-matchup-band-side"><div class="h2h-matchup-band-name">' + escapeHtmlFR(oppName || 'TBD') + '</div><div class="h2h-matchup-band-score">' + fmtH2HScore(oppScore) + '</div></div>';
-}
-
-function renderH2HStandings(members, settings, allMatchups, allScores, myUid){
-  var wrap = document.getElementById('h2h-standings-wrap');
-  if(!wrap) return;
-
-  var records = {};
-  var order = [];
-  Object.keys(members).forEach(function(uid){
-    var m = members[uid];
-    if(!m || !m.teamName || m.active === false) return;
-    records[uid] = { uid: uid, wins:0, losses:0, ties:0, pf:0, pa:0, teamName:m.teamName, division: m.division || null };
-    order.push(uid);
-  });
-
-  Object.keys(allMatchups).forEach(function(wk){
-    if(wk === 'meta') return;
-    var weekNum = parseInt(wk.replace('week',''), 10);
-    var weekScores = allScores[String(weekNum)] || {};
-    (allMatchups[wk] || []).forEach(function(p){
-      if(!p.home || !p.away || !records[p.home] || !records[p.away]) return;
-      var hs = weekScores[p.home] ? weekScores[p.home].score : null;
-      var as = weekScores[p.away] ? weekScores[p.away].score : null;
-      if(typeof hs !== 'number' || typeof as !== 'number') return;
-      records[p.home].pf += hs; records[p.home].pa += as;
-      records[p.away].pf += as; records[p.away].pa += hs;
-      if(hs > as){ records[p.home].wins++; records[p.away].losses++; }
-      else if(as > hs){ records[p.away].wins++; records[p.home].losses++; }
-      else { records[p.home].ties++; records[p.away].ties++; }
-    });
-  });
-
-  function sortFn(a,b){
-    var aG = a.wins+a.losses+a.ties, bG = b.wins+b.losses+b.ties;
-    var aWp = aG ? (a.wins + a.ties*0.5)/aG : 0;
-    var bWp = bG ? (b.wins + b.ties*0.5)/bG : 0;
-    if(bWp !== aWp) return bWp - aWp;
-    return b.pf - a.pf;
-  }
-
-  function table(rows){
-    var trs = rows.map(function(r){
-      return '<tr class="' + (r.uid === myUid ? 'mine' : '') + '">'
-        + '<td>' + escapeHtmlFR(r.teamName) + '</td>'
-        + '<td class="num">' + r.wins + '</td>'
-        + '<td class="num">' + r.losses + '</td>'
-        + '<td class="num">' + r.ties + '</td>'
-        + '<td class="num">' + r.pf.toFixed(1) + '</td>'
-        + '</tr>';
-    }).join('');
-    return '<table class="h2h-standings-table"><thead><tr>'
-      + '<th>Team</th><th class="num">W</th><th class="num">L</th><th class="num">T</th><th class="num">PF</th>'
-      + '</tr></thead><tbody>' + trs + '</tbody></table>';
-  }
-
-  var divCount = settings.h2hDivisions || 0;
-  var divisionNames = settings.divisionNames || {};
-
-  if(divCount > 0){
-    var byDiv = {};
-    for(var d=1; d<=divCount; d++) byDiv[d] = [];
-    order.forEach(function(uid, i){
-      var r = records[uid];
-      var d2 = (r.division && r.division <= divCount) ? r.division : ((i % divCount) + 1);
-      byDiv[d2].push(r);
-    });
-    var blocks = [];
-    for(var d3=1; d3<=divCount; d3++){
-      var label = divisionNames[d3] || ('Division ' + d3);
-      blocks.push('<div><div class="h2h-div-name">' + escapeHtmlFR(label) + '</div>' + table(byDiv[d3].sort(sortFn)) + '</div>');
-    }
-    wrap.innerHTML = '<div class="h2h-standings-grid two-up">' + blocks.join('') + '</div>';
-  } else {
-    var allRows = order.map(function(uid){ return records[uid]; }).sort(sortFn);
-    wrap.innerHTML = '<div class="h2h-standings-grid">' + table(allRows) + '</div>';
-  }
-}
-
-function renderH2HMatchups(allMatchups, allScores, myUid){
+function renderH2HMatchups(myUid){
   var listEl = document.getElementById('h2h-matchups-list');
   if(!listEl) return;
 
-  var pairs = allMatchups['week' + currentWeek] || [];
-  var weekScores = allScores[String(currentWeek)] || {};
-  h2hLastWeekScores = weekScores;
-
+  var pairs = h2hMatchups['week' + currentWeek] || [];
   if(!pairs.length){
     listEl.innerHTML = '<div class="h2h-roster-empty">No matchups yet for this week.</div>';
     return;
   }
 
-  var rows = pairs.map(function(p, idx){
-    var isBye = (!p.away || p.awayName === 'BYE');
-    var homeEntry = p.home ? weekScores[p.home] : null;
-    var awayEntry = p.away ? weekScores[p.away] : null;
-    var canExpand = !isBye;
+  var ctx = FRAuth.getLeagueCtx();
+  var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+  // Raw per-uid score entries (with slotPts) — a different shape than the
+  // name-keyed seasonData array used elsewhere, needed here for the roster
+  // dropdown's per-player points.
+  FR.fb.get('/leagues/' + leagueId + '/season/' + (ctx.season || 2026) + '/' + currentWeek).then(function(weekScores){
+    weekScores = weekScores || {};
+    h2hLastWeekScores = weekScores;
 
-    var rowHtml = '<div class="h2h-matchup-row">'
-      + '<span class="h2h-matchup-team' + (p.home === myUid ? ' mine' : '') + '">' + escapeHtmlFR(p.homeName || 'TBD') + '<span class="h2h-matchup-score">' + fmtH2HScore(homeEntry ? homeEntry.score : null) + '</span></span>'
-      + '<span class="h2h-matchup-at">vs</span>'
-      + (isBye
-          ? '<span class="h2h-matchup-bye">BYE</span>'
-          : '<span class="h2h-matchup-team' + (p.away === myUid ? ' mine' : '') + '">' + escapeHtmlFR(p.awayName || 'TBD') + '<span class="h2h-matchup-score">' + fmtH2HScore(awayEntry ? awayEntry.score : null) + '</span></span>')
-      + (canExpand ? '<span class="h2h-matchup-caret">▾</span>' : '')
-      + '</div>'
-      + '<div class="h2h-roster-drop" id="h2h-roster-' + idx + '"></div>';
+    var rows = pairs.map(function(p, idx){
+      var isBye = (!p.away || p.awayName === 'BYE');
+      var homeEntry = p.home ? weekScores[p.home] : null;
+      var awayEntry = p.away ? weekScores[p.away] : null;
+      var canExpand = !isBye;
 
-    return '<div class="h2h-matchup" data-idx="' + idx + '"'
-      + (canExpand ? ' onclick="toggleH2HRoster(' + idx + ',\'' + p.home + '\',\'' + p.away + '\')"' : ' style="cursor:default;"')
-      + '>' + rowHtml + '</div>';
-  }).join('');
+      var rowHtml = '<div class="h2h-matchup-row">'
+        + '<span class="h2h-matchup-team' + (p.home === myUid ? ' mine' : '') + '">' + escapeHtmlFR(p.homeName || 'TBD') + '<span class="h2h-matchup-score">' + fmtScore(homeEntry ? homeEntry.score : null) + '</span></span>'
+        + '<span class="h2h-matchup-at">vs</span>'
+        + (isBye
+            ? '<span class="h2h-matchup-bye">BYE</span>'
+            : '<span class="h2h-matchup-team' + (p.away === myUid ? ' mine' : '') + '">' + escapeHtmlFR(p.awayName || 'TBD') + '<span class="h2h-matchup-score">' + fmtScore(awayEntry ? awayEntry.score : null) + '</span></span>')
+        + (canExpand ? '<span class="h2h-matchup-caret">▾</span>' : '')
+        + '</div>'
+        + '<div class="h2h-roster-drop" id="h2h-roster-' + idx + '"></div>';
 
-  listEl.innerHTML = rows;
+      return '<div class="h2h-matchup" data-idx="' + idx + '"'
+        + (canExpand ? ' onclick="toggleH2HRoster(' + idx + ',\'' + p.home + '\',\'' + p.away + '\')"' : ' style="cursor:default;"')
+        + '>' + rowHtml + '</div>';
+    }).join('');
+
+    listEl.innerHTML = rows;
+  }).catch(function(){
+    listEl.innerHTML = '<div class="h2h-roster-empty">Could not load scores for this week.</div>';
+  });
 }
 
 // Players only reveal once their own NFL team's game has kicked off, per
@@ -1987,7 +1863,6 @@ function boot(){
   if(activeTab) activeTab.classList.add('active');
   initMyTeamInput();
   applyArchiveVisibility();
-  renderH2HHomeView();
   renderAll();
   checkFirstRun();
 }
@@ -2051,8 +1926,12 @@ function loadH2HMatchups(callback){
 }
 
 function renderAllH2H(){
+  applyH2HChrome();
   var sel = document.getElementById('wk-select');
   if(sel) sel.value = currentWeek;
+
+  var user = (typeof FRAuth !== 'undefined' && FRAuth.getUser) ? FRAuth.getUser() : null;
+  var myUid = user ? user.uid : null;
 
   var weeks = Object.keys(seasonData).filter(function(k){ return !isNaN(Number(k)) && seasonData[k] && seasonData[k].length > 0; });
 
@@ -2061,13 +1940,20 @@ function renderAllH2H(){
     renderPreseasonRoster();
     try{ document.getElementById('hdr-sub').textContent = ''; }catch(e){}
     try{ document.getElementById('s-left').textContent = WEEKS; }catch(e){}
-    loadH2HMatchups(function(){ renderH2HMyMatchup(); renderH2HStandings(); });
+    loadH2HMatchups(function(){
+      renderH2HMyMatchup();
+      renderH2HMyLineup();
+      renderH2HStandings();
+      renderH2HMatchups(myUid);
+    });
     return;
   }
 
   loadH2HMatchups(function(){
     renderH2HMyMatchup();
+    renderH2HMyLineup();
     renderH2HStandings();
+    renderH2HMatchups(myUid);
     var el = document.getElementById('s-left');
     if(el) el.textContent = Math.max(0, WEEKS - weeks.length);
   });
@@ -2093,61 +1979,82 @@ function getTeamScore(week, teamName){
 }
 
 function renderH2HMyMatchup(){
-  var wt = document.getElementById('wt');
-  if(!wt) return;
+  var band = document.getElementById('h2h-matchup-band');
+  if(!band) return;
 
   if(!myTeam){
-    wt.innerHTML = '<div class="myteam-empty"><div class="myteam-empty-icon">👤</div><div class="myteam-empty-title">No team set</div><div class="myteam-empty-sub">Type your team name in the "Your Team" field above — it\'s not case sensitive.</div></div>';
+    band.innerHTML = '<div class="h2h-matchup-band-empty">Type your team name above to see your matchup.</div>';
     return;
   }
 
   var matchup = getMyH2HMatchup(currentWeek);
   if(!matchup){
-    wt.innerHTML = '<div class="myteam-empty"><div class="myteam-empty-icon">📅</div><div class="myteam-empty-title">No matchup scheduled for Week ' + currentWeek + '</div><div class="myteam-empty-sub">The commissioner hasn\'t generated a schedule for this week yet, or you have a bye.</div></div>';
+    band.innerHTML = '<div class="h2h-matchup-band-empty">📅 No matchup scheduled for Week ' + currentWeek + ' — the commissioner hasn\'t generated a schedule yet, or you have a bye.</div>';
     return;
   }
 
   var oppName = matchup.opponentName;
   var isBye = !oppName || oppName === 'BYE';
-  var myScore  = getTeamScore(currentWeek, myTeam);
-  var oppScore = isBye ? null : getTeamScore(currentWeek, oppName);
 
+  if(isBye){
+    band.innerHTML = '<div class="h2h-matchup-band-empty">🛌 Bye week for ' + escapeHtmlFR(myTeam) + ' in Week ' + currentWeek + '.</div>';
+    return;
+  }
+
+  var myScore  = getTeamScore(currentWeek, myTeam);
+  var oppScore = getTeamScore(currentWeek, oppName);
   var myDisplay  = myScore  !== null ? fmtScore(myScore)  : '—';
   var oppDisplay = oppScore !== null ? fmtScore(oppScore) : '—';
 
-  var result = null; // 'win' | 'loss' | 'tie' | null
-  if(myScore !== null && oppScore !== null){
-    if(myScore > oppScore) result = 'win';
-    else if(myScore < oppScore) result = 'loss';
-    else result = 'tie';
+  band.innerHTML = '<div class="h2h-matchup-band-side mine"><div class="h2h-matchup-band-name">' + escapeHtmlFR(myTeam) + '</div><div class="h2h-matchup-band-score">' + myDisplay + '</div></div>'
+    + '<div class="h2h-matchup-band-mid"><div class="h2h-matchup-band-wk">Week ' + currentWeek + '</div><div class="h2h-matchup-band-vs-txt">VS</div></div>'
+    + '<div class="h2h-matchup-band-side"><div class="h2h-matchup-band-name">' + escapeHtmlFR(oppName) + '</div><div class="h2h-matchup-band-score">' + oppDisplay + '</div></div>';
+}
+
+// Read-only "My Lineup" summary for H2H — what you've actually got rostered
+// this week, pulled from the same /lineups path draft.html writes to. Not
+// an editor (that's draft.html); this is just the at-a-glance view.
+function renderH2HMyLineup(){
+  var wt = document.getElementById('wt');
+  if(!wt) return;
+
+  var user = (typeof FRAuth !== 'undefined' && FRAuth.getUser) ? FRAuth.getUser() : null;
+  if(!user || !user.uid){
+    wt.innerHTML = '<div class="myteam-empty"><div class="myteam-empty-icon">👤</div><div class="myteam-empty-title">No team set</div><div class="myteam-empty-sub">Type your team name in the "Your Team" field above.</div></div>';
+    return;
   }
 
-  var resultBadge = '';
-  if(result === 'win')  resultBadge = '<span style="background:rgba(0,229,212,.12);color:var(--or);border:1px solid rgba(0,229,212,.3);padding:3px 10px;border-radius:8px;font-family:var(--fd);font-size:11px;font-weight:800;text-transform:uppercase;">WIN</span>';
-  if(result === 'loss') resultBadge = '<span style="background:rgba(255,95,160,.12);color:var(--pk);border:1px solid rgba(255,95,160,.3);padding:3px 10px;border-radius:8px;font-family:var(--fd);font-size:11px;font-weight:800;text-transform:uppercase;">LOSS</span>';
-  if(result === 'tie')  resultBadge = '<span style="background:rgba(155,109,255,.12);color:var(--pu);border:1px solid rgba(155,109,255,.3);padding:3px 10px;border-radius:8px;font-family:var(--fd);font-size:11px;font-weight:800;text-transform:uppercase;">TIE</span>';
+  var ctx = FRAuth.getLeagueCtx();
+  var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
 
-  var html = '<div style="padding:16px;">'
-    + '<div style="background:var(--bg2);border-radius:16px;border:1px solid var(--bdr);overflow:hidden;">'
-    + '<div style="padding:10px 16px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;">'
-    + '<span style="font-family:var(--fd);font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;">Week ' + currentWeek + ' Matchup</span>'
-    + resultBadge
-    + '</div>'
-    + '<div style="padding:24px 16px;display:flex;align-items:center;justify-content:space-between;">'
-    + '<div style="flex:1;text-align:center;">'
-    + '<div style="font-family:var(--fd);font-size:14px;font-weight:800;color:var(--or);text-transform:uppercase;margin-bottom:6px;">' + myTeam + '</div>'
-    + '<div style="font-family:var(--fd);font-size:36px;font-weight:900;color:' + (result === 'win' ? 'var(--or)' : result === 'loss' ? 'var(--ink3)' : 'var(--ink)') + ';">' + myDisplay + '</div>'
-    + '</div>'
-    + '<div style="font-family:var(--fd);font-size:13px;font-weight:700;color:var(--ink3);padding:0 12px;">VS</div>'
-    + '<div style="flex:1;text-align:center;">'
-    + '<div style="font-family:var(--fd);font-size:14px;font-weight:800;color:' + (isBye ? 'var(--ink3)' : 'var(--pk)') + ';text-transform:uppercase;margin-bottom:6px;">' + (isBye ? 'BYE WEEK' : oppName) + '</div>'
-    + '<div style="font-family:var(--fd);font-size:36px;font-weight:900;color:' + (result === 'loss' ? 'var(--pk)' : 'var(--ink3)') + ';">' + (isBye ? '—' : oppDisplay) + '</div>'
-    + '</div>'
-    + '</div>'
-    + '</div>'
-    + '</div>';
+  Promise.all([
+    FR.fb.get('/leagues/' + leagueId + '/lineups/' + (ctx.season || 2026) + '/week' + currentWeek + '/' + user.uid),
+    FR.fb.get('/leagues/' + leagueId + '/season/' + (ctx.season || 2026) + '/' + currentWeek)
+  ]).then(function(results){
+    var lineup = results[0];
+    var weekScores = results[1] || {};
+    var myEntry = weekScores[user.uid] || null;
 
-  wt.innerHTML = html;
+    if(!lineup || !lineup.slots){
+      wt.innerHTML = '<div class="myteam-empty"><div class="myteam-empty-icon">📋</div><div class="myteam-empty-title">No lineup set for Week ' + currentWeek + '</div><div class="myteam-empty-sub">Head to the Draft tab to set your roster for this week.</div></div>';
+      return;
+    }
+
+    var slotPts = (myEntry && myEntry.slotPts) || {};
+    var rows = Object.keys(lineup.slots).map(function(slotId){
+      var p = lineup.slots[slotId];
+      if(!p) return '<div class="lineup-slot"><span class="lineup-pos">' + escapeHtmlFR(slotId.toUpperCase()) + '</span><span class="lineup-player">—</span></div>';
+      var pts = slotPts[slotId];
+      return '<div class="lineup-slot"><span class="lineup-pos">' + escapeHtmlFR(p.pos || '') + '</span><span class="lineup-player">' + escapeHtmlFR(p.name || '') + '</span><span class="lineup-pct">' + (typeof pts === 'number' ? pts.toFixed(1) + ' pts' : '—') + '</span></div>';
+    }).join('');
+
+    wt.innerHTML = '<div class="myteam-wrap"><div class="myteam-card">'
+      + '<div style="padding:14px 16px;border-bottom:1px solid var(--bdr);font-family:var(--fd);font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;">Week ' + currentWeek + ' Lineup' + (myEntry ? ' · ' + fmtScore(myEntry.score) + ' pts' : '') + '</div>'
+      + '<div style="padding:8px 16px 16px;" class="lineup-grid">' + rows + '</div>'
+      + '</div></div>';
+  }).catch(function(){
+    wt.innerHTML = '<div class="myteam-empty"><div class="myteam-empty-icon">⚠️</div><div class="myteam-empty-title">Could not load lineup</div></div>';
+  });
 }
 
 // Compute full W-L-T standings across all weeks with a generated schedule
@@ -2239,12 +2146,14 @@ function buildStandingsTable(rows){
 function renderH2HStandings(){
   var sw = document.getElementById('sw');
   var wf = document.getElementById('wf');
+  var wrap = document.getElementById('h2h-standings-wrap');
   var standings = computeH2HStandings();
 
   if(!standings.length){
     var emptyHtml = '<div class="myteam-empty"><div class="myteam-empty-icon">📅</div><div class="myteam-empty-title">No results yet</div><div class="myteam-empty-sub">Standings appear once the commissioner generates a schedule and scores come in.</div></div>';
     if(sw) sw.innerHTML = emptyHtml;
     if(wf) wf.innerHTML = emptyHtml;
+    if(wrap) wrap.innerHTML = emptyHtml;
     return;
   }
 
@@ -2276,8 +2185,20 @@ function renderH2HStandings(){
     // Cache divisional groupings on window so the filter click handler can re-render without recomputing
     window._h2hStandingsByDivision = byDivision;
     window._h2hStandingsAll = standings;
+
+    // Homepage version: every division visible side-by-side at once,
+    // rather than behind the filter tabs used in the My Week / My Season
+    // tab versions above — this is the "no extra clicks" view.
+    if(wrap){
+      var blocks = divKeys.map(function(dk){
+        var label = dk === 'Unassigned' ? 'Unassigned' : 'Division ' + dk;
+        return '<div><div class="h2h-div-name">' + label + '</div>' + buildStandingsTable(byDivision[dk]) + '</div>';
+      });
+      wrap.innerHTML = '<div class="h2h-standings-grid two-up">' + blocks.join('') + '</div>';
+    }
   } else {
     html = buildStandingsTable(standings);
+    if(wrap) wrap.innerHTML = '<div class="h2h-standings-grid">' + html + '</div>';
   }
 
   if(sw) sw.innerHTML = html;
