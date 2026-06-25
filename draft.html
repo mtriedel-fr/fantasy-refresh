@@ -405,6 +405,7 @@ function loadSalaries(){
       if(data && data.players && Object.keys(data.players).length){
         allPlayers = Object.values(data.players).filter(function(p){ return p && p.name && p.pos; });
         if(!schedule.length) buildGamesBarFromPlayers();
+        renderPool();
         return;
       }
       if(PS_MODE){ loadFlatSalariesFromPool(); return; }
