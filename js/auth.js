@@ -268,11 +268,12 @@
   }
 
   function joinLeague(leagueId, uid, email, displayName, teamName) {
+    var resolvedTeamName = teamName || ((displayName || (email ? email.split('@')[0] : 'Player')).trim() + "'s Team");
     return dbSet('/leagues/' + leagueId + '/members/' + uid, {
       uid:         uid,
       email:       email,
       displayName: displayName || '',
-      teamName:    teamName    || '',
+      teamName:    resolvedTeamName,
       joined:      Date.now(),
       role:        'member',
       active:      true,
@@ -284,8 +285,8 @@
 
   function checkCommissioner(uid, leagueId) {
     return Promise.all([
-      dbGet('/leagues/' + leagueId + '/commissioners/' + uid),
-      dbGet('/leagues/' + leagueId + '/settings/creatorUid')
+      dbGet('/leagues/' + leagueId + '/settings/commissioners/' + uid),
+      dbGet('/leagues/' + leagueId + '/settings/createdBy')
     ]).then(function(results) {
       var isComm    = results[0] === true;
       var isCreator = results[1] === uid;
@@ -319,13 +320,16 @@
   function enterLeague(leagueId, settings, teamName) {
     if (typeof FR !== 'undefined' && FR.saveContext) {
       FR.saveContext({
-        leagueId:   leagueId,
-        leagueName: settings.name       || leagueId,
-        season:     settings.season     || 2026,
-        format:     settings.format     || 'cumulative',
-        guillotine: settings.guillotine || false,
-        cap:        settings.cap        || 60000,
-        role:       'member'
+        leagueId:    leagueId,
+        leagueName:  settings.name       || leagueId,
+        season:      settings.season     || 2026,
+        format:      settings.format     || 'cumulative',
+        guillotine:  settings.guillotine || false,
+        cap:         settings.cap        || 60000,
+        role:        'member',
+        isPreseason: settings.isPreseason || settings.format === 'preseason' || settings.seasonType === 'Preseason',
+        seasonType:  settings.seasonType  || (settings.format === 'preseason' ? 'Preseason' : 'Regular'),
+        weeks:       settings.weeks       || 18
       });
     }
     if (teamName) {
