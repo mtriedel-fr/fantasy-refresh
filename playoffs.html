@@ -190,8 +190,14 @@ function loadFromCloud(){
   var urlSeason = (new URLSearchParams(window.location.search)).get('season') || '2026';
   var backBtn = document.getElementById('back-btn-href');
   if(backBtn) backBtn.href = urlSeason === '2025' ? '/archive2025.html' : '/league.html';
-  console.log('playoffs loading season:', urlSeason);
-  fetch(FB_DB_URL + '/season' + urlSeason + '.json')
+  var pCtx = FRAuth.getLeagueCtx();
+  var pLeagueId = pCtx ? pCtx.leagueId : 'fr_refresh26';
+  console.log('playoffs loading season:', urlSeason, 'league:', pLeagueId);
+  // Same legacy-path bug as league.html's playoffs tab: /season{year} is a
+  // top-level path with no security rule granting read access (only
+  // /season2025 exists, and even that's read-only for the old single-league
+  // data). Scores live per-league now.
+  fetch(FB_DB_URL + '/leagues/' + pLeagueId + '/season/' + urlSeason + '.json')
     .then(function(r){ return r.json(); })
     .then(function(data){
       console.log('playoffs data received, null?', data === null, 'keys:', data ? Object.keys(data).length : 0);

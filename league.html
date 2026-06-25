@@ -2883,8 +2883,14 @@ function loadFromCloud(){
   var urlSeason = (new URLSearchParams(window.location.search)).get('season') || '2026';
   var backBtn = document.getElementById('back-btn-href');
   if(backBtn) backBtn.href = urlSeason === '2025' ? '/archive2025.html' : '/league.html';
-  console.log('playoffs loading season:', urlSeason);
-  fetch(FB_DB_URL + '/season' + urlSeason + '.json')
+  var pCtx = FRAuth.getLeagueCtx();
+  var pLeagueId = pCtx ? pCtx.leagueId : 'fr_refresh26';
+  console.log('playoffs loading season:', urlSeason, 'league:', pLeagueId);
+  // NOTE: this used to read a legacy top-level /season{year} path left over
+  // from before multi-league support. That path has no security rule at
+  // all (only /season2025 exists, and even that is write-only false with
+  // no read grant) — every request to it 401s. Scores live per-league now.
+  fetch(FB_DB_URL + '/leagues/' + pLeagueId + '/season/' + urlSeason + '.json')
     .then(function(r){ return r.json(); })
     .then(function(data){
       console.log('playoffs data received, null?', data === null, 'keys:', data ? Object.keys(data).length : 0);

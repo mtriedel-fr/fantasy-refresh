@@ -128,6 +128,7 @@ html[data-theme="light"] body{background:#D8F0EE;}
 </style>
 </head>
 <body>
+<script src="league-context.js"></script>
 <div class="wrap">
 
 <div class="hdr">
@@ -162,7 +163,11 @@ var _backBtn = document.getElementById('back-btn');
 if(_backBtn) _backBtn.href = backLink;
 
 // ── LOAD ───────────────────────────────────────────────────────
-fetch(FB_DB_URL + '/season' + urlSeason + '.json')
+var pLeagueId = (typeof FR !== 'undefined' && FR.ctx) ? (FR.ctx().leagueId || 'fr_refresh26') : 'fr_refresh26';
+// This used to read a legacy top-level /season{year} path with no security
+// rule granting read access (only /season2025 exists, read-only, from
+// before multi-league support). Scores live per-league now.
+fetch(FB_DB_URL + '/leagues/' + pLeagueId + '/season/' + urlSeason + '.json')
   .then(function(r){ return r.json(); })
   .then(function(d){
     if(d && typeof d === 'object' && !d.error) seasonData = d;
