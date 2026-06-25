@@ -1723,18 +1723,14 @@ function escapeHtmlFR(s){
 }
 
 function applyArchiveVisibility(){
-  // The 2025 archive only has data for the original league. Note: hiding
-  // an <option> via style.display is unreliable across browsers (several,
-  // including Safari, just ignore it for native selects) — removing the
-  // element outright is the only way that reliably works everywhere.
+  // The 2025 archive only has data for the original league, and once it's
+  // gone, 2026 is the only option left in this dropdown for every other
+  // league — at that point the dropdown itself is just clutter, so hide
+  // the whole thing rather than leave a single-option select sitting there.
   var ctx = FRAuth.getLeagueCtx();
   var isOgLeague = !ctx || ctx.leagueId === 'fr_refresh26';
-  var opt = document.getElementById('season-opt-2025');
-  console.log('[archive-check] leagueId:', ctx && ctx.leagueId, '| isOgLeague:', isOgLeague, '| option found:', !!opt);
-  if(!isOgLeague && opt && opt.parentNode){
-    opt.parentNode.removeChild(opt);
-    console.log('[archive-check] removed 2025 option');
-  }
+  var sel = document.getElementById('season-select');
+  if(sel) sel.style.display = isOgLeague ? '' : 'none';
 }
 
 function applyH2HChrome(){
@@ -1902,8 +1898,27 @@ loadFromCloud();
 function buildWeekBar(){
   var sel = document.getElementById('wk-select');
   if(!sel) return;
+  buildWeekBarRange(sel, WEEKS);
+
+  if(IS_H2H_LEAGUE){
+    // playoffStartWeek/playoffTeams aren't part of the synchronous league
+    // context, so the bar starts with the generic WEEKS-long range above,
+    // then corrects itself once playoff settings actually load — stopping
+    // at the real last playoff week instead of running on to week 18.
+    var ctx = FRAuth.getLeagueCtx();
+    var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+    FR.fb.get('/leagues/' + leagueId + '/settings').then(function(settings){
+      if(!settings) return;
+      var rounds = Math.max(1, Math.ceil(Math.log2(settings.playoffTeams || 4)));
+      var lastWeek = (settings.playoffStartWeek || 15) + rounds - 1;
+      buildWeekBarRange(sel, lastWeek);
+    }).catch(function(){});
+  }
+}
+
+function buildWeekBarRange(sel, lastWeek){
   sel.innerHTML = '';
-  for(var i = 1; i <= WEEKS; i++){
+  for(var i = 1; i <= lastWeek; i++){
     var k = String(i);
     var hasData = seasonData[k] && seasonData[k].length > 0;
     var o = document.createElement('option');
