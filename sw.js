@@ -1,7 +1,9 @@
 // Fantasy Refresh — Service Worker
-// Caches static assets for fast loads and offline support
-const CACHE_NAME    = 'fr-v3';
-const CACHE_STATIC  = 'fr-static-v3';
+// Caches static assets for offline support. Network-first: a normal
+// reload should always see whatever's actually deployed — the cache only
+// kicks in when the network is genuinely unreachable.
+const CACHE_NAME    = 'fr-v4';
+const CACHE_STATIC  = 'fr-static-v4';
 
 // Files to pre-cache on install
 const PRECACHE = [
@@ -78,22 +80,21 @@ self.addEventListener('fetch', function(e) {
     return;
   }
 
-  // Cache-first for static assets
+  // Network-first: a reload should always reflect what's actually
+  // deployed. The cache is only a fallback for when the network is
+  // unreachable (true offline support), never a substitute for a fresh
+  // file the network can actually serve.
   e.respondWith(
-    caches.match(e.request).then(function(cached) {
-      var networkFetch = fetch(e.request).then(function(response) {
-        // Update cache with fresh version
-        if (response && response.status === 200 && response.type === 'basic') {
-          var clone = response.clone();
-          caches.open(CACHE_STATIC).then(function(cache) {
-            cache.put(e.request, clone);
-          });
-        }
-        return response;
-      }).catch(function() {
-        return cached; // fallback to cache if offline
-      });
-      return cached || networkFetch;
+    fetch(e.request).then(function(response) {
+      if (response && response.status === 200 && response.type === 'basic') {
+        var clone = response.clone();
+        caches.open(CACHE_STATIC).then(function(cache) {
+          cache.put(e.request, clone);
+        });
+      }
+      return response;
+    }).catch(function() {
+      return caches.match(e.request);
     })
   );
 });
