@@ -7949,6 +7949,10 @@ document.addEventListener('DOMContentLoaded', function(){
 <!-- MORE MENU (slides up) -->
 <div id="more-menu" style="display:none;position:fixed;bottom:60px;left:0;right:0;background:var(--bg2);border-top:1px solid var(--bdr2);padding:16px;z-index:99;" onclick="event.stopPropagation()">
   <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">
+    <button onclick="closeMoreMenu();goToDraft()" style="background:rgba(0,229,212,.08);border:1px solid rgba(0,229,212,.2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;">
+      <div style="font-size:20px;margin-bottom:4px;">📋</div>
+      <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--or);text-transform:uppercase;">Draft</div>
+    </button>
     <button id="more-guillotine-btn" onclick="closeMoreMenu();switchBottomNav('guillotine','bn-more')" style="background:var(--bg3);border:1px solid var(--bdr2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;">
       <div style="font-size:20px;margin-bottom:4px;">☠️</div>
       <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink2);text-transform:uppercase;">Guillotine</div>
