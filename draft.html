@@ -992,12 +992,39 @@ function renderPicker(){
 }
 
 // ── PICK PLAYER ────────────────────────────────────────────────
+// Finds the best open slot for a position when no slot was pre-selected —
+// prefers a dedicated slot for that position, falls back to FLEX.
+function findOpenSlotForPosition(pos){
+  for(var i = 0; i < SLOT_DEFS.length; i++){
+    var s = SLOT_DEFS[i];
+    if(s.pos !== 'FLEX' && s.eligible.indexOf(pos) >= 0 && !lineup[s.id]) return s;
+  }
+  for(var j = 0; j < SLOT_DEFS.length; j++){
+    var sf = SLOT_DEFS[j];
+    if(sf.pos === 'FLEX' && sf.eligible.indexOf(pos) >= 0 && !lineup[sf.id]) return sf;
+  }
+  return null;
+}
+
 function pickPlayer(playerId){
-  if(!activeSlot) return;
   var p = allPlayers.find(function(x){ return x.id === playerId; });
   if(!p) return;
   if(p.status === 'O' || p.status === 'IR'){ showToast(p.name+' is out', true); return; }
   if(isPlayerLocked(p)){ showToast(p.name+' is locked 🔒', true); return; }
+
+  // No slot pre-selected — tapping a slot is now an optional filter, not a
+  // requirement, so a direct tap on a player drafts them straight to the
+  // best open slot for their position.
+  var wasAutoSlot = false;
+  if(!activeSlot){
+    var alreadyAt = Object.keys(lineup).find(function(sid){ return lineup[sid] && lineup[sid].id === playerId; });
+    if(alreadyAt){ removePlayer(alreadyAt); return; }
+
+    var openSlot = findOpenSlotForPosition(p.pos);
+    if(!openSlot){ showToast('No open slot for ' + p.pos, true); return; }
+    activeSlot = openSlot.id;
+    wasAutoSlot = true;
+  }
 
   var slot = SLOT_DEFS.find(function(s){ return s.id === activeSlot; });
 
@@ -1029,12 +1056,22 @@ function pickPlayer(playerId){
 
   if(replaced){
     showToast(replaced + ' replaced with ' + p.name + ' ✓');
-    renderPicker();
+    var stillFull = Object.values(lineup).filter(Boolean).length >= 9;
+    if(window.innerWidth <= 860 && stillFull){
+      closePicker();
+    } else {
+      renderPicker();
+    }
     return;
   }
 
-  // Only auto-advance to next empty slot if we filled an empty slot
-  var nextSlot = findNextEmptySlot(slot);
+  // Only auto-advance to next empty slot if we filled an empty slot AND
+  // the slot was explicitly tapped — a free-browse draft (auto-derived
+  // slot) goes back to the unfiltered All Players view instead, so the
+  // picker doesn't lock itself into "now fill this specific slot" mode.
+  var nextSlot = wasAutoSlot ? null : findNextEmptySlot(slot);
+  var rosterComplete = Object.values(lineup).filter(Boolean).length >= 9;
+
   if(nextSlot){
     activeSlot = nextSlot.id;
     var color = POS_COLORS[nextSlot.pos] || 'var(--or)';
@@ -1043,6 +1080,16 @@ function pickPlayer(playerId){
     document.getElementById('picker-slot-label').style.color = color;
     renderPicker();
     renderRoster();
+  } else if(wasAutoSlot && !rosterComplete){
+    // Free-browse pick, more slots still open — stay in the picker,
+    // reset to unfiltered so the next direct click works the same way.
+    activeSlot = null;
+    document.getElementById('picker-slot-label').textContent = 'All Players';
+    document.getElementById('picker-slot-label').style.color = 'var(--ink2)';
+    renderPicker();
+    renderRoster();
+    showToast(p.name + ' added ✓');
+    return;
   } else {
     if(window.innerWidth <= 860){
       closePicker();
