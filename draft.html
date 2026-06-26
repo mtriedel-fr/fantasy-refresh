@@ -28,7 +28,7 @@
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 html,body{height:100%;overflow:hidden;}
-body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;flex-direction:column;padding-bottom:64px;}
+body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;flex-direction:column;}
 
 /* ── HEADER ── */
 .hdr{background:var(--hdr);border-top:3px solid var(--or);border-bottom:1px solid var(--bdr);padding:10px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-shrink:0;}
@@ -1245,6 +1245,7 @@ function submitLineup(){
     msg.textContent='✓ Lineup submitted! Good luck.'; msg.className='submit-msg ok';
     btn.textContent='↑ Update Lineup'; btn.disabled=false;
     showToast('Lineup submitted! 🏈');
+    setTimeout(function(){ window.location.href = '/league.html'; }, 1200);
   }).catch(function(err){
     console.error('Lineup submit failed:', err);
     document.getElementById('submit-msg').textContent='Submission failed — try again';
@@ -1443,12 +1444,5 @@ function goBack(){
       });
     }
   </script>
-<!-- BACK BAR -->
-<div style="position:fixed;bottom:0;left:0;right:0;background:var(--hdr);border-top:1px solid var(--bdr);padding:12px 20px;padding-bottom:calc(12px + env(safe-area-inset-bottom));display:flex;align-items:center;justify-content:space-between;z-index:50;">
-  <button onclick="window.location.href='/league.html'" style="display:flex;align-items:center;gap:6px;background:none;border:1px solid var(--bdr2);color:var(--ink2);font-family:var(--fd);font-size:13px;font-weight:700;padding:8px 16px;border-radius:8px;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;">
-    ← Back to League
-  </button>
-  <div style="font-family:var(--fd);font-size:12px;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;">Draft</div>
-</div>
 </body>
 </html>
