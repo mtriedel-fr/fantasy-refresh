@@ -65,8 +65,9 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
 
 /* ── ROSTER PANEL ── */
 .roster-panel{width:380px;flex-shrink:0;border-right:1px solid var(--bdr);display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden;min-height:0;}
+.roster-panel.expanded{width:100%;border-right:none;}
 .roster-title{padding:12px 20px;font-family:var(--fd);font-size:13px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid var(--bdr);background:var(--bg2);flex-shrink:0;}
-.roster-slots{flex:1;overflow-y:auto;padding:10px 14px;min-height:0;scrollbar-width:thin;scrollbar-color:var(--bdr2) transparent;}
+.roster-slots{padding:10px 14px;}
 .roster-slots::-webkit-scrollbar{width:5px;}
 .roster-slots::-webkit-scrollbar-track{background:transparent;}
 .roster-slots::-webkit-scrollbar-thumb{background:var(--bdr2);border-radius:3px;}
@@ -89,7 +90,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
 .slot-remove-btn:hover{background:var(--pk);color:#fff;border-color:var(--pk);}
 
 /* ── SUBMIT ── */
-.submit-area{padding:12px 14px;border-top:1px solid var(--bdr);background:var(--bg2);flex-shrink:0;}
+.submit-area{position:sticky;bottom:0;padding:12px 14px;border-top:1px solid var(--bdr);background:var(--bg2);flex-shrink:0;}
 .submit-btn{width:100%;padding:13px;background:linear-gradient(135deg,var(--or),var(--pk));border:none;border-radius:10px;color:#050808;font-family:var(--fd);font-size:15px;font-weight:900;text-transform:uppercase;letter-spacing:.8px;cursor:pointer;transition:opacity .15s;}
 .submit-btn:hover{opacity:.9;}
 .submit-btn:disabled{opacity:.35;cursor:not-allowed;background:var(--bg4);color:var(--ink3);border:1px solid var(--bdr);}
@@ -99,6 +100,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
 
 /* ── PLAYER PICKER PANEL ── */
 .picker-panel{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--bg);min-height:0;}
+.picker-panel.collapsed{display:none !important;}
 .picker-header{padding:12px 20px;border-bottom:1px solid var(--bdr);background:var(--bg2);flex-shrink:0;display:flex;align-items:center;gap:12px;}
 .picker-slot-label{font-family:var(--fd);font-size:16px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;}
 .picker-game-filter{font-family:var(--fd);font-size:12px;color:var(--pk);background:rgba(255,95,160,.1);border:1px solid rgba(255,95,160,.3);padding:3px 10px;border-radius:12px;}
@@ -238,6 +240,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
   <!-- ROSTER -->
   <div class="roster-panel">
     <div class="roster-title">Your Roster — <span id="week-label">Week —</span></div>
+    <button id="browse-players-btn" onclick="openPickerPanel()" style="display:none;align-items:center;justify-content:center;gap:6px;margin:0 14px 10px;padding:10px;background:rgba(0,229,212,.1);border:1px solid rgba(0,229,212,.3);border-radius:8px;color:var(--or);font-family:var(--fd);font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;cursor:pointer;">🔍 Browse Players</button>
     <div class="roster-slots" id="roster-slots"></div>
     <div class="submit-area">
       <button class="submit-btn" id="submit-btn" onclick="submitLineup()" disabled>Build Your Lineup</button>
@@ -902,6 +905,10 @@ function selectSlot(slotId){
   document.getElementById('picker-slot-label').style.color = color;
   document.getElementById('picker-search').value = '';
   document.getElementById('picker-panel').classList.add('open');
+  document.getElementById('picker-panel').classList.remove('collapsed');
+  document.querySelector('.roster-panel').classList.remove('expanded');
+  var browseBtn = document.getElementById('browse-players-btn');
+  if(browseBtn) browseBtn.style.display = 'none';
   renderRoster();
   renderPicker();
 }
@@ -911,7 +918,25 @@ function closePicker(){
   document.getElementById('picker-slot-label').textContent = 'All Players';
   document.getElementById('picker-slot-label').style.color = 'var(--ink2)';
   document.getElementById('picker-panel').classList.remove('open');
+  // On desktop the picker is a permanent side panel, not an overlay, so
+  // just resetting the filter had no visible effect — Close now actually
+  // collapses it and lets the roster take the full width. "Browse Players"
+  // brings it back.
+  if(window.innerWidth > 860){
+    document.getElementById('picker-panel').classList.add('collapsed');
+    document.querySelector('.roster-panel').classList.add('expanded');
+    var browseBtn = document.getElementById('browse-players-btn');
+    if(browseBtn) browseBtn.style.display = 'flex';
+  }
   renderRoster();
+  renderPicker();
+}
+
+function openPickerPanel(){
+  document.getElementById('picker-panel').classList.remove('collapsed');
+  document.querySelector('.roster-panel').classList.remove('expanded');
+  var browseBtn = document.getElementById('browse-players-btn');
+  if(browseBtn) browseBtn.style.display = 'none';
   renderPicker();
 }
 
