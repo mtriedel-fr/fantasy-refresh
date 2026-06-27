@@ -815,10 +815,15 @@ function renderGamePreview(game){
     var injBadge = (p.status && p.status !== 'Active')
       ? '<span class="p-inj inj-'+p.status+'">'+p.status+'</span>' : '';
     var isIn2 = !!inLineup[p.id];
-    var cls = 'player-row'+(isIn2?' selected':'')+(isOut?' disabled':'');
     var locked2   = isPlayerLocked(p);
-    var draftLbl2 = isIn2 ? '✓' : locked2 ? '🔒' : '+';
-    var draftCls2 = 'draft-btn' + (isIn2 ? ' drafted' : locked2 ? ' drafted' : '');
+    // Same cap math as the main picker — exclude whoever currently
+    // occupies the active slot, since they're the one being replaced.
+    var currentOccupantSalary = (activeSlot && lineup[activeSlot]) ? (lineup[activeSlot].salary || 0) : 0;
+    var spentExRepl = getSpent() - currentOccupantSalary;
+    var wouldOvr2 = !isIn2 && (spentExRepl + p.salary > CAP);
+    var cls = 'player-row'+(isIn2?' selected':'')+((isOut||wouldOvr2)?' disabled':'');
+    var draftLbl2 = isIn2 ? '✓' : locked2 ? '🔒' : wouldOvr2 ? '💰' : '+';
+    var draftCls2 = 'draft-btn' + (isIn2 || locked2 || wouldOvr2 ? ' drafted' : '');
     return '<div class="'+cls+'">'
       + '<div class="p-pos" style="background:'+posColor+'18;color:'+posColor+'">'+p.pos+'</div>'
       + '<div class="p-info" onclick="openNews(\''+p.id+'\',event)" style="cursor:pointer;">'
@@ -1074,15 +1079,19 @@ function renderPicker(){
     var isSelected = inLineup[p.id] === activeSlot;
     var isElsewhere= inLineup[p.id] && inLineup[p.id] !== activeSlot;
     var isOut      = p.status === 'O' || p.status === 'IR';
-    var spent      = getSpent();
+    // If we're replacing whoever's currently in the active slot, their
+    // salary comes back out of the budget first — otherwise it's double
+    // counted and players that are actually affordable look like they're not.
+    var currentOccupantSalary = (activeSlot && lineup[activeSlot]) ? (lineup[activeSlot].salary || 0) : 0;
+    var spent      = getSpent() - currentOccupantSalary;
     var wouldOvr   = !isSelected && (spent + p.salary > CAP);
     var locked     = isPlayerLocked(p);
     var disabled   = isOut || locked || (wouldOvr && !isSelected);
     var injBadge   = (p.status && p.status !== 'Active')
       ? '<span class="p-inj inj-'+p.status+'">'+p.status+'</span>' : '';
     var posColor   = POS_COLORS[p.pos] || 'var(--ink2)';
-    var draftLabel = isSelected ? '✓ Drafted' : locked ? '🔒 Locked' : '+ Draft';
-    var draftCls   = 'draft-btn' + (isSelected ? ' drafted' : locked ? ' drafted' : '');
+    var draftLabel = isSelected ? '✓ Drafted' : locked ? '🔒 Locked' : wouldOvr ? '💰 Can\'t Afford' : '+ Draft';
+    var draftCls   = 'draft-btn' + (isSelected || locked || wouldOvr ? ' drafted' : '');
     var rowCls     = 'player-row'+(isSelected?' selected':'')+(disabled?' disabled':'');
     html += '<div class="'+rowCls+'">'
       + '<div class="p-pos" style="background:'+posColor+'18;color:'+posColor+'">'+p.pos+'</div>'

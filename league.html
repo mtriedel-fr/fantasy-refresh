@@ -198,6 +198,11 @@ tr:hover td{background:var(--or4);}
 .lineup-card-pts{flex-shrink:0;text-align:right;font-family:var(--fd);font-size:16px;font-weight:900;color:var(--ink);line-height:1;}
 .lineup-card-pts-lbl{display:block;font-size:9px;font-weight:700;color:var(--ink3);letter-spacing:.5px;margin-top:1px;}
 .lineup-card-pending{font-size:10px;font-weight:700;color:var(--ink3);background:var(--bg2);border:1px solid var(--bdr2);border-radius:5px;padding:1px 6px;text-transform:uppercase;letter-spacing:.3px;}
+.lineup-card.started{background:var(--bg3);border-color:var(--bdr2);opacity:.85;}
+.lineup-card.started .lineup-card-pos{opacity:.6;}
+.lineup-card-locked-tag{font-size:10px;font-weight:700;color:var(--ink3);background:rgba(255,255,255,.05);border:1px solid var(--bdr2);border-radius:5px;padding:1px 6px;text-transform:uppercase;letter-spacing:.3px;}
+.lineup-card-swap-btn{flex-shrink:0;font-family:var(--fd);font-size:11px;font-weight:800;color:var(--or);background:rgba(0,229,212,.1);border:1px solid rgba(0,229,212,.3);border-radius:7px;padding:6px 10px;cursor:pointer;text-transform:uppercase;letter-spacing:.3px;margin-left:8px;}
+.lineup-card-swap-btn:hover{background:rgba(0,229,212,.18);}
 .lineup-card-live{color:#3CD06C;font-size:10px;}
 .my-team-badge{font-family:var(--fd);font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:2px 7px;border-radius:8px;margin-left:6px;background:rgba(0,212,204,.15);color:var(--or);border:1px solid rgba(0,212,204,.4);}
 
@@ -1938,7 +1943,7 @@ function toggleH2HRoster(idx, homeUid, awayUid){
   });
 }
 
-var LINEUP_POS_COLORS = {QB:'var(--or)', RB:'var(--pk)', WR:'var(--pu)', TE:'#FF9A3A', FLEX:'var(--ink2)', DEF:'#69BE28'};
+var LINEUP_POS_COLORS = {QB:'var(--or)', RB:'var(--pk)', WR:'var(--pu)', TE:'#FF9A3A', FLEX:'var(--ink2)', DEF:'#69BE28', SUPERFLEX:'#FFD23F'};
 
 // Canonical roster order — QB, RB, WR, TE, FLEX, DEF — regardless of
 // however the slot keys happen to be ordered in the stored data. Scales
@@ -1986,8 +1991,22 @@ function fetchWeekSchedule(week){
     .catch(function(){ return {}; });
 }
 
-function buildLineupPlayerCard(p, pts, hasStarted, gameMap, showNotStartedTag){
-  var posColor = LINEUP_POS_COLORS[p.pos] || 'var(--ink2)';
+// Standard baseline counts — any slot numbered beyond these is a promoted
+// flex-type slot (matches the same rule draft.html uses to build SLOT_DEFS).
+var LINEUP_STD_COUNT = { qb:1, rb:2, wr:3, te:1 };
+function lineupSlotStructuralLabel(slotId, playerPos){
+  var prefix = String(slotId).replace(/[0-9]+$/, '').toLowerCase();
+  var num = parseInt(String(slotId).replace(/[^0-9]/g, ''), 10) || 1;
+  if(prefix === 'fx' || prefix === 'flex') return 'FLEX';
+  if(prefix === 'df' || prefix === 'def') return 'DEF';
+  if(prefix === 'qb' && num > LINEUP_STD_COUNT.qb) return 'SUPERFLEX';
+  if(LINEUP_STD_COUNT.hasOwnProperty(prefix) && num > LINEUP_STD_COUNT[prefix]) return 'FLEX';
+  return playerPos || prefix.toUpperCase();
+}
+
+function buildLineupPlayerCard(p, pts, hasStarted, gameMap, showNotStartedTag, slotId){
+  var slotLabel = slotId ? lineupSlotStructuralLabel(slotId, p.pos) : (p.pos || '');
+  var posColor = LINEUP_POS_COLORS[slotLabel] || LINEUP_POS_COLORS[p.pos] || 'var(--ink2)';
   var ptsLabel = (typeof pts === 'number') ? pts.toFixed(1) : '0.0';
   var game = (gameMap && p.team) ? gameMap[p.team] : null;
   var gameLine = '';
@@ -1996,17 +2015,27 @@ function buildLineupPlayerCard(p, pts, hasStarted, gameMap, showNotStartedTag){
     var kickoff = fmtKickoff(game.time);
     gameLine = '<div class="lineup-card-game">' + vsAt + ' ' + escapeHtmlFR(game.opp) + (kickoff ? ' · ' + kickoff : '') + '</div>';
   }
-  var notStartedTag = (showNotStartedTag && !hasStarted)
-    ? '<span class="lineup-card-pending">Not started</span>'
-    : (hasStarted ? '<span class="lineup-card-live">●</span>' : '');
 
-  return '<div class="lineup-card">'
-    + '<div class="lineup-card-pos" style="background:' + posColor + '1f;color:' + posColor + ';border-color:' + posColor + '40;">' + escapeHtmlFR(p.pos || '') + '</div>'
+  // Started = locked in, shown with a muted "can't touch this" look.
+  // Not started = still swappable, gets an actionable Swap button —
+  // only relevant when viewing your own lineup (showNotStartedTag).
+  var statusTag = '';
+  var swapBtn = '';
+  if(hasStarted){
+    statusTag = '<span class="lineup-card-locked-tag">🔒 Locked</span>';
+  } else if(showNotStartedTag){
+    statusTag = '<span class="lineup-card-pending">Not started</span>';
+    swapBtn = '<button class="lineup-card-swap-btn" onclick="goToDraft()" title="Swap this player">🔄 Swap</button>';
+  }
+
+  return '<div class="lineup-card' + (hasStarted ? ' started' : '') + '">'
+    + '<div class="lineup-card-pos" style="background:' + posColor + '1f;color:' + posColor + ';border-color:' + posColor + '40;">' + escapeHtmlFR(slotLabel) + '</div>'
     + '<div class="lineup-card-mid">'
-    +   '<div class="lineup-card-name">' + escapeHtmlFR(p.name || '') + ' ' + notStartedTag + '</div>'
+    +   '<div class="lineup-card-name">' + escapeHtmlFR(p.name || '') + ' ' + statusTag + '</div>'
     +   gameLine
     + '</div>'
     + '<div class="lineup-card-pts">' + ptsLabel + '<span class="lineup-card-pts-lbl">PTS</span></div>'
+    + swapBtn
     + '</div>';
 }
 
@@ -2025,7 +2054,7 @@ function rosterColumn(lineup, scoreEntry, locks, isMine, gameMap){
       var p = lineup.slots[slotId];
       if(!p) return '';
       var hasStarted = !!(p.team && locks && locks[p.team]);
-      return buildLineupPlayerCard(p, slotPts[slotId], hasStarted, gameMap, true);
+      return buildLineupPlayerCard(p, slotPts[slotId], hasStarted, gameMap, true, slotId);
     }).join('');
     return '<div><div class="h2h-roster-side-hdr">' + escapeHtmlFR(teamLabel) + '</div><div class="lineup-card-list">' + (allRows || '<div class="h2h-roster-empty">Empty roster.</div>') + '</div></div>';
   }
@@ -2038,7 +2067,7 @@ function rosterColumn(lineup, scoreEntry, locks, isMine, gameMap){
     if(!p) return;
     var hasStarted = !!(p.team && locks && locks[p.team]);
     if(!hasStarted){ notStartedCount++; return; }
-    startedRows.push(buildLineupPlayerCard(p, slotPts[slotId], hasStarted, gameMap, false));
+    startedRows.push(buildLineupPlayerCard(p, slotPts[slotId], hasStarted, gameMap, false, slotId));
   });
 
   var body = startedRows.length ? ('<div class="lineup-card-list">' + startedRows.join('') + '</div>') : '<div class="h2h-roster-empty">No players have kicked off yet.</div>';
