@@ -2519,6 +2519,17 @@ function renderCumHome(){
   var numbersPanel = document.getElementById('sub-numbers');
   if(numbersPanel) numbersPanel.classList.remove('hidden');
 
+  // On first load only: keep the landing page (lineup + standings) as the
+  // very first thing visible, with This Week not yet open — same pattern
+  // already used for H2H, reusing the same one-time flag.
+  if(!h2hChromeInitialized){
+    h2hChromeInitialized = true;
+    var ywTab = document.getElementById('tab-yourweek');
+    if(ywTab) ywTab.classList.add('hidden');
+    document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); });
+    document.querySelectorAll('.bn-item').forEach(function(b){ b.classList.remove('active'); });
+  }
+
   renderCumStandingsPage(0);
 }
 
@@ -8192,7 +8203,7 @@ document.addEventListener('DOMContentLoaded', function(){
     <span class="bn-icon">🏠</span>
     <span class="bn-label">Home</span>
   </button>
-  <button class="bn-item active" id="bn-week" onclick="closeMoreMenu();switchBottomNav('yourweek','bn-week','mylineup')">
+  <button class="bn-item active" id="bn-week" onclick="closeMoreMenu();switchBottomNav('yourweek','bn-week','numbers')">
     <span class="bn-icon">📊</span>
     <span class="bn-label">This Week</span>
   </button>
