@@ -961,8 +961,8 @@ setTimeout(function(){
      it stays visible above whichever tab is active, not just the landing
      page. Top offset gets measured from the real header height via JS
      (positionMyTeamBar), since the header's height isn't fixed. -->
-<div id="cum-myteam-bar" class="hidden" style="position:fixed;left:0;right:0;z-index:556;background:var(--bg2);border-bottom:1px solid var(--bdr);display:flex;justify-content:center;padding:10px 16px;">
-  <button id="cum-lineup-toggle" onclick="toggleCumLineup()" style="background:none;border:none;display:flex;align-items:center;gap:8px;cursor:pointer;padding:0;color:var(--ink);">
+<div id="cum-myteam-bar" class="hidden" style="position:fixed;left:0;right:0;z-index:556;display:flex;justify-content:center;padding:10px 0;pointer-events:none;">
+  <button id="cum-lineup-toggle" onclick="toggleCumLineup()" style="pointer-events:auto;background:var(--bg2);border:1px solid var(--bdr2);border-radius:22px;display:flex;align-items:center;gap:8px;cursor:pointer;padding:9px 20px;color:var(--ink);box-shadow:0 3px 12px rgba(0,0,0,.3);">
     <span style="font-family:var(--fd);font-size:13px;font-weight:800;color:var(--or);text-transform:uppercase;letter-spacing:.5px;">👤 My Team</span>
     <span id="cum-lineup-caret" style="font-size:11px;color:var(--ink3);transition:transform .15s;">▾</span>
   </button>
