@@ -174,7 +174,7 @@ tr:hover td{background:var(--or4);}
 .h2h-standings-table tr:last-child td{border-bottom:none;}
 .h2h-matchup{position:relative;border:1px solid var(--bdr);border-radius:8px;margin-bottom:8px;overflow:hidden;cursor:pointer;background:var(--bg4);}
 .h2h-matchup-row{display:flex;align-items:center;justify-content:center;gap:16px;padding:12px 14px;}
-.h2h-matchup-team{flex:0 1 150px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:3px;font-family:var(--fd);font-size:13px;font-weight:700;color:var(--ink);}
+.h2h-matchup-team{flex:1 1 0;min-width:0;max-width:150px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:3px;font-family:var(--fd);font-size:13px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .h2h-matchup-team.mine{color:var(--or);}
 .h2h-matchup-score{font-family:var(--fd);font-size:16px;font-weight:800;color:var(--ink2);text-align:center;}
 .h2h-matchup-at{font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;padding:0 4px;flex-shrink:0;}
@@ -183,11 +183,11 @@ tr:hover td{background:var(--or4);}
 .h2h-matchup.open .h2h-matchup-caret{transform:translateY(-50%) rotate(180deg);}
 .h2h-roster-drop{display:none;border-top:1px solid var(--bdr);padding:10px 12px;background:var(--bg2);}
 .h2h-matchup.open .h2h-roster-drop{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
-.h2h-roster-side-hdr{font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;}
+.h2h-roster-side-hdr{font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;text-align:center;}
 .h2h-roster-player{display:flex;justify-content:space-between;gap:8px;font-size:12px;padding:3px 0;color:var(--ink);}
 .h2h-roster-player .pos{color:var(--ink3);font-size:10px;text-transform:uppercase;margin-right:6px;}
-.h2h-roster-empty{font-size:12px;color:var(--ink3);font-style:italic;}
-.h2h-roster-pending{font-size:11px;color:var(--ink3);font-style:italic;margin-top:6px;padding-top:6px;border-top:1px dashed var(--bdr2);}
+.h2h-roster-empty{font-size:12px;color:var(--ink3);font-style:italic;text-align:center;}
+.h2h-roster-pending{font-size:11px;color:var(--ink3);font-style:italic;margin-top:6px;padding-top:6px;border-top:1px dashed var(--bdr2);text-align:center;}
 
 .lineup-card-list{display:flex;flex-direction:column;gap:6px;}
 .lineup-card{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg4);border:1px solid var(--bdr);border-radius:10px;}
@@ -545,9 +545,9 @@ tr.my-team:hover td{background:rgba(255,95,160,.18) !important;}
 .tab-overlay-close-bar{position:sticky;top:0;background:var(--bg2);z-index:1;padding:14px 18px;border-bottom:1px solid var(--bdr);}
 .tab-overlay-close-bar-row{display:flex;align-items:center;justify-content:space-between;}
 .myteam-toggle-row{display:flex;justify-content:center;margin-top:10px;}
-.myteam-toggle-btn{background:none;border:1px solid var(--bdr2);border-radius:18px;display:flex;align-items:center;gap:8px;cursor:pointer;padding:7px 16px;color:var(--ink);}
-.myteam-toggle-btn span:first-child{font-family:var(--fd);font-size:12px;font-weight:800;color:var(--or);text-transform:uppercase;letter-spacing:.5px;}
-.myteam-caret{font-size:11px;color:var(--ink3);transition:transform .15s;}
+.myteam-toggle-btn{background:linear-gradient(135deg,var(--or),var(--pk));border:none;border-radius:10px;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;padding:11px 24px;box-shadow:0 3px 12px rgba(0,229,212,.25);}
+.myteam-toggle-btn span:first-child{font-family:var(--fd);font-size:13px;font-weight:800;color:#050808;text-transform:uppercase;letter-spacing:.5px;}
+.myteam-caret{font-size:11px;color:#050808;transition:transform .15s;}
 .myteam-drop{margin-top:12px;}
 .tab-overlay-close-bar.hidden{display:none !important;}
 .tab-overlay-close-bar-title{font-family:var(--fd);font-size:13px;font-weight:800;color:var(--or);text-transform:uppercase;letter-spacing:1px;}
@@ -924,7 +924,7 @@ setTimeout(function(){
 <div id="h2h-myteam-toggle-wrap" class="hidden" style="padding:0 16px 14px;">
   <div class="myteam-toggle-row" data-myteam-anchor="h2hhome" style="margin:0;">
     <button class="myteam-toggle-btn" onclick="toggleMyTeam('h2hhome')">
-      <span>👤 My Team</span>
+      <span class="myteam-label">👤 My Team</span>
       <span class="myteam-caret" id="myteam-caret-h2hhome">▾</span>
     </button>
   </div>
@@ -976,7 +976,7 @@ setTimeout(function(){
   <div class="h2h-section h2h-section-matchups" style="margin-bottom:10px;">
     <div class="myteam-toggle-row" data-myteam-anchor="home" style="margin:0;">
       <button class="myteam-toggle-btn" onclick="toggleMyTeam('home')">
-        <span>👤 My Team</span>
+        <span class="myteam-label">👤 My Team</span>
         <span class="myteam-caret" id="myteam-caret-home">▾</span>
       </button>
     </div>
@@ -1034,7 +1034,7 @@ setTimeout(function(){
     </div>
     <div class="myteam-toggle-row" data-myteam-anchor="yourweek">
       <button class="myteam-toggle-btn" onclick="toggleMyTeam('yourweek')">
-        <span>👤 My Team</span>
+        <span class="myteam-label">👤 My Team</span>
         <span class="myteam-caret" id="myteam-caret-yourweek">▾</span>
       </button>
     </div>
@@ -1060,7 +1060,7 @@ setTimeout(function(){
     </div>
     <div class="myteam-toggle-row" data-myteam-anchor="yourseason">
       <button class="myteam-toggle-btn" onclick="toggleMyTeam('yourseason')">
-        <span>👤 My Team</span>
+        <span class="myteam-label">👤 My Team</span>
         <span class="myteam-caret" id="myteam-caret-yourseason">▾</span>
       </button>
     </div>
@@ -1086,7 +1086,7 @@ setTimeout(function(){
     </div>
     <div class="myteam-toggle-row" data-myteam-anchor="guillotine">
       <button class="myteam-toggle-btn" onclick="toggleMyTeam('guillotine')">
-        <span>👤 My Team</span>
+        <span class="myteam-label">👤 My Team</span>
         <span class="myteam-caret" id="myteam-caret-guillotine">▾</span>
       </button>
     </div>
@@ -1101,7 +1101,7 @@ setTimeout(function(){
     </div>
     <div class="myteam-toggle-row" data-myteam-anchor="league">
       <button class="myteam-toggle-btn" onclick="toggleMyTeam('league')">
-        <span>👤 My Team</span>
+        <span class="myteam-label">👤 My Team</span>
         <span class="myteam-caret" id="myteam-caret-league">▾</span>
       </button>
     </div>
@@ -1116,7 +1116,7 @@ setTimeout(function(){
     </div>
     <div class="myteam-toggle-row" data-myteam-anchor="playoffs">
       <button class="myteam-toggle-btn" onclick="toggleMyTeam('playoffs')">
-        <span>👤 My Team</span>
+        <span class="myteam-label">👤 My Team</span>
         <span class="myteam-caret" id="myteam-caret-playoffs">▾</span>
       </button>
     </div>
@@ -2374,6 +2374,7 @@ function renderH2HMyLineup(){
     var hasAnyPlayer = !!(lineup && lineup.slots && Object.keys(lineup.slots).some(function(k){ return !!lineup.slots[k]; }));
     var ctaBtn = document.getElementById('h2h-draft-cta-btn');
     if(ctaBtn) ctaBtn.textContent = hasAnyPlayer ? '✏️ Review Team' : '📝 Draft Your Team';
+    document.querySelectorAll('.myteam-label').forEach(function(l){ l.textContent = hasAnyPlayer ? '👤 My Team' : '📝 Draft Team'; });
 
     if(!lineup || !lineup.slots){
       wt.innerHTML = '<div class="myteam-empty"><div class="myteam-empty-icon">📋</div><div class="myteam-empty-title">No lineup set for Week ' + currentWeek + '</div><div class="myteam-empty-sub">Head to the Draft tab to set your roster for this week.</div></div>';
@@ -2582,11 +2583,29 @@ function filterH2HDivision(btn, divKey){
 // The non-H2H counterpart to the H2H homepage. Sits alongside the My
 // Lineup / Weekly Standing / Weekly Numbers sub-tabs under My Week,
 // not instead of them.
+// Cumulative's equivalent of the hasAnyPlayer check H2H already does for
+// its Draft/Review button — same idea, just a standalone lightweight
+// fetch since cumulative has no other function already pulling this.
+function updateMyTeamLabelsForCumulative(){
+  var user = (typeof FRAuth !== 'undefined' && FRAuth.getUser) ? FRAuth.getUser() : null;
+  if(!user || !user.uid) return;
+  var ctx = FRAuth.getLeagueCtx();
+  var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+  var season = (ctx && ctx.season) || 2026;
+
+  FR.fb.get('/leagues/' + leagueId + '/lineups/' + season + '/week' + currentWeek + '/' + user.uid).then(function(lineup){
+    var hasAnyPlayer = !!(lineup && lineup.slots && Object.keys(lineup.slots).some(function(k){ return !!lineup.slots[k]; }));
+    document.querySelectorAll('.myteam-label').forEach(function(l){ l.textContent = hasAnyPlayer ? '👤 My Team' : '📝 Draft Team'; });
+  }).catch(function(){});
+}
+
 function renderCumHome(){
   var home = document.getElementById('cum-home');
   if(!home) return;
   if(IS_H2H_LEAGUE){ home.classList.add('hidden'); return; }
   home.classList.remove('hidden');
+
+  updateMyTeamLabelsForCumulative();
 
   // Lineup + standings already live permanently on the landing page above
   // for cumulative leagues, so My Week just shows Weekly Numbers directly —
