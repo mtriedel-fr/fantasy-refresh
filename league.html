@@ -542,7 +542,13 @@ tr.my-team:hover td{background:rgba(255,95,160,.18) !important;}
 .tab-overlay{position:fixed !important;top:0;left:0;right:0;bottom:0;background:var(--bg);z-index:550;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:calc(76px + env(safe-area-inset-bottom));transform:translateY(100%);transition:transform .3s ease;}
 .tab-overlay:not(.hidden){transform:translateY(0);}
 .tab-overlay.hidden{display:block !important;pointer-events:none;}
-.tab-overlay-close-bar{position:sticky;top:0;background:var(--bg2);z-index:1;padding:14px 18px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;}
+.tab-overlay-close-bar{position:sticky;top:0;background:var(--bg2);z-index:1;padding:14px 18px;border-bottom:1px solid var(--bdr);}
+.tab-overlay-close-bar-row{display:flex;align-items:center;justify-content:space-between;}
+.myteam-toggle-row{display:flex;justify-content:center;margin-top:10px;}
+.myteam-toggle-btn{background:none;border:1px solid var(--bdr2);border-radius:18px;display:flex;align-items:center;gap:8px;cursor:pointer;padding:7px 16px;color:var(--ink);}
+.myteam-toggle-btn span:first-child{font-family:var(--fd);font-size:12px;font-weight:800;color:var(--or);text-transform:uppercase;letter-spacing:.5px;}
+.myteam-caret{font-size:11px;color:var(--ink3);transition:transform .15s;}
+.myteam-drop{margin-top:12px;}
 .tab-overlay-close-bar.hidden{display:none !important;}
 .tab-overlay-close-bar-title{font-family:var(--fd);font-size:13px;font-weight:800;color:var(--or);text-transform:uppercase;letter-spacing:1px;}
 .tab-overlay-close-btn{background:none;border:1px solid var(--bdr2);color:var(--ink3);font-size:13px;padding:5px 14px;border-radius:6px;cursor:pointer;font-family:var(--fd);}
@@ -915,6 +921,15 @@ setTimeout(function(){
   <button id="h2h-draft-cta-btn" onclick="goToDraft()" style="background:linear-gradient(135deg,var(--or),var(--pk));border:none;border-radius:10px;padding:13px 48px;color:#050808;font-family:var(--fd);font-size:14px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;cursor:pointer;box-shadow:0 3px 12px rgba(0,229,212,.25);width:100%;max-width:340px;">📝 Draft Your Team</button>
 </div>
 
+<div id="h2h-myteam-toggle-wrap" class="hidden" style="padding:0 16px 14px;">
+  <div class="myteam-toggle-row" data-myteam-anchor="h2hhome" style="margin:0;">
+    <button class="myteam-toggle-btn" onclick="toggleMyTeam('h2hhome')">
+      <span>👤 My Team</span>
+      <span class="myteam-caret" id="myteam-caret-h2hhome">▾</span>
+    </button>
+  </div>
+</div>
+
 <!-- H2H HOME — standings + weekly matchups, shown only for head-to-head leagues -->
 <div id="h2h-home" class="hidden">
   <div class="h2h-section h2h-section-standings">
@@ -959,11 +974,12 @@ setTimeout(function(){
      shown for every non-H2H league. Always visible, no tab click needed. -->
 <div id="cum-home" class="hidden">
   <div class="h2h-section h2h-section-matchups" style="margin-bottom:10px;">
-    <button id="cum-lineup-toggle" onclick="toggleCumLineup()" style="width:100%;background:none;border:none;display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:0;color:var(--ink);">
-      <span style="font-family:var(--fd);font-size:13px;font-weight:800;color:var(--or);text-transform:uppercase;letter-spacing:.5px;">👤 My Team</span>
-      <span id="cum-lineup-caret" style="font-size:11px;color:var(--ink3);transition:transform .15s;">▾</span>
-    </button>
-    <div id="cum-lineup-drop" class="hidden" style="margin-top:12px;"></div>
+    <div class="myteam-toggle-row" data-myteam-anchor="home" style="margin:0;">
+      <button class="myteam-toggle-btn" onclick="toggleMyTeam('home')">
+        <span>👤 My Team</span>
+        <span class="myteam-caret" id="myteam-caret-home">▾</span>
+      </button>
+    </div>
   </div>
   <div class="h2h-section h2h-section-standings">
     <div class="h2h-section-hdr">🏆 Weekly Standings</div>
@@ -971,6 +987,11 @@ setTimeout(function(){
     <div id="cum-standings-pager" style="display:flex;gap:6px;justify-content:center;margin-top:12px;flex-wrap:wrap;"></div>
   </div>
 </div>
+
+<!-- Single shared My Team dropdown — JS moves this to right after
+     whichever toggle button was clicked, rather than duplicating the
+     dropdown panel on every screen. -->
+<div id="myteam-drop" class="myteam-drop hidden"></div>
 
 <!-- PRIMARY NAV TAB BAR - hidden, replaced by bottom nav -->
 <div class="nav-tab-bar" id="nav-tab-bar" style="display:none;">
@@ -1007,8 +1028,16 @@ setTimeout(function(){
 <!-- YOUR WEEK — My Lineup / Weekly Standing / Weekly Numbers -->
 <div id="tab-yourweek" class="content">
   <div class="tab-overlay-close-bar hidden">
-    <span class="tab-overlay-close-bar-title">📅 This Week</span>
-    <button class="tab-overlay-close-btn" onclick="closeH2HTabOverlay()">✕ Close</button>
+    <div class="tab-overlay-close-bar-row">
+      <span class="tab-overlay-close-bar-title">📅 This Week</span>
+      <button class="tab-overlay-close-btn" onclick="closeH2HTabOverlay()">✕ Close</button>
+    </div>
+    <div class="myteam-toggle-row" data-myteam-anchor="yourweek">
+      <button class="myteam-toggle-btn" onclick="toggleMyTeam('yourweek')">
+        <span>👤 My Team</span>
+        <span class="myteam-caret" id="myteam-caret-yourweek">▾</span>
+      </button>
+    </div>
   </div>
   <div class="sub-tabs-scroll" id="yourweek-subtabs-scroll">
     <div class="sub-tabs">
@@ -1025,8 +1054,16 @@ setTimeout(function(){
 <!-- YOUR SEASON — My Season / Seasonal Standings / Movement -->
 <div id="tab-yourseason" class="content hidden">
   <div class="tab-overlay-close-bar hidden">
-    <span class="tab-overlay-close-bar-title">📈 Your Season</span>
-    <button class="tab-overlay-close-btn" onclick="closeH2HTabOverlay()">✕ Close</button>
+    <div class="tab-overlay-close-bar-row">
+      <span class="tab-overlay-close-bar-title">📈 Your Season</span>
+      <button class="tab-overlay-close-btn" onclick="closeH2HTabOverlay()">✕ Close</button>
+    </div>
+    <div class="myteam-toggle-row" data-myteam-anchor="yourseason">
+      <button class="myteam-toggle-btn" onclick="toggleMyTeam('yourseason')">
+        <span>👤 My Team</span>
+        <span class="myteam-caret" id="myteam-caret-yourseason">▾</span>
+      </button>
+    </div>
   </div>
   <div class="sub-tabs-scroll">
     <div class="sub-tabs">
@@ -1043,22 +1080,46 @@ setTimeout(function(){
 <div id="tab-seasonwrap" class="content hidden"><div id="wsw"></div></div>
 <div id="tab-guillotine" class="content hidden">
   <div class="tab-overlay-close-bar hidden">
-    <span class="tab-overlay-close-bar-title">🔪 Guillotine</span>
-    <button class="tab-overlay-close-btn" onclick="closeH2HTabOverlay()">✕ Close</button>
+    <div class="tab-overlay-close-bar-row">
+      <span class="tab-overlay-close-bar-title">🔪 Guillotine</span>
+      <button class="tab-overlay-close-btn" onclick="closeH2HTabOverlay()">✕ Close</button>
+    </div>
+    <div class="myteam-toggle-row" data-myteam-anchor="guillotine">
+      <button class="myteam-toggle-btn" onclick="toggleMyTeam('guillotine')">
+        <span>👤 My Team</span>
+        <span class="myteam-caret" id="myteam-caret-guillotine">▾</span>
+      </button>
+    </div>
   </div>
   <div id="wg"></div>
 </div>
 <div id="tab-league" class="content hidden">
   <div class="tab-overlay-close-bar hidden">
-    <span class="tab-overlay-close-bar-title">🏆 League</span>
-    <button class="tab-overlay-close-btn" onclick="closeH2HTabOverlay()">✕ Close</button>
+    <div class="tab-overlay-close-bar-row">
+      <span class="tab-overlay-close-bar-title">🏆 League</span>
+      <button class="tab-overlay-close-btn" onclick="closeH2HTabOverlay()">✕ Close</button>
+    </div>
+    <div class="myteam-toggle-row" data-myteam-anchor="league">
+      <button class="myteam-toggle-btn" onclick="toggleMyTeam('league')">
+        <span>👤 My Team</span>
+        <span class="myteam-caret" id="myteam-caret-league">▾</span>
+      </button>
+    </div>
   </div>
   <div id="wleague"></div>
 </div>
 <div id="tab-playoffs" class="content hidden">
   <div class="tab-overlay-close-bar hidden">
-    <span class="tab-overlay-close-bar-title">🏆 Playoffs</span>
-    <button class="tab-overlay-close-btn" onclick="closeH2HTabOverlay()">✕ Close</button>
+    <div class="tab-overlay-close-bar-row">
+      <span class="tab-overlay-close-bar-title">🏆 Playoffs</span>
+      <button class="tab-overlay-close-btn" onclick="closeH2HTabOverlay()">✕ Close</button>
+    </div>
+    <div class="myteam-toggle-row" data-myteam-anchor="playoffs">
+      <button class="myteam-toggle-btn" onclick="toggleMyTeam('playoffs')">
+        <span>👤 My Team</span>
+        <span class="myteam-caret" id="myteam-caret-playoffs">▾</span>
+      </button>
+    </div>
   </div>
   <!-- Playoff round pills -->
   <div style="display:flex;gap:8px;padding:12px 16px;background:var(--bg2);border-bottom:1px solid var(--bdr);overflow-x:auto;">
@@ -1820,16 +1881,19 @@ function applyH2HChrome(){
   var home = document.getElementById('h2h-home');
   var band = document.getElementById('h2h-matchup-band');
   var cta = document.getElementById('h2h-draft-cta');
+  var myTeamWrap = document.getElementById('h2h-myteam-toggle-wrap');
 
   if(!IS_H2H_LEAGUE){
     if(home) home.classList.add('hidden');
     if(band) band.classList.add('hidden');
     if(cta) cta.classList.add('hidden');
+    if(myTeamWrap) myTeamWrap.classList.add('hidden');
     return;
   }
   if(home) home.classList.remove('hidden');
   if(band) band.classList.remove('hidden');
   if(cta) cta.classList.remove('hidden');
+  if(myTeamWrap) myTeamWrap.classList.remove('hidden');
 
   var wStats = document.getElementById('stats-weekly');
   var sStats = document.getElementById('stats-season');
@@ -2611,26 +2675,36 @@ function renderCumStandingsPage(page){
   }
 }
 
-function toggleCumLineup(){
-  var drop = document.getElementById('cum-lineup-drop');
-  var caret = document.getElementById('cum-lineup-caret');
-  if(!drop) return;
-  var isHidden = drop.classList.contains('hidden');
-  if(!isHidden){
+// One shared My Team dropdown, usable from any screen (landing page or
+// any of the five tab overlays) for either league format — the lineup
+// data lives at the same path regardless of format, so there's nothing
+// format-specific here. Moves the single #myteam-drop panel to right
+// after whichever toggle button was clicked, rather than duplicating it.
+function toggleMyTeam(context){
+  var drop = document.getElementById('myteam-drop');
+  var anchor = document.querySelector('[data-myteam-anchor="' + context + '"]');
+  if(!drop || !anchor) return;
+
+  var alreadyOpenHere = !drop.classList.contains('hidden') && drop.previousElementSibling === anchor;
+
+  // Reset every caret to closed first.
+  document.querySelectorAll('.myteam-caret').forEach(function(c){ c.style.transform = 'rotate(0deg)'; });
+
+  if(alreadyOpenHere){
     drop.classList.add('hidden');
-    if(caret) caret.style.transform = 'rotate(0deg)';
     return;
   }
+
+  anchor.parentNode.insertBefore(drop, anchor.nextSibling);
   drop.classList.remove('hidden');
+  var caret = document.getElementById('myteam-caret-' + context);
   if(caret) caret.style.transform = 'rotate(180deg)';
-  loadCumLineup();
+  loadMyTeamLineup(drop);
 }
 
 // Reuses rosterColumn() (built for the H2H roster dropdown) — same
 // kickoff-lock-gated reveal, no need for a second implementation.
-function loadCumLineup(targetId){
-  targetId = targetId || 'cum-lineup-drop';
-  var drop = document.getElementById(targetId);
+function loadMyTeamLineup(drop){
   if(!drop) return;
   var user = (typeof FRAuth !== 'undefined' && FRAuth.getUser) ? FRAuth.getUser() : null;
   if(!user || !user.uid){
@@ -5985,12 +6059,12 @@ function closeH2HTabOverlay(){
 function handleNav(val){
   // The lineup dropdown's open/closed state persists even while it's
   // visually covered by a full-screen tab — close it explicitly on any
-  // navigation so it isn't still sitting open when the person comes back.
-  var cumDrop = document.getElementById('cum-lineup-drop');
-  if(cumDrop && !cumDrop.classList.contains('hidden')){
-    cumDrop.classList.add('hidden');
-    var caret = document.getElementById('cum-lineup-caret');
-    if(caret) caret.style.transform = 'rotate(0deg)';
+  // navigation so it isn't still sitting open (in whatever screen it was
+  // opened from) when the person comes back.
+  var myTeamDrop = document.getElementById('myteam-drop');
+  if(myTeamDrop && !myTeamDrop.classList.contains('hidden')){
+    myTeamDrop.classList.add('hidden');
+    document.querySelectorAll('.myteam-caret').forEach(function(c){ c.style.transform = 'rotate(0deg)'; });
   }
 
   if(val === 'league'){ document.body.style.overflow = 'hidden'; document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); }); document.getElementById('tab-league').classList.remove('hidden'); document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); }); document.getElementById('navtab-league').classList.add('active'); setStatBoxes('hidden'); renderLeague(); return; }
