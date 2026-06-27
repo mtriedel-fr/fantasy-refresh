@@ -1047,7 +1047,13 @@ setTimeout(function(){
   </div>
   <div id="wg"></div>
 </div>
-<div id="tab-league" class="content hidden"><div id="wleague"></div></div>
+<div id="tab-league" class="content hidden">
+  <div class="tab-overlay-close-bar hidden">
+    <span class="tab-overlay-close-bar-title">🏆 League</span>
+    <button class="tab-overlay-close-btn" onclick="closeH2HTabOverlay()">✕ Close</button>
+  </div>
+  <div id="wleague"></div>
+</div>
 <div id="tab-playoffs" class="content hidden">
   <div class="tab-overlay-close-bar hidden">
     <span class="tab-overlay-close-bar-title">🏆 Playoffs</span>
@@ -1847,7 +1853,7 @@ function applyH2HChrome(){
   // takeovers for H2H, same pattern as the commissioner panel — but this
   // only applies here in JS, gated on IS_H2H_LEAGUE, so the cumulative OG
   // league's tab behavior is completely untouched.
-  ['tab-yourweek','tab-yourseason','tab-guillotine','tab-playoffs'].forEach(function(id){
+  ['tab-yourweek','tab-yourseason','tab-guillotine','tab-playoffs','tab-league'].forEach(function(id){
     var t = document.getElementById(id);
     if(t) t.classList.add('tab-overlay');
   });
@@ -2528,6 +2534,17 @@ function renderCumHome(){
   if(weeklyStandingPanel) weeklyStandingPanel.classList.add('hidden');
   var numbersPanel = document.getElementById('sub-numbers');
   if(numbersPanel) numbersPanel.classList.remove('hidden');
+
+  // This Week / Your Season / Playoffs / Guillotine / League become
+  // full-screen takeovers for cumulative leagues too — this was only ever
+  // wired up for H2H before, so these tabs were just showing inline here,
+  // which is why the landing page (lineup + standings) stayed visible
+  // behind every one of them.
+  ['tab-yourweek','tab-yourseason','tab-guillotine','tab-playoffs','tab-league'].forEach(function(id){
+    var t = document.getElementById(id);
+    if(t) t.classList.add('tab-overlay');
+  });
+  document.querySelectorAll('.tab-overlay-close-bar').forEach(function(b){ b.classList.remove('hidden'); });
 
   // On first load only: keep the landing page (lineup + standings) as the
   // very first thing visible, with This Week not yet open — same pattern
@@ -5965,7 +5982,17 @@ function closeH2HTabOverlay(){
 }
 
 function handleNav(val){
-  if(val === 'league'){ document.body.style.overflow = ''; document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); }); document.getElementById('tab-league').classList.remove('hidden'); document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); }); document.getElementById('navtab-league').classList.add('active'); setStatBoxes('hidden'); renderLeague(); return; }
+  // The lineup dropdown's open/closed state persists even while it's
+  // visually covered by a full-screen tab — close it explicitly on any
+  // navigation so it isn't still sitting open when the person comes back.
+  var cumDrop = document.getElementById('cum-lineup-drop');
+  if(cumDrop && !cumDrop.classList.contains('hidden')){
+    cumDrop.classList.add('hidden');
+    var caret = document.getElementById('cum-lineup-caret');
+    if(caret) caret.style.transform = 'rotate(0deg)';
+  }
+
+  if(val === 'league'){ document.body.style.overflow = 'hidden'; document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); }); document.getElementById('tab-league').classList.remove('hidden'); document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); }); document.getElementById('navtab-league').classList.add('active'); setStatBoxes('hidden'); renderLeague(); return; }
   if(val === 'playoffs'){ document.body.style.overflow = 'hidden'; document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); }); document.getElementById('tab-playoffs').classList.remove('hidden'); document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); }); document.getElementById('navtab-playoffs').classList.add('active'); setStatBoxes('hidden'); renderPlayoffs(); return; }
   if(val === 'guillotine'){ document.body.style.overflow = 'hidden'; document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); }); document.getElementById('tab-guillotine').classList.remove('hidden'); document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); }); document.getElementById('navtab-guillotine').classList.add('active'); setStatBoxes('guillotine'); renderGuillotine(); return; }
   if(val === 'yourseason'){
