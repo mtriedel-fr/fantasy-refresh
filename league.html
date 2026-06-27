@@ -1818,20 +1818,12 @@ function applyH2HChrome(){
   var sStats = document.getElementById('stats-season');
   if(wStats) wStats.classList.add('hidden');
   if(sStats) sStats.classList.add('hidden');
-  var subWeeklyStanding = document.getElementById('subtab-weeklystanding');
-  if(subWeeklyStanding) subWeeklyStanding.style.display = 'none';
   var subMovement = document.getElementById('subtab-movement');
   if(subMovement) subMovement.style.display = 'none';
-  // My Lineup used to live as its own sub-tab here, but the Draft/Review
-  // Team button on the matchup band now covers that job — so for H2H,
-  // skip the sub-tab switcher entirely and just show Weekly Numbers
-  // directly under Your Week.
-  var subTabsBar = document.getElementById('yourweek-subtabs-scroll');
-  if(subTabsBar) subTabsBar.style.display = 'none';
-  var mylineupPanel = document.getElementById('sub-mylineup');
-  if(mylineupPanel) mylineupPanel.classList.add('hidden');
-  var numbersPanel = document.getElementById('sub-numbers');
-  if(numbersPanel) numbersPanel.classList.remove('hidden');
+  // My Lineup, Weekly Standing, and Weekly Numbers all live together under
+  // the My Week popup again — switching between them via their own tabs,
+  // same as before. The Draft/Review Team button and the always-visible
+  // homepage stuff sit alongside this, not instead of it.
 
   var ctx = FRAuth.getLeagueCtx();
   // Guillotine is a separate flag a H2H league can also carry.
@@ -2506,24 +2498,16 @@ function filterH2HDivision(btn, divKey){
 }
 
 // ── CUMULATIVE HOME — View Lineup dropdown + paginated standings ────
-// The non-H2H counterpart to the H2H homepage. My Lineup / Weekly
-// Standing sub-tabs become redundant once these are always-visible, so
-// they get hidden here the same way they were consolidated for H2H.
+// The non-H2H counterpart to the H2H homepage. Sits alongside the My
+// Lineup / Weekly Standing / Weekly Numbers sub-tabs under My Week,
+// not instead of them.
 function renderCumHome(){
   var home = document.getElementById('cum-home');
   if(!home) return;
   if(IS_H2H_LEAGUE){ home.classList.add('hidden'); return; }
   home.classList.remove('hidden');
 
-  var subTabsBar = document.getElementById('yourweek-subtabs-scroll');
-  if(subTabsBar) subTabsBar.style.display = 'none';
-  var mylineupPanel = document.getElementById('sub-mylineup');
-  if(mylineupPanel) mylineupPanel.classList.add('hidden');
-  var weeklyStandingPanel = document.getElementById('sub-weeklystanding');
-  if(weeklyStandingPanel) weeklyStandingPanel.classList.add('hidden');
-  var numbersPanel = document.getElementById('sub-numbers');
-  if(numbersPanel) numbersPanel.classList.remove('hidden');
-
+  loadCumLineup('wt');
   renderCumStandingsPage(0);
 }
 
@@ -2594,8 +2578,9 @@ function toggleCumLineup(){
 
 // Reuses rosterColumn() (built for the H2H roster dropdown) — same
 // kickoff-lock-gated reveal, no need for a second implementation.
-function loadCumLineup(){
-  var drop = document.getElementById('cum-lineup-drop');
+function loadCumLineup(targetId){
+  targetId = targetId || 'cum-lineup-drop';
+  var drop = document.getElementById(targetId);
   if(!drop) return;
   var user = (typeof FRAuth !== 'undefined' && FRAuth.getUser) ? FRAuth.getUser() : null;
   if(!user || !user.uid){
@@ -8216,10 +8201,6 @@ document.addEventListener('DOMContentLoaded', function(){
 <!-- MORE MENU (slides up) -->
 <div id="more-menu" style="display:none;position:fixed;bottom:60px;left:0;right:0;background:var(--bg2);border-top:1px solid var(--bdr2);padding:16px;z-index:99;" onclick="event.stopPropagation()">
   <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">
-    <button onclick="closeMoreMenu();goToDraft()" style="background:rgba(0,229,212,.08);border:1px solid rgba(0,229,212,.2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;">
-      <div style="font-size:20px;margin-bottom:4px;">📋</div>
-      <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--or);text-transform:uppercase;">Draft</div>
-    </button>
     <button id="more-guillotine-btn" onclick="closeMoreMenu();switchBottomNav('guillotine','bn-more')" style="background:var(--bg3);border:1px solid var(--bdr2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;">
       <div style="font-size:20px;margin-bottom:4px;">☠️</div>
       <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink2);text-transform:uppercase;">Guillotine</div>
