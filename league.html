@@ -965,7 +965,7 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
 <div class="nav-tab-bar" id="nav-tab-bar" style="display:none;">
   <div class="nav-tab active" id="navtab-yourweek" onclick="handleNav('yourweek')">
     <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-    <span>Your Week</span>
+    <span>This Week</span>
   </div>
   <div class="nav-tab" id="navtab-yourseason" onclick="handleNav('yourseason')">
     <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
@@ -996,7 +996,7 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
 <!-- YOUR WEEK — My Lineup / Weekly Standing / Weekly Numbers -->
 <div id="tab-yourweek" class="content">
   <div class="tab-overlay-close-bar hidden">
-    <span class="tab-overlay-close-bar-title">📅 Your Week</span>
+    <span class="tab-overlay-close-bar-title">📅 This Week</span>
     <button class="tab-overlay-close-btn" onclick="closeH2HTabOverlay()">✕ Close</button>
   </div>
   <div class="sub-tabs-scroll" id="yourweek-subtabs-scroll">
@@ -2507,7 +2507,18 @@ function renderCumHome(){
   if(IS_H2H_LEAGUE){ home.classList.add('hidden'); return; }
   home.classList.remove('hidden');
 
-  loadCumLineup('wt');
+  // Lineup + standings already live permanently on the landing page above
+  // for cumulative leagues, so My Week just shows Weekly Numbers directly —
+  // no sub-tab switcher needed here (H2H keeps its own full switcher).
+  var subTabsBar = document.getElementById('yourweek-subtabs-scroll');
+  if(subTabsBar) subTabsBar.style.display = 'none';
+  var mylineupPanel = document.getElementById('sub-mylineup');
+  if(mylineupPanel) mylineupPanel.classList.add('hidden');
+  var weeklyStandingPanel = document.getElementById('sub-weeklystanding');
+  if(weeklyStandingPanel) weeklyStandingPanel.classList.add('hidden');
+  var numbersPanel = document.getElementById('sub-numbers');
+  if(numbersPanel) numbersPanel.classList.remove('hidden');
+
   renderCumStandingsPage(0);
 }
 
@@ -8183,7 +8194,7 @@ document.addEventListener('DOMContentLoaded', function(){
   </button>
   <button class="bn-item active" id="bn-week" onclick="closeMoreMenu();switchBottomNav('yourweek','bn-week','mylineup')">
     <span class="bn-icon">📊</span>
-    <span class="bn-label">My Week</span>
+    <span class="bn-label">This Week</span>
   </button>
   <button class="bn-item" id="bn-season" onclick="closeMoreMenu();switchBottomNav('yourseason','bn-season','standings')">
     <span class="bn-icon">📅</span>
