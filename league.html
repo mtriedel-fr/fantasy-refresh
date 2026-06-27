@@ -525,6 +525,7 @@ tr.my-team:hover td{background:rgba(255,95,160,.18) !important;}
 .tab-overlay{position:fixed !important;top:0;left:0;right:0;bottom:0;background:var(--bg);z-index:550;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:calc(76px + env(safe-area-inset-bottom));}
 .tab-overlay.hidden{display:none !important;}
 .tab-overlay-close-bar{position:sticky;top:0;background:var(--bg2);z-index:1;padding:14px 18px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;}
+.tab-overlay-close-bar.hidden{display:none !important;}
 .tab-overlay-close-bar-title{font-family:var(--fd);font-size:13px;font-weight:800;color:var(--or);text-transform:uppercase;letter-spacing:1px;}
 .tab-overlay-close-btn{background:none;border:1px solid var(--bdr2);color:var(--ink3);font-size:13px;padding:5px 14px;border-radius:6px;cursor:pointer;font-family:var(--fd);}
 .comm-title-bar{position:sticky;top:0;background:var(--hdr);z-index:1;padding:16px 28px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;}
@@ -924,6 +925,23 @@ try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(d
   <div class="stat"><div class="stat-lbl">Season avg</div><div class="stat-val" id="ss-avg">—</div></div>
   <div class="stat"><div class="stat-lbl">Most consistent</div><div class="stat-val" id="ss-streak">—</div><div class="stat-sub" id="ss-streak-name" style="font-family:var(--fd);font-size:11px;color:var(--ink3);letter-spacing:.5px;text-transform:uppercase;margin-top:2px"></div></div>
   <div class="stat"><div class="stat-lbl">Weeks played</div><div class="stat-val" id="ss-weeks">—</div></div>
+</div>
+
+<!-- CUMULATIVE HOME — View Lineup dropdown + paginated weekly standings,
+     shown for every non-H2H league. Always visible, no tab click needed. -->
+<div id="cum-home" class="hidden">
+  <div class="h2h-section h2h-section-matchups" style="margin-bottom:10px;">
+    <button id="cum-lineup-toggle" onclick="toggleCumLineup()" style="width:100%;background:none;border:none;display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:0;color:var(--ink);">
+      <span style="font-family:var(--fd);font-size:13px;font-weight:800;color:var(--or);text-transform:uppercase;letter-spacing:.5px;">👤 View My Lineup</span>
+      <span id="cum-lineup-caret" style="font-size:11px;color:var(--ink3);transition:transform .15s;">▾</span>
+    </button>
+    <div id="cum-lineup-drop" class="hidden" style="margin-top:12px;"></div>
+  </div>
+  <div class="h2h-section h2h-section-standings">
+    <div class="h2h-section-hdr">🏆 Weekly Standings</div>
+    <div id="cum-standings-wrap"></div>
+    <div id="cum-standings-pager" style="display:flex;gap:6px;justify-content:center;margin-top:12px;flex-wrap:wrap;"></div>
+  </div>
 </div>
 
 <!-- PRIMARY NAV TAB BAR - hidden, replaced by bottom nav -->
@@ -2358,6 +2376,122 @@ function filterH2HDivision(btn, divKey){
   if(content) content.innerHTML = buildStandingsTable(rows);
 }
 
+// ── CUMULATIVE HOME — View Lineup dropdown + paginated standings ────
+// The non-H2H counterpart to the H2H homepage. My Lineup / Weekly
+// Standing sub-tabs become redundant once these are always-visible, so
+// they get hidden here the same way they were consolidated for H2H.
+function renderCumHome(){
+  var home = document.getElementById('cum-home');
+  if(!home) return;
+  if(IS_H2H_LEAGUE){ home.classList.add('hidden'); return; }
+  home.classList.remove('hidden');
+
+  var subTabsBar = document.getElementById('yourweek-subtabs-scroll');
+  if(subTabsBar) subTabsBar.style.display = 'none';
+  var mylineupPanel = document.getElementById('sub-mylineup');
+  if(mylineupPanel) mylineupPanel.classList.add('hidden');
+  var weeklyStandingPanel = document.getElementById('sub-weeklystanding');
+  if(weeklyStandingPanel) weeklyStandingPanel.classList.add('hidden');
+  var numbersPanel = document.getElementById('sub-numbers');
+  if(numbersPanel) numbersPanel.classList.remove('hidden');
+
+  renderCumStandingsPage(0);
+}
+
+function computeCumStandings(){
+  var entries = seasonData[String(currentWeek)] || [];
+  return entries.slice().sort(function(a,b){ return b.score - a.score; });
+}
+
+function renderCumStandingsPage(page){
+  var wrap = document.getElementById('cum-standings-wrap');
+  var pager = document.getElementById('cum-standings-pager');
+  if(!wrap) return;
+
+  var all = computeCumStandings();
+  if(!all.length){
+    wrap.innerHTML = '<div class="myteam-empty"><div class="myteam-empty-icon">📅</div><div class="myteam-empty-title">No results yet</div><div class="myteam-empty-sub">Standings appear once scores come in for Week ' + currentWeek + '.</div></div>';
+    if(pager) pager.innerHTML = '';
+    return;
+  }
+
+  var perPage = 10;
+  var totalPages = Math.ceil(all.length / perPage);
+  if(page >= totalPages) page = totalPages - 1;
+  if(page < 0) page = 0;
+
+  var pageRows = all.slice(page*perPage, page*perPage + perPage);
+  var rows = pageRows.map(function(t, i){
+    var isMe = myTeam && teamMatch(t.name, myTeam);
+    return '<tr' + (isMe ? ' class="my-team"' : '') + '>'
+      + '<td class="rk">' + (page*perPage + i + 1) + '</td>'
+      + '<td style="font-family:var(--fd);font-size:14px;font-weight:700;color:' + (isMe ? 'var(--or)' : 'var(--ink)') + ';">' + escapeHtmlFR(t.name) + '</td>'
+      + '<td style="text-align:right;font-family:var(--fd);color:var(--ink2);">' + fmtScore(t.score) + '</td>'
+      + '</tr>';
+  }).join('');
+
+  wrap.innerHTML = '<table class="st-table"><thead><tr><th class="rk">#</th><th>Team</th><th style="text-align:right;">Score</th></tr></thead><tbody>' + rows + '</tbody></table>';
+
+  if(pager){
+    if(totalPages <= 1){
+      pager.innerHTML = '';
+    } else {
+      var btns = [];
+      for(var p = 0; p < totalPages; p++){
+        var startRank = p*perPage + 1;
+        var endRank   = Math.min((p+1)*perPage, all.length);
+        var active    = p === page;
+        btns.push('<button onclick="renderCumStandingsPage(' + p + ')" style="font-family:var(--fd);font-size:11px;font-weight:700;padding:5px 10px;border-radius:6px;cursor:pointer;border:1px solid ' + (active ? 'var(--or)' : 'var(--bdr)') + ';background:' + (active ? 'rgba(0,229,212,.12)' : 'var(--bg2)') + ';color:' + (active ? 'var(--or)' : 'var(--ink3)') + ';">' + startRank + '-' + endRank + '</button>');
+      }
+      pager.innerHTML = btns.join('');
+    }
+  }
+}
+
+function toggleCumLineup(){
+  var drop = document.getElementById('cum-lineup-drop');
+  var caret = document.getElementById('cum-lineup-caret');
+  if(!drop) return;
+  var isHidden = drop.classList.contains('hidden');
+  if(!isHidden){
+    drop.classList.add('hidden');
+    if(caret) caret.style.transform = 'rotate(0deg)';
+    return;
+  }
+  drop.classList.remove('hidden');
+  if(caret) caret.style.transform = 'rotate(180deg)';
+  loadCumLineup();
+}
+
+// Reuses rosterColumn() (built for the H2H roster dropdown) — same
+// kickoff-lock-gated reveal, no need for a second implementation.
+function loadCumLineup(){
+  var drop = document.getElementById('cum-lineup-drop');
+  if(!drop) return;
+  var user = (typeof FRAuth !== 'undefined' && FRAuth.getUser) ? FRAuth.getUser() : null;
+  if(!user || !user.uid){
+    drop.innerHTML = '<div class="myteam-empty"><div class="myteam-empty-icon">👤</div><div class="myteam-empty-title">No team set</div></div>';
+    return;
+  }
+  drop.innerHTML = '<div class="h2h-roster-empty">Loading…</div>';
+  var ctx = FRAuth.getLeagueCtx();
+  var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+  var season = (ctx && ctx.season) || 2026;
+
+  Promise.all([
+    FR.fb.get('/leagues/' + leagueId + '/lineups/' + season + '/week' + currentWeek + '/' + user.uid),
+    FR.fb.get('/leagues/' + leagueId + '/season/' + season + '/' + currentWeek + '/' + user.uid),
+    FR.fb.get('/leagues/' + leagueId + '/locks/' + season + '/week' + currentWeek)
+  ]).then(function(results){
+    var lineup     = results[0];
+    var scoreEntry = results[1];
+    var locks      = results[2] || {};
+    drop.innerHTML = rosterColumn(lineup, scoreEntry, locks);
+  }).catch(function(){
+    drop.innerHTML = '<div class="myteam-empty"><div class="myteam-empty-icon">⚠️</div><div class="myteam-empty-title">Could not load lineup</div></div>';
+  });
+}
+
 function renderAll(){
   // Head-to-head leagues use a completely separate render pipeline —
   // matchups + W-L standings instead of cumulative point totals.
@@ -2365,6 +2499,8 @@ function renderAll(){
     renderAllH2H();
     return;
   }
+
+  renderCumHome();
 
   // Sync dropdown to currentWeek
   var sel = document.getElementById('wk-select');

@@ -444,14 +444,22 @@ function loadFlatSalariesFromPool(){
     .catch(function(){});
 }
 
+// Some data providers use different abbreviations for the same team across
+// different endpoints — Washington in particular shows up as both WAS and
+// WSH depending on the source. Normalize before comparing anywhere a team
+// abbreviation gets matched, so a mismatch here can't silently make an
+// entire team's players disappear from the pool.
+var TEAM_ALIASES = { WAS: 'WSH', WSH: 'WSH' };
+function normTeam(abbr){ return TEAM_ALIASES[abbr] || abbr; }
+
 function filterPlayersToSchedule(){
   // Build set of teams playing this week from schedule
   var playingTeams = {};
   schedule.forEach(function(g){
-    if(g.teams) g.teams.forEach(function(t){ playingTeams[t] = true; });
+    if(g.teams) g.teams.forEach(function(t){ playingTeams[normTeam(t)] = true; });
   });
   if(!Object.keys(playingTeams).length) return;
-  allPlayers = allPlayers.filter(function(p){ return playingTeams[p.team]; });
+  allPlayers = allPlayers.filter(function(p){ return playingTeams[normTeam(p.team)]; });
 }
 
 
@@ -717,14 +725,14 @@ function renderGamePreview(game){
   var slot = activeSlot ? SLOT_DEFS.find(function(s){ return s.id === activeSlot; }) : null;
 
   var awayPlayers = allPlayers.filter(function(p){
-    if(p.team !== game.away) return false;
+    if(normTeam(p.team) !== normTeam(game.away)) return false;
     if(draftedInPreview[p.id]) return false;
     if(slot && slot.eligible.indexOf(p.pos) < 0) return false;
     return true;
   }).sort(sortByPos);
 
   var homePlayers = allPlayers.filter(function(p){
-    if(p.team !== game.home) return false;
+    if(normTeam(p.team) !== normTeam(game.home)) return false;
     if(draftedInPreview[p.id]) return false;
     if(slot && slot.eligible.indexOf(p.pos) < 0) return false;
     return true;
@@ -755,7 +763,7 @@ function renderGamePreview(game){
       + '</div>';
   }
 
-  var html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0;height:100%;">'
+  var html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0;">'
 
     // Away team
     + '<div style="border-right:1px solid var(--bdr);">'
@@ -1317,11 +1325,11 @@ function loadLocks(){
 }
 
 function isPlayerLocked(player){
-  return !!(player && player.team && teamLocks[player.team]);
+  return !!(player && player.team && teamLocks[normTeam(player.team)]);
 }
 
 function isTeamLocked(team){
-  return !!(team && teamLocks[team]);
+  return !!(team && teamLocks[normTeam(team)]);
 }
 
 function showToast(msg,isErr){
