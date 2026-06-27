@@ -1177,7 +1177,7 @@ function pickPlayer(playerId){
 
   if(replaced){
     showToast(replaced + ' replaced with ' + p.name + ' ✓');
-    var stillFull = Object.values(lineup).filter(Boolean).length >= 9;
+    var stillFull = Object.values(lineup).filter(Boolean).length >= SLOT_DEFS.length;
     if(window.innerWidth <= 860 && stillFull){
       closePicker();
     } else {
@@ -1191,7 +1191,7 @@ function pickPlayer(playerId){
   // slot) goes back to the unfiltered All Players view instead, so the
   // picker doesn't lock itself into "now fill this specific slot" mode.
   var nextSlot = wasAutoSlot ? null : findNextEmptySlot(slot);
-  var rosterComplete = Object.values(lineup).filter(Boolean).length >= 9;
+  var rosterComplete = Object.values(lineup).filter(Boolean).length >= SLOT_DEFS.length;
 
   if(nextSlot){
     activeSlot = nextSlot.id;
@@ -1291,20 +1291,24 @@ function updateCap(){
 
 function updateSubmitBtn(){
   var filled = Object.values(lineup).filter(Boolean).length;
+  var total  = SLOT_DEFS.length;
   var spent  = getSpent();
   var btn    = document.getElementById('submit-btn');
   var msg    = document.getElementById('submit-msg');
   if(!currentUser){
     btn.disabled=true; btn.textContent='Build Your Lineup';
     msg.textContent='Sign in to submit your lineup'; msg.className='submit-msg';
-  } else if(filled<9){
+  } else if(filled===0){
     btn.disabled=true; btn.textContent='Build Your Lineup';
-    msg.textContent=(9-filled)+' slot'+(9-filled===1?'':'s')+' remaining';
-    msg.className='submit-msg';
+    msg.textContent='Add players to your roster'; msg.className='submit-msg';
   } else if(spent>CAP){
     btn.disabled=true;
     msg.textContent='Over cap by $'+(spent-CAP).toLocaleString();
     msg.className='submit-msg err';
+  } else if(filled<total){
+    btn.disabled=false; btn.textContent='Save Lineup →';
+    msg.textContent=(total-filled)+' slot'+(total-filled===1?'':'s')+' still open · saved picks are kept';
+    msg.className='submit-msg ok';
   } else {
     btn.disabled=false; btn.textContent='Submit Lineup →';
     msg.textContent='$'+(CAP-spent).toLocaleString()+' remaining · Ready to submit';
@@ -1315,7 +1319,7 @@ function updateSubmitBtn(){
 // ── SUBMIT ─────────────────────────────────────────────────────
 function submitLineup(){
   if(!currentUser){ showToast('Sign in first',true); return; }
-  if(Object.values(lineup).filter(Boolean).length<9){ showToast('Fill all 9 slots',true); return; }
+  if(Object.values(lineup).filter(Boolean).length===0){ showToast('Add at least one player first',true); return; }
   if(getSpent()>CAP){ showToast('Over cap',true); return; }
   var btn = document.getElementById('submit-btn');
   btn.disabled=true; btn.textContent='Submitting…';

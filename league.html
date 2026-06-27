@@ -527,6 +527,10 @@ tr.my-team:hover td{background:rgba(255,95,160,.18) !important;}
 /* BOTTOM NAV */
 .bottom-nav{position:fixed;bottom:0;left:0;right:0;background:var(--hdr);border-top:1px solid var(--bdr);display:flex;align-items:center;z-index:560;padding-bottom:env(safe-area-inset-bottom);}
 .bn-item{flex:1;display:flex;flex-direction:column;align-items:center;padding:10px 0 8px;gap:3px;cursor:pointer;-webkit-tap-highlight-color:transparent;border:none;background:transparent;}
+/* The bottom-nav is fixed, so it doesn't move with page scroll — without
+   this, content near the bottom of the page (like a long matchups list)
+   ends up permanently hidden underneath it with no way to scroll past. */
+body{padding-bottom:calc(76px + env(safe-area-inset-bottom));}
 .bn-icon{font-size:18px;line-height:1;}
 .bn-label{font-family:var(--fd);font-size:9px;text-transform:uppercase;letter-spacing:.5px;font-weight:700;}
 .bn-item.active .bn-label{color:var(--or);}
@@ -914,12 +918,6 @@ setTimeout(function(){
 <!-- H2H PERSONAL MATCHUP BAND — replaces the Score/Current Place stats
      band for head-to-head leagues. First thing visible, no scrolling. -->
 <div class="h2h-matchup-band hidden" id="h2h-matchup-band"></div>
-
-<!-- DRAFT/REVIEW TEAM CTA — text and icon swap based on whether this
-     week's lineup has already been set -->
-<div id="h2h-draft-cta" class="hidden" style="text-align:center;padding:0 16px 14px;">
-  <button id="h2h-draft-cta-btn" onclick="goToDraft()" style="background:linear-gradient(135deg,var(--or),var(--pk));border:none;border-radius:10px;padding:13px 48px;color:#050808;font-family:var(--fd);font-size:14px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;cursor:pointer;box-shadow:0 3px 12px rgba(0,229,212,.25);width:100%;max-width:340px;">📝 Draft Your Team</button>
-</div>
 
 <div id="h2h-myteam-toggle-wrap" class="hidden" style="padding:0 16px 14px;">
   <div class="myteam-toggle-row" data-myteam-anchor="h2hhome" style="margin:0;">
@@ -1880,19 +1878,16 @@ function applyArchiveVisibility(){
 function applyH2HChrome(){
   var home = document.getElementById('h2h-home');
   var band = document.getElementById('h2h-matchup-band');
-  var cta = document.getElementById('h2h-draft-cta');
   var myTeamWrap = document.getElementById('h2h-myteam-toggle-wrap');
 
   if(!IS_H2H_LEAGUE){
     if(home) home.classList.add('hidden');
     if(band) band.classList.add('hidden');
-    if(cta) cta.classList.add('hidden');
     if(myTeamWrap) myTeamWrap.classList.add('hidden');
     return;
   }
   if(home) home.classList.remove('hidden');
   if(band) band.classList.remove('hidden');
-  if(cta) cta.classList.remove('hidden');
   if(myTeamWrap) myTeamWrap.classList.remove('hidden');
 
   var wStats = document.getElementById('stats-weekly');
@@ -2032,6 +2027,31 @@ function lineupSlotSortKey(slotId){
 }
 function sortedSlotIds(slots){
   return Object.keys(slots).sort(function(a, b){ return lineupSlotSortKey(a) - lineupSlotSortKey(b); });
+}
+
+// The standard 9-slot total (1 QB, 2 RB, 3 WR, 1 TE, 1 FLEX, 1 DEF) unless
+// a league's settings specify a custom roster — saved lineup data only
+// ever stores filled slots, so there's no way to know the expected total
+// from the data alone; it has to come from settings.
+function totalRosterSlots(cfg){
+  if(!cfg) return 9;
+  var qb   = cfg.qb    != null ? cfg.qb    : 1;
+  var rb   = cfg.rb    != null ? cfg.rb    : 2;
+  var wr   = cfg.wr    != null ? cfg.wr    : 3;
+  var te   = cfg.te    != null ? cfg.te    : 1;
+  var flex = cfg.flex  != null ? cfg.flex  : 1;
+  var def  = cfg.def   != null ? cfg.def   : 1;
+  return qb + rb + wr + te + flex + def;
+}
+
+// Draft Team (nothing picked yet) / Finish Team (some but not all slots
+// filled) / My Team (complete) — applies to every "My Team" button across
+// every screen, since they all share the same .myteam-label class.
+function updateMyTeamLabel(filledCount, totalCount){
+  var text = filledCount === 0 ? '📝 Draft Team'
+    : filledCount < totalCount ? '🧩 Finish Team'
+    : '👤 My Team';
+  document.querySelectorAll('.myteam-label').forEach(function(l){ l.textContent = text; });
 }
 
 // Builds {TEAM: {opp, time, isHome}} from the worker's /schedule response,
@@ -2365,16 +2385,16 @@ function renderH2HMyLineup(){
 
   Promise.all([
     FR.fb.get('/leagues/' + leagueId + '/lineups/' + (ctx.season || 2026) + '/week' + currentWeek + '/' + user.uid),
-    FR.fb.get('/leagues/' + leagueId + '/season/' + (ctx.season || 2026) + '/' + currentWeek)
+    FR.fb.get('/leagues/' + leagueId + '/season/' + (ctx.season || 2026) + '/' + currentWeek),
+    FR.fb.get('/leagues/' + leagueId + '/settings')
   ]).then(function(results){
     var lineup = results[0];
     var weekScores = results[1] || {};
     var myEntry = weekScores[user.uid] || null;
+    var settings = results[2] || {};
 
-    var hasAnyPlayer = !!(lineup && lineup.slots && Object.keys(lineup.slots).some(function(k){ return !!lineup.slots[k]; }));
-    var ctaBtn = document.getElementById('h2h-draft-cta-btn');
-    if(ctaBtn) ctaBtn.textContent = hasAnyPlayer ? '✏️ Review Team' : '📝 Draft Your Team';
-    document.querySelectorAll('.myteam-label').forEach(function(l){ l.textContent = hasAnyPlayer ? '👤 My Team' : '📝 Draft Team'; });
+    var filledCount = (lineup && lineup.slots) ? Object.keys(lineup.slots).filter(function(k){ return !!lineup.slots[k]; }).length : 0;
+    updateMyTeamLabel(filledCount, totalRosterSlots(settings.rosterConfig));
 
     if(!lineup || !lineup.slots){
       wt.innerHTML = '<div class="myteam-empty"><div class="myteam-empty-icon">📋</div><div class="myteam-empty-title">No lineup set for Week ' + currentWeek + '</div><div class="myteam-empty-sub">Head to the Draft tab to set your roster for this week.</div></div>';
@@ -2593,9 +2613,14 @@ function updateMyTeamLabelsForCumulative(){
   var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
   var season = (ctx && ctx.season) || 2026;
 
-  FR.fb.get('/leagues/' + leagueId + '/lineups/' + season + '/week' + currentWeek + '/' + user.uid).then(function(lineup){
-    var hasAnyPlayer = !!(lineup && lineup.slots && Object.keys(lineup.slots).some(function(k){ return !!lineup.slots[k]; }));
-    document.querySelectorAll('.myteam-label').forEach(function(l){ l.textContent = hasAnyPlayer ? '👤 My Team' : '📝 Draft Team'; });
+  Promise.all([
+    FR.fb.get('/leagues/' + leagueId + '/lineups/' + season + '/week' + currentWeek + '/' + user.uid),
+    FR.fb.get('/leagues/' + leagueId + '/settings')
+  ]).then(function(results){
+    var lineup = results[0];
+    var settings = results[1] || {};
+    var filledCount = (lineup && lineup.slots) ? Object.keys(lineup.slots).filter(function(k){ return !!lineup.slots[k]; }).length : 0;
+    updateMyTeamLabel(filledCount, totalRosterSlots(settings.rosterConfig));
   }).catch(function(){});
 }
 
