@@ -957,19 +957,14 @@ setTimeout(function(){
 
 <!-- CUMULATIVE HOME — View Lineup dropdown + paginated weekly standings,
      shown for every non-H2H league. Always visible, no tab click needed. -->
-<!-- PERSISTENT MY TEAM BAR — cumulative leagues only. Fixed position so
-     it stays visible above whichever tab is active, not just the landing
-     page. Top offset gets measured from the real header height via JS
-     (positionMyTeamBar), since the header's height isn't fixed. -->
-<div id="cum-myteam-bar" class="hidden" style="position:fixed;left:0;right:0;z-index:556;display:flex;justify-content:center;padding:10px 0;pointer-events:none;">
-  <button id="cum-lineup-toggle" onclick="toggleCumLineup()" style="pointer-events:auto;background:var(--bg2);border:1px solid var(--bdr2);border-radius:22px;display:flex;align-items:center;gap:8px;cursor:pointer;padding:9px 20px;color:var(--ink);box-shadow:0 3px 12px rgba(0,0,0,.3);">
-    <span style="font-family:var(--fd);font-size:13px;font-weight:800;color:var(--or);text-transform:uppercase;letter-spacing:.5px;">👤 My Team</span>
-    <span id="cum-lineup-caret" style="font-size:11px;color:var(--ink3);transition:transform .15s;">▾</span>
-  </button>
-</div>
-<div id="cum-lineup-drop" class="hidden" style="position:fixed;left:0;right:0;z-index:556;background:var(--bg);border-bottom:1px solid var(--bdr);max-height:60vh;overflow-y:auto;padding:14px 16px;box-shadow:0 8px 24px rgba(0,0,0,.4);"></div>
-
 <div id="cum-home" class="hidden">
+  <div class="h2h-section h2h-section-matchups" style="margin-bottom:10px;">
+    <button id="cum-lineup-toggle" onclick="toggleCumLineup()" style="width:100%;background:none;border:none;display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:0;color:var(--ink);">
+      <span style="font-family:var(--fd);font-size:13px;font-weight:800;color:var(--or);text-transform:uppercase;letter-spacing:.5px;">👤 My Team</span>
+      <span id="cum-lineup-caret" style="font-size:11px;color:var(--ink3);transition:transform .15s;">▾</span>
+    </button>
+    <div id="cum-lineup-drop" class="hidden" style="margin-top:12px;"></div>
+  </div>
   <div class="h2h-section h2h-section-standings">
     <div class="h2h-section-hdr">🏆 Weekly Standings</div>
     <div id="cum-standings-wrap"></div>
@@ -2523,40 +2518,11 @@ function filterH2HDivision(btn, divKey){
 // The non-H2H counterpart to the H2H homepage. Sits alongside the My
 // Lineup / Weekly Standing / Weekly Numbers sub-tabs under My Week,
 // not instead of them.
-// Measures the real header height (it isn't fixed, varies with content)
-// and positions the persistent My Team bar + its dropdown right below it,
-// then pushes page content down by the same amount so nothing ends up
-// hidden underneath — position:fixed removes the bar from normal flow,
-// so this compensates for that manually.
-function positionMyTeamBar(){
-  var hdr = document.querySelector('.hdr');
-  var bar = document.getElementById('cum-myteam-bar');
-  var drop = document.getElementById('cum-lineup-drop');
-  if(!hdr || !bar) return;
-  var hdrH = hdr.offsetHeight;
-  bar.style.top = hdrH + 'px';
-  var barH = bar.offsetHeight;
-  if(drop) drop.style.top = (hdrH + barH) + 'px';
-
-  var cumHome = document.getElementById('cum-home');
-  if(cumHome) cumHome.style.marginTop = barH + 'px';
-  document.querySelectorAll('.tab-overlay').forEach(function(t){
-    t.style.paddingTop = barH + 'px';
-  });
-}
-
 function renderCumHome(){
   var home = document.getElementById('cum-home');
   if(!home) return;
   if(IS_H2H_LEAGUE){ home.classList.add('hidden'); return; }
   home.classList.remove('hidden');
-
-  // The My Team bar is persistent — shown once here and never hidden by
-  // tab navigation, unlike everything else in cum-home.
-  var myTeamBar = document.getElementById('cum-myteam-bar');
-  if(myTeamBar) myTeamBar.classList.remove('hidden');
-  positionMyTeamBar();
-  window.addEventListener('resize', positionMyTeamBar);
 
   // Lineup + standings already live permanently on the landing page above
   // for cumulative leagues, so My Week just shows Weekly Numbers directly —
