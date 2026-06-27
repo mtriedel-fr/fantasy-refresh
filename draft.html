@@ -293,7 +293,56 @@ var SLOT_DEFS = [
   {id:'fx1', pos:'FLEX', label:'FLEX', eligible:['WR','RB','TE']},
   {id:'df1', pos:'DEF',  label:'DEF',  eligible:['DEF']}
 ];
-var POS_COLORS = {QB:'var(--or)',RB:'var(--pk)',WR:'var(--pu)',TE:'#FF9A3A',DEF:'#69BE28',FLEX:'var(--ink2)'};
+var POS_COLORS = {QB:'var(--or)',RB:'var(--pk)',WR:'var(--pu)',TE:'#FF9A3A',DEF:'#69BE28',FLEX:'var(--ink2)',SUPERFLEX:'#FFD23F'};
+
+// Builds SLOT_DEFS from the league's rosterConfig instead of the hardcoded
+// 9-slot default — any count beyond the standard baseline (1 QB, 2 RB,
+// 3 WR, 1 TE) becomes a flex-type slot rather than a dedicated single-
+// position one. A 3rd RB, 4th WR, or 2nd TE becomes FLEX; a 2nd QB (a
+// superflex league) becomes SUPERFLEX (QB/RB/WR/TE eligible). With
+// standard counts this produces an array identical to the default above,
+// so existing leagues see no change at all.
+function buildSlotDefsFromConfig(cfg){
+  var qbCount   = cfg.qb    != null ? cfg.qb    : 1;
+  var rbCount   = cfg.rb    != null ? cfg.rb    : 2;
+  var wrCount   = cfg.wr    != null ? cfg.wr    : 3;
+  var teCount   = cfg.te    != null ? cfg.te    : 1;
+  var flexCount = cfg.flex  != null ? cfg.flex  : 1;
+  var defCount  = cfg.def   != null ? cfg.def   : 1;
+  var STD = { qb:1, rb:2, wr:3, te:1 };
+
+  var flexElig = ['RB','WR','TE'];
+  if(cfg.flexEligible && cfg.flexEligible.qb) flexElig = ['QB','RB','WR','TE'];
+
+  var defs = [];
+  for(var i = 1; i <= qbCount; i++){
+    defs.push(i <= STD.qb
+      ? {id:'qb'+i, pos:'QB', label:'QB', eligible:['QB']}
+      : {id:'qb'+i, pos:'SUPERFLEX', label:'SUPERFLEX', eligible:['QB','RB','WR','TE']});
+  }
+  for(var r = 1; r <= rbCount; r++){
+    defs.push(r <= STD.rb
+      ? {id:'rb'+r, pos:'RB', label:'RB', eligible:['RB']}
+      : {id:'rb'+r, pos:'FLEX', label:'FLEX', eligible:flexElig.slice()});
+  }
+  for(var w = 1; w <= wrCount; w++){
+    defs.push(w <= STD.wr
+      ? {id:'wr'+w, pos:'WR', label:'WR', eligible:['WR']}
+      : {id:'wr'+w, pos:'FLEX', label:'FLEX', eligible:flexElig.slice()});
+  }
+  for(var t = 1; t <= teCount; t++){
+    defs.push(t <= STD.te
+      ? {id:'te'+t, pos:'TE', label:'TE', eligible:['TE']}
+      : {id:'te'+t, pos:'FLEX', label:'FLEX', eligible:flexElig.slice()});
+  }
+  for(var f = 1; f <= flexCount; f++){
+    defs.push({id:'fx'+f, pos:'FLEX', label:'FLEX', eligible:flexElig.slice()});
+  }
+  for(var d = 1; d <= defCount; d++){
+    defs.push({id:'df'+d, pos:'DEF', label:'DEF', eligible:['DEF']});
+  }
+  return defs;
+}
 
 // ── STATE ─────────────────────────────────────────────────────
 var allPlayers   = [];
@@ -314,11 +363,29 @@ document.addEventListener('DOMContentLoaded', function(){
       if(u) currentUser = JSON.parse(u);
     }
   }catch(e){}
-  SLOT_DEFS.forEach(function(s){ lineup[s.id] = null; });
-  renderRoster();
-  loadWeekAndData();
-  fixMainHeightForScaledDisplays();
-  window.addEventListener('resize', fixMainHeightForScaledDisplays);
+
+  function startBoot(){
+    SLOT_DEFS.forEach(function(s){ lineup[s.id] = null; });
+    renderRoster();
+    loadWeekAndData();
+    fixMainHeightForScaledDisplays();
+    window.addEventListener('resize', fixMainHeightForScaledDisplays);
+  }
+
+  // Build SLOT_DEFS from the league's actual roster config before anything
+  // else runs — if this fails or the league uses standard counts, the
+  // default array already declared above is identical, so nothing changes.
+  if(typeof FRAuth !== 'undefined' && FRAuth.getLeagueCtx && typeof FR !== 'undefined' && FR.fb){
+    var ctx0 = FRAuth.getLeagueCtx();
+    var leagueId0 = ctx0 ? ctx0.leagueId : 'fr_refresh26';
+    FR.fb.get('/leagues/' + leagueId0 + '/settings').then(function(settings){
+      if(settings && settings.rosterConfig){
+        SLOT_DEFS = buildSlotDefsFromConfig(settings.rosterConfig);
+      }
+    }).catch(function(){}).then(startBoot);
+  } else {
+    startBoot();
+  }
 });
 
 // ── DPI-SCALING SAFETY NET ───────────────────────────────────────
@@ -904,11 +971,18 @@ function renderRoster(){
 })();
 
 // ── SLOT SELECTION ─────────────────────────────────────────────
+// Friendly label showing exactly which positions are eligible for a flex-type slot
+function friendlySlotLabel(slot){
+  if(slot.label === 'FLEX') return 'FLEX (' + slot.eligible.join('/') + ')';
+  if(slot.label === 'SUPERFLEX') return 'SUPERFLEX (' + slot.eligible.join('/') + ')';
+  return slot.label;
+}
+
 function selectSlot(slotId){
   activeSlot = slotId;
   var slot  = SLOT_DEFS.find(function(s){ return s.id === slotId; });
   var color = POS_COLORS[slot.pos] || 'var(--or)';
-  var label = slot.label === 'FLEX' ? 'FLEX (WR/RB/TE)' : slot.label;
+  var label = friendlySlotLabel(slot);
   document.getElementById('picker-slot-label').textContent = label;
   document.getElementById('picker-slot-label').style.color = color;
   document.getElementById('picker-search').value = '';
@@ -1025,15 +1099,21 @@ function renderPicker(){
 
 // ── PICK PLAYER ────────────────────────────────────────────────
 // Finds the best open slot for a position when no slot was pre-selected —
-// prefers a dedicated slot for that position, falls back to FLEX.
+// dedicated slot for that position first, then FLEX, then SUPERFLEX last
+// (that slot is precious — usually meant for a 2nd QB in a superflex
+// league, not just an extra parking spot for any position).
 function findOpenSlotForPosition(pos){
   for(var i = 0; i < SLOT_DEFS.length; i++){
     var s = SLOT_DEFS[i];
-    if(s.pos !== 'FLEX' && s.eligible.indexOf(pos) >= 0 && !lineup[s.id]) return s;
+    if(s.pos !== 'FLEX' && s.pos !== 'SUPERFLEX' && s.eligible.indexOf(pos) >= 0 && !lineup[s.id]) return s;
   }
   for(var j = 0; j < SLOT_DEFS.length; j++){
     var sf = SLOT_DEFS[j];
     if(sf.pos === 'FLEX' && sf.eligible.indexOf(pos) >= 0 && !lineup[sf.id]) return sf;
+  }
+  for(var k = 0; k < SLOT_DEFS.length; k++){
+    var ss = SLOT_DEFS[k];
+    if(ss.pos === 'SUPERFLEX' && ss.eligible.indexOf(pos) >= 0 && !lineup[ss.id]) return ss;
   }
   return null;
 }
@@ -1107,7 +1187,7 @@ function pickPlayer(playerId){
   if(nextSlot){
     activeSlot = nextSlot.id;
     var color = POS_COLORS[nextSlot.pos] || 'var(--or)';
-    var label = nextSlot.label === 'FLEX' ? 'FLEX (WR/RB/TE)' : nextSlot.label;
+    var label = friendlySlotLabel(nextSlot);
     document.getElementById('picker-slot-label').textContent = label;
     document.getElementById('picker-slot-label').style.color = color;
     renderPicker();
