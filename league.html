@@ -188,6 +188,17 @@ tr:hover td{background:var(--or4);}
 .h2h-roster-player .pos{color:var(--ink3);font-size:10px;text-transform:uppercase;margin-right:6px;}
 .h2h-roster-empty{font-size:12px;color:var(--ink3);font-style:italic;}
 .h2h-roster-pending{font-size:11px;color:var(--ink3);font-style:italic;margin-top:6px;padding-top:6px;border-top:1px dashed var(--bdr2);}
+
+.lineup-card-list{display:flex;flex-direction:column;gap:6px;}
+.lineup-card{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg4);border:1px solid var(--bdr);border-radius:10px;}
+.lineup-card-pos{flex-shrink:0;font-family:var(--fd);font-size:11px;font-weight:800;padding:5px 8px;border-radius:7px;border:1px solid;text-align:center;min-width:38px;}
+.lineup-card-mid{flex:1;min-width:0;}
+.lineup-card-name{font-family:var(--fd);font-size:13px;font-weight:700;color:var(--ink);display:flex;align-items:center;gap:6px;}
+.lineup-card-game{font-size:11px;color:var(--ink3);margin-top:2px;}
+.lineup-card-pts{flex-shrink:0;text-align:right;font-family:var(--fd);font-size:16px;font-weight:900;color:var(--ink);line-height:1;}
+.lineup-card-pts-lbl{display:block;font-size:9px;font-weight:700;color:var(--ink3);letter-spacing:.5px;margin-top:1px;}
+.lineup-card-pending{font-size:10px;font-weight:700;color:var(--ink3);background:var(--bg2);border:1px solid var(--bdr2);border-radius:5px;padding:1px 6px;text-transform:uppercase;letter-spacing:.3px;}
+.lineup-card-live{color:#3CD06C;font-size:10px;}
 .my-team-badge{font-family:var(--fd);font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:2px 7px;border-radius:8px;margin-left:6px;background:rgba(0,212,204,.15);color:var(--or);border:1px solid rgba(0,212,204,.4);}
 
 /* ACTION BAR — search left, nav dropdown right */
@@ -1918,14 +1929,72 @@ function toggleH2HRoster(idx, homeUid, awayUid){
   Promise.all([
     FR.fb.get('/leagues/' + leagueId + '/lineups/' + (ctx.season || 2026) + '/week' + currentWeek + '/' + homeUid).catch(function(){ return null; }),
     FR.fb.get('/leagues/' + leagueId + '/lineups/' + (ctx.season || 2026) + '/week' + currentWeek + '/' + awayUid).catch(function(){ return null; }),
-    FR.fb.get('/leagues/' + leagueId + '/locks/' + (ctx.season || 2026) + '/week' + currentWeek).catch(function(){ return {}; })
+    FR.fb.get('/leagues/' + leagueId + '/locks/' + (ctx.season || 2026) + '/week' + currentWeek).catch(function(){ return {}; }),
+    fetchWeekSchedule(currentWeek)
   ]).then(function(results){
     var locks = results[2] || {};
-    dropEl.innerHTML = rosterColumn(results[0], homeScoreEntry, locks, homeUid === myUid) + rosterColumn(results[1], awayScoreEntry, locks, awayUid === myUid);
+    var gameMap = results[3] || {};
+    dropEl.innerHTML = rosterColumn(results[0], homeScoreEntry, locks, homeUid === myUid, gameMap) + rosterColumn(results[1], awayScoreEntry, locks, awayUid === myUid, gameMap);
   });
 }
 
-function rosterColumn(lineup, scoreEntry, locks, isMine){
+var LINEUP_POS_COLORS = {QB:'var(--or)', RB:'var(--pk)', WR:'var(--pu)', TE:'#FF9A3A', FLEX:'var(--ink2)', DEF:'#69BE28'};
+
+// Builds {TEAM: {opp, time, isHome}} from the worker's /schedule response,
+// so each rostered player can show who they're playing and when.
+function buildTeamGameMap(games){
+  var map = {};
+  (games || []).forEach(function(g){
+    if(!g.home || !g.away) return;
+    map[g.home] = { opp: g.away, time: g.time, isHome: true };
+    map[g.away] = { opp: g.home, time: g.time, isHome: false };
+  });
+  return map;
+}
+
+function fmtKickoff(iso){
+  if(!iso) return '';
+  var d = new Date(iso);
+  if(isNaN(d.getTime())) return '';
+  var day = d.toLocaleDateString('en-US', { weekday: 'short' });
+  var time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  return day + ' ' + time;
+}
+
+function fetchWeekSchedule(week){
+  var ctx = FRAuth.getLeagueCtx();
+  var seasonType = (ctx && (ctx.isPreseason || ctx.seasonType === 'Preseason')) ? 'Preseason' : 'Regular';
+  return fetch(TANK01_WORKER + '/schedule?week=' + week + '&season=2026&seasonType=' + seasonType)
+    .then(function(r){ return r.json(); })
+    .then(function(data){ return buildTeamGameMap(data && data.games); })
+    .catch(function(){ return {}; });
+}
+
+function buildLineupPlayerCard(p, pts, hasStarted, gameMap, showNotStartedTag){
+  var posColor = LINEUP_POS_COLORS[p.pos] || 'var(--ink2)';
+  var ptsLabel = (typeof pts === 'number') ? pts.toFixed(1) : '0.0';
+  var game = (gameMap && p.team) ? gameMap[p.team] : null;
+  var gameLine = '';
+  if(game){
+    var vsAt = game.isHome ? 'vs' : '@';
+    var kickoff = fmtKickoff(game.time);
+    gameLine = '<div class="lineup-card-game">' + vsAt + ' ' + escapeHtmlFR(game.opp) + (kickoff ? ' · ' + kickoff : '') + '</div>';
+  }
+  var notStartedTag = (showNotStartedTag && !hasStarted)
+    ? '<span class="lineup-card-pending">Not started</span>'
+    : (hasStarted ? '<span class="lineup-card-live">●</span>' : '');
+
+  return '<div class="lineup-card">'
+    + '<div class="lineup-card-pos" style="background:' + posColor + '1f;color:' + posColor + ';border-color:' + posColor + '40;">' + escapeHtmlFR(p.pos || '') + '</div>'
+    + '<div class="lineup-card-mid">'
+    +   '<div class="lineup-card-name">' + escapeHtmlFR(p.name || '') + ' ' + notStartedTag + '</div>'
+    +   gameLine
+    + '</div>'
+    + '<div class="lineup-card-pts">' + ptsLabel + '<span class="lineup-card-pts-lbl">PTS</span></div>'
+    + '</div>';
+}
+
+function rosterColumn(lineup, scoreEntry, locks, isMine, gameMap){
   var teamLabel = (lineup && lineup.team) || '';
   if(!lineup || !lineup.slots){
     return '<div><div class="h2h-roster-side-hdr">' + escapeHtmlFR(teamLabel) + '</div><div class="h2h-roster-empty">No lineup set.</div></div>';
@@ -1940,12 +2009,9 @@ function rosterColumn(lineup, scoreEntry, locks, isMine){
       var p = lineup.slots[slotId];
       if(!p) return '';
       var hasStarted = !!(p.team && locks && locks[p.team]);
-      var pts = slotPts[slotId];
-      var ptsLabel = (typeof pts === 'number') ? pts.toFixed(1) : '0.0';
-      var notStartedTag = hasStarted ? '' : ' <span style="font-size:10px;color:var(--ink3);font-style:italic;">(not started)</span>';
-      return '<div class="h2h-roster-player"><span><span class="pos">' + escapeHtmlFR(p.pos || '') + '</span>' + escapeHtmlFR(p.name || '') + notStartedTag + '</span><span>' + ptsLabel + '</span></div>';
+      return buildLineupPlayerCard(p, slotPts[slotId], hasStarted, gameMap, true);
     }).join('');
-    return '<div><div class="h2h-roster-side-hdr">' + escapeHtmlFR(teamLabel) + '</div>' + (allRows || '<div class="h2h-roster-empty">Empty roster.</div>') + '</div>';
+    return '<div><div class="h2h-roster-side-hdr">' + escapeHtmlFR(teamLabel) + '</div><div class="lineup-card-list">' + (allRows || '<div class="h2h-roster-empty">Empty roster.</div>') + '</div></div>';
   }
 
   var startedRows = [];
@@ -1956,11 +2022,10 @@ function rosterColumn(lineup, scoreEntry, locks, isMine){
     if(!p) return;
     var hasStarted = !!(p.team && locks && locks[p.team]);
     if(!hasStarted){ notStartedCount++; return; }
-    var pts = slotPts[slotId];
-    startedRows.push('<div class="h2h-roster-player"><span><span class="pos">' + escapeHtmlFR(p.pos || '') + '</span>' + escapeHtmlFR(p.name || '') + '</span><span>' + (typeof pts === 'number' ? pts.toFixed(1) : '0.0') + '</span></div>');
+    startedRows.push(buildLineupPlayerCard(p, slotPts[slotId], hasStarted, gameMap, false));
   });
 
-  var body = startedRows.length ? startedRows.join('') : '<div class="h2h-roster-empty">No players have kicked off yet.</div>';
+  var body = startedRows.length ? ('<div class="lineup-card-list">' + startedRows.join('') + '</div>') : '<div class="h2h-roster-empty">No players have kicked off yet.</div>';
   var footer = notStartedCount
     ? '<div class="h2h-roster-pending">' + notStartedCount + ' more player' + (notStartedCount > 1 ? 's' : '') + ' not started yet — still swappable.</div>'
     : '';
@@ -2500,12 +2565,14 @@ function loadCumLineup(){
   Promise.all([
     FR.fb.get('/leagues/' + leagueId + '/lineups/' + season + '/week' + currentWeek + '/' + user.uid),
     FR.fb.get('/leagues/' + leagueId + '/season/' + season + '/' + currentWeek + '/' + user.uid),
-    FR.fb.get('/leagues/' + leagueId + '/locks/' + season + '/week' + currentWeek)
+    FR.fb.get('/leagues/' + leagueId + '/locks/' + season + '/week' + currentWeek),
+    fetchWeekSchedule(currentWeek)
   ]).then(function(results){
     var lineup     = results[0];
     var scoreEntry = results[1];
     var locks      = results[2] || {};
-    drop.innerHTML = rosterColumn(lineup, scoreEntry, locks, true);
+    var gameMap    = results[3] || {};
+    drop.innerHTML = rosterColumn(lineup, scoreEntry, locks, true, gameMap);
   }).catch(function(){
     drop.innerHTML = '<div class="myteam-empty"><div class="myteam-empty-icon">⚠️</div><div class="myteam-empty-title">Could not load lineup</div></div>';
   });
