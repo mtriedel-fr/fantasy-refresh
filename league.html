@@ -145,6 +145,7 @@ tr:hover td{background:var(--or4);}
 
 /* H2H PERSONAL MATCHUP BAND — replaces the Score/Current Place stats band */
 .h2h-matchup-band{display:flex;align-items:center;justify-content:center;gap:18px;padding:14px 20px;background:var(--bg3);border-bottom:1px solid var(--bdr);}
+.h2h-matchup-band.hidden{display:none !important;}
 .h2h-matchup-band-side{flex:1;max-width:170px;text-align:center;min-width:0;}
 .h2h-matchup-band-name{font-family:var(--fd);font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .h2h-matchup-band-side.mine .h2h-matchup-band-name{color:var(--or);}
@@ -1912,6 +1913,7 @@ function toggleH2HRoster(idx, homeUid, awayUid){
   var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
   var homeScoreEntry = h2hLastWeekScores[homeUid] || null;
   var awayScoreEntry = h2hLastWeekScores[awayUid] || null;
+  var myUid = (typeof FRAuth !== 'undefined' && FRAuth.getUser && FRAuth.getUser()) ? FRAuth.getUser().uid : null;
 
   Promise.all([
     FR.fb.get('/leagues/' + leagueId + '/lineups/' + (ctx.season || 2026) + '/week' + currentWeek + '/' + homeUid).catch(function(){ return null; }),
@@ -1919,16 +1921,33 @@ function toggleH2HRoster(idx, homeUid, awayUid){
     FR.fb.get('/leagues/' + leagueId + '/locks/' + (ctx.season || 2026) + '/week' + currentWeek).catch(function(){ return {}; })
   ]).then(function(results){
     var locks = results[2] || {};
-    dropEl.innerHTML = rosterColumn(results[0], homeScoreEntry, locks) + rosterColumn(results[1], awayScoreEntry, locks);
+    dropEl.innerHTML = rosterColumn(results[0], homeScoreEntry, locks, homeUid === myUid) + rosterColumn(results[1], awayScoreEntry, locks, awayUid === myUid);
   });
 }
 
-function rosterColumn(lineup, scoreEntry, locks){
+function rosterColumn(lineup, scoreEntry, locks, isMine){
   var teamLabel = (lineup && lineup.team) || '';
   if(!lineup || !lineup.slots){
     return '<div><div class="h2h-roster-side-hdr">' + escapeHtmlFR(teamLabel) + '</div><div class="h2h-roster-empty">No lineup set.</div></div>';
   }
   var slotPts = (scoreEntry && scoreEntry.slotPts) || {};
+
+  // Viewing your own team — no opponent to hide anything from, so show
+  // every rostered player regardless of kickoff status. The hide-until-
+  // kickoff behavior below only matters for an opponent's roster.
+  if(isMine){
+    var allRows = Object.keys(lineup.slots).map(function(slotId){
+      var p = lineup.slots[slotId];
+      if(!p) return '';
+      var hasStarted = !!(p.team && locks && locks[p.team]);
+      var pts = slotPts[slotId];
+      var ptsLabel = (typeof pts === 'number') ? pts.toFixed(1) : '0.0';
+      var notStartedTag = hasStarted ? '' : ' <span style="font-size:10px;color:var(--ink3);font-style:italic;">(not started)</span>';
+      return '<div class="h2h-roster-player"><span><span class="pos">' + escapeHtmlFR(p.pos || '') + '</span>' + escapeHtmlFR(p.name || '') + notStartedTag + '</span><span>' + ptsLabel + '</span></div>';
+    }).join('');
+    return '<div><div class="h2h-roster-side-hdr">' + escapeHtmlFR(teamLabel) + '</div>' + (allRows || '<div class="h2h-roster-empty">Empty roster.</div>') + '</div>';
+  }
+
   var startedRows = [];
   var notStartedCount = 0;
 
@@ -2486,7 +2505,7 @@ function loadCumLineup(){
     var lineup     = results[0];
     var scoreEntry = results[1];
     var locks      = results[2] || {};
-    drop.innerHTML = rosterColumn(lineup, scoreEntry, locks);
+    drop.innerHTML = rosterColumn(lineup, scoreEntry, locks, true);
   }).catch(function(){
     drop.innerHTML = '<div class="myteam-empty"><div class="myteam-empty-icon">⚠️</div><div class="myteam-empty-title">Could not load lineup</div></div>';
   });
