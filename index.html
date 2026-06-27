@@ -811,6 +811,13 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
 </div>
 <script>
 try{if(localStorage.getItem('fr_install_dismissed')==='1'||window.matchMedia('(display-mode: standalone)').matches){document.getElementById('install-guide-banner').style.display='none';}}catch(e){}
+setTimeout(function(){
+  var b = document.getElementById('install-guide-banner');
+  if(b && b.style.display !== 'none'){
+    b.style.display = 'none';
+    try{ localStorage.setItem('fr_install_dismissed','1'); }catch(e){}
+  }
+}, 20000);
 </script>
 <div class="hdr">
   <div class="logo">
