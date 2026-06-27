@@ -1940,6 +1940,22 @@ function toggleH2HRoster(idx, homeUid, awayUid){
 
 var LINEUP_POS_COLORS = {QB:'var(--or)', RB:'var(--pk)', WR:'var(--pu)', TE:'#FF9A3A', FLEX:'var(--ink2)', DEF:'#69BE28'};
 
+// Canonical roster order — QB, RB, WR, TE, FLEX, DEF — regardless of
+// however the slot keys happen to be ordered in the stored data. Scales
+// automatically if a league has more or fewer slots of any position
+// (e.g. 3 RBs instead of 2): they all group together within that
+// position's place in the sequence, sub-sorted by slot number.
+var LINEUP_SLOT_ORDER = { qb:0, rb:1, wr:2, te:3, fx:4, flex:4, def:5, df:5 };
+function lineupSlotSortKey(slotId){
+  var prefix = String(slotId).replace(/[0-9]+$/, '').toLowerCase();
+  var order = LINEUP_SLOT_ORDER.hasOwnProperty(prefix) ? LINEUP_SLOT_ORDER[prefix] : 99;
+  var num = parseInt(String(slotId).replace(/[^0-9]/g, ''), 10) || 0;
+  return order * 100 + num;
+}
+function sortedSlotIds(slots){
+  return Object.keys(slots).sort(function(a, b){ return lineupSlotSortKey(a) - lineupSlotSortKey(b); });
+}
+
 // Builds {TEAM: {opp, time, isHome}} from the worker's /schedule response,
 // so each rostered player can show who they're playing and when.
 function buildTeamGameMap(games){
@@ -2005,7 +2021,7 @@ function rosterColumn(lineup, scoreEntry, locks, isMine, gameMap){
   // every rostered player regardless of kickoff status. The hide-until-
   // kickoff behavior below only matters for an opponent's roster.
   if(isMine){
-    var allRows = Object.keys(lineup.slots).map(function(slotId){
+    var allRows = sortedSlotIds(lineup.slots).map(function(slotId){
       var p = lineup.slots[slotId];
       if(!p) return '';
       var hasStarted = !!(p.team && locks && locks[p.team]);
@@ -2017,7 +2033,7 @@ function rosterColumn(lineup, scoreEntry, locks, isMine, gameMap){
   var startedRows = [];
   var notStartedCount = 0;
 
-  Object.keys(lineup.slots).forEach(function(slotId){
+  sortedSlotIds(lineup.slots).forEach(function(slotId){
     var p = lineup.slots[slotId];
     if(!p) return;
     var hasStarted = !!(p.team && locks && locks[p.team]);
@@ -2263,7 +2279,7 @@ function renderH2HMyLineup(){
     }
 
     var slotPts = (myEntry && myEntry.slotPts) || {};
-    var rows = Object.keys(lineup.slots).map(function(slotId){
+    var rows = sortedSlotIds(lineup.slots).map(function(slotId){
       var p = lineup.slots[slotId];
       if(!p) return '<div class="lineup-slot"><span class="lineup-pos">' + escapeHtmlFR(slotId.toUpperCase()) + '</span><span class="lineup-player">—</span></div>';
       var pts = slotPts[slotId];
