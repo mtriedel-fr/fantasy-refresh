@@ -56,6 +56,12 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
 .btn-secondary{font-family:var(--fd);font-size:15px;font-weight:800;padding:14px 30px;background:transparent;border:1.5px solid var(--bdr2);border-radius:12px;color:var(--ink2);cursor:pointer;text-transform:uppercase;letter-spacing:.5px;transition:all .15s;}
 .btn-secondary:hover{border-color:var(--or);color:var(--or);}
 
+/* WAITLIST BANNER */
+.wl-pill{display:inline-flex;align-items:center;gap:8px;font-family:var(--fd);font-size:13px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--or);border:1.5px solid var(--or4);background:var(--or4);padding:8px 18px;border-radius:999px;margin-bottom:24px;text-decoration:none;transition:all .15s;}
+.wl-pill:hover{border-color:var(--or);background:rgba(0,229,212,.18);}
+.wl-pill .arrow{transition:transform .15s;}
+.wl-pill:hover .arrow{transform:translateX(3px);}
+
 /* PREVIEW TABS */
 .preview-wrap{width:100%;max-width:900px;margin:0 auto;position:relative;}
 .preview-tabs{display:flex;gap:0;margin-bottom:0;border-bottom:none;}
@@ -233,6 +239,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
 <!-- HERO -->
 <section class="hero">
   <div class="hero-bg"></div>
+  <a href="/waitlist.html" class="wl-pill">● Going public next season — get early access <span class="arrow">→</span></a>
   <p style="font-family:var(--fd);font-size:clamp(22px,5vw,36px);font-weight:700;color:var(--ink2);text-transform:uppercase;letter-spacing:.5px;line-height:1.2;margin-bottom:10px;text-align:center;">Think you're good<br>at Fantasy Football?</p>
   <h1 class="hero-title" style="font-size:clamp(72px,18vw,148px);margin-bottom:18px;"><span class="pk">PROVE IT!</span></h1>
   <p class="hero-sub">Fresh roster every week. Salary cap every week. 18 chances to prove you're better than everyone else — no luck, no excuses.</p>
