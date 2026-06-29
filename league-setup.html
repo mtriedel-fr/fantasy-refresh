@@ -16,16 +16,11 @@
 <circle cx='50' cy='50' r='50' fill='%23050808'/><!-- Top-right arc (teal) — from ~200deg to ~20deg clockwise --><path d='M 22 62 A 32 32 0 1 1 78 62' fill='none' stroke='%2300E5D4' stroke-width='9' stroke-linecap='round'/><!-- Teal arrowhead pointing right at top --><polygon points='78,50 68,44 72,58' fill='%2300E5D4'/><!-- Bottom arc (pink) — short return arc --><path d='M 78 62 A 32 32 0 0 1 22 62' fill='none' stroke='%23FF5FA0' stroke-width='9' stroke-linecap='round'/><!-- Pink arrowhead pointing left at bottom --><polygon points='22,50 32,44 28,58' fill='%23FF5FA0'/></svg>">
 <circle cx='50' cy='50' r='50' fill='%23050808'/><path d='M80 50 C80 28 66 14 50 14 C34 14 20 28 20 50' fill='none' stroke='%2300E5D4' stroke-width='7' stroke-linecap='round'/><line x1='50' y1='14' x2='42' y2='24' stroke='%2300E5D4' stroke-width='7' stroke-linecap='round'/><line x1='50' y1='14' x2='58' y2='24' stroke='%2300E5D4' stroke-width='7' stroke-linecap='round'/><path d='M20 50 C20 72 34 86 50 86 C66 86 80 72 80 50' fill='none' stroke='%23FF5FA0' stroke-width='7' stroke-linecap='round'/><line x1='50' y1='86' x2='42' y2='76' stroke='%23FF5FA0' stroke-width='7' stroke-linecap='round'/><line x1='50' y1='86' x2='58' y2='76' stroke='%23FF5FA0' stroke-width='7' stroke-linecap='round'/><line x1='35' y1='50' x2='65' y2='50' stroke='%23F0FAFA' stroke-width='2' stroke-linecap='round'/><line x1='46' y1='44' x2='46' y2='56' stroke='%23F0FAFA' stroke-width='2' stroke-linecap='round'/><line x1='54' y1='44' x2='54' y2='56' stroke='%23F0FAFA' stroke-width='2' stroke-linecap='round'/></svg>">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/theme.css">
 <script src="/js/auth.js"></script>
 <script src="/league-context.js"></script>
 <style>
-:root{
-  --hdr:#050808;--bg:#0A0F0F;--bg2:#0D1515;--bg3:#101C1C;--bg4:#142020;
-  --or:#00E5D4;--pk:#FF5FA0;--pu:#9B6DFF;
-  --ink:#F0FAFA;--ink2:#6ABFBF;--ink3:#3A8888;
-  --bdr:#0D3535;--bdr2:#104040;
-  --fd:'Barlow Condensed',sans-serif;--fb:'Barlow',sans-serif;
-}
+/* :root variables now live in /css/theme.css — removed from here to stop the per-file drift the review flagged */
 [data-theme="light"]{
   --hdr:#F0F8F8;--bg:#F5FAFA;--bg2:#E8F5F5;--bg3:#DCF0F0;--bg4:#D0EEEE;
   --or:#007A70;--pk:#CC3070;--pu:#6030CC;

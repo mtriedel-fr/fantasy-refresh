@@ -19,20 +19,11 @@
   <link rel="apple-touch-icon" href="/icons/icon.svg">
 <script src="league-context.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/theme.css">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 html{overflow-x:hidden;}
-:root{
-  /* DARK MODE (default) */
-  --hdr:#050808;--hdr2:#080E0E;
-  --bg:#0A0F0F;--bg2:#0D1515;--bg3:#101C1C;--bg4:#142020;
-  --or:#00E5D4;--or2:#33EDE0;--or4:#003A38;
-  --pk:#FF5FA0;--pk2:#FF85B8;--pk4:#3A0020;
-  --pu:#9B6DFF;--pu2:#B899FF;--pu4:#1A0A3A;
-  --ink:#F0FAFA;--ink2:#6ABFBF;--ink3:#3A8888;
-  --bdr:#0D3535;--bdr2:#104040;--red:#FF5FA0;--grn:#00E5D4;
-  --fd:'Barlow Condensed',sans-serif;--fb:'Barlow',sans-serif;
-}
+/* :root variables now live in /css/theme.css — removed from here to stop the per-file drift the review flagged. (The OTHER :root block further down, --c0..--c5 chart colors, is untouched — different purpose, not duplicated elsewhere.) */
 [data-theme="light"]{
   --hdr:#050808;--hdr2:#080E0E;
   --bg:#F0FAFA;--bg2:#E0F5F5;--bg3:#FFFFFF;--bg4:#F5FEFE;
@@ -5120,8 +5111,7 @@ function generateSalaries(){
           }
 
           // Load our player pool for Sleeper IDs + injury status
-          return fetch(FR.paths.url(FR.paths.players()))
-            .then(function(r){ return r.json(); })
+          return FR.fb.getPlayerPool()
             .then(function(poolPlayers){
               var salaries = {};
               var count    = 0;
@@ -5191,8 +5181,7 @@ function generateSalaries(){
 function generateFlatSalaries(week){
   // Fallback: flat salaries by position tier when projections unavailable
   var FLAT = {QB:8500, RB:6500, WR:6000, TE:5500, DEF:5000};
-  return fetch(FR.paths.url(FR.paths.players()))
-    .then(function(r){ return r.json(); })
+  return FR.fb.getPlayerPool()
     .then(function(players){
       var firstKey = players ? Object.keys(players)[0] : null;
       var salaries = {};

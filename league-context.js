@@ -130,8 +130,60 @@
           method: 'DELETE'
         }).then(function(r) { return r.json(); });
       });
+    },
+
+    // GET the shared player pool, but skip the (large) download entirely if
+    // a cached copy already matches the pool's own `updated` timestamp.
+    // The pool only changes when "Refresh Player Pool" runs (or, going
+    // forward, the Wednesday weekly-prep automation) — usually once a week —
+    // so most page loads can now skip re-downloading ~1,500-3,000 player
+    // records and just confirm nothing changed.
+    getPlayerPool: function() {
+      var season = ctx().season;
+      var cacheKey = 'fr_pool_cache_' + season;
+      return fetch(FB_DB_URL + '/playerPool/' + season + '/updated.json')
+        .then(function(r) { return r.json(); })
+        .then(function(updated) {
+          try {
+            var cached = JSON.parse(localStorage.getItem(cacheKey) || 'null');
+            if (cached && cached.updated === updated && cached.players) {
+              return cached.players;
+            }
+          } catch (e) { /* corrupt cache entry — fall through to a real fetch */ }
+          return fetch(FB_DB_URL + paths.players() + '.json')
+            .then(function(r) { return r.json(); })
+            .then(function(players) {
+              try {
+                localStorage.setItem(cacheKey, JSON.stringify({ updated: updated, players: players }));
+              } catch (e) { /* localStorage full/unavailable — caching is best-effort, not required */ }
+              return players;
+            });
+        })
+        .catch(function() {
+          // If even the timestamp check fails (offline, etc.), fall back to
+          // the old uncached behavior rather than failing the page entirely.
+          return fetch(FB_DB_URL + paths.players() + '.json').then(function(r) { return r.json(); });
+        });
     }
   };
+
+  // ── SHARED ERROR HANDLER ───────────────────────────────────
+  // A lot of .catch() blocks across the app silently swallow failures —
+  // no console log, no toast, nothing visible to the user or to you.
+  // This is a drop-in replacement: logs to console (so it's debuggable)
+  // and shows a toast IF the page already defines one (every page has its
+  // own showToast() with slightly different styling, so this calls
+  // whichever one is already in scope rather than forcing a single style).
+  function handleError(err, label) {
+    var msg = label ? (label + ': ' + (err && err.message ? err.message : err)) : (err && err.message ? err.message : String(err));
+    console.error('[FR]', msg, err);
+    try {
+      if (typeof showToast === 'function') {
+        showToast(label || 'Something went wrong — please try again', true);
+      }
+    } catch (e) { /* showToast itself failing shouldn't throw past this point */ }
+  }
+
 
   // ── COMMISSIONER CHECK ──────────────────────────────────────
   function checkCommissionerStatus(uid) {
@@ -228,6 +280,7 @@
     clearContext:            clearContext,
     paths:                   paths,
     fb:                      fb,
+    handleError:             handleError,
     loadLeagueSettings:      loadLeagueSettings,
     getUserLeagues:          getUserLeagues,
     switchLeague:            switchLeague,

@@ -18,14 +18,9 @@
 <script src="league-context.js"></script>
 <script src="/js/auth.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/theme.css">
 <style>
-:root{
-  --hdr:#050808;--bg:#0A0F0F;--bg2:#0D1515;--bg3:#101C1C;--bg4:#142020;
-  --or:#00E5D4;--pk:#FF5FA0;--pu:#9B6DFF;
-  --ink:#F0FAFA;--ink2:#6ABFBF;--ink3:#3A8888;
-  --bdr:#0D3535;--bdr2:#104040;
-  --fd:'Barlow Condensed',sans-serif;--fb:'Barlow',sans-serif;
-}
+/* :root variables now live in /css/theme.css — removed from here to stop the per-file drift the review flagged */
 *{box-sizing:border-box;margin:0;padding:0;}
 html,body{height:100%;overflow:hidden;}
 body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;flex-direction:column;}
@@ -490,8 +485,7 @@ function loadSalaries(){
 
 function loadFlatSalariesFromPool(){
   var FLAT = {QB:8500, RB:6500, WR:6000, TE:5500, DEF:5000};
-  fetch(FR.paths.url(FR.paths.players()))
-    .then(function(r){ return r.json(); })
+  FR.fb.getPlayerPool()
     .then(function(players){
       if(!players) return;
       allPlayers = Object.values(players)
@@ -508,7 +502,7 @@ function loadFlatSalariesFromPool(){
       }
       renderPool();
     })
-    .catch(function(){});
+    .catch(function(err){ FR.handleError(err, "Couldn't load players — try refreshing"); });
 }
 
 // Some data providers use different abbreviations for the same team across
@@ -913,7 +907,7 @@ function loadSubmitted(){
       document.getElementById('submit-msg').className = 'submit-msg ok';
       document.getElementById('submit-btn').textContent = '↑ Update Lineup';
     })
-    .catch(function(){});
+    .catch(function(err){ console.error('[FR] Failed to load saved lineup:', err); });
 }
 
 // ── ROSTER RENDER ──────────────────────────────────────────────
