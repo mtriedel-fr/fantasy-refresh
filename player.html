@@ -133,7 +133,7 @@ html[data-theme="light"] body{background:#D8F0EE;}
     </div>
   </div>
   <div class="hdr-r">
-    <a id="back-btn" href="index.html" class="back-btn">← Back to Standings</a>
+    <a id="back-btn" href="league.html" class="back-btn">← Back to Standings</a>
     <button class="back-btn theme-toggle" onclick="toggleTheme()" id="theme-btn" title="Toggle light/dark">🌙</button>
   </div>
 </div>
@@ -149,7 +149,7 @@ var seasonData  = {};
 var teamName    = decodeURIComponent((new URLSearchParams(window.location.search)).get('team') || '');
 var urlSeason   = (new URLSearchParams(window.location.search)).get('season') || '2026';
 var backupKey   = 'fr_' + urlSeason + '_backup';
-var backLink    = urlSeason === '2025' ? 'archive2025.html' : 'index.html';
+var backLink    = urlSeason === '2025' ? 'archive2025.html' : 'league.html';
 // Set back button immediately
 var _backBtn = document.getElementById('back-btn');
 if(_backBtn) _backBtn.href = backLink;
@@ -290,7 +290,7 @@ function render(){
       // This is a 2025 DK name — show their 2026 name
       if(teamMatch(teamName, userProfile.dk2025)){
         dk2025callout = '<div style="margin-top:10px;padding:8px 14px;background:rgba(0,229,212,.08);border:1px solid rgba(0,229,212,.2);border-radius:8px;font-family:var(--fd);font-size:12px;color:var(--or);">'
-          + '🏈 Competing in 2026 as <strong><a href="index.html" style="color:var(--or);text-decoration:none;">' + userProfile.team2026 + '</a></strong></div>';
+          + '🏈 Competing in 2026 as <strong><a href="league.html" style="color:var(--or);text-decoration:none;">' + userProfile.team2026 + '</a></strong></div>';
       }
       // This is a 2026 team name — show their 2025 DK name
       if(teamMatch(teamName, userProfile.team2026)){
