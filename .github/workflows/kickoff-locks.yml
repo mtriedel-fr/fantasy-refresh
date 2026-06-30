@@ -94,21 +94,37 @@ jobs:
             }
           }
 
-          async function main() {
-            const week = await getCurrentWeek();
-            console.log(`Checking locks for Week ${week}...`);
+          // Same active-league discovery as auto-scoring.yml — keeps the
+          // two workflows in sync on which leagues are live.
+          async function getActiveLeagues() {
+            try {
+              const leagues = await firebaseGet('/leagues.json?shallow=true');
+              if (!leagues || leagues.error) {
+                console.log('Could not fetch leagues, falling back to fr_refresh26');
+                return ['fr_refresh26'];
+              }
+              const leagueIds = Object.keys(leagues);
+              const active = [];
+              for (const id of leagueIds) {
+                try {
+                  const settings = await firebaseGet(`/leagues/${id}/settings.json`);
+                  if (settings && settings.active !== false && settings.season == SEASON) {
+                    active.push(id);
+                  }
+                } catch(e) {
+                  // Skip leagues we can't read
+                }
+              }
+              return active.length ? active : ['fr_refresh26'];
+            } catch(e) {
+              console.log('Error fetching leagues:', e.message);
+              return ['fr_refresh26'];
+            }
+          }
 
-            const gamesData = await fetchJson(
-              `https://${T01_HOST}/getNFLGamesForWeek?week=${week}&seasonType=Regular&season=${SEASON}`,
-              { 'X-RapidAPI-Key': T01_KEY, 'X-RapidAPI-Host': T01_HOST }
-            );
-
-            const games = Array.isArray(gamesData.body)
-              ? gamesData.body
-              : Object.values(gamesData.body || {});
-
+          async function lockLeagueWeek(leagueId, week, games) {
             const existingLocks = await firebaseGet(
-              `/leagues/fr_refresh26/locks/${SEASON}/week${week}.json`
+              `/leagues/${leagueId}/locks/${SEASON}/week${week}.json`
             ).catch(() => ({}));
 
             const locks = existingLocks || {};
@@ -131,27 +147,53 @@ jobs:
                 if (!locks[homeTeam]) {
                   locks[homeTeam] = { lockedAt: lockTime, gameId, opponent: awayTeam };
                   newLocks++;
-                  console.log(`Locked: ${homeTeam} (${gameId})`);
+                  console.log(`  Locked: ${homeTeam} (${gameId})`);
                 }
                 if (!locks[awayTeam]) {
                   locks[awayTeam] = { lockedAt: lockTime, gameId, opponent: homeTeam };
                   newLocks++;
-                  console.log(`Locked: ${awayTeam} (${gameId})`);
+                  console.log(`  Locked: ${awayTeam} (${gameId})`);
                 }
               }
             }
 
             if (newLocks > 0) {
-              await firebasePut(`/leagues/fr_refresh26/locks/${SEASON}/week${week}.json`, locks);
-              console.log(`Wrote ${newLocks} new locks to Firebase`);
+              await firebasePut(`/leagues/${leagueId}/locks/${SEASON}/week${week}.json`, locks);
+              console.log(`  ✅ Wrote ${newLocks} new locks for ${leagueId}`);
             } else {
-              console.log('No new locks this run.');
+              console.log(`  No new locks for ${leagueId} this run.`);
             }
 
-            await firebasePut(`/leagues/fr_refresh26/locks/${SEASON}/meta.json`, {
+            await firebasePut(`/leagues/${leagueId}/locks/${SEASON}/meta.json`, {
               lastChecked: Date.now(),
               week
             });
+          }
+
+          async function main() {
+            const week = await getCurrentWeek();
+            console.log(`Checking locks for Week ${week}...`);
+
+            const gamesData = await fetchJson(
+              `https://${T01_HOST}/getNFLGamesForWeek?week=${week}&seasonType=Regular&season=${SEASON}`,
+              { 'X-RapidAPI-Key': T01_KEY, 'X-RapidAPI-Host': T01_HOST }
+            );
+
+            const games = Array.isArray(gamesData.body)
+              ? gamesData.body
+              : Object.values(gamesData.body || {});
+
+            const leagues = await getActiveLeagues();
+            console.log(`Leagues to lock: ${leagues.join(', ')}`);
+
+            for (const leagueId of leagues) {
+              console.log(`\n--- ${leagueId} ---`);
+              try {
+                await lockLeagueWeek(leagueId, week, games);
+              } catch(e) {
+                console.error(`Failed locking ${leagueId}:`, e.message);
+              }
+            }
           }
 
           main().catch(e => {
