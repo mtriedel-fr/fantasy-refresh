@@ -293,6 +293,214 @@ jobs:
               week, lastScored: Date.now(), allFinal,
               gamesActive: activeGames.length
             });
+
+            // ── HEAD-TO-HEAD: compute matchup results when this league uses that format ──
+            const settings = await firebaseGet(`/leagues/${leagueId}/settings.json`).catch(() => null);
+            if (settings && settings.format === 'headtohead' && allFinal) {
+              await computeH2HMatchupResults(leagueId, week, scoreUpdates, existingScores);
+              await advancePlayoffsIfNeeded(leagueId, week, settings);
+            }
+          }
+
+          // Reads the week's matchup schedule, merges in newly written + existing
+          // scores, and tags each matchup with a winner — written back so the
+          // app's standings can read a server-confirmed result without recomputing
+          // from scratch every time, and so other automation (e.g. playoff
+          // advancement) can rely on it.
+          async function computeH2HMatchupResults(leagueId, week, scoreUpdates, existingScores) {
+            const matchups = await firebaseGet(`/leagues/${leagueId}/matchups/${SEASON}/week${week}.json`).catch(() => null);
+            if (!matchups || !Array.isArray(matchups)) {
+              console.log(`  No H2H schedule for week ${week} — skipping matchup results.`);
+              return;
+            }
+
+            const allScores = { ...existingScores, ...scoreUpdates };
+            const scoreByTeamName = {};
+            const seenTeamNames = new Set();
+            Object.values(allScores).forEach(entry => {
+              if (!entry || !entry.team) return;
+              if (seenTeamNames.has(entry.team)) {
+                console.warn(`  ⚠️  Duplicate team name detected: "${entry.team}" — scores may be merging incorrectly. Check for two members with the same team name.`);
+              }
+              seenTeamNames.add(entry.team);
+              scoreByTeamName[entry.team] = entry.score;
+            });
+
+            const results = matchups.map(m => {
+              const homeScore = scoreByTeamName[m.homeName];
+              const awayScore = m.awayName === 'BYE' ? null : scoreByTeamName[m.awayName];
+              let winner = null;
+              if (homeScore !== undefined && awayScore !== undefined && awayScore !== null) {
+                if (homeScore > awayScore) winner = 'home';
+                else if (homeScore < awayScore) winner = 'away';
+                else winner = 'tie';
+              } else if (m.awayName === 'BYE') {
+                winner = 'home';
+              }
+              return { ...m, homeScore: homeScore ?? null, awayScore: awayScore ?? null, winner };
+            });
+
+            await firebasePut(`/leagues/${leagueId}/matchups/${SEASON}/week${week}.json`, results);
+            console.log(`  ⚔️  Computed ${results.length} H2H matchup result(s) for week ${week}`);
+          }
+
+          // Standard single-elimination bracket pairing: best seed vs worst seed,
+          // 2nd vs 2nd-worst, etc. Mirrors the same logic used client-side when
+          // a commissioner first seeds the bracket.
+          function buildBracketPairings(seeds) {
+            const n = seeds.length;
+            const pairs = [];
+            for (let i = 0; i < n / 2; i++) {
+              pairs.push([seeds[i], seeds[n - 1 - i]]);
+            }
+            return pairs;
+          }
+
+          // Same fixed-bracket "slot order" used client-side so the server-
+          // automated advancement produces identical results to a manual
+          // commissioner "Force Check" — keeps both code paths in lockstep.
+          const BRACKET_SLOT_ORDER = {
+            2:  [1, 2],
+            4:  [1, 4, 2, 3],
+            6:  [1, 6, 3, 4, 2, 5],
+            8:  [1, 8, 4, 5, 2, 7, 3, 6],
+            10: [1, 10, 5, 6, 3, 8, 2, 9, 4, 7],
+            12: [1, 12, 6, 7, 3, 10, 2, 11, 5, 8, 4, 9],
+            16: [1, 16, 8, 9, 4, 13, 5, 12, 2, 15, 7, 10, 3, 14, 6, 11]
+          };
+
+          function buildFixedNextRoundPairs(winnersInSlotOrder) {
+            const pairs = [];
+            for (let i = 0; i < winnersInSlotOrder.length; i += 2) {
+              pairs.push([winnersInSlotOrder[i], winnersInSlotOrder[i + 1]]);
+            }
+            return pairs;
+          }
+
+          // Checks whether the league is currently in a playoff week, and if so,
+          // whether every matchup in the active bracket round has a confirmed
+          // winner. If yes, automatically builds and writes the next round —
+          // or crowns the champion if this was the final round. Runs after every
+          // scoring pass, so this fires the moment the last playoff game of the
+          // week goes final, with zero manual steps.
+          async function advancePlayoffsIfNeeded(leagueId, week, settings) {
+            const playoffData = await firebaseGet(`/leagues/${leagueId}/playoffs/${SEASON}.json`).catch(() => null);
+            if (!playoffData || !playoffData.seeds || !playoffData.rounds) {
+              return; // playoffs not seeded yet — nothing to advance
+            }
+            if (playoffData.champion) {
+              return; // already crowned, nothing left to do
+            }
+
+            const playoffStartWeek = playoffData.playoffStartWeek || settings.playoffStartWeek || 15;
+            const expectedWeekForCurrentRound = playoffStartWeek + (playoffData.currentRound - 1);
+
+            // Only act when the scoring run we just did corresponds to the
+            // week this round is actually being played in.
+            if (parseInt(week) !== expectedWeekForCurrentRound) return;
+
+            const roundKey = `round${playoffData.currentRound}`;
+            const round = playoffData.rounds[roundKey];
+            if (!round) return;
+
+            const matchups = await firebaseGet(`/leagues/${leagueId}/matchups/${SEASON}/week${week}.json`).catch(() => null);
+            const scoreByTeamName = {};
+            if (matchups) {
+              matchups.forEach(m => {
+                if (m.homeScore !== null && m.homeScore !== undefined) scoreByTeamName[m.homeName] = m.homeScore;
+                if (m.awayScore !== null && m.awayScore !== undefined) scoreByTeamName[m.awayName] = m.awayScore;
+              });
+            }
+            // Fall back to season scores directly if a playoff matchup
+            // wasn't part of the regular schedule writer (e.g. seeded fresh).
+            const seasonScores = await firebaseGet(`/leagues/${leagueId}/season/${SEASON}/${week}.json`).catch(() => ({}));
+            Object.values(seasonScores || {}).forEach(entry => {
+              if (entry && entry.team && scoreByTeamName[entry.team] === undefined) {
+                scoreByTeamName[entry.team] = entry.score;
+              }
+            });
+
+            let allDecided = true;
+            const updatedRound = round.map(m => {
+              if (m.winner) return m; // already decided in a prior run
+              if (!m.awayName || m.awayName === 'BYE') {
+                return { ...m, winner: m.homeUid };
+              }
+              const homeScore = scoreByTeamName[m.homeName];
+              const awayScore = scoreByTeamName[m.awayName];
+              if (homeScore === undefined || awayScore === undefined) {
+                allDecided = false;
+                return m;
+              }
+              return {
+                ...m,
+                homeScore, awayScore,
+                winner: homeScore >= awayScore ? m.homeUid : m.awayUid
+              };
+            });
+
+            if (!allDecided) {
+              // Save whichever scores we do have so the bracket UI shows live progress,
+              // but don't advance the round until every matchup is confirmed.
+              await firebasePatch(`/leagues/${leagueId}/playoffs/${SEASON}.json`, {
+                [`rounds/${roundKey}`]: updatedRound
+              });
+              console.log(`  🏆 Playoff round ${playoffData.currentRound} in progress — not all matchups final yet.`);
+              return;
+            }
+
+            if (updatedRound.length === 1) {
+              // Final round just finished — crown the champion.
+              const champUid = updatedRound[0].winner;
+              const champSeed = playoffData.seeds.find(s => s.uid === champUid);
+              await firebasePatch(`/leagues/${leagueId}/playoffs/${SEASON}.json`, {
+                [`rounds/${roundKey}`]: updatedRound,
+                champion: champSeed ? champSeed.name : null
+              });
+              console.log(`  🏆 Playoffs complete — champion: ${champSeed ? champSeed.name : champUid}`);
+              return;
+            }
+
+            const bracketFormat = playoffData.bracketFormat || 'fixed';
+            let nextPairs;
+
+            if (bracketFormat === 'fixed') {
+              // Fixed bracket — advance by bracket slot position, not by
+              // re-ranking survivors. Mirrors the client-side logic exactly
+              // so a commissioner's manual "Force Check" never disagrees
+              // with what the automated scoring run already decided.
+              const winnersInSlotOrder = updatedRound.map(m => {
+                const winnerSeed = playoffData.seeds.find(s => s.uid === m.winner);
+                if (!winnerSeed) return null;
+                const winnerSlot = (m.winner === m.homeUid) ? m.homeSlot : m.awaySlot;
+                return { ...winnerSeed, slot: winnerSlot };
+              }).filter(Boolean);
+              nextPairs = buildFixedNextRoundPairs(winnersInSlotOrder);
+            } else {
+              // Reseed mode — re-rank survivors by original seed number and
+              // re-pair best-remaining vs worst-remaining each round.
+              const winners = updatedRound
+                .map(m => playoffData.seeds.find(s => s.uid === m.winner))
+                .filter(Boolean)
+                .sort((a, b) => a.seed - b.seed);
+              nextPairs = buildBracketPairings(winners);
+            }
+
+            const nextRoundKey = `round${playoffData.currentRound + 1}`;
+            const nextRound = nextPairs.map(pair => ({
+              homeSeed: pair[0].seed, awaySeed: pair[1].seed,
+              homeUid: pair[0].uid, awayUid: pair[1].uid,
+              homeName: pair[0].name, awayName: pair[1].name,
+              homeSlot: pair[0].slot || null, awaySlot: pair[1].slot || null,
+              winner: null
+            }));
+
+            await firebasePatch(`/leagues/${leagueId}/playoffs/${SEASON}.json`, {
+              [`rounds/${roundKey}`]: updatedRound,
+              [`rounds/${nextRoundKey}`]: nextRound,
+              currentRound: playoffData.currentRound + 1
+            });
+            console.log(`  🏆 Playoff round ${playoffData.currentRound} complete — advanced to round ${playoffData.currentRound + 1}`);
           }
 
           // ── Lock scores for a league ───────────────────────────
@@ -324,7 +532,7 @@ jobs:
             console.log(`\n=== Auto-Scoring | Week ${week} | ${seasonType} | ${new Date().toISOString()} ===`);
             console.log(`Leagues to score: ${leagues.join(', ')}`);
 
-            // Lock run (Tuesday 9am)
+            // Lock run (Tuesday 9am) — single pass, no loop needed
             if (IS_LOCK_RUN) {
               for (const leagueId of leagues) {
                 await lockLeague(leagueId, week);
@@ -332,8 +540,12 @@ jobs:
               return;
             }
 
-            // Get games for this week
-            const gamesData = await t01(`/getNFLGamesForWeek?week=${week}&seasonType=${seasonType}&season=${SEASON}`);
+            // Get games for this week once per cron tick — game list is stable
+            // within a 5-minute window, no need to re-fetch each inner pass.
+            // Tank01 numbers preseason weeks starting at 0 (HOF = week 0).
+            // Our app's week numbers are 1-4 (1=HOF, 2=PS Wk1, etc) — translate for the API call.
+            const apiWeek = seasonType === 'Preseason' ? (week - 1) : week;
+            const gamesData = await t01(`/getNFLGamesForWeek?week=${apiWeek}&seasonType=${seasonType}&season=${SEASON}`);
             const games = Array.isArray(gamesData.body)
               ? gamesData.body : Object.values(gamesData.body || {});
 
@@ -342,7 +554,7 @@ jobs:
               return;
             }
 
-            // Filter to active/final games
+            // Filter to active/final games — also stable within the window
             const activeGames = games.filter(g => {
               const s = (g.gameStatus || g.status || '').toLowerCase();
               return s.includes('progress') || s.includes('final') ||
@@ -361,40 +573,72 @@ jobs:
               return s.includes('final') || s.includes('completed');
             });
 
-            // Fetch box scores for active games
-            const boxScores = {};
-            for (const game of activeGames) {
-              const gameId = game.gameID || game.gameId || '';
-              if (!gameId) continue;
-              try {
-                const bs = await t01(`/getNFLBoxScore?gameID=${gameId}&fantasyPoints=true&PPRScoring=true`);
-                if (bs.body) {
-                  boxScores[gameId] = bs.body;
-                  console.log(`  📊 ${gameId}: ${Object.keys(bs.body.playerStats || {}).length} player stats`);
+            // ── 2-MINUTE SCORING LOOP ─────────────────────────────
+            // GitHub Actions cron minimum is 5 minutes. Rather than accept
+            // 5-minute stale scores, we run 3 scoring passes inside this single
+            // cron execution — one immediately, one at ~2 min, one at ~4 min.
+            // Box scores are re-fetched fresh each pass (that's the point).
+            // Stable data (week, leagues, game list) is fetched once above.
+            // At Ultra tier (15,000 calls/day) this costs ~6,000 calls on a
+            // worst-case Sunday — 40% of the daily limit, well within budget.
+            const PASSES = 3;
+            const PASS_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
+
+            for (let pass = 1; pass <= PASSES; pass++) {
+              const passStart = Date.now();
+              console.log(`\n── Pass ${pass}/${PASSES} | ${new Date().toISOString()} ──`);
+
+              // Fetch box scores fresh every pass — this is where the live data lives
+              const boxScores = {};
+              for (const game of activeGames) {
+                const gameId = game.gameID || game.gameId || '';
+                if (!gameId) continue;
+                try {
+                  const bs = await t01(`/getNFLBoxScore?gameID=${gameId}&fantasyPoints=true&PPRScoring=true`);
+                  if (bs.body) {
+                    boxScores[gameId] = bs.body;
+                    const bsName = bs.body.playerStats || {};
+                    const sample = Object.values(bsName)[0];
+                    console.log(`  📊 ${gameId}: ${Object.keys(bsName).length} player stats` +
+                      (sample ? ` (sleeperBotID present: ${sample.sleeperBotID ? 'YES ✓' : 'no — falling back to name match'})` : ''));
+                  }
+                } catch(e) {
+                  console.error(`  ❌ Failed box score ${gameId}:`, e.message);
                 }
-              } catch(e) {
-                console.error(`  ❌ Failed box score ${gameId}:`, e.message);
               }
-            }
 
-            // Build player stats lookup
-            const playerStats = {};
-            Object.values(boxScores).forEach(bs => {
-              Object.entries(bs.playerStats || {}).forEach(([pid, stats]) => {
-                playerStats[pid] = stats;
-                const name = (stats.longName || stats.playerName || '').toLowerCase();
-                if (name) playerStats[name] = stats;
+              // Build player stats lookup from this pass's fresh box scores
+              const playerStats = {};
+              Object.values(boxScores).forEach(bs => {
+                Object.entries(bs.playerStats || {}).forEach(([pid, stats]) => {
+                  playerStats[pid] = stats;
+                  if (stats.sleeperBotID) playerStats[stats.sleeperBotID] = stats;
+                  const name = (stats.longName || stats.playerName || '').toLowerCase();
+                  if (name) playerStats[name] = stats;
+                });
               });
-            });
 
-            // Score all leagues
-            for (const leagueId of leagues) {
-              try {
-                await scoreLeague(leagueId, week, seasonType, activeGames, allFinal, playerStats);
-              } catch(e) {
-                console.error(`Failed scoring ${leagueId}:`, e.message);
+              // Score all leagues with this pass's data
+              for (const leagueId of leagues) {
+                try {
+                  await scoreLeague(leagueId, week, seasonType, activeGames, allFinal, playerStats);
+                } catch(e) {
+                  console.error(`Failed scoring ${leagueId}:`, e.message);
+                }
+              }
+
+              // Wait 2 minutes before the next pass — skip wait after the final pass
+              if (pass < PASSES) {
+                const elapsed = Date.now() - passStart;
+                const waitMs = Math.max(0, PASS_INTERVAL_MS - elapsed);
+                if (waitMs > 0) {
+                  console.log(`  ⏱ Next pass in ${Math.round(waitMs/1000)}s…`);
+                  await new Promise(resolve => setTimeout(resolve, waitMs));
+                }
               }
             }
+
+            console.log(`\n✓ All ${PASSES} passes complete | ${new Date().toISOString()}`);
           }
 
           main().catch(e => {
