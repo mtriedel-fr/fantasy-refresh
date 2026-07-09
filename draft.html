@@ -455,7 +455,7 @@ function loadSalaries(){
   if(TEST_MODE){
     workerFetch('salaries').then(function(data){
       allPlayers = Object.values(data.players||{}).filter(function(p){ return p && p.name && p.pos; });
-      renderPool();
+      renderPicker();
     }).catch(function(){});
     return;
   }
@@ -470,7 +470,7 @@ function loadSalaries(){
       if(data && data.players && Object.keys(data.players).length){
         allPlayers = Object.values(data.players).filter(function(p){ return p && p.name && p.pos; });
         if(!schedule.length) buildGamesBarFromPlayers();
-        renderPool();
+        renderPicker();
         repriceLineup();   // saved lineup may have loaded first with stale snapshot prices
         return;
       }
@@ -501,7 +501,7 @@ function loadFlatSalariesFromPool(){
       } else if(!schedule.length){
         buildGamesBarFromPlayers();
       }
-      renderPool();
+      renderPicker();
     })
     .catch(function(err){ FR.handleError(err, "Couldn't load players — try refreshing"); });
 }
@@ -622,7 +622,7 @@ function loadSchedule(){
       // In preseason: re-filter player pool to only teams playing this week
       if(PS_MODE && allPlayers.length){
         filterPlayersToSchedule();
-        renderPool();
+        renderPicker();
       }
 
       // Fetch odds in background — group games by date to minimize API calls
@@ -660,7 +660,7 @@ function loadSchedule(){
           buildGamesBar(schedule);
           if(allPlayers.length){
             filterPlayersToSchedule();
-            renderPool();
+            renderPicker();
           }
           return;
         }
