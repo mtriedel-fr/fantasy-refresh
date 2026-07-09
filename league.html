@@ -7910,38 +7910,32 @@ function saveSalaries(week, salaries, count){
       cap:       60000
     }
   };
-  return fetch(FR.paths.url(FR.paths.salaries()) + '/week' + week + '.json', {
-    method:  'PUT',
-    headers: {'Content-Type':'application/json'},
-    body:    JSON.stringify(payload)
-  }).then(function(){
-    var status = document.getElementById('sal-status');
-    if(status){
-      status.textContent = '✓ ' + count + ' player salaries saved for Week ' + week + ' · ' + new Date().toLocaleString();
-      status.className = 'salary-status ok';
-    }
-    // Update badge
-    var badge = document.getElementById('sal-lock-badge');
-    if(badge){ badge.textContent = '🔓 Unlocked'; badge.className = 'salary-lock-badge unlocked'; }
-    showToast('Week ' + week + ' salaries generated — ' + count + ' players ✓');
-  });
+  return FR.fb.put(FR.paths.salaries() + '/week' + week, payload)
+    .then(function(){
+      var status = document.getElementById('sal-status');
+      if(status){
+        status.textContent = '✓ ' + count + ' player salaries saved for Week ' + week + ' · ' + new Date().toLocaleString();
+        status.className = 'salary-status ok';
+      }
+      // Update badge
+      var badge = document.getElementById('sal-lock-badge');
+      if(badge){ badge.textContent = '🔓 Unlocked'; badge.className = 'salary-lock-badge unlocked'; }
+      showToast('Week ' + week + ' salaries generated — ' + count + ' players ✓');
+    });
 }
 
 function toggleSalaryLock(){
   var sel = document.getElementById('sal-week-sel');
   if(!sel || !sel.value) return;
   var week = sel.value;
-  fetch(FR.paths.url(FR.paths.salaries()) + '/week' + week + '/meta/locked.json')
-    .then(function(r){ return r.json(); })
+  FR.fb.get(FR.paths.salaries() + '/week' + week + '/meta/locked')
     .then(function(locked){
       var newLocked = !locked;
-      return fetch(FR.paths.url(FR.paths.salaries()) + '/week' + week + '/meta/locked.json', {
-        method: 'PUT', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify(newLocked)
-      }).then(function(){
-        showToast('Week ' + week + ' ' + (newLocked ? '🔒 Locked' : '🔓 Unlocked'));
-        loadSalaryStatus();
-      });
+      return FR.fb.put(FR.paths.salaries() + '/week' + week + '/meta/locked', newLocked)
+        .then(function(){
+          showToast('Week ' + week + ' ' + (newLocked ? '🔒 Locked' : '🔓 Unlocked'));
+          loadSalaryStatus();
+        });
     });
 }
 // ── COMMISSIONER MANAGEMENT ───────────────────────────────────
