@@ -5011,7 +5011,16 @@ function loadPoolStatus(){
 
 
 // ── SALARY ENGINE ─────────────────────────────────────────────
-var SAL_MULTIPLIER = 1800;  // projected_pts × this = salary
+// Per-position multipliers — see SALARY_METHODOLOGY.md at repo root for full
+// sourcing/math. Kept in sync with league.html; see that file's comment for
+// the full rationale.
+var POSITION_MULTIPLIERS = {
+  QB:  325,
+  RB:  510,
+  WR:  485,
+  TE:  505,
+  DEF: 480
+};
 var SAL_MIN = 3700;
 var SAL_MAX = 11300;
 var SAL_ROUND = 100;        // round to nearest $100
@@ -5136,8 +5145,9 @@ function generateSalaries(){
                 // Skip injured out players
                 if(inj === 'O' || inj === 'IR') return;
 
-                // Calculate salary: proj pts × multiplier, clamped to min/max
-                var sal = salRound(p.proj * SAL_MULTIPLIER);
+                // Calculate salary: proj pts × POSITION-SPECIFIC multiplier, clamped to min/max
+                var mult = POSITION_MULTIPLIERS[p.pos] || POSITION_MULTIPLIERS.WR;
+                var sal = salRound(p.proj * mult);
                 sal = Math.max(SAL_MIN, Math.min(SAL_MAX, sal));
 
                 salaries[pid] = {

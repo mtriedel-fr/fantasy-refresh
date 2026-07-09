@@ -6578,7 +6578,18 @@ function loadPoolStatus(){
 
 
 // ── SALARY ENGINE ─────────────────────────────────────────────
-var SAL_MULTIPLIER = 1800;  // projected_pts × this = salary
+// Per-position multipliers — see SALARY_METHODOLOGY.md at repo root for full
+// sourcing/math. Short version: real DFS platforms price QBs cheaper relative
+// to raw points (roster scarcity — only 1 QB slot vs multiple skill slots),
+// and TE ceilings cap lower than WR/RB regardless of multiplier. These are
+// reverse-engineered from real DraftKings salary data, scaled to our $60k cap.
+var POSITION_MULTIPLIERS = {
+  QB:  325,  // Real DK ceiling ~$7,300 x1.2 / ~27pt elite proj
+  RB:  510,  // Real DK ceiling ~$8,500 x1.2 / ~20pt elite proj
+  WR:  485,  // Real DK ceiling ~$8,900 (top of real DK slate) x1.2 / ~22pt elite proj
+  TE:  505,  // Real DK ceiling ~$5,900-6,900 x1.2 / ~14pt elite proj
+  DEF: 480
+};
 var SAL_MIN = 3700;
 var SAL_MAX = 11300;
 var SAL_ROUND = 100;        // round to nearest $100
@@ -7834,8 +7845,9 @@ function generateSalaries(){
                 // Skip injured out players
                 if(inj === 'O' || inj === 'IR') return;
 
-                // Calculate salary: proj pts × multiplier, clamped to min/max
-                var sal = salRound(p.proj * SAL_MULTIPLIER);
+                // Calculate salary: proj pts × POSITION-SPECIFIC multiplier, clamped to min/max
+                var mult = POSITION_MULTIPLIERS[p.pos] || POSITION_MULTIPLIERS.WR;
+                var sal = salRound(p.proj * mult);
                 sal = Math.max(SAL_MIN, Math.min(SAL_MAX, sal));
 
                 salaries[pid] = {
