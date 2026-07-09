@@ -471,6 +471,7 @@ function loadSalaries(){
         allPlayers = Object.values(data.players).filter(function(p){ return p && p.name && p.pos; });
         if(!schedule.length) buildGamesBarFromPlayers();
         renderPool();
+        repriceLineup();   // saved lineup may have loaded first with stale snapshot prices
         return;
       }
       // Real salaries haven't been generated for this week yet — fall back
@@ -901,6 +902,7 @@ function loadSubmitted(){
     .then(function(data){
       if(!data || !data.slots) return;
       SLOT_DEFS.forEach(function(s){ if(data.slots[s.id]) lineup[s.id] = data.slots[s.id]; });
+      repriceLineup();   // sync snapshot salaries to the current week's sheet
       renderRoster();
       updateCap();
       document.getElementById('submit-msg').textContent = '✓ Submitted — tap any slot to update';
@@ -908,6 +910,33 @@ function loadSubmitted(){
       document.getElementById('submit-btn').textContent = '↑ Update Lineup';
     })
     .catch(function(err){ console.error('[FR] Failed to load saved lineup:', err); });
+}
+
+// ── LINEUP RE-PRICING ──────────────────────────────────────────
+// Saved lineups store full player objects with the salary snapshotted at
+// draft time. When the week's salary sheet regenerates (e.g. flat fallback
+// replaced by real projections), those snapshots go stale — the roster and
+// cap math would silently use old prices. This re-syncs every drafted
+// player's salary/proj to the CURRENT sheet whenever both are loaded.
+// Runs from both loadSubmitted() and loadSalaries() since either can
+// finish first. Players no longer on the sheet keep their snapshot price
+// (they'd be flagged at lock time anyway).
+function repriceLineup(){
+  if(!allPlayers || !allPlayers.length) return;
+  var byId = {};
+  allPlayers.forEach(function(p){ byId[p.id] = p; });
+  var changed = false;
+  Object.keys(lineup).forEach(function(sid){
+    var lp = lineup[sid];
+    if(!lp || !lp.id) return;
+    var cur = byId[lp.id];
+    if(cur && (cur.salary !== lp.salary || cur.proj !== lp.proj)){
+      lp.salary = cur.salary;
+      lp.proj   = cur.proj;
+      changed = true;
+    }
+  });
+  if(changed){ renderRoster(); updateCap(); }
 }
 
 // ── ROSTER RENDER ──────────────────────────────────────────────
