@@ -72,7 +72,21 @@ jobs:
                 path: opts.pathname + opts.search,
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
-              }, res => { let d=''; res.on('data',c=>d+=c); res.on('end',()=>resolve(d)); });
+              }, res => {
+                let d = '';
+                res.on('data', c => d += c);
+                res.on('end', () => {
+                  // CRITICAL: actually check the write succeeded. A 401 from
+                  // security rules previously resolved as "success" here, which
+                  // made the log claim salaries were generated while Firebase
+                  // silently rejected every write.
+                  if (res.statusCode >= 200 && res.statusCode < 300) {
+                    resolve(d);
+                  } else {
+                    reject(new Error(`Firebase write REJECTED (HTTP ${res.statusCode}) at ${path} — ${d.slice(0, 200)}`));
+                  }
+                });
+              });
               req.on('error', reject);
               req.write(body);
               req.end();
@@ -233,6 +247,13 @@ jobs:
           }
 
           (async () => {
+            if (!FB_TOKEN) {
+              console.error('❌ FIREBASE_AUTH_TOKEN secret is missing or empty.');
+              console.error('   Writes will be rejected by security rules without it.');
+              console.error('   Create it: GitHub repo → Settings → Secrets and variables → Actions');
+              console.error('   Value: Firebase console → Project settings → Service accounts → Database secrets');
+              process.exit(1);
+            }
             const pool = await refreshPlayerPool();
             const leagues = await getActiveLeagues();
             console.log(`Active leagues: ${leagues.map(l => l.id).join(', ')}`);
