@@ -37,9 +37,30 @@ jobs:
           const T01_HOST  = 'tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com';
           const WORKER    = 'https://fantasy-refresh-news.mtriedel.workers.dev';
 
-          // ── Salary engine — ported 1:1 from league.html's generateSalaries()/
-          // generateFlatSalaries() so behavior matches what the manual button does today.
-          const SAL_MULTIPLIER = 1800;
+          // ── Salary engine ──────────────────────────────────────────────
+          // Per-position multipliers, NOT a single flat number. This is
+          // deliberate — see SALARY_METHODOLOGY.md at the repo root for the
+          // full sourcing, math, and how to recalibrate. Short version:
+          //
+          // A flat multiplier (the old approach, 1800) meant any player
+          // projecting above ~6 points slammed into the $11,300 ceiling —
+          // nearly the entire startable player pool priced identically.
+          //
+          // These per-position numbers are reverse-engineered from real
+          // DraftKings NFL Classic salary data ($50k cap, same 9-player
+          // roster shape as us), scaled by 1.2x to match our $60k cap, then
+          // solved against real elite weekly projections per position. QBs
+          // get a lower multiplier than skill positions on purpose — real
+          // DFS platforms price QBs cheaper relative to raw points scored,
+          // because a lineup only needs one QB but several skill-position
+          // slots (roster-construction scarcity, not point-scoring ability).
+          const POSITION_MULTIPLIERS = {
+            QB:  325,  // Real DK ceiling ~$7,300 (Tua, 2024 Wk1) x1.2 / ~27pt elite proj
+            RB:  510,  // Real DK ceiling ~$8,500 (Kamara/Bell tier) x1.2 / ~20pt elite proj
+            WR:  485,  // Real DK ceiling ~$8,900 (CeeDee Lamb, 2024 Wk1 — top of slate) x1.2 / ~22pt elite proj
+            TE:  505,  // Real DK ceiling ~$5,900-6,900 (Kincaid/Gronk tier) x1.2 / ~14pt elite proj — TE ceiling caps lower, not the multiplier
+            DEF: 480
+          };
           const SAL_MIN_DEFAULT = 3700;
           const SAL_MAX_DEFAULT = 11300;
           const SAL_ROUND = 100;
@@ -194,7 +215,8 @@ jobs:
               const pid = poolP ? poolP.id : ('t01_' + p.id);
               const inj = poolP ? (poolP.status || p.status || null) : (p.status || null);
               if (inj === 'O' || inj === 'IR') return;
-              let sal = Math.round((p.proj * SAL_MULTIPLIER) / SAL_ROUND) * SAL_ROUND;
+              const mult = POSITION_MULTIPLIERS[p.pos] || POSITION_MULTIPLIERS.WR; // fallback, shouldn't hit given the position filter above
+              let sal = Math.round((p.proj * mult) / SAL_ROUND) * SAL_ROUND;
               sal = Math.max(min, Math.min(max, sal));
               salaries[pid] = { id: pid, name: p.name, pos: p.pos, team: p.team, proj: Math.round(p.proj*10)/10, salary: sal, status: inj };
               count++;
