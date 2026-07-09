@@ -126,7 +126,14 @@ jobs:
               const req = https.request({
                 hostname: u.hostname, path: u.pathname + u.search, method: 'PUT',
                 headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
-              }, res => { let d=''; res.on('data',c=>d+=c); res.on('end',()=>resolve(d)); });
+              }, res => {
+                let d = '';
+                res.on('data', c => d += c);
+                res.on('end', () => {
+                  if (res.statusCode >= 200 && res.statusCode < 300) resolve(d);
+                  else reject(new Error(`Firebase PUT REJECTED (HTTP ${res.statusCode}) at ${path} — ${d.slice(0,200)}`));
+                });
+              });
               req.on('error', reject);
               req.write(body); req.end();
             });
@@ -140,7 +147,14 @@ jobs:
               const req = https.request({
                 hostname: u.hostname, path: u.pathname + u.search, method: 'PATCH',
                 headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
-              }, res => { let d=''; res.on('data',c=>d+=c); res.on('end',()=>resolve(d)); });
+              }, res => {
+                let d = '';
+                res.on('data', c => d += c);
+                res.on('end', () => {
+                  if (res.statusCode >= 200 && res.statusCode < 300) resolve(d);
+                  else reject(new Error(`Firebase PATCH REJECTED (HTTP ${res.statusCode}) at ${path} — ${d.slice(0,200)}`));
+                });
+              });
               req.on('error', reject);
               req.write(body); req.end();
             });
@@ -532,7 +546,7 @@ jobs:
             console.log(`\n=== Auto-Scoring | Week ${week} | ${seasonType} | ${new Date().toISOString()} ===`);
             console.log(`Leagues to score: ${leagues.join(', ')}`);
 
-            // Lock run (Tuesday 9am) — single pass, no loop needed
+            // Lock run (Tuesday 9am)
             if (IS_LOCK_RUN) {
               for (const leagueId of leagues) {
                 await lockLeague(leagueId, week);
@@ -540,8 +554,7 @@ jobs:
               return;
             }
 
-            // Get games for this week once per cron tick — game list is stable
-            // within a 5-minute window, no need to re-fetch each inner pass.
+            // Get games for this week
             // Tank01 numbers preseason weeks starting at 0 (HOF = week 0).
             // Our app's week numbers are 1-4 (1=HOF, 2=PS Wk1, etc) — translate for the API call.
             const apiWeek = seasonType === 'Preseason' ? (week - 1) : week;
@@ -554,7 +567,7 @@ jobs:
               return;
             }
 
-            // Filter to active/final games — also stable within the window
+            // Filter to active/final games
             const activeGames = games.filter(g => {
               const s = (g.gameStatus || g.status || '').toLowerCase();
               return s.includes('progress') || s.includes('final') ||
@@ -573,72 +586,51 @@ jobs:
               return s.includes('final') || s.includes('completed');
             });
 
-            // ── 2-MINUTE SCORING LOOP ─────────────────────────────
-            // GitHub Actions cron minimum is 5 minutes. Rather than accept
-            // 5-minute stale scores, we run 3 scoring passes inside this single
-            // cron execution — one immediately, one at ~2 min, one at ~4 min.
-            // Box scores are re-fetched fresh each pass (that's the point).
-            // Stable data (week, leagues, game list) is fetched once above.
-            // At Ultra tier (15,000 calls/day) this costs ~6,000 calls on a
-            // worst-case Sunday — 40% of the daily limit, well within budget.
-            const PASSES = 3;
-            const PASS_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
-
-            for (let pass = 1; pass <= PASSES; pass++) {
-              const passStart = Date.now();
-              console.log(`\n── Pass ${pass}/${PASSES} | ${new Date().toISOString()} ──`);
-
-              // Fetch box scores fresh every pass — this is where the live data lives
-              const boxScores = {};
-              for (const game of activeGames) {
-                const gameId = game.gameID || game.gameId || '';
-                if (!gameId) continue;
-                try {
-                  const bs = await t01(`/getNFLBoxScore?gameID=${gameId}&fantasyPoints=true&PPRScoring=true`);
-                  if (bs.body) {
-                    boxScores[gameId] = bs.body;
-                    const bsName = bs.body.playerStats || {};
-                    const sample = Object.values(bsName)[0];
-                    console.log(`  📊 ${gameId}: ${Object.keys(bsName).length} player stats` +
-                      (sample ? ` (sleeperBotID present: ${sample.sleeperBotID ? 'YES ✓' : 'no — falling back to name match'})` : ''));
-                  }
-                } catch(e) {
-                  console.error(`  ❌ Failed box score ${gameId}:`, e.message);
+            // Fetch box scores for active games
+            const boxScores = {};
+            for (const game of activeGames) {
+              const gameId = game.gameID || game.gameId || '';
+              if (!gameId) continue;
+              try {
+                const bs = await t01(`/getNFLBoxScore?gameID=${gameId}&fantasyPoints=true&PPRScoring=true`);
+                if (bs.body) {
+                  boxScores[gameId] = bs.body;
+                  const bsName = bs.body.playerStats || {};
+                  const sample = Object.values(bsName)[0];
+                  console.log(`  📊 ${gameId}: ${Object.keys(bsName).length} player stats` +
+                    (sample ? ` (sleeperBotID present: ${sample.sleeperBotID ? 'YES ✓' : 'no — falling back to name match'})` : ''));
                 }
-              }
-
-              // Build player stats lookup from this pass's fresh box scores
-              const playerStats = {};
-              Object.values(boxScores).forEach(bs => {
-                Object.entries(bs.playerStats || {}).forEach(([pid, stats]) => {
-                  playerStats[pid] = stats;
-                  if (stats.sleeperBotID) playerStats[stats.sleeperBotID] = stats;
-                  const name = (stats.longName || stats.playerName || '').toLowerCase();
-                  if (name) playerStats[name] = stats;
-                });
-              });
-
-              // Score all leagues with this pass's data
-              for (const leagueId of leagues) {
-                try {
-                  await scoreLeague(leagueId, week, seasonType, activeGames, allFinal, playerStats);
-                } catch(e) {
-                  console.error(`Failed scoring ${leagueId}:`, e.message);
-                }
-              }
-
-              // Wait 2 minutes before the next pass — skip wait after the final pass
-              if (pass < PASSES) {
-                const elapsed = Date.now() - passStart;
-                const waitMs = Math.max(0, PASS_INTERVAL_MS - elapsed);
-                if (waitMs > 0) {
-                  console.log(`  ⏱ Next pass in ${Math.round(waitMs/1000)}s…`);
-                  await new Promise(resolve => setTimeout(resolve, waitMs));
-                }
+              } catch(e) {
+                console.error(`  ❌ Failed box score ${gameId}:`, e.message);
               }
             }
 
-            console.log(`\n✓ All ${PASSES} passes complete | ${new Date().toISOString()}`);
+            // Build player stats lookup
+            const playerStats = {};
+            Object.values(boxScores).forEach(bs => {
+              Object.entries(bs.playerStats || {}).forEach(([pid, stats]) => {
+                playerStats[pid] = stats;
+                // Tank01 ships a sleeperBotID field on player records in their other
+                // sport APIs (confirmed via their MLB product) — if it's present here
+                // too, this is the REAL fix for matching: our lineups store Sleeper's
+                // own player ID, which has never had any relationship to Tank01's
+                // internal numeric pid above. Indexing by it (when present) means the
+                // scoreLeague() lookup at `playerStats[player.id]` actually succeeds,
+                // instead of always silently falling through to name-matching.
+                if (stats.sleeperBotID) playerStats[stats.sleeperBotID] = stats;
+                const name = (stats.longName || stats.playerName || '').toLowerCase();
+                if (name) playerStats[name] = stats;
+              });
+            });
+
+            // Score all leagues
+            for (const leagueId of leagues) {
+              try {
+                await scoreLeague(leagueId, week, seasonType, activeGames, allFinal, playerStats);
+              } catch(e) {
+                console.error(`Failed scoring ${leagueId}:`, e.message);
+              }
+            }
           }
 
           main().catch(e => {

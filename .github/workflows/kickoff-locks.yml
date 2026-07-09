@@ -23,6 +23,7 @@ jobs:
       - name: Check game statuses and write locks
         env:
           FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
           TANK01_KEY: ${{ secrets.TANK01_KEY }}
           FR_SEASON: "2026"
         run: |
@@ -56,7 +57,14 @@ jobs:
           function firebasePut(path, payload) {
             return new Promise((resolve, reject) => {
               const body = JSON.stringify(payload);
-              const opts = new URL(FB_URL + path);
+              // Append auth token — locks writes require commissioner/admin auth
+              // under the published security rules. This function previously sent
+              // writes unauthenticated (worked under old loose rules, silently
+              // rejected under current ones).
+              const FB_TOKEN = process.env.FIREBASE_AUTH_TOKEN;
+              const sep = path.includes('?') ? '&' : '?';
+              const authedPath = FB_TOKEN ? `${path}${sep}auth=${FB_TOKEN}` : path;
+              const opts = new URL(FB_URL + authedPath);
               const options = {
                 hostname: opts.hostname,
                 path: opts.pathname + opts.search,
@@ -69,7 +77,10 @@ jobs:
               const req = https.request(options, res => {
                 let data = '';
                 res.on('data', chunk => data += chunk);
-                res.on('end', () => resolve(data));
+                res.on('end', () => {
+                  if (res.statusCode >= 200 && res.statusCode < 300) resolve(data);
+                  else reject(new Error(`Firebase PUT REJECTED (HTTP ${res.statusCode}) at ${path} — ${data.slice(0,200)}`));
+                });
               });
               req.on('error', reject);
               req.write(body);
