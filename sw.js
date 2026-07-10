@@ -2,8 +2,8 @@
 // Caches static assets for offline support. Network-first: a normal
 // reload should always see whatever's actually deployed — the cache only
 // kicks in when the network is genuinely unreachable.
-const CACHE_NAME    = 'fr-v4';
-const CACHE_STATIC  = 'fr-static-v4';
+const CACHE_NAME    = 'fr-v5';
+const CACHE_STATIC  = 'fr-static-v5';
 
 // Files to pre-cache on install
 const PRECACHE = [
