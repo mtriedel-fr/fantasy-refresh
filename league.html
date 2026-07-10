@@ -2051,10 +2051,33 @@ function buildTeamGameMap(games){
   var map = {};
   (games || []).forEach(function(g){
     if(!g.home || !g.away) return;
-    map[g.home] = { opp: g.away, time: g.time, isHome: true };
-    map[g.away] = { opp: g.home, time: g.time, isHome: false };
+    map[g.home] = { opp: g.away, time: g.time, isHome: true,  international: !!g.international };
+    map[g.away] = { opp: g.home, time: g.time, isHome: false, international: !!g.international };
   });
   return map;
+}
+
+// Stadium type per team — fixed, doesn't change game to game, so this is a
+// static lookup rather than an API call. "retractable" defaults to shown as
+// closed/dome-like since roof status on a given game day isn't something
+// Tank01 exposes — genuinely accurate roof-open/closed status would require
+// a live source we don't have. Source: public knowledge of current NFL
+// stadiums as of the 2026 season — recheck if a team relocates/opens a new
+// stadium (e.g. this list assumes each team's most recent known home venue).
+var STADIUM_TYPE = {
+  ARI:'dome', ATL:'dome', BUF:'outdoor', CAR:'outdoor', CHI:'outdoor',
+  CIN:'outdoor', CLE:'outdoor', DAL:'retractable', DEN:'outdoor', DET:'dome',
+  GB:'outdoor', HOU:'retractable', IND:'retractable', JAX:'outdoor', KC:'outdoor',
+  LAC:'outdoor', LAR:'outdoor', LV:'dome', MIA:'outdoor', MIN:'dome',
+  NE:'outdoor', NO:'dome', NYG:'outdoor', NYJ:'outdoor', PHI:'outdoor',
+  PIT:'outdoor', SEA:'outdoor', SF:'outdoor', TB:'outdoor', TEN:'outdoor',
+  WSH:'outdoor'
+};
+function stadiumIcon(teamAbbr){
+  var type = STADIUM_TYPE[teamAbbr];
+  if(type === 'dome') return '🏟️';
+  if(type === 'retractable') return '🔓';
+  return '';  // outdoor — no icon needed, it's the default assumption
 }
 
 function fmtKickoff(iso){
@@ -2095,9 +2118,15 @@ function buildLineupPlayerCard(p, pts, hasStarted, gameMap, showNotStartedTag, s
   var game = (gameMap && p.team) ? gameMap[p.team] : null;
   var gameLine = '';
   if(game){
-    var vsAt = game.isHome ? 'vs' : '@';
+    var vsAt = game.international ? (game.isHome ? 'vs' : '@') + ' Int\'l' : (game.isHome ? 'vs' : '@');
     var kickoff = fmtKickoff(game.time);
-    gameLine = '<div class="lineup-card-game">' + vsAt + ' ' + escapeHtmlFR(game.opp) + (kickoff ? ' · ' + kickoff : '') + '</div>';
+    // Dome/retractable icon reflects the STADIUM the game is played at —
+    // the home team's stadium, regardless of which side p.team is on.
+    var hostTeam = game.isHome ? p.team : game.opp;
+    var venueIcon = stadiumIcon(hostTeam);
+    gameLine = '<div class="lineup-card-game">' + vsAt + ' ' + escapeHtmlFR(game.opp)
+      + (venueIcon ? ' ' + venueIcon : '')
+      + (kickoff ? ' · ' + kickoff : '') + '</div>';
   }
 
   // Started = locked in, shown with a muted "can't touch this" look.
@@ -2140,7 +2169,26 @@ function rosterColumn(lineup, scoreEntry, locks, isMine, gameMap){
       var hasStarted = !!(p.team && locks && locks[p.team]);
       return buildLineupPlayerCard(p, slotPts[slotId], hasStarted, gameMap, true, slotId);
     }).join('');
-    return '<div><div class="h2h-roster-side-hdr">' + escapeHtmlFR(teamLabel) + '</div><div class="lineup-card-list">' + (allRows || '<div class="h2h-roster-empty">Empty roster.</div>') + '</div></div>';
+
+    // Budget remaining — sum actual drafted salaries against the league cap.
+    // Reads straight off the saved lineup's own salary snapshot per player
+    // (same values repriceLineup() in draft.html keeps in sync), so this
+    // always matches what the draft page itself would show as spent/remaining.
+    var spentTotal = 0;
+    sortedSlotIds(lineup.slots).forEach(function(slotId){
+      var p = lineup.slots[slotId];
+      if(p && p.salary) spentTotal += p.salary;
+    });
+    var capForBudget = (typeof SAL_CAP !== 'undefined' && SAL_CAP) ? SAL_CAP : 60000;
+    var remaining = capForBudget - spentTotal;
+    var budgetColor = remaining < 0 ? 'var(--pk)' : 'var(--or)';
+    var budgetLine = '<div class="myteam-budget-line" style="font-family:var(--fd);font-size:12.5px;font-weight:700;color:'
+      + budgetColor + ';padding:2px 0 8px;">'
+      + '$' + remaining.toLocaleString() + ' remaining'
+      + ' <span style="color:var(--ink3);font-weight:500;">of $' + capForBudget.toLocaleString() + '</span>'
+      + '</div>';
+
+    return '<div><div class="h2h-roster-side-hdr">' + escapeHtmlFR(teamLabel) + '</div>' + budgetLine + '<div class="lineup-card-list">' + (allRows || '<div class="h2h-roster-empty">Empty roster.</div>') + '</div></div>';
   }
 
   var startedRows = [];
