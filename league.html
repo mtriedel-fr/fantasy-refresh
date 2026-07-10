@@ -2075,8 +2075,14 @@ var STADIUM_TYPE = {
 };
 function stadiumIcon(teamAbbr){
   var type = STADIUM_TYPE[teamAbbr];
-  if(type === 'dome') return '🏟️';
-  if(type === 'retractable') return '🔓';
+  // Retractable roofs merged into "dome" visually — we can't know a given
+  // stadium's real-time roof status, so showing it as weather-shielded by
+  // default is the more honest simplification, not just a display choice.
+  // Previously used a separate open-padlock icon (🔓) for retractable —
+  // removed because it visually collided with the unrelated "player locked
+  // at kickoff" indicator (🔒) used elsewhere on this page, causing dome/
+  // retractable stadiums to look like locked players at a glance.
+  if(type === 'dome' || type === 'retractable') return '🏟️';
   return '';  // outdoor — no icon needed, it's the default assumption
 }
 

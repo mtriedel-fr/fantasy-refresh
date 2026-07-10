@@ -375,8 +375,10 @@ var STADIUM_TYPE = {
 };
 function draftStadiumIcon(teamAbbr){
   var type = STADIUM_TYPE[teamAbbr];
-  if(type === 'dome') return '🏟️';
-  if(type === 'retractable') return '🔓';
+  // Retractable merged into dome — see league.html's stadiumIcon() for why
+  // (real-time roof status isn't knowable, and the previous 🔓 icon visually
+  // collided with the unrelated player-locked-at-kickoff indicator 🔒).
+  if(type === 'dome' || type === 'retractable') return '🏟️';
   return '';
 }
 
@@ -657,8 +659,13 @@ function loadSchedule(){
         renderPicker();
       }
 
-      // Fetch odds in background — group games by date to minimize API calls
-      if(!PS_MODE){
+      // Fetch odds in background — group games by date to minimize API calls.
+      // Previously skipped entirely during preseason (PS_MODE) — now attempts
+      // regardless, since there's no real downside: if Tank01 doesn't have
+      // preseason odds for a given game, the .catch() below just no-ops and
+      // the O/U badge simply doesn't appear for that game, same as any other
+      // missing-data case already handled elsewhere on this page.
+      {
         var dates = {};
         schedule.forEach(function(g){
           if(g.time){
@@ -1507,17 +1514,44 @@ function showToast(msg,isErr){
 // ── PLAYER NEWS ────────────────────────────────────────────────
 
 var espnIdCache = {};
+var newsOverlayPlayer = null;  // currently open player, so tab switches know who to reload for
+var scoresLoadedFor = null;    // avoid re-fetching scores if already loaded for this player
 
 function openNews(playerId, event){
   if(event) event.stopPropagation();
   var p = allPlayers.find(function(x){ return x.id === playerId; });
   if(!p) return;
 
+  newsOverlayPlayer = p;
+  scoresLoadedFor = null;
+
   document.getElementById('news-player-name').textContent = p.name;
   document.getElementById('news-player-meta').textContent =
     (p.pos||'') + (p.team ? ' · '+p.team : '') + (p.salary ? ' · $'+p.salary.toLocaleString() : '');
-  document.getElementById('news-body').innerHTML = '<div class="news-loading">Loading news…</div>';
   document.getElementById('news-overlay').classList.add('open');
+
+  // Always reset to the News tab when opening a new player
+  switchNewsTab('news');
+}
+
+function switchNewsTab(tab){
+  var newsBtn    = document.getElementById('news-tab-news');
+  var scoresBtn  = document.getElementById('news-tab-scores');
+  if(!newsBtn || !scoresBtn) return;
+
+  var activeStyle   = 'color:var(--or);border-bottom:2px solid var(--or);';
+  var inactiveStyle = 'color:var(--ink3);border-bottom:2px solid transparent;';
+  newsBtn.setAttribute('style',   newsBtn.getAttribute('style').replace(/color:[^;]+;border-bottom:[^;]+;/, tab==='news'   ? activeStyle : inactiveStyle));
+  scoresBtn.setAttribute('style', scoresBtn.getAttribute('style').replace(/color:[^;]+;border-bottom:[^;]+;/, tab==='scores' ? activeStyle : inactiveStyle));
+
+  if(tab === 'news') loadNewsTab();
+  else loadScoresTab();
+}
+
+function loadNewsTab(){
+  var p = newsOverlayPlayer;
+  if(!p) return;
+  document.getElementById('news-body').innerHTML = '<div class="news-loading">Loading news…</div>';
 
   fetch(WORKER+'/news?name='+encodeURIComponent(p.name))
     .then(function(r){ return r.json(); })
@@ -1541,6 +1575,42 @@ function openNews(playerId, event){
       }
     })
     .catch(function(){ showNewsLinks(p); });
+}
+
+// Real per-game history for this NFL player this season — NOT this league's
+// fantasy points (a physical player can be drafted by different users each
+// week under this format, so "their score in our league" isn't a coherent
+// per-player concept). This shows actual NFL games played and real stat
+// lines, sourced from Tank01's game log.
+function loadScoresTab(){
+  var p = newsOverlayPlayer;
+  if(!p) return;
+  document.getElementById('news-body').innerHTML = '<div class="news-loading">Loading game log…</div>';
+
+  fetch(WORKER+'/playergames?name='+encodeURIComponent(p.name)+'&season=2026')
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      if(data.games && data.games.length){
+        var html = '<div style="padding:4px 20px 12px;">' + data.games.map(function(g){
+          var vsAt = g.isHome === true ? 'vs' : g.isHome === false ? '@' : '';
+          return '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--bdr);">'
+            + '<div><span style="font-family:var(--fd);font-weight:700;font-size:13px;color:var(--ink);">Week '+(g.week||'—')+'</span>'
+            + '<span style="font-size:12px;color:var(--ink3);margin-left:8px;">'+vsAt+' '+(g.opp||'')+'</span></div>'
+            + '<div style="font-family:var(--fd);font-weight:800;font-size:15px;color:var(--or);">'+g.pts.toFixed(1)+' <span style="font-size:10px;color:var(--ink3);font-weight:500;">PTS</span></div>'
+            + '</div>';
+        }).join('') + '</div>';
+        document.getElementById('news-body').innerHTML = html;
+      } else {
+        document.getElementById('news-body').innerHTML =
+          '<div class="news-loading" style="padding:32px 20px;text-align:center;color:var(--ink3);">'
+          + 'No game log available yet' + (data.error ? ' <div style="font-size:11px;margin-top:6px;opacity:.7;">('+data.error+')</div>' : '')
+          + '</div>';
+      }
+    })
+    .catch(function(){
+      document.getElementById('news-body').innerHTML =
+        '<div class="news-loading" style="padding:32px 20px;text-align:center;color:var(--ink3);">Could not load game log</div>';
+    });
 }
 
 
@@ -1604,6 +1674,12 @@ function goBack(){
         <div class="news-sheet-meta" id="news-player-meta"></div>
       </div>
       <button class="news-sheet-close" onclick="closeNews()">✕</button>
+    </div>
+    <div class="news-tabs" style="display:flex;border-bottom:1px solid var(--bdr);">
+      <button class="news-tab active" id="news-tab-news" onclick="switchNewsTab('news')"
+        style="flex:1;padding:10px;background:none;border:none;font-family:var(--fd);font-size:12.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--or);border-bottom:2px solid var(--or);cursor:pointer;">News</button>
+      <button class="news-tab" id="news-tab-scores" onclick="switchNewsTab('scores')"
+        style="flex:1;padding:10px;background:none;border:none;font-family:var(--fd);font-size:12.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--ink3);border-bottom:2px solid transparent;cursor:pointer;">Scores &amp; Matchups</button>
     </div>
     <div class="news-body" id="news-body"></div>
   </div>
