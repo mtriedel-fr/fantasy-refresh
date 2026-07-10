@@ -122,16 +122,38 @@ jobs:
           async function getActiveLeagues() {
             try {
               const leagues = await firebaseGet('/leagues.json?shallow=true');
-              if (!leagues || leagues.error) return [{ id: 'fr_refresh26', settings: null }];
+              if (!leagues || leagues.error) {
+                console.log('⚠️  Could not read /leagues.json — falling back to fr_refresh26 only');
+                return [{ id: 'fr_refresh26', settings: null }];
+              }
               const ids = Object.keys(leagues);
+              console.log(`Found ${ids.length} league(s) in Firebase: ${ids.join(', ')}`);
               const out = [];
               for (const id of ids) {
                 try {
                   const settings = await firebaseGet(`/leagues/${id}/settings.json`);
-                  if (settings && settings.active !== false) out.push({ id, settings });
-                } catch (e) { /* skip unreadable league */ }
+                  // FIXED: previously required settings to exist AND explicitly
+                  // NOT be false — meaning a league with no settings node, or a
+                  // partially-populated one missing the `active` field, was
+                  // silently dropped with zero logging. A league is now only
+                  // excluded if `active` is explicitly set to false; missing
+                  // settings entirely defaults to active (opt-out, not opt-in).
+                  if (settings && settings.active === false) {
+                    console.log(`  ⊘ ${id}: skipped — settings.active is explicitly false`);
+                  } else {
+                    out.push({ id, settings: settings || null });
+                    console.log(`  ✓ ${id}: included${settings ? '' : ' (no settings node found — defaulting to active)'}`);
+                  }
+                } catch (e) {
+                  console.log(`  ⚠️  ${id}: could not read settings (${e.message}) — including anyway, defaulting to active`);
+                  out.push({ id, settings: null });
+                }
               }
-              return out.length ? out : [{ id: 'fr_refresh26', settings: null }];
+              if (!out.length) {
+                console.log('⚠️  No leagues survived filtering — falling back to fr_refresh26 only');
+                return [{ id: 'fr_refresh26', settings: null }];
+              }
+              return out;
             } catch (e) {
               console.log('Could not fetch leagues, falling back to fr_refresh26:', e.message);
               return [{ id: 'fr_refresh26', settings: null }];

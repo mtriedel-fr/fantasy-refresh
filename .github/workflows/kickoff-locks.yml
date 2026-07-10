@@ -115,17 +115,32 @@ jobs:
                 return ['fr_refresh26'];
               }
               const leagueIds = Object.keys(leagues);
+              console.log(`Found ${leagueIds.length} league(s): ${leagueIds.join(', ')}`);
+              // FIXED: previously silently dropped any league with no settings
+              // node, or whose settings.season didn't exactly match — with
+              // zero logging. Kickoff locks silently missing a league means
+              // that league's rosters never lock at game time. Now defaults
+              // to active/included unless explicitly excluded, and logs why.
               const active = [];
               for (const id of leagueIds) {
                 try {
                   const settings = await firebaseGet(`/leagues/${id}/settings.json`);
-                  if (settings && settings.active !== false && settings.season == SEASON) {
-                    active.push(id);
+                  if (settings && settings.active === false) {
+                    console.log(`  ⊘ ${id}: skipped — settings.active is explicitly false`);
+                    continue;
                   }
+                  if (settings && settings.season != null && String(settings.season) !== String(SEASON)) {
+                    console.log(`  ⊘ ${id}: skipped — settings.season (${settings.season}) doesn't match current season (${SEASON})`);
+                    continue;
+                  }
+                  active.push(id);
+                  console.log(`  ✓ ${id}: included${settings ? '' : ' (no settings node — defaulting to active)'}`);
                 } catch(e) {
-                  // Skip leagues we can't read
+                  console.log(`  ⚠️  ${id}: could not read settings (${e.message}) — including anyway, defaulting to active`);
+                  active.push(id);
                 }
               }
+              if (!active.length) console.log('⚠️  No leagues survived filtering — falling back to fr_refresh26 only');
               return active.length ? active : ['fr_refresh26'];
             } catch(e) {
               console.log('Error fetching leagues:', e.message);

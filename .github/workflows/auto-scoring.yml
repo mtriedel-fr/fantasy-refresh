@@ -225,18 +225,36 @@ jobs:
               const leagueIds = Object.keys(leagues);
               console.log(`Found ${leagueIds.length} league(s): ${leagueIds.join(', ')}`);
 
-              // Filter to active leagues only
+              // Filter to active leagues only.
+              // FIXED: previously excluded any league silently if `settings`
+              // was missing, if `active` was anything but explicitly-not-false,
+              // OR if `settings.season` didn't exactly match SEASON — three
+              // separate ways a real league could vanish with zero logging.
+              // This is scoring/locks — silently dropping a league here means
+              // that league's users see no live scores on game day. Now:
+              // default to active unless explicitly disabled, and log every
+              // inclusion/exclusion so a miss is visible in the Actions log
+              // instead of only discovered by a user reporting missing scores.
               const active = [];
               for (const id of leagueIds) {
                 try {
                   const settings = await firebaseGet(`/leagues/${id}/settings.json`);
-                  if (settings && settings.active !== false && settings.season == SEASON) {
-                    active.push(id);
+                  if (settings && settings.active === false) {
+                    console.log(`  ⊘ ${id}: skipped — settings.active is explicitly false`);
+                    continue;
                   }
+                  if (settings && settings.season != null && String(settings.season) !== String(SEASON)) {
+                    console.log(`  ⊘ ${id}: skipped — settings.season (${settings.season}) doesn't match current season (${SEASON})`);
+                    continue;
+                  }
+                  active.push(id);
+                  console.log(`  ✓ ${id}: included${settings ? '' : ' (no settings node — defaulting to active)'}`);
                 } catch(e) {
-                  // Skip leagues we can't read
+                  console.log(`  ⚠️  ${id}: could not read settings (${e.message}) — including anyway, defaulting to active`);
+                  active.push(id);
                 }
               }
+              if (!active.length) console.log('⚠️  No leagues survived filtering — falling back to fr_refresh26 only');
               return active.length ? active : ['fr_refresh26'];
             } catch(e) {
               console.log('Error fetching leagues:', e.message);
