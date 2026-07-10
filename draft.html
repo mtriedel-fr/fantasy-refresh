@@ -172,9 +172,24 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
 .news-item-meta{font-family:var(--fd);font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-top:6px;}
 .news-loading{padding:40px 20px;text-align:center;color:var(--ink3);font-family:var(--fd);font-size:14px;}
 .draft-btn{flex-shrink:0;background:rgba(0,229,212,.12);border:1px solid rgba(0,229,212,.3);color:var(--or);font-family:var(--fd);font-size:12px;font-weight:800;padding:5px 12px;border-radius:8px;cursor:pointer;text-transform:uppercase;letter-spacing:.3px;transition:all .15s;white-space:nowrap;}
-.draft-btn:hover{background:var(--or);color:#050808;border-color:var(--or);}
+/* Hover styles scoped to real hover-capable pointers (mouse/trackpad) only.
+   On touch devices, :hover has no real meaning but browsers still apply it
+   after a tap and don't clear it until the next tap elsewhere — so without
+   this scoping, a button just tapped stays visually "hovered" (solid fill),
+   and when the list reflows and a DIFFERENT player's row slides into that
+   same screen position, it can inherit that stuck hover look, making it
+   appear already-selected right when someone's about to tap again. This was
+   the actual visual cause of a reported mis-tap where a tester thought a
+   player was already drafted and tapped again, unintentionally drafting
+   someone they didn't mean to. See also: the PICK_LOCK_MS interaction lock
+   in pickPlayer()/removePlayer(), which prevents the harmful OUTCOME even
+   if the visual confusion still occurs for any other reason. */
+@media (hover: hover) and (pointer: fine){
+  .draft-btn:hover{background:var(--or);color:#050808;border-color:var(--or);}
+  .draft-btn.drafted:hover{background:var(--pk);color:#fff;border-color:var(--pk);}
+  [data-theme="light"] .draft-btn:hover{background:var(--or);color:#fff;}
+}
 .draft-btn.drafted{background:rgba(255,95,160,.1);border-color:rgba(255,95,160,.3);color:var(--pk);}
-.draft-btn.drafted:hover{background:var(--pk);color:#fff;border-color:var(--pk);}
 
 
 [data-theme="light"]{
@@ -186,7 +201,6 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
 [data-theme="light"] .hdr{border-bottom:1px solid var(--bdr);}
 [data-theme="light"] .player-row:hover{background:var(--bg3);}
 [data-theme="light"] .draft-btn{background:rgba(0,122,112,.12);border-color:rgba(0,122,112,.3);color:var(--or);}
-[data-theme="light"] .draft-btn:hover{background:var(--or);color:#fff;}
 [data-theme="light"] .draft-btn.drafted{background:rgba(204,48,112,.1);border-color:rgba(204,48,112,.3);color:var(--pk);}
 [data-theme="light"] .picker-search{background:var(--bg3);border-color:var(--bdr2);color:var(--or);}
 [data-theme="light"] .news-sheet{background:var(--bg2);}
@@ -234,7 +248,11 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
 
   <!-- ROSTER -->
   <div class="roster-panel">
-    <div class="roster-title">Your Roster — <span id="week-label">Week —</span></div>
+    <div class="roster-title" style="display:flex;align-items:center;justify-content:space-between;">
+      <span>Your Roster — <span id="week-label">Week —</span></span>
+      <button onclick="clearRoster()" title="Clear roster and save"
+        style="background:none;border:1px solid var(--bdr2);border-radius:7px;color:var(--ink3);font-family:var(--fd);font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;padding:5px 9px;cursor:pointer;white-space:nowrap;">🗑 Clear</button>
+    </div>
     <button id="browse-players-btn" onclick="openPickerPanel()" style="display:none;align-items:center;justify-content:center;gap:6px;margin:0 14px 10px;padding:10px;background:rgba(0,229,212,.1);border:1px solid rgba(0,229,212,.3);border-radius:8px;color:var(--or);font-family:var(--fd);font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;cursor:pointer;">🔍 Browse Players</button>
     <div class="roster-slots" id="roster-slots"></div>
     <div class="submit-area">
@@ -1210,7 +1228,23 @@ function findOpenSlotForPosition(pos){
   return null;
 }
 
+var lastPickTime = 0;
+var PICK_LOCK_MS  = 450;  // long enough to absorb a stray second tap after
+                           // the list reflows, short enough to feel instant
+
 function pickPlayer(playerId){
+  // Guard against the exact confusion this was built to prevent: the moment
+  // a player is drafted, the picker list re-renders and reflows instantly —
+  // whatever row was BELOW the drafted player slides up to occupy the same
+  // screen position the user just tapped. A fast second tap (a natural
+  // double-tap gesture, or just quick repeated tapping) can land on that
+  // now-different player and draft THEM too, unintentionally — this was
+  // reported directly by a tester. Rather than rely on making the visual
+  // confusion impossible (which would need a real reflow animation, a
+  // bigger change), this makes the actual harmful outcome — drafting the
+  // wrong player — physically impossible for a brief window after any pick.
+  if(Date.now() - lastPickTime < PICK_LOCK_MS) return;
+
   var p = allPlayers.find(function(x){ return x.id === playerId; });
   if(!p) return;
   if(p.status === 'O' || p.status === 'IR'){ showToast(p.name+' is out', true); return; }
@@ -1235,6 +1269,7 @@ function pickPlayer(playerId){
   // If player is already in this slot — deselect
   if(lineup[activeSlot] && lineup[activeSlot].id === playerId){
     lineup[activeSlot] = null;
+    lastPickTime = Date.now();
     renderRoster();
     updateCap();
     renderPicker();
@@ -1255,6 +1290,7 @@ function pickPlayer(playerId){
   var wasEmpty = !lineup[activeSlot];
   var replaced = lineup[activeSlot] ? lineup[activeSlot].name : null;
   lineup[activeSlot] = p;
+  lastPickTime = Date.now();
   renderRoster();
   updateCap();
 
@@ -1324,9 +1360,11 @@ function findNextEmptySlot(currentSlot){
 }
 
 function removePlayer(slotId){
+  if(Date.now() - lastPickTime < PICK_LOCK_MS) return;
   var p = lineup[slotId];
   if(p && isPlayerLocked(p)){ showToast(p.name+' is locked — cannot remove 🔒', true); return; }
   lineup[slotId] = null;
+  lastPickTime = Date.now();
   if(activeSlot === slotId){
     activeSlot = null;
     document.getElementById('picker-panel').classList.remove('open');
@@ -1406,25 +1444,8 @@ function submitLineup(){
   if(getSpent()>CAP){ showToast('Over cap',true); return; }
   var btn = document.getElementById('submit-btn');
   btn.disabled=true; btn.textContent='Submitting…';
-  var slots={};
-  SLOT_DEFS.forEach(function(s){ if(lineup[s.id]) slots[s.id]=lineup[s.id]; });
 
-  var ctx = FRAuth.getLeagueCtx();
-  var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
-
-  // This used to write to a legacy /lineups{year}/week{N}/{uid} path with
-  // no league scoping at all — left over from before multi-league support.
-  // Nothing else in the app (roster dropdowns, the Draft/Review button,
-  // kickoff-lock reveals) ever read from that path; they all read from
-  // /leagues/{id}/lineups/{season}/week{N}/{uid}. A submitted lineup was
-  // saving somewhere nothing else could ever find it.
-  FR.fb.get('/leagues/' + leagueId + '/members/' + currentUser.uid).then(function(member){
-    var teamName = (member && member.teamName) || (ctx && ctx.teamName) || currentUser.team2026 || currentUser.email;
-    return FR.fb.put('/leagues/' + leagueId + '/lineups/' + (ctx.season || FR_SEASON) + '/week' + currentWeek + '/' + currentUser.uid, {
-      uid: currentUser.uid, team: teamName,
-      week: currentWeek, slots: slots, totalSal: getSpent(), submitted: Date.now()
-    });
-  }).then(function(){
+  saveLineupToFirebase().then(function(){
     var msg=document.getElementById('submit-msg');
     msg.textContent='✓ Lineup submitted! Good luck.'; msg.className='submit-msg ok';
     btn.textContent='↑ Update Lineup'; btn.disabled=false;
@@ -1435,6 +1456,90 @@ function submitLineup(){
     document.getElementById('submit-msg').textContent='Submission failed — try again';
     document.getElementById('submit-msg').className='submit-msg err';
     btn.disabled=false; btn.textContent='Submit Lineup →';
+  });
+}
+
+// Shared save path — writes whatever is CURRENTLY in `lineup` to Firebase.
+// Used by both submitLineup() (which requires at least 1 player before
+// calling this) and clearRoster() (which explicitly allows saving a fully
+// or partially empty lineup — that's the whole point of a clear action).
+// This used to write to a legacy /lineups{year}/week{N}/{uid} path with
+// no league scoping at all — left over from before multi-league support.
+// Nothing else in the app (roster dropdowns, the Draft/Review button,
+// kickoff-lock reveals) ever read from that path; they all read from
+// /leagues/{id}/lineups/{season}/week{N}/{uid}. A submitted lineup was
+// saving somewhere nothing else could ever find it.
+function saveLineupToFirebase(){
+  var slots={};
+  SLOT_DEFS.forEach(function(s){ if(lineup[s.id]) slots[s.id]=lineup[s.id]; });
+
+  var ctx = FRAuth.getLeagueCtx();
+  var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+
+  return FR.fb.get('/leagues/' + leagueId + '/members/' + currentUser.uid).then(function(member){
+    var teamName = (member && member.teamName) || (ctx && ctx.teamName) || currentUser.team2026 || currentUser.email;
+    return FR.fb.put('/leagues/' + leagueId + '/lineups/' + (ctx.season || FR_SEASON) + '/week' + currentWeek + '/' + currentUser.uid, {
+      uid: currentUser.uid, team: teamName,
+      week: currentWeek, slots: slots, totalSal: getSpent(), submitted: Date.now()
+    });
+  });
+}
+
+// ── CLEAR ROSTER ─────────────────────────────────────────────────
+// Clears every UNLOCKED slot and saves the result immediately — this is a
+// real, persisted action (not just a local reset), so it needs its own
+// guard rules distinct from submitLineup(): it must be ALLOWED to save a
+// fully empty lineup (that's the point), but must NOT touch any slot whose
+// player's game has already started — same rule enforced everywhere else
+// a player can be removed (removePlayer()), just applied across the whole
+// roster at once instead of one slot at a time.
+function clearRoster(){
+  if(!currentUser){ showToast('Sign in first',true); return; }
+
+  var filledSlots = SLOT_DEFS.filter(function(s){ return lineup[s.id]; });
+  if(!filledSlots.length){ showToast('Roster is already empty', true); return; }
+
+  var lockedSlots   = filledSlots.filter(function(s){ return isPlayerLocked(lineup[s.id]); });
+  var clearableCount = filledSlots.length - lockedSlots.length;
+
+  if(!clearableCount){
+    showToast('Every player in your roster is locked — nothing to clear', true);
+    return;
+  }
+
+  var confirmMsg = lockedSlots.length
+    ? 'Clear ' + clearableCount + ' player' + (clearableCount===1?'':'s') + '? '
+      + lockedSlots.length + ' locked player' + (lockedSlots.length===1?'':'s') + ' (game already started) will stay in your roster — locked players can\'t be removed.'
+    : 'Clear your entire roster for Week ' + currentWeek + '? This saves immediately — you\'ll need to redraft before this week locks.';
+  if(!confirm(confirmMsg)) return;
+
+  SLOT_DEFS.forEach(function(s){
+    if(lineup[s.id] && !isPlayerLocked(lineup[s.id])) lineup[s.id] = null;
+  });
+
+  renderRoster();
+  updateCap();
+  renderPicker();
+
+  var msg = document.getElementById('submit-msg');
+  msg.textContent = 'Clearing…';
+  msg.className = 'submit-msg';
+
+  saveLineupToFirebase().then(function(){
+    var stillHasPlayers = Object.values(lineup).filter(Boolean).length > 0;
+    msg.textContent = stillHasPlayers
+      ? '✓ Cleared — ' + lockedSlots.length + ' locked player' + (lockedSlots.length===1?'':'s') + ' kept'
+      : '✓ Roster cleared';
+    msg.className = 'submit-msg ok';
+    var btn = document.getElementById('submit-btn');
+    btn.textContent = stillHasPlayers ? '↑ Update Lineup' : 'Build Your Lineup';
+    btn.disabled = false;
+    showToast('Roster cleared and saved');
+  }).catch(function(err){
+    console.error('Clear roster save failed:', err);
+    msg.textContent = 'Cleared locally but failed to save — try again';
+    msg.className = 'submit-msg err';
+    showToast('Could not save cleared roster', true);
   });
 }
 
