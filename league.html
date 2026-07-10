@@ -2770,9 +2770,24 @@ function renderCumStandingsPage(page){
 // format-specific here. Moves the single #myteam-drop panel to right
 // after whichever toggle button was clicked, rather than duplicating it.
 function toggleMyTeam(context){
-  var drop = document.getElementById('myteam-drop');
   var anchor = document.querySelector('[data-myteam-anchor="' + context + '"]');
-  if(!drop || !anchor) return;
+  if(!anchor) return;
+
+  // If this button currently reads "📝 Draft Team" (zero players drafted),
+  // there's nothing useful to show in the dropdown — it would just render
+  // an empty state telling them to go to the Draft tab. Skip the detour
+  // and take them straight there instead. This was a real point of
+  // confusion for new members: the most prominent button on the page said
+  // "Draft Team" but only opened an empty box with small-print instructions
+  // to go find a different button elsewhere.
+  var labelEl = anchor.querySelector('.myteam-label');
+  if(labelEl && labelEl.textContent.indexOf('Draft Team') > -1){
+    goToDraft();
+    return;
+  }
+
+  var drop = document.getElementById('myteam-drop');
+  if(!drop) return;
 
   var alreadyOpenHere = !drop.classList.contains('hidden') && drop.previousElementSibling === anchor;
 
