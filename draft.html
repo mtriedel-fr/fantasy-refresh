@@ -1442,8 +1442,7 @@ function showNewsLinks(p){
   var slug = p.name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/-+$/,'');
   var links = [
     {label:'📰 FantasyPros', url:'https://www.fantasypros.com/nfl/players/'+slug+'.php', desc:'News, rankings & projections'},
-    {label:'🏈 ESPN',        url:'https://www.espn.com/search/results?q='+encodeURIComponent(p.name), desc:'Stats & news'},
-    {label:'🔍 Google News', url:'https://news.google.com/search?q='+encodeURIComponent(p.name+' NFL'), desc:'Latest headlines'}
+    {label:'🏈 ESPN',        url:'https://www.espn.com/search/results?q='+encodeURIComponent(p.name), desc:'Stats & news'}
   ];
   document.getElementById('news-body').innerHTML =
     '<div style="padding:12px 20px;font-size:12px;color:var(--ink3);border-bottom:1px solid var(--bdr);">No recent news — check these sources:</div>'
@@ -1564,11 +1563,6 @@ function loadNewsTab(){
             +'<div class="news-item-meta">'+(item.date?item.date+' · ':'')+(item.source||'')+'</div>'
             +'</div>';
         }).join('');
-        var slug = p.name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/-+$/,'');
-        html += '<a href="https://www.fantasypros.com/nfl/players/'+slug+'.php" target="_blank" rel="noopener"'
-          +' style="display:block;padding:12px 20px;font-family:var(--fd);font-size:12px;font-weight:700;'
-          +'color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;text-align:center;'
-          +'border-top:1px solid var(--bdr);">More on FantasyPros ↗</a>';
         document.getElementById('news-body').innerHTML = html;
       } else {
         showNewsLinks(p);
@@ -1577,39 +1571,57 @@ function loadNewsTab(){
     .catch(function(){ showNewsLinks(p); });
 }
 
-// Real per-game history for this NFL player this season — NOT this league's
-// fantasy points (a physical player can be drafted by different users each
-// week under this format, so "their score in our league" isn't a coherent
-// per-player concept). This shows actual NFL games played and real stat
-// lines, sourced from Tank01's game log.
+// Full 18-week season schedule for this real NFL player, with actual points
+// scored in Fantasy Refresh's own scoring format for weeks already played.
+// NOT this league's fantasy points (a physical player can be drafted by
+// different users on different weeks under this format, so "their score in
+// our league" isn't a coherent per-player concept) — this is their real
+// on-field performance, scored using our rules, which is what actually
+// matters when deciding whether to draft them.
 function loadScoresTab(){
   var p = newsOverlayPlayer;
-  if(!p) return;
-  document.getElementById('news-body').innerHTML = '<div class="news-loading">Loading game log…</div>';
+  if(!p || !p.team) {
+    document.getElementById('news-body').innerHTML =
+      '<div class="news-loading" style="padding:32px 20px;text-align:center;color:var(--ink3);">No team on file for this player</div>';
+    return;
+  }
+  document.getElementById('news-body').innerHTML = '<div class="news-loading">Loading season schedule…</div>';
 
-  fetch(WORKER+'/playergames?name='+encodeURIComponent(p.name)+'&season=2026')
+  fetch(WORKER+'/playerschedule?name='+encodeURIComponent(p.name)+'&team='+encodeURIComponent(p.team)+'&season=2026')
     .then(function(r){ return r.json(); })
     .then(function(data){
-      if(data.games && data.games.length){
-        var html = '<div style="padding:4px 20px 12px;">' + data.games.map(function(g){
-          var vsAt = g.isHome === true ? 'vs' : g.isHome === false ? '@' : '';
-          return '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--bdr);">'
-            + '<div><span style="font-family:var(--fd);font-weight:700;font-size:13px;color:var(--ink);">Week '+(g.week||'—')+'</span>'
-            + '<span style="font-size:12px;color:var(--ink3);margin-left:8px;">'+vsAt+' '+(g.opp||'')+'</span></div>'
-            + '<div style="font-family:var(--fd);font-weight:800;font-size:15px;color:var(--or);">'+g.pts.toFixed(1)+' <span style="font-size:10px;color:var(--ink3);font-weight:500;">PTS</span></div>'
-            + '</div>';
-        }).join('') + '</div>';
-        document.getElementById('news-body').innerHTML = html;
-      } else {
+      if(!data.schedule || !data.schedule.length){
         document.getElementById('news-body').innerHTML =
-          '<div class="news-loading" style="padding:32px 20px;text-align:center;color:var(--ink3);">'
-          + 'No game log available yet' + (data.error ? ' <div style="font-size:11px;margin-top:6px;opacity:.7;">('+data.error+')</div>' : '')
-          + '</div>';
+          '<div class="news-loading" style="padding:32px 20px;text-align:center;color:var(--ink3);">Schedule not available yet</div>';
+        return;
       }
+      var html = '<div style="padding:4px 20px 16px;">' + data.schedule.map(function(g){
+        var isBye = g.opp === 'BYE';
+        var vsAt  = g.isHome === true ? 'vs' : g.isHome === false ? '@' : '';
+        var right;
+        if(isBye){
+          right = '<span style="font-family:var(--fd);font-size:12px;color:var(--ink3);font-weight:700;">BYE</span>';
+        } else if(g.played && typeof g.pts === 'number'){
+          right = '<span style="font-family:var(--fd);font-weight:800;font-size:15px;color:var(--or);">'+g.pts.toFixed(1)+'<span style="font-size:10px;color:var(--ink3);font-weight:500;"> PTS</span></span>';
+        } else if(g.played){
+          // Game already happened but we couldn't find this player's stat
+          // line in the box score (name mismatch, DNP, inactive, etc.)
+          right = '<span style="font-family:var(--fd);font-size:12px;color:var(--ink3);">—</span>';
+        } else {
+          right = '<span style="font-family:var(--fd);font-size:11px;color:var(--ink3);">Upcoming</span>';
+        }
+        return '<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--bdr);'+(isBye?'opacity:.5;':'')+'">'
+          + '<div><span style="font-family:var(--fd);font-weight:700;font-size:13px;color:var(--ink);">Wk '+g.week+'</span>'
+          + (isBye ? '' : '<span style="font-size:12px;color:var(--ink3);margin-left:8px;">'+vsAt+' '+(g.opp||'—')+'</span>')
+          + '</div>'
+          + right
+          + '</div>';
+      }).join('') + '</div>';
+      document.getElementById('news-body').innerHTML = html;
     })
     .catch(function(){
       document.getElementById('news-body').innerHTML =
-        '<div class="news-loading" style="padding:32px 20px;text-align:center;color:var(--ink3);">Could not load game log</div>';
+        '<div class="news-loading" style="padding:32px 20px;text-align:center;color:var(--ink3);">Could not load season schedule</div>';
     });
 }
 
