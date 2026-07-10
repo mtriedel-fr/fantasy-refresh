@@ -6438,7 +6438,97 @@ function handleRemoveUser(btn){
   var uid = btn.getAttribute('data-uid');
   var teamName = decodeURIComponent(btn.getAttribute('data-team')||'');
   var isCurrentlyActive = btn.getAttribute('data-active') === '1';
-  removeUser(uid, teamName, isCurrentlyActive);
+
+  // Already soft-removed → the only action available from here is restore.
+  // (Restoring stays a single click, no choice needed.)
+  if(!isCurrentlyActive){
+    removeUser(uid, teamName, isCurrentlyActive);
+    return;
+  }
+
+  // Active member → offer a real choice between soft-remove and hard-delete,
+  // rather than defaulting straight to one.
+  showRemoveChoiceModal(uid, teamName);
+}
+
+// ── REMOVE-CHOICE MODAL ──────────────────────────────────────────
+// Presents the commissioner with two genuinely different actions:
+//   Soft remove — reversible, hides from standings/rosters/counts, but stays
+//                 fully visible (dimmed, "Removed" badge) in this panel with
+//                 a restore option. Historical locked weeks are untouched.
+//   Hard delete — NOT reversible. Removes the member record entirely and
+//                 cleans up their reverse-index entry (/users/{uid}/leagues)
+//                 so no ghost league appears in their own account. Their
+//                 team name disappears from this panel too. Already-locked/
+//                 scored historical weeks are deliberately left alone —
+//                 matchups and locked lineups reference the uid directly,
+//                 not the live member record, so past results stay intact
+//                 even after a hard delete (can't retroactively un-score a
+//                 game that already happened without corrupting standings).
+function showRemoveChoiceModal(uid, teamName){
+  var existing = document.getElementById('remove-choice-modal');
+  if(existing) existing.remove();
+
+  var displayName = teamName || 'this player';
+  var modal = document.createElement('div');
+  modal.id = 'remove-choice-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+  modal.innerHTML =
+    '<div style="background:var(--bg2);border:1.5px solid var(--bdr2);border-radius:16px;padding:24px;max-width:420px;width:100%;">'
+    + '<div style="font-family:var(--fd);font-size:19px;font-weight:800;color:var(--ink);margin-bottom:6px;">Remove ' + escapeHtmlFR(displayName) + '?</div>'
+    + '<div style="font-size:13.5px;color:var(--ink2);margin-bottom:18px;line-height:1.5;">Choose how you want to remove them. This choice matters — one option can be undone, the other can\'t.</div>'
+
+    + '<button onclick="confirmRemoveChoice(\'' + uid + '\', \'' + encodeURIComponent(teamName||'') + '\', false)" '
+    + 'style="width:100%;text-align:left;padding:14px;margin-bottom:10px;border-radius:10px;border:1.5px solid var(--bdr2);background:var(--bg);cursor:pointer;">'
+    + '<div style="font-family:var(--fd);font-weight:800;color:var(--or);font-size:14.5px;">Soft Remove — Recommended</div>'
+    + '<div style="font-size:12.5px;color:var(--ink3);margin-top:3px;line-height:1.4;">Hides them from standings and the league listing. You\'ll still see them here in commissioner tools, dimmed, with a restore button. Nothing is deleted — fully reversible anytime.</div>'
+    + '</button>'
+
+    + '<button onclick="confirmRemoveChoice(\'' + uid + '\', \'' + encodeURIComponent(teamName||'') + '\', true)" '
+    + 'style="width:100%;text-align:left;padding:14px;margin-bottom:14px;border-radius:10px;border:1.5px solid rgba(255,95,160,.35);background:var(--bg);cursor:pointer;">'
+    + '<div style="font-family:var(--fd);font-weight:800;color:var(--pk);font-size:14.5px;">Hard Delete — Cannot be undone</div>'
+    + '<div style="font-size:12.5px;color:var(--ink3);margin-top:3px;line-height:1.4;">Permanently removes their membership and team name from this league entirely — including from this commissioner panel. Already-played, locked weeks stay in the record (past scores/standings aren\'t affected). Use this for someone who joined by mistake, not for a real player leaving mid-season.</div>'
+    + '</button>'
+
+    + '<button onclick="document.getElementById(\'remove-choice-modal\').remove()" '
+    + 'style="width:100%;padding:11px;border-radius:10px;border:none;background:transparent;color:var(--ink3);font-size:13px;cursor:pointer;">Cancel</button>'
+    + '</div>';
+  document.body.appendChild(modal);
+}
+
+function confirmRemoveChoice(uid, encodedTeamName, isHardDelete){
+  var teamName = decodeURIComponent(encodedTeamName || '');
+  var modal = document.getElementById('remove-choice-modal');
+  if(modal) modal.remove();
+
+  if(!isHardDelete){
+    removeUser(uid, teamName, true); // true = "currently active", triggers the soft-remove path
+    return;
+  }
+
+  var finalConfirm = 'Permanently delete ' + (teamName || 'this player') + '?\n\n'
+    + 'This cannot be undone. Their team name and membership will be removed from this league entirely, and this league will disappear from their own account. Past locked weeks/scores are not affected.\n\n'
+    + 'Type-to-confirm not required — but make sure this is really what you want.';
+  if(!confirm(finalConfirm)) return;
+
+  var ctx = FRAuth.getLeagueCtx();
+  var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+
+  // Remove the member record AND the reverse index entry so the user
+  // doesn't see a ghost league in their own account afterward.
+  Promise.all([
+    FR.fb.delete('/leagues/' + leagueId + '/members/' + uid),
+    FR.fb.delete('/users/' + uid + '/leagues/' + leagueId)
+  ])
+    .then(function(){
+      showToast((teamName || 'Player') + ' permanently deleted');
+      renderUserPanel();
+      if(IS_H2H_LEAGUE) maybeAutoGenerateH2HSchedule();
+    })
+    .catch(function(err){
+      console.error('[FR] Hard delete failed:', err);
+      showToast('Could not delete — try again', true);
+    });
 }
 
 // Soft-removal (active:false) rather than a hard delete — preserves any
