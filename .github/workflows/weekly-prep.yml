@@ -55,13 +55,13 @@ jobs:
           // because a lineup only needs one QB but several skill-position
           // slots (roster-construction scarcity, not point-scoring ability).
           const POSITION_MULTIPLIERS = {
-            QB:  325,  // Real DK ceiling ~$7,300 (Tua, 2024 Wk1) x1.2 / ~27pt elite proj
-            RB:  510,  // Real DK ceiling ~$8,500 (Kamara/Bell tier) x1.2 / ~20pt elite proj
-            WR:  485,  // Real DK ceiling ~$8,900 (CeeDee Lamb, 2024 Wk1 — top of slate) x1.2 / ~22pt elite proj
-            TE:  505,  // Real DK ceiling ~$5,900-6,900 (Kincaid/Gronk tier) x1.2 / ~14pt elite proj — TE ceiling caps lower, not the multiplier
-            DEF: 480
+            QB:  350,  // raised from 325 — targets a 3-stud roster ceiling, see SALARY_METHODOLOGY.md
+            RB:  525,  // raised from 510
+            WR:  505,  // raised from 485
+            TE:  510,  // raised from 505
+            DEF: 500   // raised from 480
           };
-          const SAL_MIN_DEFAULT = 3700;
+          const SAL_MIN_DEFAULT = 4500; // raised from 3700 — see SALARY_METHODOLOGY.md "Floor recalibration" for why
           const SAL_MAX_DEFAULT = 11300;
           const SAL_ROUND = 100;
           const FLAT = { QB: 8500, RB: 6500, WR: 6000, TE: 5500, DEF: 5000 };
@@ -238,7 +238,9 @@ jobs:
               const inj = poolP ? (poolP.status || p.status || null) : (p.status || null);
               if (inj === 'O' || inj === 'IR') return;
               const mult = POSITION_MULTIPLIERS[p.pos] || POSITION_MULTIPLIERS.WR; // fallback, shouldn't hit given the position filter above
-              let sal = Math.round((p.proj * mult) / SAL_ROUND) * SAL_ROUND;
+              // Round UP to the next $100 (not nearest) — see SALARY_METHODOLOGY.md
+              // "Round-up + multiplier recalibration" for why.
+              let sal = Math.ceil((p.proj * mult) / SAL_ROUND) * SAL_ROUND;
               sal = Math.max(min, Math.min(max, sal));
               salaries[pid] = { id: pid, name: p.name, pos: p.pos, team: p.team, proj: Math.round(p.proj*10)/10, salary: sal, status: inj };
               count++;
