@@ -46,20 +46,16 @@ jobs:
           // projecting above ~6 points slammed into the $11,300 ceiling —
           // nearly the entire startable player pool priced identically.
           //
-          // These per-position numbers are reverse-engineered from real
-          // DraftKings NFL Classic salary data ($50k cap, same 9-player
-          // roster shape as us), scaled by 1.2x to match our $60k cap, then
-          // solved against real elite weekly projections per position. QBs
-          // get a lower multiplier than skill positions on purpose — real
-          // DFS platforms price QBs cheaper relative to raw points scored,
-          // because a lineup only needs one QB but several skill-position
-          // slots (roster-construction scarcity, not point-scoring ability).
+          // QBs get a lower multiplier than skill positions on purpose —
+          // they're priced cheaper relative to raw points scored, because
+          // a lineup only needs one QB but several skill-position slots
+          // (roster-construction scarcity, not point-scoring ability).
           const POSITION_MULTIPLIERS = {
-            QB:  350,  // raised from 325 — targets a 3-stud roster ceiling, see SALARY_METHODOLOGY.md
-            RB:  525,  // raised from 510
-            WR:  505,  // raised from 485
-            TE:  510,  // raised from 505
-            DEF: 500   // raised from 480
+            QB:  380,  // ticked down from 400 — was outpricing RB/WR at the elite tier
+            RB:  525,
+            WR:  505,
+            TE:  575,  // ticked down from 630 — same reasoning
+            DEF: 500
           };
           const SAL_MIN_DEFAULT = 4500; // raised from 3700 — see SALARY_METHODOLOGY.md "Floor recalibration" for why
           const SAL_MAX_DEFAULT = 11300;
