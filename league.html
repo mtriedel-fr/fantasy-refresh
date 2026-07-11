@@ -7110,10 +7110,10 @@ function loadPoolStatus(){
 // points (roster scarcity — only 1 QB slot vs multiple skill slots), and
 // TE ceilings cap lower than WR/RB regardless of multiplier.
 var POSITION_MULTIPLIERS = {
-  QB:  350,  // raised from 325 — targets a 3-stud roster ceiling, see SALARY_METHODOLOGY.md
+  QB:  380,  // ticked down from 400 — was outpricing RB/WR at the elite tier
   RB:  525,
   WR:  505,
-  TE:  510,  // raised from 505
+  TE:  575,  // ticked down from 630 — same reasoning
   DEF: 500
 };
 var SAL_MIN = 4500; // raised from 3700 — the old floor let 5 punt-priced
