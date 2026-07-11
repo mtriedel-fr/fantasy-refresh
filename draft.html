@@ -992,7 +992,39 @@ function pickFromPreview(playerId){
   if(badge) badge.style.display = 'none';
 
   showToast(replaced ? (replaced+' replaced with '+p.name+' ✓') : (p.name+' → '+slot.label+' ✓'));
-  closePicker();
+  closeGamePreviewAfterPick();
+}
+
+// After drafting from a game's side-by-side preview: clear the game filter
+// and return to the normal player list. Deliberately DIFFERENT from
+// closePicker() on desktop — closePicker() fully collapses the picker
+// panel (giving the roster full width), which felt right on mobile after a
+// pick but was reported as unwanted on desktop: it meant every pick from a
+// game preview closed the whole browsing panel, requiring an extra click
+// on "Browse Players" just to keep looking at other players. On desktop
+// this keeps the panel open, just switched back to the unfiltered list.
+function closeGamePreviewAfterPick(){
+  document.querySelectorAll('.game-chip').forEach(function(b){
+    b.classList.toggle('active', b.getAttribute('data-game') === 'all');
+  });
+  activeGame = null;
+  var badge = document.getElementById('picker-game-filter');
+  if(badge) badge.style.display = 'none';
+  activeSlot = null;
+  document.getElementById('picker-slot-label').textContent = 'All Players';
+  document.getElementById('picker-slot-label').style.color = 'var(--ink2)';
+
+  if(window.innerWidth <= 860){
+    // Mobile: close the tray fully, same behavior already confirmed
+    // working well — the roster becomes the full-screen view.
+    document.getElementById('picker-panel').classList.remove('open');
+  }
+  // Desktop: intentionally no collapse/expanded class changes here — the
+  // picker panel stays open and visible, now showing the normal All
+  // Players list instead of the game preview.
+
+  renderRoster();
+  renderPicker();
 }
 
 function loadSubmitted(){
