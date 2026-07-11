@@ -1367,8 +1367,7 @@ function pickPlayer(playerId){
 
   if(replaced){
     showToast(replaced + ' replaced with ' + p.name + ' ✓');
-    var stillFull = Object.values(lineup).filter(Boolean).length >= SLOT_DEFS.length;
-    if(window.innerWidth <= 860 && stillFull){
+    if(window.innerWidth <= 860){
       closePicker();
     } else {
       renderPicker();
@@ -1392,14 +1391,23 @@ function pickPlayer(playerId){
     renderPicker();
     renderRoster();
   } else if(wasAutoSlot && !rosterComplete){
-    // Free-browse pick, more slots still open — stay in the picker,
-    // reset to unfiltered so the next direct click works the same way.
+    // Free-browse pick, more slots still open. On mobile, revert to the
+    // team/roster view after every pick — matches the game-preview pick
+    // behavior, and was specifically requested: picking from the game
+    // view correctly closed the tray, but picking from the plain player
+    // list stayed open, which felt inconsistent. On desktop, stay in the
+    // picker (closing here would be a bad interruption on a bigger
+    // screen where the picker and roster are already both visible).
     activeSlot = null;
     document.getElementById('picker-slot-label').textContent = 'All Players';
     document.getElementById('picker-slot-label').style.color = 'var(--ink2)';
-    renderPicker();
-    renderRoster();
     showToast(p.name + ' added ✓');
+    if(window.innerWidth <= 860){
+      closePicker(); // closePicker() already re-renders both roster and picker
+    } else {
+      renderRoster();
+      renderPicker();
+    }
     return;
   } else {
     if(window.innerWidth <= 860){
