@@ -2287,7 +2287,14 @@ function buildWeekBar(){
 
 function buildWeekBarRange(sel, lastWeek){
   sel.innerHTML = '';
-  for(var i = 1; i <= lastWeek; i++){
+  // Hard safety net: if lastWeek is ever 0, NaN, or undefined for any
+  // reason, fall back to a full 18-week range rather than the loop below
+  // silently running zero times and leaving the dropdown empty.
+  var safeLastWeek = (lastWeek && lastWeek >= 1) ? lastWeek : 18;
+  // Same guard on the other boundary — currentWeek defaults to 1 in this
+  // file, but falling back defensively here too in case that ever changes.
+  var effectiveCurrentWeek = currentWeek || 1;
+  for(var i = 1; i <= safeLastWeek; i++){
     var k = String(i);
     var hasData = seasonData[k] && seasonData[k].length > 0;
     var o = document.createElement('option');
@@ -2297,11 +2304,8 @@ function buildWeekBarRange(sel, lastWeek){
     // rather than letting someone pick a week with no real data. Browsers
     // render disabled <option> elements greyed-out and unselectable by
     // default, which matches "lighter and not clickable" with no extra CSS.
-    // currentWeek is the same value the rest of the app already treats as
-    // "what week is actually live right now," so this stays consistent
-    // with how locks/scoring/salary generation already reason about time.
-    if(i > currentWeek) o.disabled = true;
-    if(i === currentWeek) o.selected = true;
+    if(i > effectiveCurrentWeek) o.disabled = true;
+    if(i === effectiveCurrentWeek) o.selected = true;
     sel.appendChild(o);
   }
 }
