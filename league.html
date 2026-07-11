@@ -6557,10 +6557,13 @@ function renderChatFeed(data){
 
   var html = keys.map(function(key){
     var m = data[key];
-    if(!m || !m.text) return '';
+    if(!m || (!m.text && !m.gifUrl)) return '';
     var mine = myUid && m.uid === myUid;
     var canDelete = mine || chatIsCommissioner;
     var when = m.ts ? new Date(m.ts).toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'}) : '';
+    var body = m.gifUrl
+      ? '<img src="' + escapeHtmlFR(m.gifUrl) + '" loading="lazy" style="max-width:180px;max-height:180px;border-radius:8px;margin-top:4px;display:block;" />'
+      : '<div style="font-size:14px;color:var(--ink);margin-top:2px;word-break:break-word;">' + escapeHtmlFR(m.text) + '</div>';
     return '<div style="padding:7px 0;border-bottom:1px solid var(--bdr);">'
       + '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;">'
       + '<span style="font-family:var(--fd);font-weight:800;font-size:12.5px;color:var(--or);">' + escapeHtmlFR(m.team || 'Someone') + '</span>'
@@ -6568,7 +6571,7 @@ function renderChatFeed(data){
       + '<span style="font-size:10.5px;color:var(--ink3);">' + when + '</span>'
       + (canDelete ? '<button onclick="deleteChatMessage(\'' + key + '\')" title="Delete" style="background:none;border:none;color:var(--ink3);cursor:pointer;font-size:12px;padding:0 2px;">✕</button>' : '')
       + '</span></div>'
-      + '<div style="font-size:14px;color:var(--ink);margin-top:2px;word-break:break-word;">' + escapeHtmlFR(m.text) + '</div>'
+      + body
       + '</div>';
   }).join('');
   feed.innerHTML = html;
@@ -6579,6 +6582,91 @@ function renderChatFeed(data){
   if(chatPanelOpen){
     try{ localStorage.setItem(chatLastSeenKey(), String(chatNewestTs)); }catch(e){}
   }
+}
+
+// ── GIF SEARCH (GIPHY) ───────────────────────────────────────
+// ⚠️ SET THIS: sign up free at developers.giphy.com (2 min, no cost),
+// create an app, copy the Beta key it gives you. Beta tier is 100
+// searches/hour, 1,000/day — plenty for a 12-20 person league. Apply for
+// the free "Production" upgrade before public launch at higher user
+// counts (same review-then-raise-the-cap model as most free API tiers).
+// GIPHY's own docs require client-side calls for some endpoints, so
+// having this key visible in page source is expected/normal for their
+// API — it's not a secret in the same sense as the Tank01 key.
+var GIPHY_API_KEY = 'YOUR_GIPHY_KEY_HERE';
+
+var gifSearchDebounceTimer = null;
+function debouncedGifSearch(){
+  clearTimeout(gifSearchDebounceTimer);
+  gifSearchDebounceTimer = setTimeout(runGifSearch, 350);
+}
+
+function openGifSearch(){
+  var panel = document.getElementById('chat-gif-search');
+  if(panel) panel.classList.remove('hidden');
+  var q = document.getElementById('chat-gif-query');
+  if(q){ q.value = ''; q.focus(); }
+  // Show trending GIFs as the empty-state, rather than a blank box —
+  // GIPHY's Trending endpoint is meant for exactly this.
+  runGifSearch();
+}
+
+function closeGifSearch(){
+  var panel = document.getElementById('chat-gif-search');
+  if(panel) panel.classList.add('hidden');
+}
+
+function runGifSearch(){
+  var q = (document.getElementById('chat-gif-query').value || '').trim();
+  var results = document.getElementById('chat-gif-results');
+  if(!results) return;
+  if(GIPHY_API_KEY === 'YOUR_GIPHY_KEY_HERE'){
+    results.innerHTML = '<div style="grid-column:1/-1;padding:14px;text-align:center;color:var(--ink3);font-size:11.5px;">GIF search needs a free GIPHY API key — see comment near GIPHY_API_KEY in the code.</div>';
+    return;
+  }
+  var url = q
+    ? 'https://api.giphy.com/v1/gifs/search?api_key=' + GIPHY_API_KEY + '&q=' + encodeURIComponent(q) + '&limit=12&rating=pg-13'
+    : 'https://api.giphy.com/v1/gifs/trending?api_key=' + GIPHY_API_KEY + '&limit=12&rating=pg-13';
+
+  fetch(url)
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      var gifs = (data && data.data) || [];
+      if(!gifs.length){
+        results.innerHTML = '<div style="grid-column:1/-1;padding:14px;text-align:center;color:var(--ink3);font-size:12px;">No results</div>';
+        return;
+      }
+      results.innerHTML = gifs.map(function(g){
+        var thumb = g.images && g.images.fixed_height_small ? g.images.fixed_height_small.url : '';
+        if(!thumb) return '';
+        return '<img src="' + thumb + '" onclick="sendGifMessage(\'' + g.id + '\')" loading="lazy" '
+          + 'style="width:100%;border-radius:6px;cursor:pointer;aspect-ratio:1;object-fit:cover;" />';
+      }).join('');
+    })
+    .catch(function(){
+      results.innerHTML = '<div style="grid-column:1/-1;padding:14px;text-align:center;color:var(--ink3);font-size:12px;">Search failed — try again</div>';
+    });
+}
+
+function sendGifMessage(gifId){
+  var user = (typeof FRAuth !== 'undefined' && FRAuth.getUser) ? FRAuth.getUser() : null;
+  if(!user){ showToast('Sign in first', true); return; }
+
+  var ctx = FRAuth.getLeagueCtx();
+  var teamName = (ctx && ctx.teamName) || myTeam || user.email || 'Someone';
+  var now = Date.now();
+  var key = now + '_' + Math.random().toString(36).slice(2, 8);
+  // Full-size rendition URL, built from the ID rather than re-fetched —
+  // GIPHY's media CDN URLs are deterministic from the GIF ID.
+  var gifUrl = 'https://media.giphy.com/media/' + gifId + '/giphy.gif';
+
+  closeGifSearch();
+  FR.fb.put(FR.paths.chat() + '/' + key, { uid: user.uid, team: teamName, gifUrl: gifUrl, ts: now })
+    .then(function(){ loadChatMessages(); })
+    .catch(function(err){
+      console.error('[FR] GIF send failed:', err);
+      showToast('Could not send — try again', true);
+    });
 }
 
 function sendChatMessage(){
@@ -8825,7 +8913,19 @@ document.addEventListener('DOMContentLoaded', function(){
     <button class="chat-panel-min" onclick="toggleChatPanel()" title="Minimize">─</button>
   </div>
   <div class="chat-panel-body" id="chat-feed"></div>
+  <div class="chat-gif-search hidden" id="chat-gif-search">
+    <div style="display:flex;gap:6px;padding:8px 10px;border-top:1px solid var(--bdr);">
+      <input type="text" id="chat-gif-query" placeholder="Search GIFs..."
+        style="flex:1;padding:7px 10px;background:var(--bg);border:1px solid var(--bdr2);border-radius:8px;color:var(--ink);font-family:var(--fb);font-size:13px;outline:none;"
+        oninput="debouncedGifSearch()" onkeydown="if(event.key==='Escape') closeGifSearch()">
+      <button onclick="closeGifSearch()" style="background:none;border:none;color:var(--ink3);cursor:pointer;font-size:16px;padding:0 6px;">✕</button>
+    </div>
+    <div id="chat-gif-results" style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;max-height:180px;overflow-y:auto;padding:0 10px 6px;"></div>
+    <div style="text-align:right;padding:0 10px 6px;font-size:9px;color:var(--ink3);">Powered by GIPHY</div>
+  </div>
   <div class="chat-panel-input-row">
+    <button onclick="openGifSearch()" title="Add a GIF"
+      style="padding:9px 11px;background:var(--bg);border:1px solid var(--bdr2);border-radius:9px;color:var(--ink2);font-family:var(--fd);font-weight:800;font-size:11px;cursor:pointer;white-space:nowrap;">GIF</button>
     <input type="text" id="chat-input" placeholder="Say something..." maxlength="280"
       style="flex:1;padding:9px 12px;background:var(--bg);border:1px solid var(--bdr2);border-radius:9px;color:var(--ink);font-family:var(--fb);font-size:13.5px;outline:none;"
       onkeydown="if(event.key==='Enter') sendChatMessage()">
