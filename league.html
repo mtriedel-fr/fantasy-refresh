@@ -2600,7 +2600,7 @@ function renderH2HStandings(){
   var standings = computeH2HStandings();
 
   if(!standings.length){
-    var emptyHtml = '<div class="myteam-empty"><div class="myteam-empty-icon">📅</div><div class="myteam-empty-title">No results yet</div><div class="myteam-empty-sub">Standings appear once the commissioner generates a schedule and scores come in.</div></div>';
+    var emptyHtml = '<div class="myteam-empty"><div class="myteam-empty-icon">📅</div><div class="myteam-empty-title">No results yet</div><div class="myteam-empty-sub">Standings appear once the commissioner generates a schedule and scores come in.</div></div>' + buildKickoffCountdown();
     if(sw) sw.innerHTML = emptyHtml;
     if(wf) wf.innerHTML = emptyHtml;
     if(wrap) wrap.innerHTML = emptyHtml;
@@ -2754,7 +2754,7 @@ function renderCumStandingsPage(page){
 
   var all = computeCumStandings();
   if(!all.length){
-    wrap.innerHTML = '<div class="myteam-empty"><div class="myteam-empty-icon">📅</div><div class="myteam-empty-title">No results yet</div><div class="myteam-empty-sub">Standings appear once scores come in for Week ' + currentWeek + '.</div></div>';
+    wrap.innerHTML = '<div class="myteam-empty"><div class="myteam-empty-icon">📅</div><div class="myteam-empty-title">No results yet</div><div class="myteam-empty-sub">Standings appear once scores come in for Week ' + currentWeek + '.</div></div>' + buildKickoffCountdown();
     if(pager) pager.innerHTML = '';
     return;
   }
@@ -4395,6 +4395,21 @@ function renderPreseasonRoster(){
     .catch(function(){});
 }
 
+// ── KICKOFF COUNTDOWN CARD (shared) ─────────────────────────────
+// Extracted from showEmpty() so the "No results yet" standings empty
+// states can show the same countdown card, not just the This Week tab.
+function buildKickoffCountdown(){
+  var seasonStart = IS_PRESEASON_LEAGUE ? new Date('2026-08-06') : new Date('2026-09-03');
+  var seasonStartLabel = IS_PRESEASON_LEAGUE ? 'Aug 6, 2026' : 'Sep 3, 2026';
+  var startLabel = IS_PRESEASON_LEAGUE ? 'Preseason Starts' : 'Season Starts';
+  var now = new Date();
+  var days = Math.ceil((seasonStart - now) / (1000 * 60 * 60 * 24));
+
+  return days > 0
+    ? '<div style="display:flex;justify-content:center;align-items:center;padding:24px 20px;"><div style="background:linear-gradient(135deg,rgba(0,229,212,.08),rgba(255,95,160,.08));border:1px solid rgba(0,229,212,.2);border-radius:20px;padding:28px 40px;text-align:center;max-width:280px;"><div style="font-family:var(--fd);font-size:13px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;">' + startLabel + '</div><div style="font-family:var(--fd);font-size:64px;font-weight:900;color:var(--or);line-height:1;margin-bottom:8px;">' + days + '</div><div style="font-family:var(--fd);font-size:13px;font-weight:700;color:var(--pk);text-transform:uppercase;letter-spacing:1px;">days to kickoff</div><div style="font-family:var(--fd);font-size:11px;color:var(--ink3);margin-top:10px;text-transform:uppercase;letter-spacing:.5px;">' + seasonStartLabel + '</div></div></div>'
+    : '<div style="display:flex;justify-content:center;padding:24px 20px;"><div style="font-family:var(--fd);font-size:18px;font-weight:800;color:var(--or);text-transform:uppercase;">' + (IS_PRESEASON_LEAGUE ? 'Preseason underway' : 'Season starting soon') + '</div></div>';
+}
+
 // ── SHOW EMPTY ────────────────────────────────────────────────────
 function showEmpty(){
   var seasonStart = IS_PRESEASON_LEAGUE ? new Date('2026-08-06') : new Date('2026-09-03');
@@ -4421,9 +4436,7 @@ function showEmpty(){
     + '</div>' + slotRows + '</div>';
 
   // Countdown for season/other views
-  var countdownHtml = days > 0
-    ? '<div style="display:flex;justify-content:center;align-items:center;padding:48px 20px;"><div style="background:linear-gradient(135deg,rgba(0,229,212,.08),rgba(255,95,160,.08));border:1px solid rgba(0,229,212,.2);border-radius:20px;padding:28px 40px;text-align:center;max-width:280px;"><div style="font-family:var(--fd);font-size:13px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;">' + startLabel + '</div><div style="font-family:var(--fd);font-size:64px;font-weight:900;color:var(--or);line-height:1;margin-bottom:8px;">' + days + '</div><div style="font-family:var(--fd);font-size:13px;font-weight:700;color:var(--pk);text-transform:uppercase;letter-spacing:1px;">days to kickoff</div><div style="font-family:var(--fd);font-size:11px;color:var(--ink3);margin-top:10px;text-transform:uppercase;letter-spacing:.5px;">' + seasonStartLabel + '</div></div></div>'
-    : '<div style="display:flex;justify-content:center;padding:48px 20px;"><div style="font-family:var(--fd);font-size:18px;font-weight:800;color:var(--or);text-transform:uppercase;">' + (IS_PRESEASON_LEAGUE ? 'Preseason underway' : 'Season starting soon') + '</div></div>';
+  var countdownHtml = buildKickoffCountdown();
 
   // My Lineup = empty slots + draft link
   var wt = document.getElementById('wt');
