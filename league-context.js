@@ -64,6 +64,7 @@
     matchups:       function()       { return paths.league() + '/matchups/' + ctx().season; },
     weekMatchups:   function(w)      { return paths.matchups() + '/week' + w; },
     reactions:      function()       { return paths.league() + '/reactions/' + ctx().season; },
+    chat:           function()       { return paths.league() + '/chat/' + ctx().season; },
     weekReactions:  function(w)      { return paths.reactions() + '/' + w; },
     playerPool:     function()       { return '/playerPool/' + ctx().season; },
     players:        function()       { return paths.playerPool() + '/players'; },
