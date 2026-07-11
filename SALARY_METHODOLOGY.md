@@ -178,6 +178,39 @@ them, add floor-priced punts for the remaining slots, and check against
 the cap. If 3 studs stops fitting, multipliers went too far; if 4 fits
 again, they need to go further.
 
+## QB and TE recalibration (raised — elite QB/TE were too cheap)
+
+**The ask:** elite QBs and TEs should cost more than they did. At the
+previous multipliers (QB 350, TE 510), an elite QB (27pt proj) priced at
+$9,500 and an elite TE (14pt proj) priced at $7,200 — both well under the
+$11,300 ceiling, with room to spare.
+
+**The change:** QB 350→400, TE 510→630. RB, WR, and DEF unchanged.
+
+| | Old price | New price |
+|---|---|---|
+| Elite QB (27pt) | $9,500 | $10,800 |
+| Elite TE (14pt) | $7,200 | $8,900 |
+| Mid QB (20pt) | $7,000 | $8,000 |
+| Mid TE (9pt, replacement-tier) | $4,600 | $5,700 |
+
+**Re-verified the 3-stud ceiling still holds** — this recalibration made it
+slightly *tighter*, not looser, since a stud QB now costs more:
+
+```
+3 studs + 6 punts = $57,500 — FITS, $2,500 to spare
+4 studs + 5 punts = $64,300 — OVER by $4,300
+```
+
+**Quick follow-up tick-down:** QB 400→380, TE 630→575 — the QB raise had
+gone slightly too far, pricing an elite QB ($10,800) above elite RB
+($10,700), which wasn't the intent. At 380, elite QB ($10,300) sits below
+elite WR (hits the $11,300 ceiling) and just above elite RB ($10,000) —
+QB no longer leads the pack. TE ticked down proportionally to $8,100
+(from $8,900), still a real increase from the original 510/$7,200, just
+not as steep as the first pass. 3-stud ceiling re-verified and still
+holds ($3,100 to spare at 3 studs, $3,700 over at 4).
+
 ## Where this is implemented in code
 
 The per-position multiplier table lives in three places, kept in sync

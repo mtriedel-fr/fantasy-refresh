@@ -6593,7 +6593,7 @@ function renderChatFeed(data){
 // GIPHY's own docs require client-side calls for some endpoints, so
 // having this key visible in page source is expected/normal for their
 // API — it's not a secret in the same sense as the Tank01 key.
-var GIPHY_API_KEY = 'ncSrnBt7EIj4J5gh4N1pXgoEuQlfofYC';
+var GIPHY_API_KEY = 'YOUR_GIPHY_KEY_HERE';
 
 var gifSearchDebounceTimer = null;
 function debouncedGifSearch(){
@@ -7106,16 +7106,15 @@ function loadPoolStatus(){
 
 // ── SALARY ENGINE ─────────────────────────────────────────────
 // Per-position multipliers — see SALARY_METHODOLOGY.md at repo root for full
-// sourcing/math. Short version: real DFS platforms price QBs cheaper relative
-// to raw points (roster scarcity — only 1 QB slot vs multiple skill slots),
-// and TE ceilings cap lower than WR/RB regardless of multiplier. These are
-// reverse-engineered from real DraftKings salary data, scaled to our $60k cap.
+// sourcing/math. Short version: QBs are priced cheaper relative to raw
+// points (roster scarcity — only 1 QB slot vs multiple skill slots), and
+// TE ceilings cap lower than WR/RB regardless of multiplier.
 var POSITION_MULTIPLIERS = {
-  QB:  350,  // raised from 325 — targets a 3-stud roster ceiling, see SALARY_METHODOLOGY.md
-  RB:  525,  // raised from 510
-  WR:  505,  // raised from 485
-  TE:  510,  // raised from 505
-  DEF: 500   // raised from 480
+  QB:  380,  // ticked down from 400 — was outpricing RB/WR at the elite tier
+  RB:  525,
+  WR:  505,
+  TE:  575,  // ticked down from 630 — same reasoning
+  DEF: 500
 };
 var SAL_MIN = 4500; // raised from 3700 — the old floor let 5 punt-priced
 // bench slots (5x $3,700 = $18,500) comfortably subsidize 4 real studs at
