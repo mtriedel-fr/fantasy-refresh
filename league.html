@@ -2257,9 +2257,7 @@ function boot(){
   checkFirstRun();
 }
 
-loadFromCloud();
-
-// ── WEEK BAR ───────────────────────────────────────────────────
+loadPlayoffsFromCloud();
 var H2H_LAST_WEEK = null; // set once playoff settings load, for any code that needs the real season-end week instead of the generic WEEKS default
 var h2hChromeInitialized = false; // ensures the homepage-first default only gets forced on the very first render, not every re-render
 
@@ -3781,7 +3779,16 @@ function teamLink(name){
 }
 
 // ── LOAD ───────────────────────────────────────────────────────
-function loadFromCloud(){
+// Renamed from loadFromCloud() — this was silently overwriting the REAL
+// page-boot loadFromCloud() defined earlier in this file (JS function
+// declarations with the same name at the top level: the LAST one wins,
+// permanently, for every call site in the whole script, regardless of
+// where each call physically sits). That meant boot() — and everything
+// gated behind it, including the week dropdown population — never ran
+// through the normal automatic page-load path at all. This function is
+// playoffs-specific (loads season data, calls renderPlayoffs()) and needed
+// its own distinct name.
+function loadPlayoffsFromCloud(){
   var _hdrSub = document.getElementById('hdr-sub'); if(_hdrSub) _hdrSub.textContent = 'Loading...';
   var urlSeason = (new URLSearchParams(window.location.search)).get('season') || '2026';
   var backBtn = document.getElementById('back-btn-href');
