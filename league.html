@@ -2238,10 +2238,16 @@ function boot(){
     return !isNaN(Number(k)) && seasonData[k] && seasonData[k].length > 0;
   }).map(Number);
   if(loadedWks.length) currentWeek = Math.max.apply(null, loadedWks);
-  // Default to Your Week > My Lineup
+  // Previously forced tab-yourweek (This Week — a full-screen overlay tab)
+  // to be the default visible content here, unconditionally, every time
+  // boot() ran. That's what was actually causing the full-screen takeover
+  // on landing — it silently undid the "start hidden" markup fix the
+  // instant the page booted. Nothing here forces a specific full-screen
+  // tab open anymore; the real landing content (my-team-bar/stats/cum-home)
+  // is what naturally shows once renderAll() below runs, since none of the
+  // .content tabs (League/Playoffs/Guillotine/Season/This Week) claim the
+  // screen unless a user explicitly navigates to one.
   document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); });
-  var defaultTab = document.getElementById('tab-yourweek');
-  if(defaultTab) defaultTab.classList.remove('hidden');
   ['weeklystanding','numbers','myseason','standings','movement'].forEach(function(n){
     var el = document.getElementById('sub-' + n);
     if(el) el.classList.add('hidden');
@@ -2249,8 +2255,6 @@ function boot(){
   var mylineup = document.getElementById('sub-mylineup');
   if(mylineup) mylineup.classList.remove('hidden');
   document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); });
-  var activeTab = document.getElementById('navtab-yourweek');
-  if(activeTab) activeTab.classList.add('active');
   initMyTeamInput();
   applyArchiveVisibility();
   renderAll();
