@@ -989,7 +989,7 @@ setTimeout(function(){
 
 <!-- PRIMARY NAV TAB BAR - hidden, replaced by bottom nav -->
 <div class="nav-tab-bar" id="nav-tab-bar" style="display:none;">
-  <div class="nav-tab active" id="navtab-yourweek" onclick="handleNav('yourweek')">
+  <div class="nav-tab" id="navtab-yourweek" onclick="handleNav('yourweek')">
     <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
     <span>This Week</span>
   </div>
@@ -1020,7 +1020,7 @@ setTimeout(function(){
 </div>
 
 <!-- YOUR WEEK — My Lineup / Weekly Standing / Weekly Numbers -->
-<div id="tab-yourweek" class="content">
+<div id="tab-yourweek" class="content hidden">
   <div class="tab-overlay-close-bar hidden">
     <div class="tab-overlay-close-bar-row">
       <span class="tab-overlay-close-bar-title">📅 This Week</span>
@@ -2694,6 +2694,12 @@ function updateMyTeamLabelsForCumulative(){
     var settings = results[1] || {};
     var filledCount = (lineup && lineup.slots) ? Object.keys(lineup.slots).filter(function(k){ return !!lineup.slots[k]; }).length : 0;
     updateMyTeamLabel(filledCount, totalRosterSlots(settings.rosterConfig));
+    // Decided here, from the real data, rather than in renderCumHome() —
+    // that ran before this fetch resolved, so it was checking a label that
+    // hadn't been updated yet and could open an empty dropdown for a
+    // brand-new member. A blank roster should just stay as the plain
+    // "📝 Draft Team" button — nothing to auto-open.
+    autoOpenMyTeamOnce('home', filledCount > 0);
   }).catch(function(){});
 }
 
@@ -2797,6 +2803,35 @@ function renderCumStandingsPage(page){
 // data lives at the same path regardless of format, so there's nothing
 // format-specific here. Moves the single #myteam-drop panel to right
 // after whichever toggle button was clicked, rather than duplicating it.
+var myTeamAutoOpened = false; // ensures the landing-page auto-open only happens once, respecting later manual open/close choices
+
+// Auto-opens the My Team dropdown on first landing-page render, WITHOUT
+// the click-only redirect-to-draft behavior that toggleMyTeam() has for a
+// zero-player roster — that shortcut belongs to a deliberate user click,
+// not to a page just finishing loading. hasPlayers is passed in from the
+// caller's own real data check (not re-derived from DOM text here), since
+// checking the label directly was racy — this function used to run before
+// the async fetch that sets the label had resolved, so it could open an
+// empty dropdown for a brand-new member. A blank roster now just stays as
+// the plain "📝 Draft Team" button, nothing shown.
+function autoOpenMyTeamOnce(context, hasPlayers){
+  if(myTeamAutoOpened) return;
+  myTeamAutoOpened = true;
+  if(!hasPlayers) return;
+
+  var anchor = document.querySelector('[data-myteam-anchor="' + context + '"]');
+  if(!anchor) return;
+
+  var drop = document.getElementById('myteam-drop');
+  if(!drop) return;
+
+  anchor.parentNode.insertBefore(drop, anchor.nextSibling);
+  drop.classList.remove('hidden');
+  var caret = document.getElementById('myteam-caret-' + context);
+  if(caret){ caret.style.transform = 'rotate(180deg)'; caret.textContent = '▴ Hide'; }
+  loadMyTeamLineup(drop);
+}
+
 function toggleMyTeam(context){
   var anchor = document.querySelector('[data-myteam-anchor="' + context + '"]');
   if(!anchor) return;
@@ -2819,8 +2854,13 @@ function toggleMyTeam(context){
 
   var alreadyOpenHere = !drop.classList.contains('hidden') && drop.previousElementSibling === anchor;
 
-  // Reset every caret to closed first.
-  document.querySelectorAll('.myteam-caret').forEach(function(c){ c.style.transform = 'rotate(0deg)'; });
+  // Reset every caret to closed first — both the rotation AND the text,
+  // so "will this click hide it?" is unambiguous rather than relying on
+  // rotation alone, which is easy to miss at a glance.
+  document.querySelectorAll('.myteam-caret').forEach(function(c){
+    c.style.transform = 'rotate(0deg)';
+    c.textContent = '▾';
+  });
 
   if(alreadyOpenHere){
     drop.classList.add('hidden');
@@ -2830,7 +2870,7 @@ function toggleMyTeam(context){
   anchor.parentNode.insertBefore(drop, anchor.nextSibling);
   drop.classList.remove('hidden');
   var caret = document.getElementById('myteam-caret-' + context);
-  if(caret) caret.style.transform = 'rotate(180deg)';
+  if(caret){ caret.style.transform = 'rotate(180deg)'; caret.textContent = '▴ Hide'; }
   loadMyTeamLineup(drop);
 }
 
@@ -8560,7 +8600,7 @@ document.addEventListener('DOMContentLoaded', function(){
     <span class="bn-icon">🏠</span>
     <span class="bn-label">Home</span>
   </button>
-  <button class="bn-item active" id="bn-week" onclick="closeMoreMenu();switchBottomNav('yourweek','bn-week','numbers')">
+  <button class="bn-item" id="bn-week" onclick="closeMoreMenu();switchBottomNav('yourweek','bn-week','numbers')">
     <span class="bn-icon">📊</span>
     <span class="bn-label">This Week</span>
   </button>
