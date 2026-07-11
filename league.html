@@ -6843,18 +6843,25 @@ function loadPoolStatus(){
 // and TE ceilings cap lower than WR/RB regardless of multiplier. These are
 // reverse-engineered from real DraftKings salary data, scaled to our $60k cap.
 var POSITION_MULTIPLIERS = {
-  QB:  325,  // Real DK ceiling ~$7,300 x1.2 / ~27pt elite proj
-  RB:  510,  // Real DK ceiling ~$8,500 x1.2 / ~20pt elite proj
-  WR:  485,  // Real DK ceiling ~$8,900 (top of real DK slate) x1.2 / ~22pt elite proj
-  TE:  505,  // Real DK ceiling ~$5,900-6,900 x1.2 / ~14pt elite proj
-  DEF: 480
+  QB:  350,  // raised from 325 — targets a 3-stud roster ceiling, see SALARY_METHODOLOGY.md
+  RB:  525,  // raised from 510
+  WR:  505,  // raised from 485
+  TE:  510,  // raised from 505
+  DEF: 500   // raised from 480
 };
-var SAL_MIN = 3700;
+var SAL_MIN = 4500; // raised from 3700 — the old floor let 5 punt-priced
+// bench slots (5x $3,700 = $18,500) comfortably subsidize 4 real studs at
+// $38,600, fitting a genuinely loaded roster with $2,900 to spare. $4,500
+// closes that gap. See SALARY_METHODOLOGY.md "Floor recalibration."
 var SAL_MAX = 11300;
 var SAL_ROUND = 100;        // round to nearest $100
 
 function salRound(n){
-  return Math.round(Math.max(SAL_MIN, Math.min(SAL_MAX, n)) / SAL_ROUND) * SAL_ROUND;
+  // Round UP to the next $100 (not nearest) — deliberately biases every
+  // price slightly higher, compounding with the multiplier increase to
+  // push elite players further past what 4 studs can afford. See
+  // SALARY_METHODOLOGY.md "Round-up + multiplier recalibration."
+  return Math.ceil(Math.max(SAL_MIN, Math.min(SAL_MAX, n)) / SAL_ROUND) * SAL_ROUND;
 }
 
 function initSalaryPanel(){
@@ -6913,7 +6920,7 @@ function loadSalaryStatus(){
 var TANK01_WORKER = 'https://fantasy-refresh-news.mtriedel.workers.dev';
 var SAL_CAP = 60000;
 var SAL_MAX = 11300;
-var SAL_MIN = 3700;
+var SAL_MIN = 4500;
 
 // ── HEAD-TO-HEAD SCHEDULE GENERATOR ─────────────────────────────────
 function initH2HVisibility(settings){

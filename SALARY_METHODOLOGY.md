@@ -12,7 +12,7 @@ than "the code just did it."
 Each player's weekly salary is calculated as:
 
 ```
-salary = round( projected_points × POSITION_MULTIPLIER[position] , to nearest $100 )
+salary = round_up( projected_points × POSITION_MULTIPLIER[position] , to next $100 )
 salary = clamp( salary, SAL_MIN, SAL_MAX )
 ```
 
@@ -24,101 +24,159 @@ salary math is applied.
 
 ## Why per-position multipliers, not one flat number
 
-A single multiplier applied to every position doesn't match how real salary-cap
-DFS platforms (DraftKings, FanDuel) price players, and produces a distorted
-market: quarterbacks routinely project 18-27 points in a given week, while an
-elite wide receiver projecting 20+ points is a monster outlier. A flat
-multiplier prices those two players nearly identically — which is not how
-either real DFS platform, or real fantasy value, works.
+A single multiplier applied to every position produces a distorted market:
+quarterbacks routinely project 18-27 points in a given week, while an elite
+wide receiver projecting 20+ points is a monster outlier. A flat multiplier
+prices those two players nearly identically — which doesn't match real
+fantasy value.
 
-Real DFS platforms price QBs *cheaper relative to their raw point projection*
-than skill-position players, because of **roster construction scarcity**: a
-lineup needs exactly one QB, but multiple WR/RB/FLEX slots. Rostering one great
-QB is a smaller lineup advantage than rostering two or three great skill-position
-players, so the market (and DK/FD's proprietary pricing algorithms) discounts QB
-pricing relative to points scored. Tight ends get the opposite treatment — priced
-lower not due to scarcity, but because even elite TE performances rarely reach
-the point ceiling that elite WR/RB performances do.
+QBs are priced *cheaper relative to their raw point projection* than
+skill-position players, because of **roster construction scarcity**: a
+lineup needs exactly one QB, but multiple WR/RB/FLEX slots. Rostering one
+great QB is a smaller lineup advantage than rostering two or three great
+skill-position players, so QB pricing is discounted relative to points
+scored on purpose. Tight ends get the opposite treatment — priced lower not
+due to scarcity, but because even elite TE performances rarely reach the
+point ceiling that elite WR/RB performances do.
 
 ## Where the numbers came from
 
-We don't have access to DraftKings' or FanDuel's actual pricing algorithm (it's
-proprietary and not published). What we have is their **observable output** —
-real salary data from actual DK slates — which we used to reverse-engineer
-multipliers that produce a similar shape, scaled to our cap.
-
-**Source data** (DraftKings NFL Classic, $50,000 salary cap, 9-player roster —
-same roster size as Fantasy Refresh):
-
-| Position | Observed DK ceiling (real slate data) | Source |
-|---|---|---|
-| QB  | ~$7,300 (Tua Tagovailoa, 2024 Wk1 slate) | ftnfantasy.com Week 1 DK salary coverage |
-| RB  | ~$8,500 (historical elite-RB ceiling, e.g. Kamara/Bell tier) | RotoGrinders DK salary analysis |
-| WR  | ~$8,900 (CeeDee Lamb, 2024 Wk1 slate — most expensive player on the slate) | ftnfantasy.com Week 1 DK salary coverage |
-| TE  | ~$5,900–6,900 (Dalton Kincaid 2024 / historical Gronkowski-tier) | ftnfantasy.com, RotoGrinders |
-
-## Scaling to our cap
-
-Fantasy Refresh uses a **$60,000** cap vs. DraftKings' **$50,000** — a 1.2×
-ratio. Every DK reference ceiling above was scaled by 1.2× before deriving our
-multiplier, so our top prices sit in the same *relative* position within our
-cap that DK's do within theirs.
+The multipliers were set by choosing a target dollar ceiling for an elite
+weekly performance at each position, then solving for the multiplier that
+produces that ceiling at a realistic elite-tier weekly projection (drawn
+from real Tank01 2026 projection data):
 
 ```
-scaled_target = dk_observed_ceiling × 1.2
+multiplier = target_ceiling / elite_weekly_projection
 ```
 
-## Deriving the multiplier
-
-For each position, we paired the scaled dollar ceiling with a realistic "elite
-weekly projection" for that position (drawn from real Tank01 2026 projection
-data — see the Week 1 sample pulled July 2026), then solved for the multiplier
-that would produce that ceiling at that projection level:
-
-```
-multiplier = scaled_target_ceiling / elite_weekly_projection
-```
-
-| Position | Scaled ceiling ($60k cap) | Elite weekly proj (real 2026 data) | Multiplier |
+| Position | Target ceiling | Elite weekly proj (real 2026 data) | Multiplier |
 |---|---|---|---|
-| QB  | $8,760  | 27 pts (Lamar Jackson / Joe Burrow tier) | **325** |
-| RB  | $10,200 | 20 pts (Bijan Robinson tier) | **510** |
-| WR  | $10,680 | 22 pts (CeeDee Lamb / elite WR1 tier) | **485** |
-| TE  | $7,080  | 14 pts (elite TE ceiling — structurally lower than WR/RB) | **505** |
-| DEF | $4,800  | 10 pts | **480** |
+| QB  | ~$9,400  | 27 pts (Lamar Jackson / Joe Burrow tier) | **350** |
+| RB  | ~$10,700 | 20 pts (Bijan Robinson tier) | **525** |
+| WR  | ~$11,300 | 22 pts (CeeDee Lamb / elite WR1 tier) | **505** |
+| TE  | ~$7,400  | 14 pts (elite TE ceiling — structurally lower than WR/RB) | **510** |
+| DEF | ~$5,000  | 10 pts | **500** |
 
-These are the `POSITION_MULTIPLIERS` values used in the salary engine. Min/max
-clamps stay the same as before ($3,700 floor / $11,300 ceiling) — the
-per-position multiplier means most positions will naturally land within that
-range at realistic projections, rather than every above-average player
-slamming into the ceiling (the bug this recalibration fixes).
+These are the `POSITION_MULTIPLIERS` values used in the salary engine.
 
 ## What this deliberately does NOT do
 
-- **It does not attempt to replicate DK/FD's algorithm exactly** — that's not
-  possible, since it's proprietary. This reproduces the observable *shape* of
-  their pricing (QB discount, TE ceiling suppression, WR/RB parity) using our
-  own projection source, not their internal logic.
-- **It is not adjusted week-to-week the way DK/FD prices are** — real DFS
-  platforms re-price based on recent performance, injury news, and market
-  demand multiple times per week. Ours re-prices once, on the Wednesday
-  automation, based purely on that week's Tank01 projection.
-- **It has not been validated across a full season** — this calibration is
-  based on Week 1 2026 projection data and historical DK reference points. If,
-  after a few real weeks, prices still feel off at a specific position (e.g.
-  TEs still bunching at the floor, or RBs feeling underpriced relative to
-  WRs), that's a signal to revisit the multiplier for that position
-  specifically — not the whole model.
+- **It doesn't chase real-time market pricing.** This re-prices once, on
+  the Wednesday automation, based purely on that week's Tank01 projection —
+  not adjusted multiple times a week for injury news or shifting demand.
+- **It hasn't been validated across a full season.** This calibration is
+  based on Week 1 2026 projection data and two rounds of internal
+  stud-affordability testing (see below). If, after a few real weeks,
+  prices still feel off at a specific position (e.g. TEs still bunching at
+  the floor, or RBs feeling underpriced relative to WRs), that's a signal
+  to revisit the multiplier for that position specifically — not the whole
+  model.
 
 ## How to recalibrate later
 
-1. Pull a real, current DraftKings NFL Classic salary sheet (any week works).
-2. Note the top 3-5 salaries at each position.
-3. Scale by `(our_cap / 50000)`.
-4. Find that week's Tank01 projection for those same players.
-5. Solve `multiplier = scaled_salary / projection` for each, average across
-   the sample.
-6. Update `POSITION_MULTIPLIERS` in all three code locations (see below).
+1. Pick a target elite-tier ceiling for each position (what should the
+   single most expensive player at that position cost, roughly, against
+   the $60,000 cap).
+2. Find that week's real Tank01 projection for a genuinely elite player at
+   that position.
+3. Solve `multiplier = target_ceiling / elite_projection`.
+4. Run the stud-affordability test below (pick N real elite players, price
+   them, fill the rest of the roster at the salary floor, check the total
+   against the cap) to confirm the resulting multiplier actually produces
+   the roster-construction ceiling you want.
+5. Update `POSITION_MULTIPLIERS` in all three code locations (see below).
+
+## Floor recalibration (added after initial launch testing)
+
+**The problem found:** the original $3,700 floor was cheap enough that a
+roster could "punt" 5 of 9 slots to bare-floor players and still afford 4
+genuine studs — an elite QB, two workhorse RBs, and a true WR1 — with real
+cap room to spare:
+
+```
+4 studs (Lamar Jackson, Saquon Barkley, Bijan Robinson, CeeDee Lamb) = $38,600
+5 floor-priced punts (5 x $3,700)                                    = $18,500
+Total: $57,100 vs $60,000 cap — $2,900 left over
+```
+
+That's a genuinely "loaded" team, comfortably affordable — not the edge
+case a salary cap is supposed to prevent, but the *easy* path.
+
+**Why the ceiling wasn't the problem.** A literal "best player at every
+position" roster (9 true elites) already fails to fit — it totals ~$77,400
+against the $60,000 cap, a $17,400 overage. The exploit wasn't at the top
+of the market; it was that punting the *bottom* of the roster was too
+cheap, effectively subsidizing stacking at the top.
+
+**The fix:** raised `SAL_MIN` from $3,700 to $4,500 — the break-even point
+for the exact 4-stud-plus-5-punt pattern above is $4,300; $4,500 adds a
+small real margin rather than leaving it razor-thin. The same math applies
+to any similar N-stud-plus-(9-N)-punt pattern — raising the floor tightens
+all of them together, not just the specific 4-stud case used to find it.
+
+**The honest tradeoff:** this compresses price differentiation among
+cheap/bench players — a wider range of low-projection players now cluster
+at the same $4,500 floor than did at $3,700. That's a real cost, but a
+smaller one than leaving the stud-stacking pattern open. If floor
+compression becomes its own complaint later, the lever to revisit is here,
+not the position multipliers above.
+
+**How to re-test this if the multipliers ever change:** rerun the
+4-stud-plus-5-punt calculation (or whatever punt count matches the current
+roster size) against the current `SAL_MIN` and confirm it no longer fits
+under the cap with room to spare. If it does, the floor needs raising
+again, proportional to how much room was found.
+
+## Round-up + multiplier recalibration (targeting a 3-stud ceiling)
+
+**The ask:** even after the floor fix above, 4 real studs (elite QB + 2
+workhorse RBs + a true WR1) still fit comfortably with room to spare. The
+goal was to bring that down to a hard ceiling of 3 studs, and to give
+mid-tier players (a real WR2, a committee-lead RB) more separation from
+the salary floor instead of everything below "elite" collapsing toward
+the same price.
+
+**Two changes together:**
+
+1. **Rounding changed from nearest-$100 to next-$100 up.** Every
+   calculated salary now rounds up, never down — a small, compounding tax
+   on every single player, elite or not, rather than a one-time policy
+   change at the top of the market.
+2. **Every position multiplier raised**: QB 325→350, RB 510→525,
+   WR 485→505, TE 505→510, DEF 480→500.
+
+**Verified result**, re-running the same stud-plus-punt test used to find
+the original floor problem:
+
+```
+3 studs (elite QB + 2 elite RB) + 6 floor punts = $56,100 — FITS, $3,900 to spare
+4 studs (+ 1 elite WR)          + 5 floor punts = $62,900 — OVER by $2,900
+5 studs                          + 4 floor punts = $68,600 — OVER by $8,600
+```
+
+3 fits, 4 doesn't, 5 is far out of reach — matches the requested ceiling.
+
+**Mid-tier separation, checked against real players:**
+
+| Player | Real proj | New price | Above floor |
+|---|---|---|---|
+| DJ Moore (solid WR2) | 16.55 | $8,400 | +$3,900 |
+| Chase Brown (RB2) | 17.53 | $9,300 | +$4,800 |
+| Michael Pittman Jr. (WR2) | 12.49 | $6,400 | +$1,900 |
+| Josh Downs (WR3/slot) | 11.76 | $6,000 | +$1,500 |
+| Kareem Hunt (committee RB) | 6.64 | $4,500 | floor |
+| Cedrick Wilson Jr. (deep bench) | 0.23 | $4,500 | floor |
+
+Real WR2/RB2-tier contributors now sit meaningfully above the floor,
+distinct from genuine bench/committee players — the "lift the middle
+tier" goal from the original ask.
+
+**If this needs another pass:** the same stud-plus-punt test is the right
+tool — pick the current week's real elite players at each position, price
+them, add floor-priced punts for the remaining slots, and check against
+the cap. If 3 studs stops fitting, multipliers went too far; if 4 fits
+again, they need to go further.
 
 ## Where this is implemented in code
 

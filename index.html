@@ -5015,18 +5015,20 @@ function loadPoolStatus(){
 // sourcing/math. Kept in sync with league.html; see that file's comment for
 // the full rationale.
 var POSITION_MULTIPLIERS = {
-  QB:  325,
-  RB:  510,
-  WR:  485,
-  TE:  505,
-  DEF: 480
+  QB:  350,
+  RB:  525,
+  WR:  505,
+  TE:  510,
+  DEF: 500
 };
-var SAL_MIN = 3700;
+var SAL_MIN = 4500;
 var SAL_MAX = 11300;
 var SAL_ROUND = 100;        // round to nearest $100
 
 function salRound(n){
-  return Math.round(Math.max(SAL_MIN, Math.min(SAL_MAX, n)) / SAL_ROUND) * SAL_ROUND;
+  // Round UP to the next $100 (not nearest) — see league.html's salRound
+  // for the full rationale, kept in sync here.
+  return Math.ceil(Math.max(SAL_MIN, Math.min(SAL_MAX, n)) / SAL_ROUND) * SAL_ROUND;
 }
 
 function initSalaryPanel(){
@@ -5085,7 +5087,7 @@ function loadSalaryStatus(){
 var TANK01_WORKER = 'https://fantasy-refresh-news.mtriedel.workers.dev';
 var SAL_CAP = 60000;
 var SAL_MAX = 11300;
-var SAL_MIN = 3700;
+var SAL_MIN = 4500;
 
 function generateSalaries(){
   var sel    = document.getElementById('sal-week-sel');
