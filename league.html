@@ -2600,7 +2600,7 @@ function renderH2HStandings(){
   var standings = computeH2HStandings();
 
   if(!standings.length){
-    var emptyHtml = '<div class="myteam-empty"><div class="myteam-empty-icon">📅</div><div class="myteam-empty-title">No results yet</div><div class="myteam-empty-sub">Standings appear once the commissioner generates a schedule and scores come in.</div></div>' + buildKickoffCountdown();
+    var emptyHtml = buildKickoffCountdown();
     if(sw) sw.innerHTML = emptyHtml;
     if(wf) wf.innerHTML = emptyHtml;
     if(wrap) wrap.innerHTML = emptyHtml;
@@ -2760,7 +2760,7 @@ function renderCumStandingsPage(page){
 
   var all = computeCumStandings();
   if(!all.length){
-    wrap.innerHTML = '<div class="myteam-empty"><div class="myteam-empty-icon">📅</div><div class="myteam-empty-title">No results yet</div><div class="myteam-empty-sub">Standings appear once scores come in for Week ' + currentWeek + '.</div></div>' + buildKickoffCountdown();
+    wrap.innerHTML = buildKickoffCountdown();
     if(pager) pager.innerHTML = '';
     return;
   }
@@ -2828,7 +2828,7 @@ function autoOpenMyTeamOnce(context, hasPlayers){
   anchor.parentNode.insertBefore(drop, anchor.nextSibling);
   drop.classList.remove('hidden');
   var caret = document.getElementById('myteam-caret-' + context);
-  if(caret){ caret.style.transform = 'rotate(180deg)'; caret.textContent = '▴ Hide'; }
+  if(caret) caret.textContent = '▴ Hide';
   loadMyTeamLineup(drop);
 }
 
@@ -2858,7 +2858,6 @@ function toggleMyTeam(context){
   // so "will this click hide it?" is unambiguous rather than relying on
   // rotation alone, which is easy to miss at a glance.
   document.querySelectorAll('.myteam-caret').forEach(function(c){
-    c.style.transform = 'rotate(0deg)';
     c.textContent = '▾';
   });
 
@@ -2870,7 +2869,7 @@ function toggleMyTeam(context){
   anchor.parentNode.insertBefore(drop, anchor.nextSibling);
   drop.classList.remove('hidden');
   var caret = document.getElementById('myteam-caret-' + context);
-  if(caret){ caret.style.transform = 'rotate(180deg)'; caret.textContent = '▴ Hide'; }
+  if(caret) caret.textContent = '▴ Hide';
   loadMyTeamLineup(drop);
 }
 
@@ -6256,7 +6255,7 @@ function handleNav(val){
   var myTeamDrop = document.getElementById('myteam-drop');
   if(myTeamDrop && !myTeamDrop.classList.contains('hidden')){
     myTeamDrop.classList.add('hidden');
-    document.querySelectorAll('.myteam-caret').forEach(function(c){ c.style.transform = 'rotate(0deg)'; });
+    document.querySelectorAll('.myteam-caret').forEach(function(c){ c.textContent = '▾'; });
   }
 
   if(val === 'league'){ document.body.style.overflow = 'hidden'; document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); }); document.getElementById('tab-league').classList.remove('hidden'); document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); }); document.getElementById('navtab-league').classList.add('active'); setStatBoxes('hidden'); renderLeague(); return; }
