@@ -541,9 +541,12 @@ body{padding-bottom:calc(76px + env(safe-area-inset-bottom));}
 .tab-overlay-close-bar{position:sticky;top:0;background:var(--bg2);z-index:1;padding:14px 18px;border-bottom:1px solid var(--bdr);}
 .tab-overlay-close-bar-row{display:flex;align-items:center;justify-content:space-between;}
 .myteam-toggle-row{display:flex;justify-content:center;margin-top:10px;}
-.myteam-toggle-btn{background:linear-gradient(135deg,var(--or),var(--pk));border:none;border-radius:10px;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;padding:11px 24px;box-shadow:0 3px 12px rgba(0,229,212,.25);}
+.myteam-toggle-btn{background:linear-gradient(135deg,var(--or),var(--pk));border:1.5px solid transparent;border-radius:10px;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;padding:11px 24px;box-shadow:0 3px 12px rgba(0,229,212,.25);transition:all .15s;}
+.myteam-toggle-btn.tm-open{background:var(--hdr);border-color:var(--or);color:var(--or);box-shadow:none;}
+.myteam-toggle-btn.tm-open .myteam-label{color:var(--or);}
 .myteam-toggle-btn span:first-child{font-family:var(--fd);font-size:13px;font-weight:800;color:#050808;text-transform:uppercase;letter-spacing:.5px;}
-.myteam-caret{font-size:11px;color:#050808;transition:transform .15s;}
+.myteam-caret{font-size:15px;font-weight:800;color:#050808;transition:color .15s;}
+.myteam-toggle-btn.tm-open .myteam-caret{color:var(--or);}
 .myteam-drop{margin-top:12px;}
 .tab-overlay-close-bar.hidden{display:none !important;}
 .tab-overlay-close-bar-title{font-family:var(--fd);font-size:13px;font-weight:800;color:var(--or);text-transform:uppercase;letter-spacing:1px;}
@@ -919,7 +922,7 @@ setTimeout(function(){
   <div class="myteam-toggle-row" data-myteam-anchor="h2hhome" style="margin:0;">
     <button class="myteam-toggle-btn" onclick="toggleMyTeam('h2hhome')">
       <span class="myteam-label">👤 My Team</span>
-      <span class="myteam-caret" id="myteam-caret-h2hhome">▾</span>
+      <span class="myteam-caret" id="myteam-caret-h2hhome">+</span>
     </button>
   </div>
 </div>
@@ -971,7 +974,7 @@ setTimeout(function(){
     <div class="myteam-toggle-row" data-myteam-anchor="home" style="margin:0;">
       <button class="myteam-toggle-btn" onclick="toggleMyTeam('home')">
         <span class="myteam-label">👤 My Team</span>
-        <span class="myteam-caret" id="myteam-caret-home">▾</span>
+        <span class="myteam-caret" id="myteam-caret-home">+</span>
       </button>
     </div>
   </div>
@@ -1029,7 +1032,7 @@ setTimeout(function(){
     <div class="myteam-toggle-row" data-myteam-anchor="yourweek">
       <button class="myteam-toggle-btn" onclick="toggleMyTeam('yourweek')">
         <span class="myteam-label">👤 My Team</span>
-        <span class="myteam-caret" id="myteam-caret-yourweek">▾</span>
+        <span class="myteam-caret" id="myteam-caret-yourweek">+</span>
       </button>
     </div>
   </div>
@@ -1055,7 +1058,7 @@ setTimeout(function(){
     <div class="myteam-toggle-row" data-myteam-anchor="yourseason">
       <button class="myteam-toggle-btn" onclick="toggleMyTeam('yourseason')">
         <span class="myteam-label">👤 My Team</span>
-        <span class="myteam-caret" id="myteam-caret-yourseason">▾</span>
+        <span class="myteam-caret" id="myteam-caret-yourseason">+</span>
       </button>
     </div>
   </div>
@@ -1081,7 +1084,7 @@ setTimeout(function(){
     <div class="myteam-toggle-row" data-myteam-anchor="guillotine">
       <button class="myteam-toggle-btn" onclick="toggleMyTeam('guillotine')">
         <span class="myteam-label">👤 My Team</span>
-        <span class="myteam-caret" id="myteam-caret-guillotine">▾</span>
+        <span class="myteam-caret" id="myteam-caret-guillotine">+</span>
       </button>
     </div>
   </div>
@@ -1096,7 +1099,7 @@ setTimeout(function(){
     <div class="myteam-toggle-row" data-myteam-anchor="league">
       <button class="myteam-toggle-btn" onclick="toggleMyTeam('league')">
         <span class="myteam-label">👤 My Team</span>
-        <span class="myteam-caret" id="myteam-caret-league">▾</span>
+        <span class="myteam-caret" id="myteam-caret-league">+</span>
       </button>
     </div>
   </div>
@@ -1111,7 +1114,7 @@ setTimeout(function(){
     <div class="myteam-toggle-row" data-myteam-anchor="playoffs">
       <button class="myteam-toggle-btn" onclick="toggleMyTeam('playoffs')">
         <span class="myteam-label">👤 My Team</span>
-        <span class="myteam-caret" id="myteam-caret-playoffs">▾</span>
+        <span class="myteam-caret" id="myteam-caret-playoffs">+</span>
       </button>
     </div>
   </div>
@@ -2831,8 +2834,10 @@ function autoOpenMyTeamOnce(context, hasPlayers){
 
   anchor.parentNode.insertBefore(drop, anchor.nextSibling);
   drop.classList.remove('hidden');
+  var btn = anchor.querySelector('.myteam-toggle-btn');
+  if(btn) btn.classList.add('tm-open');
   var caret = document.getElementById('myteam-caret-' + context);
-  if(caret) caret.textContent = '▴ Hide';
+  if(caret) caret.textContent = '−';
   loadMyTeamLineup(drop);
 }
 
@@ -2858,12 +2863,11 @@ function toggleMyTeam(context){
 
   var alreadyOpenHere = !drop.classList.contains('hidden') && drop.previousElementSibling === anchor;
 
-  // Reset every caret to closed first — both the rotation AND the text,
-  // so "will this click hide it?" is unambiguous rather than relying on
-  // rotation alone, which is easy to miss at a glance.
-  document.querySelectorAll('.myteam-caret').forEach(function(c){
-    c.textContent = '▾';
-  });
+  // Reset every button+caret to closed first — a plain "+" and the button's
+  // normal filled gradient look, so "will this click open/close it?" is
+  // clear from the symbol AND the whole button's style, not one small glyph.
+  document.querySelectorAll('.myteam-toggle-btn').forEach(function(b){ b.classList.remove('tm-open'); });
+  document.querySelectorAll('.myteam-caret').forEach(function(c){ c.textContent = '+'; });
 
   if(alreadyOpenHere){
     drop.classList.add('hidden');
@@ -2872,8 +2876,10 @@ function toggleMyTeam(context){
 
   anchor.parentNode.insertBefore(drop, anchor.nextSibling);
   drop.classList.remove('hidden');
+  var btn = anchor.querySelector('.myteam-toggle-btn');
+  if(btn) btn.classList.add('tm-open');
   var caret = document.getElementById('myteam-caret-' + context);
-  if(caret) caret.textContent = '▴ Hide';
+  if(caret) caret.textContent = '−';
   loadMyTeamLineup(drop);
 }
 
@@ -6259,7 +6265,8 @@ function handleNav(val){
   var myTeamDrop = document.getElementById('myteam-drop');
   if(myTeamDrop && !myTeamDrop.classList.contains('hidden')){
     myTeamDrop.classList.add('hidden');
-    document.querySelectorAll('.myteam-caret').forEach(function(c){ c.textContent = '▾'; });
+    document.querySelectorAll('.myteam-toggle-btn').forEach(function(b){ b.classList.remove('tm-open'); });
+    document.querySelectorAll('.myteam-caret').forEach(function(c){ c.textContent = '+'; });
   }
 
   if(val === 'league'){ document.body.style.overflow = 'hidden'; document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); }); document.getElementById('tab-league').classList.remove('hidden'); document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); }); document.getElementById('navtab-league').classList.add('active'); setStatBoxes('hidden'); renderLeague(); return; }
