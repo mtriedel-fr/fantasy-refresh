@@ -932,6 +932,8 @@ function renderGamePreview(game){
 }
 
 function pickFromPreview(playerId){
+  if(Date.now() - lastPickTime < PICK_LOCK_MS) return;
+
   var p = allPlayers.find(function(x){ return x.id === playerId; });
   if(!p) return;
   if(p.status === 'O' || p.status === 'IR'){ showToast(p.name+' is out', true); return; }
@@ -971,10 +973,26 @@ function pickFromPreview(playerId){
 
   var replaced = lineup[slot.id] ? lineup[slot.id].name : null;
   lineup[slot.id] = p;
+  lastPickTime = Date.now();
   renderRoster();
   updateCap();
-  renderGamePreview(activeGame); // refresh preview to show selection
+
+  // A game was selected to get here — after drafting, clear that filter
+  // and return to the roster with the new pick visible, rather than
+  // staying in the same game's side-by-side view (which would require
+  // clicking a second time just to see the team you're building). Reset
+  // the chip/badge state inline rather than calling setGameFilter(null),
+  // which would trigger a redundant second render on top of closePicker()'s
+  // own render call right below.
+  document.querySelectorAll('.game-chip').forEach(function(b){
+    b.classList.toggle('active', b.getAttribute('data-game') === 'all');
+  });
+  activeGame = null;
+  var badge = document.getElementById('picker-game-filter');
+  if(badge) badge.style.display = 'none';
+
   showToast(replaced ? (replaced+' replaced with '+p.name+' ✓') : (p.name+' → '+slot.label+' ✓'));
+  closePicker();
 }
 
 function loadSubmitted(){
