@@ -940,6 +940,7 @@ function renderGamePreview(game){
     + '</div>';
 
   document.getElementById('picker-list').innerHTML = html;
+  resetPickerScrollIfContextChanged();
 }
 
 function pickFromPreview(playerId){
@@ -1194,6 +1195,41 @@ function openPickerPanel(){
 }
 
 // ── PICKER RENDER ──────────────────────────────────────────────
+var lastPickerContext = null;
+
+function resetPickerScrollIfContextChanged(){
+  // innerHTML replacement doesn't reset a container's scrollTop — it's
+  // still the same DOM node, just with new children. So scrolling partway
+  // down the RB list, then switching to WR, kept the exact same pixel
+  // offset — which, since both lists are sorted the same way (highest
+  // salary first), visually landed near a similar PRICE POINT in the new
+  // list. That's what looked like "it remembers the last price I drafted
+  // at." Reset scroll only when the actual context (which slot/position,
+  // or which game) has changed — not on every render, so typing in the
+  // search box doesn't also reset your scroll position.
+  //
+  // Rather than resetting to the literal top (which, sorted by salary
+  // descending, is often a wall of players over what's left in budget),
+  // scroll straight to the first genuinely affordable/available player —
+  // marked as #first-affordable-row during the render loop above.
+  var contextKey = (activeSlot || 'none') + '|' + (activeGame ? activeGame.gameId : 'none');
+  if(contextKey !== lastPickerContext){
+    lastPickerContext = contextKey;
+    var list = document.getElementById('picker-list');
+    if(!list) return;
+    var target = document.getElementById('first-affordable-row');
+    if(target){
+      // Position it right at the top of the visible scroll area rather
+      // than centering it — matches the intuitive "start here" feel.
+      // scrollIntoView on a container with overflow-y:auto scrolls just
+      // that container, not the whole page.
+      target.scrollIntoView({block: 'start'});
+    } else {
+      list.scrollTop = 0; // nothing affordable, or an empty/loading state — just show the top
+    }
+  }
+}
+
 function renderPicker(){
   // If a game is selected, always show side-by-side view
   if(activeGame){
@@ -1229,6 +1265,7 @@ function renderPicker(){
       '<div class="picker-empty"><div class="picker-empty-icon">⏳</div>'
       +'<div class="picker-empty-title">Loading Players…</div>'
       +'<div class="picker-empty-sub">Fetching this week\'s salaries.</div></div>';
+    resetPickerScrollIfContextChanged();
     return;
   }
 
@@ -1237,10 +1274,12 @@ function renderPicker(){
       '<div class="picker-empty"><div class="picker-empty-icon">🔍</div>'
       +'<div class="picker-empty-title">No players found</div>'
       +'<div class="picker-empty-sub">'+(activeGame?'No eligible players in this game. Try All Games.':'Try a different search.')+'</div></div>';
+    resetPickerScrollIfContextChanged();
     return;
   }
 
   var teamGameMap = buildDraftTeamGameMap();
+  var firstAffordableMarked = false;
   var html = '';
   players.forEach(function(p){
     var isSelected = inLineup[p.id] === activeSlot;
@@ -1261,6 +1300,16 @@ function renderPicker(){
     var draftCls   = 'draft-btn' + (isSelected || locked || wouldOvr ? ' drafted' : '');
     var rowCls     = 'player-row'+(isSelected?' selected':'')+(disabled?' disabled':'');
 
+    // Mark the first genuinely pickable player (affordable, available,
+    // not locked) so the picker can open scrolled straight to it instead
+    // of the top of the list — which, sorted by salary descending, is
+    // often a wall of players you can't afford with what's left in budget.
+    var rowIdAttr = '';
+    if(!disabled && !firstAffordableMarked){
+      firstAffordableMarked = true;
+      rowIdAttr = ' id="first-affordable-row"';
+    }
+
     // Opponent / home-away / international / dome-retractable indicator.
     // NOTE: this is schedule + venue-type info only — no live weather data.
     // Tank01 (our only sports data source) doesn't expose a weather
@@ -1276,7 +1325,7 @@ function renderPicker(){
       gameMeta = ' · ' + vsAt + ' ' + game.opp + (venueIcon ? ' ' + venueIcon : '');
     }
 
-    html += '<div class="'+rowCls+'">'
+    html += '<div class="'+rowCls+'"'+rowIdAttr+'>'
       + '<div class="p-pos" style="background:'+posColor+'18;color:'+posColor+'">'+p.pos+'</div>'
       + '<div class="p-info" onclick="openNews(\''+p.id+'\',event)" style="cursor:pointer;">'
       +   '<div class="p-name">'+p.name+injBadge+(isElsewhere?' <span style="font-size:10px;color:var(--ink3)">(in lineup)</span>':'')+'</div>'
@@ -1287,6 +1336,7 @@ function renderPicker(){
       + '</div>';
   });
   document.getElementById('picker-list').innerHTML = html;
+  resetPickerScrollIfContextChanged();
 }
 
 // ── PICK PLAYER ────────────────────────────────────────────────
