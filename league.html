@@ -195,27 +195,13 @@ tr:hover td{background:var(--or4);}
 .lineup-card.started{background:var(--bg3);border-color:var(--bdr2);opacity:.85;}
 .lineup-card.started .lineup-card-pos{opacity:.6;}
 
-/* Mobile: the desktop layout crams position badge + name + two 96px-wide
-   status columns + points + swap button into one row — on a narrow phone
-   screen there simply isn't room, which was causing the name to wrap onto
-   3 lines and the "Not Started" badge to visually overlap the game info
-   text beneath it. Fix: wrap the card onto two rows instead of squeezing
-   everything sideways. Row 1 = position badge + name/team/game info
-   (full width to breathe). Row 2 = status tags + points + swap button,
-   pushed onto their own line as one group, right-aligned, with a
-   subtle divider separating it from the info above. */
-@media(max-width:600px){
-  .lineup-card{flex-wrap:wrap;}
-  .lineup-card-footer{
-    flex-basis:100%;
-    justify-content:space-between;
-    margin-top:10px;
-    padding-top:10px;
-    border-top:1px solid var(--bdr);
-  }
-  .lineup-card-status-col{width:auto;text-align:left;}
-}
-.lineup-card-locked-tag{font-size:10px;font-weight:700;color:var(--ink3);background:rgba(255,255,255,.05);border:1px solid var(--bdr2);border-radius:5px;padding:1px 6px;text-transform:uppercase;letter-spacing:.3px;}
+/* Points + status stacked vertically in one narrow column, instead of
+   spreading status tags and points across a wide multi-column footer —
+   that older layout needed a mobile-specific two-row wrap to avoid
+   overflowing on narrow phones. This stays a single row everywhere. */
+.lineup-card-pts-stack{display:flex;flex-direction:column;align-items:center;flex-shrink:0;gap:4px;}
+.lineup-card-status-tag{font-size:10px;font-weight:700;color:var(--ink3);background:var(--bg2);border:1px solid var(--bdr2);border-radius:5px;padding:1px 6px;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap;}
+.lineup-card-status-tag.live{color:var(--pk);background:rgba(255,95,160,.1);border-color:rgba(255,95,160,.3);}
 .lineup-card-swap-btn{flex-shrink:0;font-family:var(--fd);font-size:14.5px;font-weight:800;color:var(--or);background:rgba(0,229,212,.1);border:1.5px solid rgba(0,229,212,.3);border-radius:8px;padding:8px 12px;cursor:pointer;text-transform:uppercase;letter-spacing:.3px;margin-left:8px;}
 .lineup-card-swap-btn:hover{background:rgba(0,229,212,.18);}
 .lineup-card-live{color:#3CD06C;font-size:10px;}
@@ -2190,20 +2176,29 @@ function buildLineupPlayerCard(p, pts, hasStarted, gameMap, showNotStartedTag, s
   // so appending it again would just repeat itself.
   var teamTag = (p.team && p.pos !== 'DEF') ? ' - ' + escapeHtmlFR(p.team) : '';
 
-  // Two separate, fixed-width columns instead of one inline badge that
-  // shifted position depending on how long the player's name was —
-  // "Not Started" always lands in the same spot, and once a player's
-  // game begins, that same spot clears while the second column (started/
-  // locked) lights up in its own consistent position. Only relevant when
-  // viewing your own lineup (showNotStartedTag) — an opponent's roster
-  // view doesn't get the Swap button either way.
-  var notStartedCol = '';
-  var startedCol = '';
+  // Status tag — three real states now instead of just started/not:
+  //   Not started  → before kickoff
+  //   Live (PMR)   → game in progress, shows quarter + clock
+  //   Final        → game over
+  // liveStatusCode/quarter/clock come from auto-scoring.yml's box-score
+  // capture (see that file — statusCode is a confirmed Tank01 field,
+  // quarter/clock are a best-guess pending real live-game testing).
+  // Falls back to the simpler hasStarted-based Locked/Not-started split
+  // wherever live data isn't available yet (e.g. before auto-scoring has
+  // run this week, or on call sites that don't fetch it).
+  var statusTag = '';
+  var statusClass = '';
   var swapBtn = '';
-  if(hasStarted){
-    startedCol = '<span class="lineup-card-locked-tag">🔒 Locked</span>';
+  var liveCode = game ? game.liveStatusCode : null;
+  if(liveCode === 2){
+    statusTag = 'Final';
+  } else if(liveCode === 1){
+    statusTag = (game.quarter ? 'Q' + game.quarter : 'Live') + (game.clock ? ' ' + game.clock : '');
+    statusClass = ' live';
+  } else if(hasStarted){
+    statusTag = '🔒 Locked';
   } else if(showNotStartedTag){
-    notStartedCol = '<span class="lineup-card-pending">Not started</span>';
+    statusTag = 'Not started';
     swapBtn = '<button class="lineup-card-swap-btn" onclick="goToDraft()" title="Swap this player">🔄 Swap</button>';
   }
 
@@ -2213,12 +2208,11 @@ function buildLineupPlayerCard(p, pts, hasStarted, gameMap, showNotStartedTag, s
     +   '<div class="lineup-card-name">' + escapeHtmlFR(p.name || '') + teamTag + '</div>'
     +   gameLine
     + '</div>'
-    + '<div class="lineup-card-footer">'
-    +   '<div class="lineup-card-status-col">' + notStartedCol + '</div>'
-    +   '<div class="lineup-card-status-col">' + startedCol + '</div>'
+    + '<div class="lineup-card-pts-stack">'
     +   '<div class="lineup-card-pts">' + ptsLabel + '<span class="lineup-card-pts-lbl">PTS</span></div>'
-    +   swapBtn
+    +   (statusTag ? '<span class="lineup-card-status-tag' + statusClass + '">' + escapeHtmlFR(statusTag) + '</span>' : '')
     + '</div>'
+    + swapBtn
     + '</div>';
 }
 
@@ -2953,16 +2947,35 @@ function loadMyTeamLineup(drop){
   var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
   var season = (ctx && ctx.season) || 2026;
 
+  var seasonType = IS_PRESEASON_LEAGUE ? 'Preseason' : 'Regular';
+
   Promise.all([
     FR.fb.get('/leagues/' + leagueId + '/lineups/' + season + '/week' + currentWeek + '/' + user.uid),
     FR.fb.get('/leagues/' + leagueId + '/season/' + season + '/' + currentWeek + '/' + user.uid),
     FR.fb.get('/leagues/' + leagueId + '/locks/' + season + '/week' + currentWeek),
-    fetchWeekSchedule(currentWeek)
+    fetchWeekSchedule(currentWeek),
+    FR.fb.get('/liveGameStatus/' + season + '/' + seasonType + '_wk' + currentWeek).catch(function(){ return null; })
   ]).then(function(results){
     var lineup     = results[0];
     var scoreEntry = results[1];
     var locks      = results[2] || {};
     var gameMap    = results[3] || {};
+    var liveStatus = (results[4] && results[4].games) || {};
+
+    // Merge live status (statusCode/quarter/clock) into gameMap by team,
+    // so buildLineupPlayerCard can read it off the same game object it
+    // already gets, rather than needing a whole separate parameter.
+    Object.keys(liveStatus).forEach(function(gameId){
+      var g = liveStatus[gameId];
+      [g.home, g.away].forEach(function(team){
+        if(team && gameMap[team]){
+          gameMap[team].liveStatusCode = g.statusCode;
+          gameMap[team].quarter = g.quarter;
+          gameMap[team].clock = g.clock;
+        }
+      });
+    });
+
     drop.innerHTML = rosterColumn(lineup, scoreEntry, locks, true, gameMap);
   }).catch(function(){
     drop.innerHTML = '<div class="myteam-empty"><div class="myteam-empty-icon">⚠️</div><div class="myteam-empty-title">Could not load lineup</div></div>';
