@@ -947,8 +947,8 @@ function renderGamePreview(game){
     return '<div class="'+cls+'"'+rowIdAttr+'>'
       + '<div class="p-pos" style="background:'+posColor+'18;color:'+posColor+'">'+p.pos+'</div>'
       + '<div class="p-info" onclick="openNews(\''+p.id+'\',event)" style="cursor:pointer;">'
-      +   '<div class="p-name">'+p.name+injBadge+'</div>'
-      +   '<div class="p-meta">'+(p.team||'')+(p.proj?' · '+p.proj+' proj':'')+'</div>'
+      +   '<div class="p-name">'+p.name+(p.team?' - '+p.team:'')+injBadge+'</div>'
+      +   '<div class="p-meta">'+(p.proj?p.proj+' proj':'')+'</div>'
       + '</div>'
       + '<div class="p-sal">$'+(p.salary||0).toLocaleString()+'</div>'
       + '<button class="'+draftCls2+'" onclick="pickFromPreview(\''+p.id+'\')">' + draftLbl2 + '</button>'
@@ -1463,14 +1463,14 @@ function renderPicker(){
       var hostTeam = game.isHome ? p.team : game.opp;
       var venueIcon = draftStadiumIcon(hostTeam);
       var kickoff = fmtKickoff(game.time);
-      gameMeta = ' · ' + (kickoff ? kickoff + ' · ' : '') + vsAt + ' ' + game.opp + (venueIcon ? ' ' + venueIcon : '');
+      gameMeta = (kickoff ? kickoff + ' · ' : '') + vsAt + ' ' + game.opp + (venueIcon ? ' ' + venueIcon : '');
     }
 
     html += '<div class="'+rowCls+'"'+rowIdAttr+'>'
       + '<div class="p-pos" style="background:'+posColor+'18;color:'+posColor+'">'+p.pos+'</div>'
       + '<div class="p-info" onclick="openNews(\''+p.id+'\',event)" style="cursor:pointer;">'
-      +   '<div class="p-name">'+p.name+injBadge+(isElsewhere?' <span style="font-size:10px;color:var(--ink3)">(in lineup)</span>':'')+'</div>'
-      +   '<div class="p-meta">'+(p.team||'')+(p.proj?' · '+p.proj+' proj':'')+gameMeta+'</div>'
+      +   '<div class="p-name">'+p.name+(p.team?' - '+p.team:'')+injBadge+(isElsewhere?' <span style="font-size:10px;color:var(--ink3)">(in lineup)</span>':'')+'</div>'
+      +   '<div class="p-meta">'+gameMeta+(p.proj?(gameMeta?' · ':'')+p.proj+' proj':'')+'</div>'
       + '</div>'
       + '<div class="p-sal">$'+(p.salary||0).toLocaleString()+'</div>'
       + '<button class="'+draftCls+'" onclick="pickPlayer(\''+p.id+'\')">' + draftLabel + '</button>'
