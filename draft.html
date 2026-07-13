@@ -78,7 +78,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
 .slot-tap-hint{font-family:var(--fd);font-size:10px;color:var(--ink3);opacity:.6;text-transform:uppercase;letter-spacing:.5px;}
 .slot-player-body{padding:0 12px 10px;}
 .slot-player-name{font-family:var(--fd);font-size:17px;font-weight:800;color:var(--ink);}
-.slot-player-meta{display:flex;align-items:center;gap:8px;margin-top:2px;}
+.slot-player-meta{display:flex;align-items:center;gap:8px;margin-top:2px;flex-wrap:wrap;}
 .slot-player-game{font-family:var(--fd);font-size:12.5px;color:var(--ink3);margin-top:2px;}
 .slot-player-team{font-family:var(--fd);font-size:11px;color:var(--ink3);text-transform:uppercase;}
 .slot-player-sal{font-family:var(--fd);font-size:17px;font-weight:800;color:var(--or);}
@@ -1201,13 +1201,6 @@ function renderRoster(){
       // it again would just repeat itself. Matches the My Team card.
       var teamTag = (p.team && p.pos !== 'DEF') ? ' - ' + p.team : '';
       html += '<span class="slot-player-name" style="flex:1;">'+p.name+teamTag+'</span>';
-      var locked = isPlayerLocked(p);
-      if(locked){
-        html += '<span class="slot-status-tag">🔒 Locked</span>';
-      } else {
-        html += '<span class="slot-status-tag">Not started</span>';
-        html += '<button class="slot-remove-btn" data-remove-slot="'+s.id+'">Remove</button>';
-      }
     } else {
       html += '<span class="slot-empty-lbl">— empty —</span>';
     }
@@ -1228,6 +1221,13 @@ function renderRoster(){
       html += '<div class="slot-player-meta">';
       html += '<span class="slot-player-sal">$'+(p.salary||0).toLocaleString()+'</span>';
       if(p.proj) html += '<span style="font-family:var(--fd);font-size:11px;color:var(--ink3);margin-left:4px;">'+p.proj+' proj</span>';
+      // Status tag and remove button moved here, into the roomier body
+      // row, instead of the header row alongside the name — cramming
+      // position badge + name + status + remove all into one row was
+      // overflowing and overlapping on narrow phone screens.
+      var locked = isPlayerLocked(p);
+      html += '<span class="slot-status-tag" style="margin-left:auto;">' + (locked ? '🔒 Locked' : 'Not started') + '</span>';
+      if(!locked) html += '<button class="slot-remove-btn" data-remove-slot="'+s.id+'">Remove</button>';
       html += '</div></div>';
     }
     html += '</div>';

@@ -185,6 +185,7 @@ tr:hover td{background:var(--or4);}
 .lineup-card{display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--bg4);border:1px solid var(--bdr);border-radius:10px;}
 .lineup-card-pos{flex-shrink:0;font-family:var(--fd);font-size:14.5px;font-weight:800;padding:8px 11px;border-radius:8px;border:1.5px solid;text-align:center;min-width:52px;}
 .lineup-card-status-col{flex-shrink:0;width:96px;text-align:center;}
+.lineup-card-footer{display:flex;align-items:center;gap:8px;flex-shrink:0;}
 .lineup-card-mid{flex:1;min-width:0;}
 .lineup-card-name{font-family:var(--fd);font-size:17px;font-weight:700;color:var(--ink);display:flex;align-items:center;gap:6px;}
 .lineup-card-game{font-size:12.5px;color:var(--ink3);margin-top:2px;}
@@ -193,6 +194,27 @@ tr:hover td{background:var(--or4);}
 .lineup-card-pending{font-size:10px;font-weight:700;color:var(--ink3);background:var(--bg2);border:1px solid var(--bdr2);border-radius:5px;padding:1px 6px;text-transform:uppercase;letter-spacing:.3px;}
 .lineup-card.started{background:var(--bg3);border-color:var(--bdr2);opacity:.85;}
 .lineup-card.started .lineup-card-pos{opacity:.6;}
+
+/* Mobile: the desktop layout crams position badge + name + two 96px-wide
+   status columns + points + swap button into one row — on a narrow phone
+   screen there simply isn't room, which was causing the name to wrap onto
+   3 lines and the "Not Started" badge to visually overlap the game info
+   text beneath it. Fix: wrap the card onto two rows instead of squeezing
+   everything sideways. Row 1 = position badge + name/team/game info
+   (full width to breathe). Row 2 = status tags + points + swap button,
+   pushed onto their own line as one group, right-aligned, with a
+   subtle divider separating it from the info above. */
+@media(max-width:600px){
+  .lineup-card{flex-wrap:wrap;}
+  .lineup-card-footer{
+    flex-basis:100%;
+    justify-content:space-between;
+    margin-top:10px;
+    padding-top:10px;
+    border-top:1px solid var(--bdr);
+  }
+  .lineup-card-status-col{width:auto;text-align:left;}
+}
 .lineup-card-locked-tag{font-size:10px;font-weight:700;color:var(--ink3);background:rgba(255,255,255,.05);border:1px solid var(--bdr2);border-radius:5px;padding:1px 6px;text-transform:uppercase;letter-spacing:.3px;}
 .lineup-card-swap-btn{flex-shrink:0;font-family:var(--fd);font-size:14.5px;font-weight:800;color:var(--or);background:rgba(0,229,212,.1);border:1.5px solid rgba(0,229,212,.3);border-radius:8px;padding:8px 12px;cursor:pointer;text-transform:uppercase;letter-spacing:.3px;margin-left:8px;}
 .lineup-card-swap-btn:hover{background:rgba(0,229,212,.18);}
@@ -2191,10 +2213,12 @@ function buildLineupPlayerCard(p, pts, hasStarted, gameMap, showNotStartedTag, s
     +   '<div class="lineup-card-name">' + escapeHtmlFR(p.name || '') + teamTag + '</div>'
     +   gameLine
     + '</div>'
-    + '<div class="lineup-card-status-col">' + notStartedCol + '</div>'
-    + '<div class="lineup-card-status-col">' + startedCol + '</div>'
-    + '<div class="lineup-card-pts">' + ptsLabel + '<span class="lineup-card-pts-lbl">PTS</span></div>'
-    + swapBtn
+    + '<div class="lineup-card-footer">'
+    +   '<div class="lineup-card-status-col">' + notStartedCol + '</div>'
+    +   '<div class="lineup-card-status-col">' + startedCol + '</div>'
+    +   '<div class="lineup-card-pts">' + ptsLabel + '<span class="lineup-card-pts-lbl">PTS</span></div>'
+    +   swapBtn
+    + '</div>'
     + '</div>';
 }
 
