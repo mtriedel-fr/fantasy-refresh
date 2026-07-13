@@ -73,7 +73,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
 .roster-slot.filled{border-color:var(--bdr2);}
 .roster-slot.filled:hover{border-color:var(--or);}
 .slot-hdr{display:flex;align-items:center;gap:10px;padding:10px 12px;}
-.slot-pos-tag{flex-shrink:0;font-family:var(--fd);font-size:14.5px;font-weight:800;padding:8px 11px;border-radius:8px;border:1.5px solid;text-align:center;min-width:52px;}
+.slot-pos-tag{flex-shrink:0;font-family:var(--fd);font-size:12.5px;font-weight:800;padding:6px 9px;border-radius:7px;border:1.5px solid;text-align:center;min-width:44px;}
 .slot-empty-lbl{font-family:var(--fd);font-size:14px;color:var(--ink3);flex:1;}
 .slot-tap-hint{font-family:var(--fd);font-size:10px;color:var(--ink3);opacity:.6;text-transform:uppercase;letter-spacing:.5px;}
 .slot-player-body{padding:0 12px 10px;}
@@ -82,8 +82,11 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
 .slot-player-game{font-family:var(--fd);font-size:12.5px;color:var(--ink3);margin-top:2px;}
 .slot-player-team{font-family:var(--fd);font-size:11px;color:var(--ink3);text-transform:uppercase;}
 .slot-player-sal{font-family:var(--fd);font-size:17px;font-weight:800;color:var(--or);}
-.slot-status-tag{font-size:10px;font-weight:700;color:var(--ink3);background:var(--bg2);border:1px solid var(--bdr2);border-radius:5px;padding:1px 6px;text-transform:uppercase;letter-spacing:.3px;flex-shrink:0;margin-left:auto;}
-.slot-remove-btn{background:rgba(255,95,160,.1);border:1.5px solid rgba(255,95,160,.3);color:var(--pk);font-family:var(--fd);font-size:14.5px;font-weight:800;cursor:pointer;padding:8px 12px;border-radius:8px;margin-left:8px;text-transform:uppercase;letter-spacing:.3px;transition:all .15s;flex-shrink:0;}
+.slot-proj-stack{display:flex;flex-direction:column;align-items:center;flex-shrink:0;gap:4px;margin-left:auto;}
+.slot-proj-val{font-family:var(--fd);font-size:17px;font-weight:900;color:var(--ink);line-height:1;}
+.slot-proj-lbl{font-size:10px;font-weight:700;color:var(--ink3);letter-spacing:.5px;text-transform:uppercase;}
+.slot-status-tag{font-size:10px;font-weight:700;color:var(--ink3);background:var(--bg2);border:1px solid var(--bdr2);border-radius:5px;padding:1px 6px;text-transform:uppercase;letter-spacing:.3px;flex-shrink:0;}
+.slot-remove-btn{background:rgba(255,95,160,.1);border:1.5px solid rgba(255,95,160,.3);color:var(--pk);font-family:var(--fd);font-size:12.5px;font-weight:800;cursor:pointer;padding:6px 10px;border-radius:7px;margin-left:8px;text-transform:uppercase;letter-spacing:.3px;transition:all .15s;flex-shrink:0;}
 .slot-remove-btn:hover{background:var(--pk);color:#fff;border-color:var(--pk);}
 
 /* ── SUBMIT ── */
@@ -1220,13 +1223,19 @@ function renderRoster(){
       }
       html += '<div class="slot-player-meta">';
       html += '<span class="slot-player-sal">$'+(p.salary||0).toLocaleString()+'</span>';
-      if(p.proj) html += '<span style="font-family:var(--fd);font-size:11px;color:var(--ink3);margin-left:4px;">'+p.proj+' proj</span>';
+      // Projected points, given a real, prominent stacked spot — matching
+      // the same visual weight actual points get on the My Team card,
+      // instead of being small inline text tucked next to the salary.
+      html += '<div class="slot-proj-stack">'
+        + '<span class="slot-proj-val">' + (p.proj != null ? p.proj : '—') + '</span>'
+        + '<span class="slot-proj-lbl">Proj</span>'
+        + '</div>';
       // Status tag and remove button moved here, into the roomier body
       // row, instead of the header row alongside the name — cramming
       // position badge + name + status + remove all into one row was
       // overflowing and overlapping on narrow phone screens.
       var locked = isPlayerLocked(p);
-      html += '<span class="slot-status-tag" style="margin-left:auto;">' + (locked ? '🔒 Locked' : 'Not started') + '</span>';
+      html += '<span class="slot-status-tag">' + (locked ? '🔒 Locked' : 'Not started') + '</span>';
       if(!locked) html += '<button class="slot-remove-btn" data-remove-slot="'+s.id+'">Remove</button>';
       html += '</div></div>';
     }
