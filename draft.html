@@ -443,6 +443,15 @@ function draftStadiumIcon(teamAbbr){
   return '';
 }
 
+function fmtKickoff(iso){
+  if(!iso) return '';
+  var d = new Date(iso);
+  if(isNaN(d.getTime())) return '';
+  var day = d.toLocaleDateString('en-US', { weekday: 'short' });
+  var time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  return day + ' ' + time;
+}
+
 // ── BOOT ──────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', function(){
   try{
@@ -1423,7 +1432,8 @@ function renderPicker(){
       var vsAt = game.international ? (game.isHome ? 'vs' : '@') + ' Int\'l' : (game.isHome ? 'vs' : '@');
       var hostTeam = game.isHome ? p.team : game.opp;
       var venueIcon = draftStadiumIcon(hostTeam);
-      gameMeta = ' · ' + vsAt + ' ' + game.opp + (venueIcon ? ' ' + venueIcon : '');
+      var kickoff = fmtKickoff(game.time);
+      gameMeta = ' · ' + (kickoff ? kickoff + ' · ' : '') + vsAt + ' ' + game.opp + (venueIcon ? ' ' + venueIcon : '');
     }
 
     html += '<div class="'+rowCls+'"'+rowIdAttr+'>'

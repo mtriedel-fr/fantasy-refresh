@@ -2159,9 +2159,8 @@ function buildLineupPlayerCard(p, pts, hasStarted, gameMap, showNotStartedTag, s
     // the home team's stadium, regardless of which side p.team is on.
     var hostTeam = game.isHome ? p.team : game.opp;
     var venueIcon = stadiumIcon(hostTeam);
-    gameLine = '<div class="lineup-card-game">' + vsAt + ' ' + escapeHtmlFR(game.opp)
-      + (venueIcon ? ' ' + venueIcon : '')
-      + (kickoff ? ' · ' + kickoff : '') + '</div>';
+    gameLine = '<div class="lineup-card-game">' + (kickoff ? kickoff + ' · ' : '') + vsAt + ' ' + escapeHtmlFR(game.opp)
+      + (venueIcon ? ' ' + venueIcon : '') + '</div>';
   }
 
   // Team abbreviation on the name line — skipped for DEF, since a defense
