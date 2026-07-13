@@ -2209,7 +2209,7 @@ function buildLineupPlayerCard(p, pts, hasStarted, gameMap, showNotStartedTag, s
     +   gameLine
     + '</div>'
     + '<div class="lineup-card-pts-stack">'
-    +   '<div class="lineup-card-pts">' + ptsLabel + '<span class="lineup-card-pts-lbl">PTS</span></div>'
+    +   '<div class="lineup-card-pts">' + ptsLabel + '</div>'
     +   (statusTag ? '<span class="lineup-card-status-tag' + statusClass + '">' + escapeHtmlFR(statusTag) + '</span>' : '')
     + '</div>'
     + swapBtn
@@ -2895,15 +2895,13 @@ function toggleMyTeam(context){
   var anchor = document.querySelector('[data-myteam-anchor="' + context + '"]');
   if(!anchor) return;
 
-  // If this button currently reads "📝 Draft Team" (zero players drafted),
-  // there's nothing useful to show in the dropdown — it would just render
-  // an empty state telling them to go to the Draft tab. Skip the detour
-  // and take them straight there instead. This was a real point of
-  // confusion for new members: the most prominent button on the page said
-  // "Draft Team" but only opened an empty box with small-print instructions
-  // to go find a different button elsewhere.
+  // If this button currently reads "📝 Draft Team" (zero players drafted)
+  // OR "🧩 Finish Team" (some slots filled, some still empty), there's
+  // nothing useful to show in a dropdown summary — the actual next step
+  // in both cases is drafting/finishing on the Draft page, not a preview.
+  // Skip the detour and take them straight there instead.
   var labelEl = anchor.querySelector('.myteam-label');
-  if(labelEl && labelEl.textContent.indexOf('Draft Team') > -1){
+  if(labelEl && (labelEl.textContent.indexOf('Draft Team') > -1 || labelEl.textContent.indexOf('Finish Team') > -1)){
     goToDraft();
     return;
   }
