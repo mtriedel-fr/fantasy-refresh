@@ -183,7 +183,8 @@ tr:hover td{background:var(--or4);}
 
 .lineup-card-list{display:flex;flex-direction:column;gap:6px;}
 .lineup-card{display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--bg4);border:1px solid var(--bdr);border-radius:10px;}
-.lineup-card-pos{flex-shrink:0;font-family:var(--fd);font-size:12.5px;font-weight:800;padding:6px 9px;border-radius:7px;border:1px solid;text-align:center;min-width:42px;}
+.lineup-card-pos{flex-shrink:0;font-family:var(--fd);font-size:14.5px;font-weight:800;padding:8px 11px;border-radius:8px;border:1.5px solid;text-align:center;min-width:52px;}
+.lineup-card-status-col{flex-shrink:0;width:96px;text-align:center;}
 .lineup-card-mid{flex:1;min-width:0;}
 .lineup-card-name{font-family:var(--fd);font-size:17px;font-weight:700;color:var(--ink);display:flex;align-items:center;gap:6px;}
 .lineup-card-game{font-size:12.5px;color:var(--ink3);margin-top:2px;}
@@ -2163,24 +2164,36 @@ function buildLineupPlayerCard(p, pts, hasStarted, gameMap, showNotStartedTag, s
       + (kickoff ? ' · ' + kickoff : '') + '</div>';
   }
 
-  // Started = locked in, shown with a muted "can't touch this" look.
-  // Not started = still swappable, gets an actionable Swap button —
-  // only relevant when viewing your own lineup (showNotStartedTag).
-  var statusTag = '';
+  // Team abbreviation on the name line — skipped for DEF, since a defense
+  // "player" IS the team already (name is literally "PHI", "SEA", etc.),
+  // so appending it again would just repeat itself.
+  var teamTag = (p.team && p.pos !== 'DEF') ? ' - ' + escapeHtmlFR(p.team) : '';
+
+  // Two separate, fixed-width columns instead of one inline badge that
+  // shifted position depending on how long the player's name was —
+  // "Not Started" always lands in the same spot, and once a player's
+  // game begins, that same spot clears while the second column (started/
+  // locked) lights up in its own consistent position. Only relevant when
+  // viewing your own lineup (showNotStartedTag) — an opponent's roster
+  // view doesn't get the Swap button either way.
+  var notStartedCol = '';
+  var startedCol = '';
   var swapBtn = '';
   if(hasStarted){
-    statusTag = '<span class="lineup-card-locked-tag">🔒 Locked</span>';
+    startedCol = '<span class="lineup-card-locked-tag">🔒 Locked</span>';
   } else if(showNotStartedTag){
-    statusTag = '<span class="lineup-card-pending">Not started</span>';
+    notStartedCol = '<span class="lineup-card-pending">Not started</span>';
     swapBtn = '<button class="lineup-card-swap-btn" onclick="goToDraft()" title="Swap this player">🔄 Swap</button>';
   }
 
   return '<div class="lineup-card' + (hasStarted ? ' started' : '') + '">'
     + '<div class="lineup-card-pos" style="background:' + posColor + '1f;color:' + posColor + ';border-color:' + posColor + '40;">' + escapeHtmlFR(slotLabel) + '</div>'
     + '<div class="lineup-card-mid">'
-    +   '<div class="lineup-card-name">' + escapeHtmlFR(p.name || '') + ' ' + statusTag + '</div>'
+    +   '<div class="lineup-card-name">' + escapeHtmlFR(p.name || '') + teamTag + '</div>'
     +   gameLine
     + '</div>'
+    + '<div class="lineup-card-status-col">' + notStartedCol + '</div>'
+    + '<div class="lineup-card-status-col">' + startedCol + '</div>'
     + '<div class="lineup-card-pts">' + ptsLabel + '<span class="lineup-card-pts-lbl">PTS</span></div>'
     + swapBtn
     + '</div>';
