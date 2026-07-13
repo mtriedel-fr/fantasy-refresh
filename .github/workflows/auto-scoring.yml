@@ -606,6 +606,7 @@ jobs:
 
             // Fetch box scores for active games
             const boxScores = {};
+            const liveGameStatus = {}; // gameId -> {statusCode, quarter, clock, home, away}
             for (const game of activeGames) {
               const gameId = game.gameID || game.gameId || '';
               if (!gameId) continue;
@@ -617,9 +618,45 @@ jobs:
                   const sample = Object.values(bsName)[0];
                   console.log(`  📊 ${gameId}: ${Object.keys(bsName).length} player stats` +
                     (sample ? ` (sleeperBotID present: ${sample.sleeperBotID ? 'YES ✓' : 'no — falling back to name match'})` : ''));
+
+                  // gameStatusCode is a REAL, documented Tank01 field
+                  // (0=not started, 1=live, 2=final — see
+                  // tank01.com/Guides_Game_Status_Code_NFL.html).
+                  // quarter/clock field names below are an educated guess
+                  // based on common sports-API naming conventions —
+                  // UNVERIFIED against a real live response, since no
+                  // games were live when this was written (mid-July,
+                  // before preseason). First real Thursday/Sunday of live
+                  // games should be checked against this — if the "PMR"
+                  // (quarter + clock) display comes back blank/wrong while
+                  // scores are updating fine, this is the spot to fix,
+                  // same pattern as the projections endpoint fix earlier.
+                  liveGameStatus[gameId] = {
+                    statusCode: bs.body.gameStatusCode != null ? Number(bs.body.gameStatusCode) : null,
+                    quarter:    bs.body.quarter || bs.body.period || bs.body.gamePeriod || null,
+                    clock:      bs.body.gameClock || bs.body.clock || bs.body.timeRemaining || null,
+                    home:       game.homeTeamAbbr || game.homeTeam || '',
+                    away:       game.awayTeamAbbr || game.awayTeam || ''
+                  };
                 }
               } catch(e) {
                 console.error(`  ❌ Failed box score ${gameId}:`, e.message);
+              }
+            }
+
+            // Write live status globally (not per-league — the same for
+            // everyone watching this week regardless of which league).
+            // Overwritten every run (every ~2 min during game windows),
+            // so it's always close to real-time without needing a
+            // separate live-polling system on the client.
+            if (Object.keys(liveGameStatus).length) {
+              try {
+                await firebasePut(`/liveGameStatus/${SEASON}/${seasonType}_wk${week}.json`, {
+                  games: liveGameStatus,
+                  updatedAt: Date.now()
+                });
+              } catch(e) {
+                console.error('Failed to write live game status:', e.message);
               }
             }
 
