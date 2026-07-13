@@ -302,6 +302,10 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
     </div>
     <!-- Games bar inside picker — mobile only -->
     <div class="games-bar" id="picker-games-bar" style="border-bottom:1px solid var(--bdr);border-top:1px solid var(--bdr);display:none;"></div>
+    <!-- Team filter — Both/Away/Home — only shown when a game is selected.
+         Lives in the fixed header area (not inside #picker-list) so it
+         stays visible while the player list underneath scrolls. -->
+    <div class="game-team-toggle hidden" id="game-team-toggle" style="display:none;gap:6px;padding:8px 14px;border-bottom:1px solid var(--bdr);"></div>
     <div class="picker-search-bar">
       <svg class="picker-search-ico" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
       <input type="text" class="picker-search" id="picker-search" placeholder="Search players…" oninput="renderPicker()">
@@ -394,6 +398,7 @@ var allPlayers   = [];
 var lineup       = {};   // {slotId: player}
 var activeSlot   = null; // currently picking for this slotId
 var activeGame   = null; // game filter: {home, away, teams:[]}
+var activeGameTeamFilter = 'both'; // 'both' | 'away' | 'home' — which side(s) of the selected game to show
 var currentWeek  = 1;
 var schedule     = [];   // [{home,away,time,teams:[],international}]
 var currentUser  = null;
@@ -835,6 +840,7 @@ function setGameFilter(gameIdx, btn){
     b.classList.toggle('active', b.getAttribute('data-game') === key);
   });
   activeGame = gameIdx === null ? null : (schedule[gameIdx] || null);
+  activeGameTeamFilter = 'both'; // reset whenever the selected game changes
   var badge = document.getElementById('picker-game-filter');
   if(activeGame){
     badge.textContent = activeGame.away + ' @ ' + activeGame.home;
@@ -852,6 +858,8 @@ function setGameFilter(gameIdx, btn){
     renderGamePreview(activeGame);
   } else {
     // All Games cleared
+    var gtt = document.getElementById('game-team-toggle');
+    if(gtt){ gtt.style.display = 'none'; gtt.classList.add('hidden'); }
     document.getElementById('picker-slot-label').textContent = activeSlot
       ? SLOT_DEFS.find(function(s){ return s.id===activeSlot; }).label
       : 'All Players';
@@ -864,83 +872,117 @@ function setGameFilter(gameIdx, btn){
 }
 
 function renderGamePreview(game){
-  var POS_ORDER = {QB:0, RB:1, WR:2, TE:3, DEF:4};
-
-  function sortByPos(a, b){
-    var pa = POS_ORDER[a.pos] !== undefined ? POS_ORDER[a.pos] : 9;
-    var pb = POS_ORDER[b.pos] !== undefined ? POS_ORDER[b.pos] : 9;
-    if(pa !== pb) return pa - pb;
-    return b.salary - a.salary; // within same position, sort by salary
-  }
+  var POS_ORDER = ['QB','RB','WR','TE','DEF'];
+  var POS_LABELS = {QB:'Quarterbacks', RB:'Running Backs', WR:'Wide Receivers', TE:'Tight Ends', DEF:'Defense/ST'};
 
   var draftedInPreview = {};
   Object.keys(lineup).forEach(function(sid){ if(lineup[sid]) draftedInPreview[lineup[sid].id] = true; });
 
-  // If a slot is active, only show eligible positions for that slot
+  // If a slot is active, only show eligible positions for that slot —
+  // same idea as before, just applied to a single unified list now
+  // instead of filtering two separate columns.
   var slot = activeSlot ? SLOT_DEFS.find(function(s){ return s.id === activeSlot; }) : null;
 
-  var awayPlayers = allPlayers.filter(function(p){
-    if(normTeam(p.team) !== normTeam(game.away)) return false;
-    if(draftedInPreview[p.id]) return false;
-    if(slot && slot.eligible.indexOf(p.pos) < 0) return false;
-    return true;
-  }).sort(sortByPos);
+  renderGameTeamToggle(game);
 
-  var homePlayers = allPlayers.filter(function(p){
-    if(normTeam(p.team) !== normTeam(game.home)) return false;
+  var eligible = allPlayers.filter(function(p){
+    var onAway = normTeam(p.team) === normTeam(game.away);
+    var onHome = normTeam(p.team) === normTeam(game.home);
+    if(!onAway && !onHome) return false;
+    if(activeGameTeamFilter === 'away' && !onAway) return false;
+    if(activeGameTeamFilter === 'home' && !onHome) return false;
     if(draftedInPreview[p.id]) return false;
     if(slot && slot.eligible.indexOf(p.pos) < 0) return false;
     return true;
-  }).sort(sortByPos);
+  });
 
   var inLineup = {};
   Object.values(lineup).forEach(function(p){ if(p) inLineup[p.id] = true; });
 
+  var firstAffordableMarked = false;
+
   function playerRow(p){
-    var isIn  = !!inLineup[p.id];
-    var isOut = p.status === 'O' || p.status === 'IR';
-    var posColor = POS_COLORS[p.pos] || 'var(--ink2)';
-    var injBadge = (p.status && p.status !== 'Active')
-      ? '<span class="p-inj inj-'+p.status+'">'+p.status+'</span>' : '';
     var isIn2 = !!inLineup[p.id];
-    var locked2   = isPlayerLocked(p);
-    // Same cap math as the main picker — exclude whoever currently
-    // occupies the active slot, since they're the one being replaced.
+    var isOut = p.status === 'O' || p.status === 'IR';
+    var locked2 = isPlayerLocked(p);
     var currentOccupantSalary = (activeSlot && lineup[activeSlot]) ? (lineup[activeSlot].salary || 0) : 0;
     var spentExRepl = getSpent() - currentOccupantSalary;
     var wouldOvr2 = !isIn2 && (spentExRepl + p.salary > CAP);
-    var cls = 'player-row'+(isIn2?' selected':'')+((isOut||wouldOvr2)?' disabled':'');
-    var draftLbl2 = isIn2 ? '✓' : locked2 ? '🔒' : wouldOvr2 ? '💰' : '+';
+    var disabled2 = isOut || locked2 || wouldOvr2;
+    var posColor = POS_COLORS[p.pos] || 'var(--ink2)';
+    var injBadge = (p.status && p.status !== 'Active')
+      ? '<span class="p-inj inj-'+p.status+'">'+p.status+'</span>' : '';
+    var draftLbl2 = isIn2 ? '✓ Drafted' : locked2 ? '🔒 Locked' : wouldOvr2 ? '💰 Can\'t Afford' : '+ Draft';
     var draftCls2 = 'draft-btn' + (isIn2 || locked2 || wouldOvr2 ? ' drafted' : '');
-    return '<div class="'+cls+'">'
+    var cls = 'player-row'+(isIn2?' selected':'')+(disabled2?' disabled':'');
+
+    var rowIdAttr = '';
+    if(!disabled2 && !firstAffordableMarked){
+      firstAffordableMarked = true;
+      rowIdAttr = ' id="first-affordable-row"';
+    }
+
+    return '<div class="'+cls+'"'+rowIdAttr+'>'
       + '<div class="p-pos" style="background:'+posColor+'18;color:'+posColor+'">'+p.pos+'</div>'
       + '<div class="p-info" onclick="openNews(\''+p.id+'\',event)" style="cursor:pointer;">'
       +   '<div class="p-name">'+p.name+injBadge+'</div>'
-      +   '<div class="p-meta">'+(p.proj ? p.proj+' proj' : '—')+'</div>'
+      +   '<div class="p-meta">'+(p.team||'')+(p.proj?' · '+p.proj+' proj':'')+'</div>'
       + '</div>'
-      + '<div class="p-sal" style="font-size:12px;">$'+(p.salary||0).toLocaleString()+'</div>'
+      + '<div class="p-sal">$'+(p.salary||0).toLocaleString()+'</div>'
       + '<button class="'+draftCls2+'" onclick="pickFromPreview(\''+p.id+'\')">' + draftLbl2 + '</button>'
       + '</div>';
   }
 
-  var html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0;">'
+  // Group by position (QB, RB, WR, TE, DEF), sorted by salary within
+  // each group — a single unified list instead of two team columns,
+  // with a labeled header for each position that actually has players.
+  var html = '';
+  POS_ORDER.forEach(function(pos){
+    var group = eligible.filter(function(p){ return p.pos === pos; })
+      .sort(function(a,b){ return b.salary - a.salary; });
+    if(!group.length) return;
+    html += '<div style="padding:8px 14px 4px;font-family:var(--fd);font-size:11px;font-weight:800;'
+      + 'color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;background:var(--bg2);'
+      + 'border-bottom:1px solid var(--bdr);border-top:1px solid var(--bdr);">' + POS_LABELS[pos] + '</div>';
+    html += group.map(playerRow).join('');
+  });
 
-    // Away team
-    + '<div style="border-right:1px solid var(--bdr);">'
-    + '<div style="padding:8px 12px;background:var(--bg2);border-bottom:1px solid var(--bdr);font-family:var(--fd);font-size:13px;font-weight:800;color:var(--ink2);text-transform:uppercase;letter-spacing:.5px;text-align:center;">'+game.away+'</div>'
-    + awayPlayers.map(playerRow).join('')
-    + '</div>'
-
-    // Home team
-    + '<div>'
-    + '<div style="padding:8px 12px;background:var(--bg2);border-bottom:1px solid var(--bdr);font-family:var(--fd);font-size:13px;font-weight:800;color:var(--ink2);text-transform:uppercase;letter-spacing:.5px;text-align:center;">'+game.home+'</div>'
-    + homePlayers.map(playerRow).join('')
-    + '</div>'
-
-    + '</div>';
+  if(!html){
+    html = '<div class="picker-empty"><div class="picker-empty-icon">🔍</div>'
+      + '<div class="picker-empty-title">No eligible players</div>'
+      + '<div class="picker-empty-sub">' + (activeGameTeamFilter !== 'both' ? 'Try "Both Teams" or a different game.' : 'Try a different game.') + '</div></div>';
+  }
 
   document.getElementById('picker-list').innerHTML = html;
   resetPickerScrollIfContextChanged();
+}
+
+// Persistent team-filter row (Both Teams / Away / Home), rendered into the
+// fixed header area above the scrolling list — not inside #picker-list —
+// so it stays visible while the player list underneath scrolls.
+function renderGameTeamToggle(game){
+  var wrap = document.getElementById('game-team-toggle');
+  if(!wrap) return;
+  wrap.style.display = 'flex';
+  wrap.classList.remove('hidden');
+
+  function chip(value, label){
+    var active = activeGameTeamFilter === value;
+    return '<button onclick="setGameTeamFilter(\'' + value + '\')" style="'
+      + 'flex:1;padding:7px 8px;border-radius:8px;font-family:var(--fd);font-size:11.5px;font-weight:800;'
+      + 'text-transform:uppercase;letter-spacing:.4px;cursor:pointer;'
+      + (active
+          ? 'background:linear-gradient(135deg,var(--or),var(--pk));border:1.5px solid transparent;color:#050808;'
+          : 'background:var(--bg);border:1.5px solid var(--bdr2);color:var(--ink2);')
+      + '">' + label + '</button>';
+  }
+
+  wrap.innerHTML = chip('both', 'Both Teams') + chip('away', game.away) + chip('home', game.home);
+}
+
+function setGameTeamFilter(filter){
+  activeGameTeamFilter = filter;
+  if(activeGame) renderGamePreview(activeGame);
 }
 
 function pickFromPreview(playerId){
@@ -1022,6 +1064,8 @@ function closeGamePreviewAfterPick(){
   activeGame = null;
   var badge = document.getElementById('picker-game-filter');
   if(badge) badge.style.display = 'none';
+  var gtt = document.getElementById('game-team-toggle');
+  if(gtt){ gtt.style.display = 'none'; gtt.classList.add('hidden'); }
   activeSlot = null;
   document.getElementById('picker-slot-label').textContent = 'All Players';
   document.getElementById('picker-slot-label').style.color = 'var(--ink2)';
@@ -1169,6 +1213,14 @@ function selectSlot(slotId){
 
 function closePicker(){
   activeSlot = null;
+  activeGame = null;
+  document.querySelectorAll('.game-chip').forEach(function(b){
+    b.classList.toggle('active', b.getAttribute('data-game') === 'all');
+  });
+  var badge = document.getElementById('picker-game-filter');
+  if(badge) badge.style.display = 'none';
+  var gtt = document.getElementById('game-team-toggle');
+  if(gtt){ gtt.style.display = 'none'; gtt.classList.add('hidden'); }
   document.getElementById('picker-slot-label').textContent = 'All Players';
   document.getElementById('picker-slot-label').style.color = 'var(--ink2)';
   document.getElementById('picker-panel').classList.remove('open');
@@ -1212,7 +1264,7 @@ function resetPickerScrollIfContextChanged(){
   // descending, is often a wall of players over what's left in budget),
   // scroll straight to the first genuinely affordable/available player —
   // marked as #first-affordable-row during the render loop above.
-  var contextKey = (activeSlot || 'none') + '|' + (activeGame ? activeGame.gameId : 'none');
+  var contextKey = (activeSlot || 'none') + '|' + (activeGame ? activeGame.gameId : 'none') + '|' + activeGameTeamFilter;
   if(contextKey !== lastPickerContext){
     lastPickerContext = contextKey;
     var list = document.getElementById('picker-list');
