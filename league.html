@@ -183,7 +183,7 @@ tr:hover td{background:var(--or4);}
 
 .lineup-card-list{display:flex;flex-direction:column;gap:6px;}
 .lineup-card{display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--bg4);border:1px solid var(--bdr);border-radius:10px;}
-.lineup-card-pos{flex-shrink:0;font-family:var(--fd);font-size:14.5px;font-weight:800;padding:8px 11px;border-radius:8px;border:1.5px solid;text-align:center;min-width:52px;}
+.lineup-card-pos{flex-shrink:0;font-family:var(--fd);font-size:12.5px;font-weight:800;padding:6px 9px;border-radius:7px;border:1.5px solid;text-align:center;min-width:44px;}
 .lineup-card-status-col{flex-shrink:0;width:96px;text-align:center;}
 .lineup-card-footer{display:flex;align-items:center;gap:8px;flex-shrink:0;}
 .lineup-card-mid{flex:1;min-width:0;}
@@ -202,7 +202,7 @@ tr:hover td{background:var(--or4);}
 .lineup-card-pts-stack{display:flex;flex-direction:column;align-items:center;flex-shrink:0;gap:4px;}
 .lineup-card-status-tag{font-size:10px;font-weight:700;color:var(--ink3);background:var(--bg2);border:1px solid var(--bdr2);border-radius:5px;padding:1px 6px;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap;}
 .lineup-card-status-tag.live{color:var(--pk);background:rgba(255,95,160,.1);border-color:rgba(255,95,160,.3);}
-.lineup-card-swap-btn{flex-shrink:0;font-family:var(--fd);font-size:14.5px;font-weight:800;color:var(--or);background:rgba(0,229,212,.1);border:1.5px solid rgba(0,229,212,.3);border-radius:8px;padding:8px 12px;cursor:pointer;text-transform:uppercase;letter-spacing:.3px;margin-left:8px;}
+.lineup-card-swap-btn{flex-shrink:0;font-family:var(--fd);font-size:12.5px;font-weight:800;color:var(--or);background:rgba(0,229,212,.1);border:1.5px solid rgba(0,229,212,.3);border-radius:7px;padding:6px 10px;cursor:pointer;text-transform:uppercase;letter-spacing:.3px;margin-left:8px;}
 .lineup-card-swap-btn:hover{background:rgba(0,229,212,.18);}
 .lineup-card-live{color:#3CD06C;font-size:10px;}
 .my-team-badge{font-family:var(--fd);font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:2px 7px;border-radius:8px;margin-left:6px;background:rgba(0,212,204,.15);color:var(--or);border:1px solid rgba(0,212,204,.4);}
@@ -572,6 +572,15 @@ body{padding-bottom:calc(76px + env(safe-area-inset-bottom));}
 .myteam-toggle-row{display:flex;justify-content:center;margin-top:10px;}
 .myteam-toggle-btn{background:linear-gradient(135deg,var(--or),var(--pk));border:1.5px solid transparent;border-radius:10px;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;padding:11px 24px;box-shadow:0 3px 12px rgba(0,229,212,.25);transition:all .15s;}
 .myteam-toggle-btn.tm-open{background:var(--hdr);border-color:var(--or);color:var(--or);box-shadow:none;}
+/* Main button (always navigates to the draft page) and caret button
+   (toggles the roster preview open/closed) sit right next to each other
+   and share rounded corners only on their OUTER edges, so together they
+   read as one cohesive pill even though they're two separate click
+   targets — editing and previewing are genuinely different actions now,
+   not one button doing both. */
+.myteam-main-btn{border-radius:10px 0 0 10px;box-shadow:none;}
+.myteam-caret-btn{background:linear-gradient(135deg,var(--or),var(--pk));border:1.5px solid transparent;border-left:1.5px solid rgba(5,8,8,.25);border-radius:0 10px 10px 0;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:11px 16px;box-shadow:0 3px 12px rgba(0,229,212,.25);transition:all .15s;}
+.myteam-caret-btn.tm-open{background:var(--hdr);border-color:var(--or);box-shadow:none;}
 .myteam-toggle-btn.tm-open .myteam-label{color:var(--or);}
 .myteam-toggle-btn span:first-child{font-family:var(--fd);font-size:13px;font-weight:800;color:#050808;text-transform:uppercase;letter-spacing:.5px;}
 .myteam-caret{font-size:15px;font-weight:800;color:#050808;transition:color .15s;}
@@ -949,8 +958,10 @@ setTimeout(function(){
 
 <div id="h2h-myteam-toggle-wrap" class="hidden" style="padding:0 16px 14px;">
   <div class="myteam-toggle-row" data-myteam-anchor="h2hhome" style="margin:0;">
-    <button class="myteam-toggle-btn" onclick="toggleMyTeam('h2hhome')">
+    <button class="myteam-toggle-btn myteam-main-btn" onclick="goToDraft()">
       <span class="myteam-label">👤 My Team</span>
+    </button>
+    <button class="myteam-caret-btn" onclick="toggleMyTeamDropdown('h2hhome')">
       <span class="myteam-caret" id="myteam-caret-h2hhome">+</span>
     </button>
   </div>
@@ -1001,8 +1012,10 @@ setTimeout(function(){
 <div id="cum-home" class="hidden">
   <div class="h2h-section h2h-section-matchups" style="margin:14px 16px 10px;">
     <div class="myteam-toggle-row" data-myteam-anchor="home" style="margin:0;">
-      <button class="myteam-toggle-btn" onclick="toggleMyTeam('home')">
+      <button class="myteam-toggle-btn myteam-main-btn" onclick="goToDraft()">
         <span class="myteam-label">👤 My Team</span>
+      </button>
+      <button class="myteam-caret-btn" onclick="toggleMyTeamDropdown('home')">
         <span class="myteam-caret" id="myteam-caret-home">+</span>
       </button>
     </div>
@@ -1059,8 +1072,10 @@ setTimeout(function(){
       <button class="tab-overlay-close-btn" onclick="closeH2HTabOverlay()">✕ Close</button>
     </div>
     <div class="myteam-toggle-row" data-myteam-anchor="yourweek">
-      <button class="myteam-toggle-btn" onclick="toggleMyTeam('yourweek')">
+      <button class="myteam-toggle-btn myteam-main-btn" onclick="goToDraft()">
         <span class="myteam-label">👤 My Team</span>
+      </button>
+      <button class="myteam-caret-btn" onclick="toggleMyTeamDropdown('yourweek')">
         <span class="myteam-caret" id="myteam-caret-yourweek">+</span>
       </button>
     </div>
@@ -1085,8 +1100,10 @@ setTimeout(function(){
       <button class="tab-overlay-close-btn" onclick="closeH2HTabOverlay()">✕ Close</button>
     </div>
     <div class="myteam-toggle-row" data-myteam-anchor="yourseason">
-      <button class="myteam-toggle-btn" onclick="toggleMyTeam('yourseason')">
+      <button class="myteam-toggle-btn myteam-main-btn" onclick="goToDraft()">
         <span class="myteam-label">👤 My Team</span>
+      </button>
+      <button class="myteam-caret-btn" onclick="toggleMyTeamDropdown('yourseason')">
         <span class="myteam-caret" id="myteam-caret-yourseason">+</span>
       </button>
     </div>
@@ -1111,8 +1128,10 @@ setTimeout(function(){
       <button class="tab-overlay-close-btn" onclick="closeH2HTabOverlay()">✕ Close</button>
     </div>
     <div class="myteam-toggle-row" data-myteam-anchor="guillotine">
-      <button class="myteam-toggle-btn" onclick="toggleMyTeam('guillotine')">
+      <button class="myteam-toggle-btn myteam-main-btn" onclick="goToDraft()">
         <span class="myteam-label">👤 My Team</span>
+      </button>
+      <button class="myteam-caret-btn" onclick="toggleMyTeamDropdown('guillotine')">
         <span class="myteam-caret" id="myteam-caret-guillotine">+</span>
       </button>
     </div>
@@ -1126,8 +1145,10 @@ setTimeout(function(){
       <button class="tab-overlay-close-btn" onclick="closeH2HTabOverlay()">✕ Close</button>
     </div>
     <div class="myteam-toggle-row" data-myteam-anchor="league">
-      <button class="myteam-toggle-btn" onclick="toggleMyTeam('league')">
+      <button class="myteam-toggle-btn myteam-main-btn" onclick="goToDraft()">
         <span class="myteam-label">👤 My Team</span>
+      </button>
+      <button class="myteam-caret-btn" onclick="toggleMyTeamDropdown('league')">
         <span class="myteam-caret" id="myteam-caret-league">+</span>
       </button>
     </div>
@@ -1141,8 +1162,10 @@ setTimeout(function(){
       <button class="tab-overlay-close-btn" onclick="closeH2HTabOverlay()">✕ Close</button>
     </div>
     <div class="myteam-toggle-row" data-myteam-anchor="playoffs">
-      <button class="myteam-toggle-btn" onclick="toggleMyTeam('playoffs')">
+      <button class="myteam-toggle-btn myteam-main-btn" onclick="goToDraft()">
         <span class="myteam-label">👤 My Team</span>
+      </button>
+      <button class="myteam-caret-btn" onclick="toggleMyTeamDropdown('playoffs')">
         <span class="myteam-caret" id="myteam-caret-playoffs">+</span>
       </button>
     </div>
@@ -2072,13 +2095,17 @@ function totalRosterSlots(cfg){
   return qb + rb + wr + te + flex + def;
 }
 
-// Draft Team (nothing picked yet) / Finish Team (some but not all slots
-// filled) / My Team (complete) — applies to every "My Team" button across
-// every screen, since they all share the same .myteam-label class.
+// Draft Team (nothing picked yet) / Finish Lineup (some but not all slots
+// filled) / Edit Lineup (complete) — applies to every "My Team" button
+// across every screen, since they all share the same .myteam-label class.
+// All three states do the exact same thing when clicked (go to the draft
+// page) — only the wording changes to reflect actual progress. Viewing
+// the roster itself is now a SEPARATE action (the +/- toggle next to this
+// button), no longer conflated with editing.
 function updateMyTeamLabel(filledCount, totalCount){
   var text = filledCount === 0 ? '📝 Draft Team'
-    : filledCount < totalCount ? '🧩 Finish Team'
-    : '👤 My Team';
+    : filledCount < totalCount ? '🧩 Finish Lineup'
+    : '✏️ Edit Lineup';
   document.querySelectorAll('.myteam-label').forEach(function(l){ l.textContent = text; });
 }
 
@@ -2186,9 +2213,13 @@ function buildLineupPlayerCard(p, pts, hasStarted, gameMap, showNotStartedTag, s
   // Falls back to the simpler hasStarted-based Locked/Not-started split
   // wherever live data isn't available yet (e.g. before auto-scoring has
   // run this week, or on call sites that don't fetch it).
+  //
+  // No per-player Swap button anymore — editing is handled entirely by
+  // the single Draft Team/Finish Lineup/Edit Lineup button above the
+  // roster, which always goes to the draft page. These cards are now
+  // pure display: what you have, how they're doing, nothing to click.
   var statusTag = '';
   var statusClass = '';
-  var swapBtn = '';
   var liveCode = game ? game.liveStatusCode : null;
   if(liveCode === 2){
     statusTag = 'Final';
@@ -2199,7 +2230,6 @@ function buildLineupPlayerCard(p, pts, hasStarted, gameMap, showNotStartedTag, s
     statusTag = '🔒 Locked';
   } else if(showNotStartedTag){
     statusTag = 'Not started';
-    swapBtn = '<button class="lineup-card-swap-btn" onclick="goToDraft()" title="Swap this player">🔄 Swap</button>';
   }
 
   return '<div class="lineup-card' + (hasStarted ? ' started' : '') + '">'
@@ -2212,7 +2242,6 @@ function buildLineupPlayerCard(p, pts, hasStarted, gameMap, showNotStartedTag, s
     +   '<div class="lineup-card-pts">' + ptsLabel + '</div>'
     +   (statusTag ? '<span class="lineup-card-status-tag' + statusClass + '">' + escapeHtmlFR(statusTag) + '</span>' : '')
     + '</div>'
-    + swapBtn
     + '</div>';
 }
 
@@ -2862,15 +2891,12 @@ function renderCumStandingsPage(page){
 // after whichever toggle button was clicked, rather than duplicating it.
 var myTeamAutoOpened = false; // ensures the landing-page auto-open only happens once, respecting later manual open/close choices
 
-// Auto-opens the My Team dropdown on first landing-page render, WITHOUT
-// the click-only redirect-to-draft behavior that toggleMyTeam() has for a
-// zero-player roster — that shortcut belongs to a deliberate user click,
-// not to a page just finishing loading. hasPlayers is passed in from the
-// caller's own real data check (not re-derived from DOM text here), since
-// checking the label directly was racy — this function used to run before
-// the async fetch that sets the label had resolved, so it could open an
-// empty dropdown for a brand-new member. A blank roster now just stays as
-// the plain "📝 Draft Team" button, nothing shown.
+// Auto-opens the My Team dropdown on first landing-page render. hasPlayers
+// is passed in from the caller's own real data check (not re-derived from
+// DOM text here), since checking the label directly was racy — this used
+// to run before the async fetch that sets the label had resolved, so it
+// could open an empty dropdown for a brand-new member. A blank roster now
+// just stays as the plain "📝 Draft Team" button, nothing shown.
 function autoOpenMyTeamOnce(context, hasPlayers){
   if(myTeamAutoOpened) return;
   myTeamAutoOpened = true;
@@ -2884,37 +2910,35 @@ function autoOpenMyTeamOnce(context, hasPlayers){
 
   anchor.parentNode.insertBefore(drop, anchor.nextSibling);
   drop.classList.remove('hidden');
-  var btn = anchor.querySelector('.myteam-toggle-btn');
-  if(btn) btn.classList.add('tm-open');
+  var mainBtn  = anchor.querySelector('.myteam-main-btn');
+  var caretBtn = anchor.querySelector('.myteam-caret-btn');
+  if(mainBtn)  mainBtn.classList.add('tm-open');
+  if(caretBtn) caretBtn.classList.add('tm-open');
   var caret = document.getElementById('myteam-caret-' + context);
   if(caret) caret.textContent = '−';
   loadMyTeamLineup(drop);
 }
 
-function toggleMyTeam(context){
+// Toggles the roster PREVIEW open/closed — this is now the caret button's
+// only job, entirely separate from editing. Previously this function also
+// had to special-case "if the label says Draft Team/Finish Team, redirect
+// to the draft page instead of opening" — that's gone now, because editing
+// lives on its own dedicated button (goToDraft() directly) that's always
+// clickable regardless of roster fill state. The preview toggle works the
+// same way no matter how complete your roster is.
+function toggleMyTeamDropdown(context){
   var anchor = document.querySelector('[data-myteam-anchor="' + context + '"]');
   if(!anchor) return;
-
-  // If this button currently reads "📝 Draft Team" (zero players drafted)
-  // OR "🧩 Finish Team" (some slots filled, some still empty), there's
-  // nothing useful to show in a dropdown summary — the actual next step
-  // in both cases is drafting/finishing on the Draft page, not a preview.
-  // Skip the detour and take them straight there instead.
-  var labelEl = anchor.querySelector('.myteam-label');
-  if(labelEl && (labelEl.textContent.indexOf('Draft Team') > -1 || labelEl.textContent.indexOf('Finish Team') > -1)){
-    goToDraft();
-    return;
-  }
 
   var drop = document.getElementById('myteam-drop');
   if(!drop) return;
 
   var alreadyOpenHere = !drop.classList.contains('hidden') && drop.previousElementSibling === anchor;
 
-  // Reset every button+caret to closed first — a plain "+" and the button's
+  // Reset every button pair + caret to closed first — a plain "+" and the
   // normal filled gradient look, so "will this click open/close it?" is
-  // clear from the symbol AND the whole button's style, not one small glyph.
-  document.querySelectorAll('.myteam-toggle-btn').forEach(function(b){ b.classList.remove('tm-open'); });
+  // clear from the symbol AND the whole widget's style, not one small glyph.
+  document.querySelectorAll('.myteam-main-btn, .myteam-caret-btn').forEach(function(b){ b.classList.remove('tm-open'); });
   document.querySelectorAll('.myteam-caret').forEach(function(c){ c.textContent = '+'; });
 
   if(alreadyOpenHere){
@@ -2924,8 +2948,10 @@ function toggleMyTeam(context){
 
   anchor.parentNode.insertBefore(drop, anchor.nextSibling);
   drop.classList.remove('hidden');
-  var btn = anchor.querySelector('.myteam-toggle-btn');
-  if(btn) btn.classList.add('tm-open');
+  var mainBtn  = anchor.querySelector('.myteam-main-btn');
+  var caretBtn = anchor.querySelector('.myteam-caret-btn');
+  if(mainBtn)  mainBtn.classList.add('tm-open');
+  if(caretBtn) caretBtn.classList.add('tm-open');
   var caret = document.getElementById('myteam-caret-' + context);
   if(caret) caret.textContent = '−';
   loadMyTeamLineup(drop);
@@ -6332,7 +6358,7 @@ function handleNav(val){
   var myTeamDrop = document.getElementById('myteam-drop');
   if(myTeamDrop && !myTeamDrop.classList.contains('hidden')){
     myTeamDrop.classList.add('hidden');
-    document.querySelectorAll('.myteam-toggle-btn').forEach(function(b){ b.classList.remove('tm-open'); });
+    document.querySelectorAll('.myteam-main-btn, .myteam-caret-btn').forEach(function(b){ b.classList.remove('tm-open'); });
     document.querySelectorAll('.myteam-caret').forEach(function(c){ c.textContent = '+'; });
   }
 
