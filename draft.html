@@ -306,6 +306,11 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
          Lives in the fixed header area (not inside #picker-list) so it
          stays visible while the player list underneath scrolls. -->
     <div class="game-team-toggle hidden" id="game-team-toggle" style="display:none;gap:6px;padding:8px 14px;border-bottom:1px solid var(--bdr);"></div>
+    <!-- Position sub-filter — All/RB/WR/TE (or QB for SUPERFLEX) — only
+         shown when the active slot is eligible for more than one position.
+         Can appear stacked below the team toggle if a flex slot AND a
+         game are both selected at once. -->
+    <div class="flex-pos-toggle hidden" id="flex-pos-toggle" style="display:none;gap:6px;padding:8px 14px;border-bottom:1px solid var(--bdr);"></div>
     <div class="picker-search-bar">
       <svg class="picker-search-ico" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
       <input type="text" class="picker-search" id="picker-search" placeholder="Search players…" oninput="renderPicker()">
@@ -399,6 +404,7 @@ var lineup       = {};   // {slotId: player}
 var activeSlot   = null; // currently picking for this slotId
 var activeGame   = null; // game filter: {home, away, teams:[]}
 var activeGameTeamFilter = 'both'; // 'both' | 'away' | 'home' — which side(s) of the selected game to show
+var activeFlexPosFilter = 'all'; // 'all' or a specific position — sub-filter for multi-eligible slots (FLEX, SUPERFLEX)
 var currentWeek  = 1;
 var schedule     = [];   // [{home,away,time,teams:[],international}]
 var currentUser  = null;
@@ -884,6 +890,7 @@ function renderGamePreview(game){
   var slot = activeSlot ? SLOT_DEFS.find(function(s){ return s.id === activeSlot; }) : null;
 
   renderGameTeamToggle(game);
+  renderFlexPosToggle(slot);
 
   var eligible = allPlayers.filter(function(p){
     var onAway = normTeam(p.team) === normTeam(game.away);
@@ -893,6 +900,7 @@ function renderGamePreview(game){
     if(activeGameTeamFilter === 'home' && !onHome) return false;
     if(draftedInPreview[p.id]) return false;
     if(slot && slot.eligible.indexOf(p.pos) < 0) return false;
+    if(slot && slot.eligible.length > 1 && activeFlexPosFilter !== 'all' && p.pos !== activeFlexPosFilter) return false;
     return true;
   });
 
@@ -983,6 +991,43 @@ function renderGameTeamToggle(game){
 function setGameTeamFilter(filter){
   activeGameTeamFilter = filter;
   if(activeGame) renderGamePreview(activeGame);
+}
+
+// Position sub-filter for multi-eligible slots (FLEX: WR/RB/TE, SUPERFLEX:
+// QB/RB/WR/TE) — "All" plus one chip per eligible position. Hidden
+// entirely for single-position slots (QB, a dedicated RB1 slot, etc.)
+// where there's nothing to sub-filter between. Works the same whether
+// or not a game is also selected, since it's driven by the slot's own
+// eligible list, independent of the game/team toggle.
+function renderFlexPosToggle(slot){
+  var wrap = document.getElementById('flex-pos-toggle');
+  if(!wrap) return;
+  if(!slot || slot.eligible.length <= 1){
+    wrap.style.display = 'none';
+    wrap.classList.add('hidden');
+    return;
+  }
+  wrap.style.display = 'flex';
+  wrap.classList.remove('hidden');
+
+  function chip(value, label){
+    var active = activeFlexPosFilter === value;
+    return '<button onclick="setFlexPosFilter(\'' + value + '\')" style="'
+      + 'flex:1;padding:7px 8px;border-radius:8px;font-family:var(--fd);font-size:11.5px;font-weight:800;'
+      + 'text-transform:uppercase;letter-spacing:.4px;cursor:pointer;'
+      + (active
+          ? 'background:linear-gradient(135deg,var(--or),var(--pk));border:1.5px solid transparent;color:#050808;'
+          : 'background:var(--bg);border:1.5px solid var(--bdr2);color:var(--ink2);')
+      + '">' + label + '</button>';
+  }
+
+  wrap.innerHTML = chip('all', 'All ' + slot.label) + slot.eligible.map(function(pos){ return chip(pos, pos); }).join('');
+}
+
+function setFlexPosFilter(filter){
+  activeFlexPosFilter = filter;
+  if(activeGame) renderGamePreview(activeGame);
+  else renderPicker();
 }
 
 function pickFromPreview(playerId){
@@ -1196,6 +1241,7 @@ function friendlySlotLabel(slot){
 
 function selectSlot(slotId){
   activeSlot = slotId;
+  activeFlexPosFilter = 'all'; // reset whenever a different slot is tapped
   var slot  = SLOT_DEFS.find(function(s){ return s.id === slotId; });
   var color = POS_COLORS[slot.pos] || 'var(--or)';
   var label = friendlySlotLabel(slot);
@@ -1264,7 +1310,7 @@ function resetPickerScrollIfContextChanged(){
   // descending, is often a wall of players over what's left in budget),
   // scroll straight to the first genuinely affordable/available player —
   // marked as #first-affordable-row during the render loop above.
-  var contextKey = (activeSlot || 'none') + '|' + (activeGame ? activeGame.gameId : 'none') + '|' + activeGameTeamFilter;
+  var contextKey = (activeSlot || 'none') + '|' + (activeGame ? activeGame.gameId : 'none') + '|' + activeGameTeamFilter + '|' + activeFlexPosFilter;
   if(contextKey !== lastPickerContext){
     lastPickerContext = contextKey;
     var list = document.getElementById('picker-list');
@@ -1299,10 +1345,13 @@ function renderPicker(){
 
   // Filter by active slot position if one is selected, otherwise show all
   var slot = activeSlot ? SLOT_DEFS.find(function(s){ return s.id === activeSlot; }) : null;
+  renderFlexPosToggle(slot);
 
   var players = allPlayers.filter(function(p){
     // Position filter — only apply when a slot is active
     if(slot && slot.eligible.indexOf(p.pos) < 0) return false;
+    // Flex sub-filter — narrows further to one specific eligible position
+    if(slot && slot.eligible.length > 1 && activeFlexPosFilter !== 'all' && p.pos !== activeFlexPosFilter) return false;
     // Game filter
     if(activeGame && (!p.team || activeGame.teams.indexOf(p.team) < 0)) return false;
     // Search
