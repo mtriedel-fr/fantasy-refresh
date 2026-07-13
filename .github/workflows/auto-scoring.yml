@@ -649,6 +649,64 @@ jobs:
                 console.error(`Failed scoring ${leagueId}:`, e.message);
               }
             }
+
+            // ── PERMANENT WEEKLY STATS ARCHIVE ──────────────────────────
+            // Once a week's games are ALL confirmed final, that data never
+            // changes again — so instead of re-fetching it from Tank01 on
+            // every single player-detail click (up to 18 calls per click,
+            // forever), write it to Firebase ONCE here and let the client
+            // read the archive instead of hitting Tank01 for any week
+            // that's already archived. Global path (not per-league) since
+            // real NFL stats are the same regardless of which league is
+            // asking — every league benefits from one shared archive.
+            // Uses playerStats/games already fetched above for scoring —
+            // zero additional Tank01 calls to build this.
+            if (allFinal) {
+              try {
+                await archiveWeekStats(games, playerStats, seasonType, week);
+              } catch(e) {
+                console.error('Failed to archive week stats:', e.message);
+              }
+            }
+          }
+
+          async function archiveWeekStats(games, playerStats, seasonType, week) {
+            const archiveKey = `${seasonType}_wk${week}`;
+            const gameList = games.map(g => ({
+              gameId: g.gameID || g.gameId || '',
+              home:   g.homeTeamAbbr || g.homeTeam || '',
+              away:   g.awayTeamAbbr || g.awayTeam || ''
+            })).filter(g => g.home && g.away);
+
+            // De-dupe playerStats (the same box score entry is indexed under
+            // pid, sleeperBotID, AND lowercased name — collapse back down to
+            // one record per real player, keyed by name to match how the
+            // client already looks players up).
+            const players = {};
+            Object.values(playerStats).forEach(stats => {
+              const name = (stats.longName || stats.playerName || '').toLowerCase();
+              if (!name || players[name]) return;
+              const team = stats.team || stats.teamAbv || '';
+              const game = gameList.find(g => g.home === team || g.away === team);
+              players[name] = {
+                team,
+                opp:    game ? (game.home === team ? game.away : game.home) : '',
+                isHome: game ? game.home === team : null,
+                pts:    parseFloat(stats.fantasyPoints || 0)
+              };
+            });
+
+            if (!Object.keys(players).length) {
+              console.log(`  Archive: no player stats to write for ${archiveKey}`);
+              return;
+            }
+
+            await firebasePut(`/nflStatsArchive/${SEASON}/${archiveKey}.json`, {
+              games: gameList,
+              players,
+              archivedAt: Date.now()
+            });
+            console.log(`  📦 Archived ${Object.keys(players).length} player stat lines for ${archiveKey}`);
           }
 
           main().catch(e => {
