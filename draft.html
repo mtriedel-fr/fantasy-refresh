@@ -1204,39 +1204,41 @@ function renderRoster(){
       // it again would just repeat itself. Matches the My Team card.
       var teamTag = (p.team && p.pos !== 'DEF') ? ' - ' + p.team : '';
       html += '<span class="slot-player-name" style="flex:1;">'+p.name+teamTag+'</span>';
+      // Salary now sits right on the header row, far right, next to the
+      // name — instead of its own line below. One less row of clutter.
+      html += '<span class="slot-player-sal">$'+(p.salary||0).toLocaleString()+'</span>';
     } else {
       html += '<span class="slot-empty-lbl">— empty —</span>';
     }
     html += '</div>';
     if(p){
       html += '<div class="slot-player-body">';
-      // Game info line — day/time first, then opponent, then dome
-      // indicator, matching the same order used on the My Team card and
-      // the picker list. This line didn't exist here before at all.
+      // Game info line — day/time, opponent, dome, THEN projected points
+      // folded right into the same line — matching the exact format the
+      // picker list already uses, instead of a separate stacked column.
       var game = p.team ? teamGameMap[p.team] : null;
+      var gameLine = '';
       if(game){
         var vsAt = game.international ? (game.isHome ? 'vs' : '@') + ' Int\'l' : (game.isHome ? 'vs' : '@');
         var hostTeam = game.isHome ? p.team : game.opp;
         var venueIcon = draftStadiumIcon(hostTeam);
         var kickoff = fmtKickoff(game.time);
-        html += '<div class="slot-player-game">' + (kickoff ? kickoff + ' · ' : '') + vsAt + ' ' + game.opp + (venueIcon ? ' ' + venueIcon : '') + '</div>';
+        gameLine = (kickoff ? kickoff + ' · ' : '') + vsAt + ' ' + game.opp + (venueIcon ? ' ' + venueIcon : '');
       }
-      html += '<div class="slot-player-meta">';
-      html += '<span class="slot-player-sal">$'+(p.salary||0).toLocaleString()+'</span>';
-      // Projected points, given a real, prominent stacked spot — matching
-      // the same visual weight actual points get on the My Team card,
-      // instead of being small inline text tucked next to the salary.
-      html += '<div class="slot-proj-stack">'
-        + '<span class="slot-proj-val">' + (p.proj != null ? p.proj : '—') + '</span>'
-        + '<span class="slot-proj-lbl">Proj</span>'
-        + '</div>';
-      // Status tag and remove button moved here, into the roomier body
-      // row, instead of the header row alongside the name — cramming
-      // position badge + name + status + remove all into one row was
-      // overflowing and overlapping on narrow phone screens.
+      if(p.proj != null) gameLine += (gameLine ? ' · ' : '') + p.proj + ' proj';
+      if(gameLine) html += '<div class="slot-player-game">' + gameLine + '</div>';
+
+      // "Not started" was true for virtually every player on this page
+      // (you're drafting before games happen) — dropped entirely since it
+      // carried no real information. "Locked" stays, since that actually
+      // tells you something: this player can no longer be removed.
       var locked = isPlayerLocked(p);
-      html += '<span class="slot-status-tag">' + (locked ? '🔒 Locked' : 'Not started') + '</span>';
-      if(!locked) html += '<button class="slot-remove-btn" data-remove-slot="'+s.id+'">Remove</button>';
+      html += '<div class="slot-player-meta">';
+      if(locked){
+        html += '<span class="slot-status-tag" style="margin-left:auto;">🔒 Locked</span>';
+      } else {
+        html += '<button class="slot-remove-btn" data-remove-slot="'+s.id+'" style="margin-left:auto;">Remove</button>';
+      }
       html += '</div></div>';
     }
     html += '</div>';
