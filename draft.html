@@ -79,7 +79,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
 .slot-player-body{padding:0 12px 10px;}
 .slot-player-name{font-family:var(--fd);font-size:17px;font-weight:800;color:var(--ink);}
 .slot-player-meta{display:flex;align-items:center;gap:8px;margin-top:2px;flex-wrap:wrap;}
-.slot-player-game{font-family:var(--fd);font-size:12.5px;color:var(--ink3);margin-top:2px;}
+.slot-player-game{font-family:var(--fd);font-size:14px;color:var(--ink3);margin-top:2px;display:flex;align-items:center;justify-content:space-between;gap:8px;}
 .slot-player-team{font-family:var(--fd);font-size:11px;color:var(--ink3);text-transform:uppercase;}
 .slot-player-sal{font-family:var(--fd);font-size:17px;font-weight:800;color:var(--or);}
 .slot-proj-stack{display:flex;flex-direction:column;align-items:center;flex-shrink:0;gap:4px;margin-left:auto;}
@@ -1216,6 +1216,8 @@ function renderRoster(){
       // Game info line — day/time, opponent, dome, THEN projected points
       // folded right into the same line — matching the exact format the
       // picker list already uses, instead of a separate stacked column.
+      // Remove/Locked now sits on this SAME line, right-aligned, instead
+      // of its own separate row below — one less row of clutter.
       var game = p.team ? teamGameMap[p.team] : null;
       var gameLine = '';
       if(game){
@@ -1226,20 +1228,18 @@ function renderRoster(){
         gameLine = (kickoff ? kickoff + ' · ' : '') + vsAt + ' ' + game.opp + (venueIcon ? ' ' + venueIcon : '');
       }
       if(p.proj != null) gameLine += (gameLine ? ' · ' : '') + p.proj + ' proj';
-      if(gameLine) html += '<div class="slot-player-game">' + gameLine + '</div>';
 
       // "Not started" was true for virtually every player on this page
       // (you're drafting before games happen) — dropped entirely since it
       // carried no real information. "Locked" stays, since that actually
       // tells you something: this player can no longer be removed.
       var locked = isPlayerLocked(p);
-      html += '<div class="slot-player-meta">';
-      if(locked){
-        html += '<span class="slot-status-tag" style="margin-left:auto;">🔒 Locked</span>';
-      } else {
-        html += '<button class="slot-remove-btn" data-remove-slot="'+s.id+'" style="margin-left:auto;">Remove</button>';
-      }
-      html += '</div></div>';
+      var control = locked
+        ? '<span class="slot-status-tag">🔒 Locked</span>'
+        : '<button class="slot-remove-btn" data-remove-slot="'+s.id+'">Remove</button>';
+
+      html += '<div class="slot-player-game"><span>'+gameLine+'</span>'+control+'</div>';
+      html += '</div>';
     }
     html += '</div>';
   });
