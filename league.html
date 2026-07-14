@@ -2203,16 +2203,17 @@ function buildLineupPlayerCard(p, pts, hasStarted, gameMap, showNotStartedTag, s
   // so appending it again would just repeat itself.
   var teamTag = (p.team && p.pos !== 'DEF') ? ' - ' + escapeHtmlFR(p.team) : '';
 
-  // Status tag — three real states now instead of just started/not:
-  //   Not started  → before kickoff
+  // Status tag — only shown when it actually conveys something:
   //   Live (PMR)   → game in progress, shows quarter + clock
   //   Final        → game over
+  //   Locked       → kickoff passed, no live data available yet
+  // "Not started" was dropped — same simplification made on the draft
+  // page's roster panel: it's the default state for virtually every
+  // player before games begin, so showing it added clutter without
+  // conveying anything the absence of a tag doesn't already say.
   // liveStatusCode/quarter/clock come from auto-scoring.yml's box-score
   // capture (see that file — statusCode is a confirmed Tank01 field,
   // quarter/clock are a best-guess pending real live-game testing).
-  // Falls back to the simpler hasStarted-based Locked/Not-started split
-  // wherever live data isn't available yet (e.g. before auto-scoring has
-  // run this week, or on call sites that don't fetch it).
   //
   // No per-player Swap button anymore — editing is handled entirely by
   // the single Draft Team/Finish Lineup/Edit Lineup button above the
@@ -2228,8 +2229,6 @@ function buildLineupPlayerCard(p, pts, hasStarted, gameMap, showNotStartedTag, s
     statusClass = ' live';
   } else if(hasStarted){
     statusTag = '🔒 Locked';
-  } else if(showNotStartedTag){
-    statusTag = 'Not started';
   }
 
   return '<div class="lineup-card' + (hasStarted ? ' started' : '') + '">'
