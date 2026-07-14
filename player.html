@@ -156,10 +156,16 @@ if(_backBtn) _backBtn.href = backLink;
 
 // ── LOAD ───────────────────────────────────────────────────────
 var pLeagueId = (typeof FR !== 'undefined' && FR.ctx) ? (FR.ctx().leagueId || 'fr_refresh26') : 'fr_refresh26';
-// This used to read a legacy top-level /season{year} path with no security
-// rule granting read access (only /season2025 exists, read-only, from
-// before multi-league support). Scores live per-league now.
-fetch(FB_DB_URL + '/leagues/' + pLeagueId + '/season/' + urlSeason + '.json')
+// 2025 is a genuinely separate, legacy data location — that season's
+// archive lives at the top-level /season2025 path (same place
+// archive2025.html itself reads from), NOT under the per-league structure
+// that 2026+ seasons use. Reading 2025 from /leagues/{id}/season/2025
+// was always going to find nothing, since that data was never migrated
+// there — it only ever existed at the legacy path.
+var fetchUrl = urlSeason === '2025'
+  ? FB_DB_URL + '/season2025.json'
+  : FB_DB_URL + '/leagues/' + pLeagueId + '/season/' + urlSeason + '.json';
+fetch(fetchUrl)
   .then(function(r){ return r.json(); })
   .then(function(d){
     if(d && typeof d === 'object' && !d.error) seasonData = d;
