@@ -688,8 +688,9 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
 </div>
 
 <!-- YOUR TEAM — directly below week bar -->
-<div class="my-team-bar">
-  <input type="text" id="my-team-input" placeholder="Type your team name to highlight your row..." oninput="setMyTeam(this.value)">
+<div class="my-team-bar" style="display:flex;align-items:center;gap:10px;">
+  <span style="font-family:var(--fd);font-size:12px;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;">Search Team:</span>
+  <input type="text" id="my-team-input" placeholder="Your team name..." oninput="setMyTeam(this.value)" style="flex:1;">
 </div>
 
 <!-- CONTEXT-AWARE STATS BAR -->
@@ -705,19 +706,16 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
   <div class="stat"><div class="stat-lbl">Most consistent</div><div class="stat-val" id="ss-streak">—</div><div class="stat-sub" id="ss-streak-name" style="font-family:var(--fd);font-size:11px;color:var(--ink3);letter-spacing:.5px;text-transform:uppercase;margin-top:2px"></div></div>
   <div class="stat"><div class="stat-lbl">Weeks played</div><div class="stat-val" id="ss-weeks">—</div></div>
 </div>
-
-<!-- SEARCH BAR -->
-<div class="search-bar-row">
-  <div class="search-wrap">
-    <svg viewBox="0 0 24 24" class="search-icon"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-    <input type="text" id="player-search" placeholder="Search player profiles..." autocomplete="off" oninput="handleSearch(this.value)" onfocus="showDropdown()" onblur="hideDropdown()">
-    <div class="search-dropdown hidden" id="search-dropdown"></div>
-  </div>
-</div>
+<!-- Player-profile search box removed — it sat right below the team-name
+     box, looked nearly identical, and was a genuinely different feature
+     (searching individual player stat profiles, not identifying your own
+     team). That similarity was the actual source of confusion — someone
+     had typed their email into it, which was never going to find anything
+     since it's not a login field. Down to one clearly-labeled box now. -->
 
 <!-- PRIMARY NAV TAB BAR - hidden, replaced by bottom nav -->
 <div class="nav-tab-bar" id="nav-tab-bar" style="display:none;">
-  <div class="nav-tab active" id="navtab-yourweek" onclick="handleNav('yourweek')">
+  <div class="nav-tab" id="navtab-yourweek" onclick="handleNav('yourweek')">
     <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
     <span>Your Week</span>
   </div>
@@ -725,7 +723,7 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
     <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
     <span>Your Season</span>
   </div>
-  <div class="nav-tab" id="navtab-seasonwrap" onclick="handleNav('seasonwrap')">
+  <div class="nav-tab active" id="navtab-seasonwrap" onclick="handleNav('seasonwrap')">
     <svg viewBox="0 0 24 24"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
     <span>Season Wrap</span>
   </div>
@@ -740,7 +738,7 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
 </div>
 
 <!-- YOUR WEEK — My Lineup / Weekly Standing / Weekly Numbers -->
-<div id="tab-yourweek" class="content">
+<div id="tab-yourweek" class="content hidden">
   <div class="sub-tabs-scroll">
     <div class="sub-tabs">
       <div class="sub-tab active" onclick="showSubTab(this,'mylineup','yourweek')">👤 My Lineup</div>
@@ -767,7 +765,7 @@ tr.my-team:hover td{background:rgba(0,212,204,.14) !important;}
   <div id="sub-movement" class="hidden"><div id="mw"></div></div>
 </div>
 
-<div id="tab-seasonwrap" class="content hidden"><div id="wsw"></div></div>
+<div id="tab-seasonwrap" class="content"><div id="wsw"></div></div>
 <div id="tab-guillotine" class="content hidden"><div id="wg"></div></div>
 
 <div class="comm-panel hidden" id="comm-panel">
@@ -940,9 +938,12 @@ function boot(){
     return !isNaN(Number(k)) && seasonData[k] && seasonData[k].length > 0;
   }).map(Number);
   if(loadedWks.length) currentWeek = Math.max.apply(null, loadedWks);
-  // Default to Your Week > My Lineup
+  // Default to Season Wrap — was "Your Week > My Lineup" before, which
+  // meant landing on an empty "no data yet" state for a specific week
+  // rather than the season-long summary that actually makes sense as a
+  // landing page for a completed archived season.
   document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); });
-  var defaultTab = document.getElementById('tab-yourweek');
+  var defaultTab = document.getElementById('tab-seasonwrap');
   if(defaultTab) defaultTab.classList.remove('hidden');
   ['weeklystanding','numbers','myseason','standings','movement'].forEach(function(n){
     var el = document.getElementById('sub-' + n);
@@ -951,8 +952,16 @@ function boot(){
   var mylineup = document.getElementById('sub-mylineup');
   if(mylineup) mylineup.classList.remove('hidden');
   document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); });
-  var activeTab = document.getElementById('navtab-yourweek');
+  var activeTab = document.getElementById('navtab-seasonwrap');
   if(activeTab) activeTab.classList.add('active');
+  // Mobile bottom-nav highlight is normally only set on click (see
+  // switchBotNav) — sync it here too so it matches on first load instead
+  // of staying its default gray until someone taps something.
+  var bnStandings = document.getElementById('bn-standings');
+  if(bnStandings){
+    var lbl = bnStandings.querySelector('span:last-child');
+    if(lbl) lbl.style.color = 'var(--or)';
+  }
   initMyTeamInput();
   renderAll();
   checkFirstRun();
