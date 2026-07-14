@@ -37,6 +37,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
 .cap-bar{background:var(--bg2);border-bottom:1px solid var(--bdr);padding:10px 20px;flex-shrink:0;}
 .cap-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
 .cap-label{font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;}
+.picker-cap-lbl{font-family:var(--fd);font-size:9.5px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:2px;}
 .cap-amount{font-family:var(--fd);font-size:26px;font-weight:900;color:var(--or);line-height:1;}
 .cap-amount.tight{color:#FF9A3A;}
 .cap-amount.over{color:var(--pk);}
@@ -67,26 +68,20 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
 .roster-slots::-webkit-scrollbar-track{background:transparent;}
 .roster-slots::-webkit-scrollbar-thumb{background:var(--bdr2);border-radius:3px;}
 .roster-slots::-webkit-scrollbar-thumb:hover{background:var(--or);}
-.roster-slot{background:var(--bg3);border-radius:10px;margin-bottom:8px;border:1px solid var(--bdr);cursor:pointer;transition:all .15s;overflow:hidden;}
+.roster-slot{background:var(--bg3);border-radius:10px;margin-bottom:8px;border:1px solid var(--bdr);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:10px;padding:12px 14px;}
 .roster-slot:hover{border-color:var(--bdr2);}
 .roster-slot.active{border-color:var(--or);box-shadow:0 0 0 1px var(--or);}
 .roster-slot.filled{border-color:var(--bdr2);}
 .roster-slot.filled:hover{border-color:var(--or);}
-.slot-hdr{display:flex;align-items:center;gap:10px;padding:10px 12px;}
 .slot-pos-tag{flex-shrink:0;font-family:var(--fd);font-size:12.5px;font-weight:800;padding:6px 9px;border-radius:7px;border:1.5px solid;text-align:center;min-width:44px;}
 .slot-empty-lbl{font-family:var(--fd);font-size:14px;color:var(--ink3);flex:1;}
-.slot-tap-hint{font-family:var(--fd);font-size:10px;color:var(--ink3);opacity:.6;text-transform:uppercase;letter-spacing:.5px;}
-.slot-player-body{padding:0 12px 10px;}
+.slot-mid{flex:1;min-width:0;}
 .slot-player-name{font-family:var(--fd);font-size:17px;font-weight:800;color:var(--ink);}
-.slot-player-meta{display:flex;align-items:center;gap:8px;margin-top:2px;flex-wrap:wrap;}
-.slot-player-game{font-family:var(--fd);font-size:14px;color:var(--ink3);margin-top:2px;display:flex;align-items:center;justify-content:space-between;gap:8px;}
-.slot-player-team{font-family:var(--fd);font-size:11px;color:var(--ink3);text-transform:uppercase;}
+.slot-player-game{font-family:var(--fd);font-size:14px;color:var(--ink3);margin-top:2px;}
+.slot-right-stack{display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0;}
 .slot-player-sal{font-family:var(--fd);font-size:17px;font-weight:800;color:var(--or);}
-.slot-proj-stack{display:flex;flex-direction:column;align-items:center;flex-shrink:0;gap:4px;margin-left:auto;}
-.slot-proj-val{font-family:var(--fd);font-size:17px;font-weight:900;color:var(--ink);line-height:1;}
-.slot-proj-lbl{font-size:10px;font-weight:700;color:var(--ink3);letter-spacing:.5px;text-transform:uppercase;}
 .slot-status-tag{font-size:10px;font-weight:700;color:var(--ink3);background:var(--bg2);border:1px solid var(--bdr2);border-radius:5px;padding:1px 6px;text-transform:uppercase;letter-spacing:.3px;flex-shrink:0;}
-.slot-remove-btn{background:rgba(255,95,160,.1);border:1.5px solid rgba(255,95,160,.3);color:var(--pk);font-family:var(--fd);font-size:12.5px;font-weight:800;cursor:pointer;padding:6px 10px;border-radius:7px;margin-left:8px;text-transform:uppercase;letter-spacing:.3px;transition:all .15s;flex-shrink:0;}
+.slot-remove-btn{background:rgba(255,95,160,.1);border:1.5px solid rgba(255,95,160,.3);color:var(--pk);font-family:var(--fd);font-size:12.5px;font-weight:800;cursor:pointer;padding:6px 10px;border-radius:7px;text-transform:uppercase;letter-spacing:.3px;transition:all .15s;flex-shrink:0;}
 .slot-remove-btn:hover{background:var(--pk);color:#fff;border-color:var(--pk);}
 
 /* ── SUBMIT ── */
@@ -257,6 +252,10 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
   <button onclick="window.location.href='/league.html'" class="hdr-back">← League</button>
 </div>
 
+<div class="games-bar" id="games-bar">
+  <div class="games-loading">Loading schedule…</div>
+</div>
+
 <div class="cap-bar">
   <div class="cap-row">
     <div><div class="cap-label">Cap Remaining</div><div class="cap-amount" id="cap-amt">$60,000</div></div>
@@ -264,10 +263,6 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
     <div style="text-align:right;"><div class="cap-label">Roster</div><div class="cap-slots-info"><span id="slots-n">0</span>/9 filled</div></div>
   </div>
   <div class="cap-track"><div class="cap-track-fill" id="cap-fill" style="width:0%"></div></div>
-</div>
-
-<div class="games-bar" id="games-bar">
-  <div class="games-loading">Loading schedule…</div>
 </div>
 
 <div class="main">
@@ -294,19 +289,24 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
       <div class="picker-game-filter" id="picker-game-filter" style="display:none;"></div>
       <button class="picker-clear-btn" onclick="closePicker()">✕ Close</button>
     </div>
-    <!-- Budget remaining, visible inside every picker mode (game preview,
-         position-filtered, free-browse) — the picker is a full-screen
-         overlay on mobile that otherwise completely hides the main cap
-         bar sitting above it in the page, so this was invisible while
-         actually browsing/drafting, only visible once you closed back
-         out to the roster. Wired into the same updateCap() as the main
-         cap bar, so the two never drift out of sync. -->
-    <div class="picker-budget-bar" style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border-bottom:1px solid var(--bdr);background:var(--bg2);">
-      <span style="font-family:var(--fd);font-size:10.5px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;">Cap Remaining</span>
-      <span class="cap-amount" id="picker-cap-amt" style="font-family:var(--fd);font-size:16px;font-weight:800;color:var(--or);">$60,000</span>
-    </div>
     <!-- Games bar inside picker — mobile only -->
     <div class="games-bar" id="picker-games-bar" style="border-bottom:1px solid var(--bdr);border-top:1px solid var(--bdr);display:none;"></div>
+    <!-- Full cap bar (Cap Remaining / Avg per Slot / Roster filled) —
+         expanded from the old single-value version to match the main
+         page, and moved below the games bar. This sits outside the
+         scrolling #picker-list, so it's naturally "frozen" — always
+         visible while the player list scrolls beneath it — without
+         needing position:sticky, the same way the rest of the picker's
+         header controls (search bar, filters) already work. Wired into
+         the same updateCap() as the main cap bar, so all copies stay in
+         sync automatically. -->
+    <div class="picker-cap-bar" style="padding:8px 14px;border-bottom:1px solid var(--bdr);background:var(--bg2);">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <div><div class="picker-cap-lbl">Cap Remaining</div><span class="cap-amount" id="picker-cap-amt" style="font-family:var(--fd);font-size:16px;font-weight:800;color:var(--or);">$60,000</span></div>
+        <div style="text-align:center;"><div class="picker-cap-lbl">Avg / Slot</div><span id="picker-avg-per-slot" style="font-family:var(--fd);font-size:14px;font-weight:800;color:var(--ink2);">$6,667</span></div>
+        <div style="text-align:right;"><div class="picker-cap-lbl">Roster</div><span style="font-family:var(--fd);font-size:14px;font-weight:800;color:var(--ink2);"><span id="picker-slots-n">0</span>/9 filled</span></div>
+      </div>
+    </div>
     <!-- Team filter — Both/Away/Home — only shown when a game is selected.
          Lives in the fixed header area (not inside #picker-list) so it
          stays visible while the player list underneath scrolls. -->
@@ -947,7 +947,7 @@ function renderGamePreview(game){
     return '<div class="'+cls+'"'+rowIdAttr+'>'
       + '<div class="p-pos" style="background:'+posColor+'18;color:'+posColor+'">'+p.pos+'</div>'
       + '<div class="p-info" onclick="openNews(\''+p.id+'\',event)" style="cursor:pointer;">'
-      +   '<div class="p-name">'+p.name+(p.team?' - '+p.team:'')+injBadge+'</div>'
+      +   '<div class="p-name">'+p.name+(p.team&&p.pos!=='DEF'?' - '+p.team:'')+injBadge+'</div>'
       +   '<div class="p-meta">'+(p.proj?p.proj+' proj':'')+'</div>'
       + '</div>'
       + '<div class="p-sal">$'+(p.salary||0).toLocaleString()+'</div>'
@@ -1196,28 +1196,19 @@ function renderRoster(){
     var color   = POS_COLORS[s.pos] || 'var(--ink2)';
     var cls     = 'roster-slot' + (p ? ' filled' : '') + (isActive ? ' active' : '');
     html += '<div class="'+cls+'" data-slot-id="'+s.id+'">';
-    html += '<div class="slot-hdr">';
+    // Position badge — no longer wrapped in its own header row, so it
+    // naturally sits vertically centered against the whole card via the
+    // outer .roster-slot's own align-items:center, matching the My Team
+    // card exactly instead of being pinned to the top.
     html += '<span class="slot-pos-tag" style="background:'+color+'1f;color:'+color+';border-color:'+color+'40;">'+s.label+'</span>';
     if(p){
       // Team abbreviation on the name — skipped for DEF, since a defense
       // "player" IS the team already ("PHI", "SEA", etc.), so appending
       // it again would just repeat itself. Matches the My Team card.
       var teamTag = (p.team && p.pos !== 'DEF') ? ' - ' + p.team : '';
-      html += '<span class="slot-player-name" style="flex:1;">'+p.name+teamTag+'</span>';
-      // Salary now sits right on the header row, far right, next to the
-      // name — instead of its own line below. One less row of clutter.
-      html += '<span class="slot-player-sal">$'+(p.salary||0).toLocaleString()+'</span>';
-    } else {
-      html += '<span class="slot-empty-lbl">— empty —</span>';
-    }
-    html += '</div>';
-    if(p){
-      html += '<div class="slot-player-body">';
+
       // Game info line — day/time, opponent, dome, THEN projected points
-      // folded right into the same line — matching the exact format the
-      // picker list already uses, instead of a separate stacked column.
-      // Remove/Locked now sits on this SAME line, right-aligned, instead
-      // of its own separate row below — one less row of clutter.
+      // folded right into the same line, matching the picker list format.
       var game = p.team ? teamGameMap[p.team] : null;
       var gameLine = '';
       if(game){
@@ -1229,17 +1220,28 @@ function renderRoster(){
       }
       if(p.proj != null) gameLine += (gameLine ? ' · ' : '') + p.proj + ' proj';
 
-      // "Not started" was true for virtually every player on this page
-      // (you're drafting before games happen) — dropped entirely since it
-      // carried no real information. "Locked" stays, since that actually
-      // tells you something: this player can no longer be removed.
+      // Name and the game/date line now sit in the SAME middle column
+      // (.slot-mid), so the date lines up directly under the name instead
+      // of starting at the card's left edge under the badge.
+      html += '<div class="slot-mid">';
+      html +=   '<div class="slot-player-name">'+p.name+teamTag+'</div>';
+      if(gameLine) html += '<div class="slot-player-game">'+gameLine+'</div>';
+      html += '</div>';
+
+      // Salary and Remove/Locked stacked together on the right, centered
+      // — matching the exact same treatment as points+status on the My
+      // Team card, instead of salary alone on the header row and Remove
+      // separately on the line below.
       var locked = isPlayerLocked(p);
       var control = locked
         ? '<span class="slot-status-tag">🔒 Locked</span>'
         : '<button class="slot-remove-btn" data-remove-slot="'+s.id+'">Remove</button>';
-
-      html += '<div class="slot-player-game"><span>'+gameLine+'</span>'+control+'</div>';
+      html += '<div class="slot-right-stack">';
+      html +=   '<span class="slot-player-sal">$'+(p.salary||0).toLocaleString()+'</span>';
+      html +=   control;
       html += '</div>';
+    } else {
+      html += '<span class="slot-empty-lbl">— empty —</span>';
     }
     html += '</div>';
   });
@@ -1471,7 +1473,7 @@ function renderPicker(){
     html += '<div class="'+rowCls+'"'+rowIdAttr+'>'
       + '<div class="p-pos" style="background:'+posColor+'18;color:'+posColor+'">'+p.pos+'</div>'
       + '<div class="p-info" onclick="openNews(\''+p.id+'\',event)" style="cursor:pointer;">'
-      +   '<div class="p-name">'+p.name+(p.team?' - '+p.team:'')+injBadge+(isElsewhere?' <span style="font-size:10px;color:var(--ink3)">(in lineup)</span>':'')+'</div>'
+      +   '<div class="p-name">'+p.name+(p.team&&p.pos!=='DEF'?' - '+p.team:'')+injBadge+(isElsewhere?' <span style="font-size:10px;color:var(--ink3)">(in lineup)</span>':'')+'</div>'
       +   '<div class="p-meta">'+gameMeta+(p.proj?(gameMeta?' · ':'')+p.proj+' proj':'')+'</div>'
       + '</div>'
       + '<div class="p-sal">$'+(p.salary||0).toLocaleString()+'</div>'
@@ -1696,17 +1698,22 @@ function updateCap(){
   }
 
   document.getElementById('slots-n').textContent = filled;
+  var pickerSlotsEl = document.getElementById('picker-slots-n');
+  if(pickerSlotsEl) pickerSlotsEl.textContent = filled;
 
   // Avg per remaining slot
   var avgEl = document.getElementById('avg-per-slot');
+  var pickerAvgEl = document.getElementById('picker-avg-per-slot');
   if(avgEl){
     if(slotsLeft <= 0){
       avgEl.textContent = '—';
       avgEl.style.color = 'var(--ink3)';
+      if(pickerAvgEl){ pickerAvgEl.textContent = '—'; pickerAvgEl.style.color = 'var(--ink3)'; }
     } else {
       var avg = Math.floor(remaining / slotsLeft);
       avgEl.textContent = (avg < 0 ? '-$' : '$') + Math.abs(avg).toLocaleString();
       avgEl.style.color = avg < 4000 ? 'var(--pk)' : avg < 5500 ? '#FF9A3A' : 'var(--ink2)';
+      if(pickerAvgEl){ pickerAvgEl.textContent = avgEl.textContent; pickerAvgEl.style.color = avgEl.style.color; }
     }
   }
 
