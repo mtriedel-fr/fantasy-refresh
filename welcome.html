@@ -239,6 +239,10 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
 <!-- HERO -->
 <section class="hero">
   <div class="hero-bg"></div>
+  <div id="session-expired-banner" style="display:none;max-width:480px;margin:0 auto 18px;padding:12px 18px;background:rgba(255,95,160,.1);border:1px solid rgba(255,95,160,.3);border-radius:10px;text-align:center;">
+    <div style="font-family:var(--fd);font-weight:800;font-size:14px;color:var(--pk);">Your session expired — sign in again</div>
+    <div style="font-size:12.5px;color:var(--ink3);margin-top:2px;">Nothing was lost, but you'll need to log back in to keep going.</div>
+  </div>
   <p style="font-size:13.5px;color:var(--ink3);margin-bottom:10px;text-align:center;">Already have a join code from your commissioner? <a href="/auth.html?mode=signup" style="color:var(--or);font-weight:700;text-decoration:none;">Sign up with it →</a></p>
   <a href="/waitlist.html" class="wl-pill">● No code yet? Join the waitlist for next season <span class="arrow">→</span></a>
   <p style="font-family:var(--fd);font-size:clamp(22px,5vw,36px);font-weight:700;color:var(--ink2);text-transform:uppercase;letter-spacing:.5px;line-height:1.2;margin-bottom:10px;text-align:center;">Think you're good<br>at Fantasy Football?</p>
@@ -463,6 +467,16 @@ window.addEventListener('beforeinstallprompt', function(e) {
   if (banner) banner.style.display = 'flex';
 });
 document.addEventListener('DOMContentLoaded', function() {
+  // Shown when draft.html (or any page using requireValidAuth()) confirms
+  // a real session is dead and redirects here — gives a clear reason
+  // instead of landing on the welcome page with no explanation at all.
+  try{
+    if((new URLSearchParams(window.location.search)).get('expired') === '1'){
+      var banner = document.getElementById('session-expired-banner');
+      if(banner) banner.style.display = 'block';
+    }
+  }catch(e){}
+
   var btn = document.getElementById('install-btn');
   if (btn) {
     btn.addEventListener('click', function() {

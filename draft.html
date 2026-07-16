@@ -468,6 +468,21 @@ document.addEventListener('DOMContentLoaded', function(){
     }
   }catch(e){}
 
+  // Validate the REAL session before proceeding, not just the locally
+  // cached profile object checked above. Someone who logged in a while
+  // ago can still have that cached profile sitting in localStorage long
+  // after the actual Firebase session behind it has expired — the page
+  // would otherwise render normally, look fully logged in, and only fail
+  // once they hit Submit after already building a full lineup. If
+  // requireValidAuth() can't confirm a real, live session, it redirects
+  // to welcome.html itself — nothing below this point runs in that case.
+  var authCheck = (typeof FRAuth !== 'undefined' && FRAuth.requireValidAuth)
+    ? FRAuth.requireValidAuth()
+    : Promise.resolve(true);
+
+  authCheck.then(function(valid){
+    if(!valid) return;
+
   function startBoot(){
     SLOT_DEFS.forEach(function(s){ lineup[s.id] = null; });
     renderRoster();
@@ -490,6 +505,8 @@ document.addEventListener('DOMContentLoaded', function(){
   } else {
     startBoot();
   }
+
+  }); // end authCheck.then
 });
 
 // ── DPI-SCALING SAFETY NET ───────────────────────────────────────
@@ -1755,19 +1772,36 @@ function submitLineup(){
   if(Object.values(lineup).filter(Boolean).length===0){ showToast('Add at least one player first',true); return; }
   if(getSpent()>CAP){ showToast('Over cap',true); return; }
   var btn = document.getElementById('submit-btn');
-  btn.disabled=true; btn.textContent='Submitting…';
+  btn.disabled=true; btn.textContent='Checking session…';
 
-  saveLineupToFirebase().then(function(){
-    var msg=document.getElementById('submit-msg');
-    msg.textContent='✓ Lineup submitted! Good luck.'; msg.className='submit-msg ok';
-    btn.textContent='↑ Update Lineup'; btn.disabled=false;
-    showToast('Lineup submitted! 🏈');
-    setTimeout(function(){ window.location.href = '/league.html'; }, 1200);
-  }).catch(function(err){
-    console.error('Lineup submit failed:', err);
-    document.getElementById('submit-msg').textContent='Submission failed — try again';
-    document.getElementById('submit-msg').className='submit-msg err';
-    btn.disabled=false; btn.textContent='Submit Lineup →';
+  // Re-validate the real session right before the actual write — a boot-
+  // time check alone doesn't protect against the session dying WHILE
+  // someone is drafting, which can genuinely take a while for a full
+  // roster. This is the direct fix for lineups that fail at submit time
+  // because the underlying session was never actually alive, even though
+  // the page looked normally logged in the whole time. If the session is
+  // confirmed dead, requireValidAuth() redirects to welcome.html itself —
+  // nothing below runs in that case, so no half-submitted state.
+  var authCheck = (typeof FRAuth !== 'undefined' && FRAuth.requireValidAuth)
+    ? FRAuth.requireValidAuth()
+    : Promise.resolve(true);
+
+  authCheck.then(function(valid){
+    if(!valid) return;
+
+    btn.textContent='Submitting…';
+    saveLineupToFirebase().then(function(){
+      var msg=document.getElementById('submit-msg');
+      msg.textContent='✓ Lineup submitted! Good luck.'; msg.className='submit-msg ok';
+      btn.textContent='↑ Update Lineup'; btn.disabled=false;
+      showToast('Lineup submitted! 🏈');
+      setTimeout(function(){ window.location.href = '/league.html'; }, 1200);
+    }).catch(function(err){
+      console.error('Lineup submit failed:', err);
+      document.getElementById('submit-msg').textContent='Submission failed — try again';
+      document.getElementById('submit-msg').className='submit-msg err';
+      btn.disabled=false; btn.textContent='Submit Lineup →';
+    });
   });
 }
 
