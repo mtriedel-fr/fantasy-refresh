@@ -66,8 +66,14 @@
         setTokens(data.id_token, data.refresh_token, data.expires_in);
         return data.id_token;
       }
-      // Refresh token expired — clear it
+      // Refresh token expired — the session is genuinely, permanently
+      // dead, not just due for a routine refresh. Clear the cached user
+      // profile too, not just the token — otherwise getUser() keeps
+      // returning the old profile forever, and every page that checks
+      // "is someone logged in?" via getUser() alone keeps saying yes even
+      // though the real Firebase session is confirmed gone.
       clearTokens();
+      clearUser();
       return null;
     })
     .catch(function() { return null; });
@@ -128,6 +134,44 @@
       return false;
     }
     return true;
+  }
+
+  // requireAuth() above only checks a locally cached profile object — it
+  // says "yes" as long as SOMEONE once logged in and never explicitly hit
+  // Sign Out, even if the real Firebase session behind it is long dead
+  // (refresh token expired, revoked, etc). That's fine for a fast,
+  // synchronous check on most pages, but it's exactly how someone can look
+  // logged in, fill out a whole lineup, and then have the actual submit
+  // fail — the page never had a real session to submit with, it just had
+  // old cached profile data sitting in localStorage.
+  //
+  // requireValidAuth() actually calls ensureToken(), which either returns
+  // a real, currently-valid token or genuinely refreshes one — the same
+  // mechanism that's supposed to keep sessions alive silently in the
+  // background already. If that comes back null, the session is
+  // confirmed, provably dead (not just "haven't checked yet"), and this
+  // sends them to welcome.html instead of letting them continue on a page
+  // that only looks like it's signed in.
+  //
+  // Use this instead of requireAuth() on any page/action where a failed
+  // write would waste real user effort (drafting a full lineup, then
+  // finding out at submit time that none of it can actually be saved).
+  function requireValidAuth() {
+    return new Promise(function(resolve) {
+      if (!getUser()) {
+        window.location.href = '/welcome.html';
+        resolve(false);
+        return;
+      }
+      ensureToken().then(function(token) {
+        if (!token) {
+          window.location.href = '/welcome.html?expired=1';
+          resolve(false);
+          return;
+        }
+        resolve(true);
+      });
+    });
   }
 
   function requireLeague() {
@@ -377,6 +421,7 @@
 
     // Route guards
     requireAuth:        requireAuth,
+    requireValidAuth:   requireValidAuth,
     requireLeague:      requireLeague,
     redirectIfSignedIn: redirectIfSignedIn,
 
