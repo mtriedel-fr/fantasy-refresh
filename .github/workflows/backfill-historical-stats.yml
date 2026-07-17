@@ -132,6 +132,16 @@ jobs:
               try {
                 const data = await fetchJson(`${WORKER}/score?gameId=${g.gameId}`);
                 const stats = data.playerStats || {};
+                if (TEST_ONLY && !global.__loggedRawStat) {
+                  // One raw, completely unprocessed sample straight from
+                  // Tank01 — the actual field names, not what our own
+                  // extraction code assumes they are. This is what
+                  // actually tells us why pos/stats came back empty
+                  // instead of guessing at a fix a fourth time.
+                  global.__loggedRawStat = true;
+                  console.log('  [RAW SAMPLE] First unprocessed player stat entry from Tank01:');
+                  console.log('  ', JSON.stringify(Object.values(stats)[0] || {}, null, 2));
+                }
                 Object.values(stats).forEach(s => {
                   const name = (s.longName || s.playerName || '').toLowerCase();
                   if (!name || players[name]) return;
