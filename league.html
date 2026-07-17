@@ -8472,7 +8472,7 @@ function generateSalaries(){
                 return generateFlatSalaries(week);
               }
 
-              return saveSalaries(week, salaries, count);
+              return saveSalaries(week, salaries, count, false);
             });
         })
         .then(function(){
@@ -8494,6 +8494,31 @@ function generateSalaries(){
 }
 
 function generateFlatSalaries(week){
+  // Real, already-generated data existing here is strictly better than
+  // flat fallback — a failed fetch attempt right now says nothing about
+  // whether previously-saved real data is still good. It is. Never
+  // downgrade good salaries to flat pricing just because a later
+  // regeneration attempt happened to fail (Tank01 outage, RapidAPI issue,
+  // etc.) — only use flat as a first-time safety net when there's
+  // genuinely nothing better in place yet.
+  return fetch(FR.FB_DB_URL + FR.paths.salaries() + '/week' + week + '/meta.json')
+    .then(function(r){ return r.json(); })
+    .then(function(existingMeta){
+      if(existingMeta && existingMeta.count > 0 && !existingMeta.flat){
+        var status = document.getElementById('sal-status');
+        if(status){
+          status.textContent = 'Real salaries already exist for Week ' + week + ' — keeping them, not overwriting with flat.';
+          status.className = 'salary-status err';
+        }
+        showToast('Kept existing real salaries — projections unavailable right now', true);
+        return Promise.resolve();
+      }
+      return buildAndSaveFlatSalaries(week);
+    })
+    .catch(function(){ return buildAndSaveFlatSalaries(week); }); // meta fetch itself failed — fall through to flat as before
+}
+
+function buildAndSaveFlatSalaries(week){
   // Fallback: flat salaries by position tier when projections unavailable
   var FLAT = {QB:8500, RB:6500, WR:6000, TE:5500, DEF:5000};
   return FR.fb.getPlayerPool()
@@ -8512,11 +8537,11 @@ function generateFlatSalaries(week){
         };
         count++;
       });
-      return saveSalaries(week, salaries, count);
+      return saveSalaries(week, salaries, count, true);
     });
 }
 
-function saveSalaries(week, salaries, count){
+function saveSalaries(week, salaries, count, isFlat){
   var payload = {
     players:   salaries,
     meta: {
@@ -8524,7 +8549,8 @@ function saveSalaries(week, salaries, count){
       count:     count,
       generated: Date.now(),
       locked:    false,
-      cap:       60000
+      cap:       60000,
+      flat:      !!isFlat
     }
   };
   return FR.fb.put(FR.paths.salaries() + '/week' + week, payload)
