@@ -117,17 +117,27 @@ jobs:
             return { games: (res && res.games) || [] };
           }
 
+          // The player pool only ever exists for the CURRENT active
+          // season (it's a live roster resource for this year's draft,
+          // never a historical archive) — so this always checks the
+          // current season regardless of which season is being backfilled.
+          // A player's position is stable enough for this to work fine
+          // even when backfilling old stats: Baker Mayfield is a QB
+          // whether we're looking at his 2025 production or his 2026
+          // roster listing.
+          const CURRENT_SEASON_FOR_POOL = '2026';
+
           let playerPosLookup = null;
           async function getPlayerPosLookup() {
             if (playerPosLookup) return playerPosLookup;
             playerPosLookup = {};
             try {
-              const pool = await firebaseGet(`/playerPool/${SEASON}/players.json`);
+              const pool = await firebaseGet(`/playerPool/${CURRENT_SEASON_FOR_POOL}/players.json`);
               Object.values(pool || {}).forEach(p => {
                 if (p && p.name) playerPosLookup[p.name.toLowerCase()] = p.pos || '';
               });
               if (TEST_ONLY) {
-                console.log(`  [POS LOOKUP] Loaded ${Object.keys(playerPosLookup).length} names from /playerPool/${SEASON}/players.json`);
+                console.log(`  [POS LOOKUP] Loaded ${Object.keys(playerPosLookup).length} names from /playerPool/${CURRENT_SEASON_FOR_POOL}/players.json`);
                 console.log(`  [POS LOOKUP] "baker mayfield" found: ${playerPosLookup.hasOwnProperty('baker mayfield')} (value: "${playerPosLookup['baker mayfield']}")`);
                 const sampleKeys = Object.keys(playerPosLookup).slice(0, 3);
                 console.log(`  [POS LOOKUP] Sample keys actually in the pool:`, sampleKeys);
