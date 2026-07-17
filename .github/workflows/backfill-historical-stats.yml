@@ -116,12 +116,12 @@ jobs:
             'fantasyPoints=true','PPRScoring=true'
           ].join('&');
 
-          async function getHistoricalWeekGames(week, season) {
+          async function getHistoricalWeekGames(week, season, seasonType) {
             // The Worker's /schedule now tries both a plain `season` param
             // and `archiveSeason` internally (see fantasy-refresh-worker.js
             // getWeekGames) — this just calls it once and trusts whichever
             // attempt succeeded. No need to replicate that logic here.
-            const res = await fetchJson(`${WORKER}/schedule?week=${week}&season=${season}&seasonType=Regular`);
+            const res = await fetchJson(`${WORKER}/schedule?week=${week}&season=${season}&seasonType=${seasonType || 'Regular'}`);
             return { games: (res && res.games) || [] };
           }
 
@@ -154,10 +154,11 @@ jobs:
             return playerPosLookup;
           }
 
-          async function backfillWeek(season, week) {
-            const { games } = await getHistoricalWeekGames(week, season);
+          async function backfillWeek(season, week, seasonType) {
+            seasonType = seasonType || 'Regular';
+            const { games } = await getHistoricalWeekGames(week, season, seasonType);
             if (!games.length) {
-              console.log(`  Week ${week}: no schedule data returned from Worker (tried both season params internally) — skipping`);
+              console.log(`  ${seasonType} week ${week}: no schedule data returned from Worker — skipping`);
               return { week, gameCount: 0 };
             }
 
@@ -237,7 +238,7 @@ jobs:
             }
 
             if (TEST_ONLY) {
-              console.log(`  [TEST MODE] Week ${week}: would write ${Object.keys(players).length} players from ${gameList.length} games`);
+              console.log(`  [TEST MODE] ${seasonType} week ${week}: would write ${Object.keys(players).length} players from ${gameList.length} games`);
               const compareRecord = (global.__skillSampleName && players[sanitizeFirebaseKey(global.__skillSampleName)]) || Object.values(players)[0] || {};
               console.log(`  Processed record for the SAME player shown in the raw sample above (${global.__skillSampleName || 'first available'}):`);
               console.log('  ', JSON.stringify(compareRecord, null, 2));
@@ -246,11 +247,38 @@ jobs:
 
             if (!Object.keys(players).length) return { week, gameCount: gameList.length, playerCount: 0 };
 
-            await firebasePut(`/nflStatsArchive/${season}/Regular_wk${week}.json`, {
+            await firebasePut(`/nflStatsArchive/${season}/${seasonType}_wk${week}.json`, {
               games: gameList, players, archivedAt: Date.now(), backfilled: true
             });
-            console.log(`✓ Week ${week}: archived ${Object.keys(players).length} players`);
+            console.log(`✓ ${seasonType} week ${week}: archived ${Object.keys(players).length} players`);
             return { week, gameCount: gameList.length, playerCount: Object.keys(players).length };
+          }
+
+          async function sweepSeasonType(season, seasonType, weekCount) {
+            for (let week = 1; week <= weekCount; week++) {
+              // Resumable — skip weeks that are already archived, so a
+              // re-run (or a run that gets interrupted) doesn't waste
+              // calls re-fetching what it already has.
+              try {
+                const existing = await firebaseGet(`/nflStatsArchive/${season}/${seasonType}_wk${week}/players.json`);
+                // A Firebase permission error comes back as a real JSON
+                // object ({"error":"Permission denied"}) — not a thrown
+                // exception — so it was passing the same truthy/has-keys
+                // check real archived data would, and getting treated as
+                // "already archived" instead of the actual problem it is.
+                if (existing && existing.error) {
+                  console.log(`  ${seasonType} week ${week}: Firebase returned an error, not data — "${existing.error}". This usually means the database rules for nflStatsArchive were never actually published (uploading to GitHub doesn't publish Firebase rules — that's a separate manual step in the Rules tab). Stopping rather than silently skipping every week.`);
+                  return;
+                }
+                if (existing && Object.keys(existing).length > 0) {
+                  console.log(`  ${seasonType} week ${week}: already archived — skipping`);
+                  continue;
+                }
+              } catch(e) { /* nothing archived yet — proceed */ }
+
+              await backfillWeek(season, week, seasonType);
+              await sleep(800); // pacing between weeks, on top of per-game pacing above
+            }
           }
 
           (async () => {
@@ -258,47 +286,29 @@ jobs:
               console.error('❌ FIREBASE_AUTH_TOKEN secret is missing — required for a real (non-test) backfill run.');
               process.exit(1);
             }
-            console.log(`=== Historical backfill: season ${SEASON} | mode: ${TEST_ONLY ? 'TEST (week 18 only, no writes)' : 'REAL (weeks 1-18, writing to Firebase)'} ===`);
+            console.log(`=== Historical backfill: season ${SEASON} | mode: ${TEST_ONLY ? 'TEST (one regular-season + one playoff week, no writes)' : 'REAL (weeks 1-18 + playoffs, writing to Firebase)'} ===`);
 
             if (TEST_ONLY) {
-              await backfillWeek(SEASON, 18);
+              await backfillWeek(SEASON, 18, 'Regular');
+              // Playoff week-numbering is a genuine guess (NFL playoffs
+              // have 4 rounds — Wild Card, Divisional, Conference
+              // Championship, Super Bowl — assumed here to be weeks 1-4
+              // under a "Postseason" type, mirroring the regular season's
+              // convention). Testing week 1 specifically to confirm or
+              // correct that guess before committing to a full sweep,
+              // same discipline as every other Tank01 parameter this
+              // build ended up needing to verify rather than assume.
+              await backfillWeek(SEASON, 1, 'Postseason');
               console.log('\n=== TEST COMPLETE ===');
-              console.log('Check the sample record above. If it has real stat numbers (not all zeros)');
-              console.log('and a real opponent/team, the schedule lookup worked and it is safe to');
-              console.log('re-run this workflow with test_only=false for the full season.');
-              console.log('If it came back empty, paste this log back for a fix before running for real.');
+              console.log('Check both sample records above — regular season AND playoff. If both have');
+              console.log('real stat numbers and real opponents, re-run with test_only=false for the');
+              console.log('full season including playoffs. If the playoff one came back empty, paste');
+              console.log('this log back — playoff week numbering may need a different guess.');
               return;
             }
 
-            for (let week = 1; week <= 18; week++) {
-              // Resumable — skip weeks that are already archived, so a
-              // re-run (or a run that gets interrupted) doesn't waste
-              // calls re-fetching what it already has.
-              try {
-                const existing = await firebaseGet(`/nflStatsArchive/${SEASON}/Regular_wk${week}/players.json`);
-                if (week === 1) {
-                  console.log(`  [SKIP-CHECK DEBUG] Week 1 existing value:`, JSON.stringify(existing));
-                }
-                // A Firebase permission error comes back as a real JSON
-                // object ({"error":"Permission denied"}) — not a thrown
-                // exception — so it was passing the same truthy/has-keys
-                // check real archived data would, and getting treated as
-                // "already archived" instead of the actual problem it is.
-                if (existing && existing.error) {
-                  console.log(`  Week ${week}: Firebase returned an error, not data — "${existing.error}". This usually means the database rules for nflStatsArchive were never actually published (uploading to GitHub doesn't publish Firebase rules — that's a separate manual step in the Rules tab). Stopping rather than silently skipping every week.`);
-                  return;
-                }
-                if (existing && Object.keys(existing).length > 0) {
-                  console.log(`  Week ${week}: already archived — skipping`);
-                  continue;
-                }
-              } catch(e) {
-                if (week === 1) console.log(`  [SKIP-CHECK DEBUG] Week 1 threw:`, e.message);
-              }
-
-              await backfillWeek(SEASON, week);
-              await sleep(800); // pacing between weeks, on top of per-game pacing above
-            }
-            console.log(`\n✓ Backfill complete for season ${SEASON}`);
+            await sweepSeasonType(SEASON, 'Regular', 18);
+            await sweepSeasonType(SEASON, 'Postseason', 4);
+            console.log(`\n✓ Backfill complete for season ${SEASON} (regular season + playoffs)`);
           })();
           SCRIPT
