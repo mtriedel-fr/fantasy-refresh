@@ -163,6 +163,15 @@ jobs:
                   if (!name || players[name]) return;
                   const team = s.team || s.teamAbv || '';
                   const game = gameList.find(x => x.home === team || x.away === team);
+                  // Confirmed via a real sample (Baker Mayfield, week 18
+                  // 2025): stats are nested under Passing/Rushing/
+                  // Receiving/Defense sub-objects, not flat top-level
+                  // fields — same shape already handled correctly in the
+                  // projections endpoint, just missed here originally.
+                  const pass = s.Passing   || {};
+                  const rush = s.Rushing   || {};
+                  const recv = s.Receiving || {};
+                  const def  = s.Defense   || {};
                   players[name] = {
                     team,
                     // pos genuinely isn't in the box score response at all
@@ -172,16 +181,16 @@ jobs:
                     opp:    game ? (game.home === team ? game.away : game.home) : '',
                     isHome: game ? game.home === team : null,
                     pts:      parseFloat(s.fantasyPoints || 0),
-                    passYds:  parseFloat(s.passYds || 0),
-                    passTD:   parseFloat(s.passTD || 0),
-                    passInt:  parseFloat(s.passInt || 0),
-                    rushYds:  parseFloat(s.rushYds || 0),
-                    rushTD:   parseFloat(s.rushTD || 0),
-                    recYds:   parseFloat(s.recYds || 0),
-                    recTD:    parseFloat(s.recTD || 0),
-                    rec:      parseFloat(s.rec || 0),
-                    fumbLost: parseFloat(s.fumbLost || 0),
-                    twoPt:    parseFloat(s.twoPt || 0)
+                    passYds:  parseFloat(pass.passYds || 0),
+                    passTD:   parseFloat(pass.passTD  || 0),
+                    passInt:  parseFloat(pass.int     || 0),
+                    rushYds:  parseFloat(rush.rushYds || 0),
+                    rushTD:   parseFloat(rush.rushTD  || 0),
+                    recYds:   parseFloat(recv.recYds       || 0),
+                    recTD:    parseFloat(recv.recTD        || 0),
+                    rec:      parseFloat(recv.receptions   || 0),
+                    fumbLost: parseFloat(def.fumblesLost   || 0),
+                    twoPt:    parseFloat(s.twoPt || 0) // not seen in any sample yet — unverified, kept as a harmless best-effort attempt
                   };
                 });
               } catch(e) {
