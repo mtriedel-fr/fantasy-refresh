@@ -126,6 +126,12 @@ jobs:
               Object.values(pool || {}).forEach(p => {
                 if (p && p.name) playerPosLookup[p.name.toLowerCase()] = p.pos || '';
               });
+              if (TEST_ONLY) {
+                console.log(`  [POS LOOKUP] Loaded ${Object.keys(playerPosLookup).length} names from /playerPool/${SEASON}/players.json`);
+                console.log(`  [POS LOOKUP] "baker mayfield" found: ${playerPosLookup.hasOwnProperty('baker mayfield')} (value: "${playerPosLookup['baker mayfield']}")`);
+                const sampleKeys = Object.keys(playerPosLookup).slice(0, 3);
+                console.log(`  [POS LOOKUP] Sample keys actually in the pool:`, sampleKeys);
+              }
             } catch(e) { console.error('  Could not load player pool for position lookup:', e.message); }
             return playerPosLookup;
           }
