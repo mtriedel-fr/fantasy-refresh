@@ -54,7 +54,7 @@ jobs:
             QB:  380,  // ticked down from 400 — was outpricing RB/WR at the elite tier
             RB:  525,
             WR:  505,
-            TE:  575,  // ticked down from 630 — same reasoning
+            TE:  525,  // ticked down from 575 — a mid-tier TE was pricing above an equally productive RB/WR; 525 matches RB's own multiplier exactly
             DEF: 500
           };
           const SAL_MIN_DEFAULT = 4500; // raised from 3700 — see SALARY_METHODOLOGY.md "Floor recalibration" for why
@@ -302,6 +302,63 @@ jobs:
             console.log(`✓ ${leagueId}: ${result.count} salaries generated for week ${week}${usedFlat ? ' (flat)' : ''}`);
           }
 
+          // Cache the full season's schedule — this barely ever changes
+          // once the NFL publishes it (rare flex-schedule moves aside),
+          // but was being re-fetched live from Tank01 on every single page
+          // load across the app, and up to 18 times in a row for the
+          // player-card "Scores & Matchups" feature specifically. Written
+          // once here per run (piggybacking on this job's existing weekly
+          // cadence), read from Firebase everywhere else instead.
+          // Reuses the Worker's own /schedule endpoint per week rather
+          // than re-implementing its wrong-year-rejection and hardcoded
+          // Week 1 protections a second time here.
+          //
+          // Only re-fetches weeks that haven't happened yet — a week
+          // that's already been played isn't going anywhere, so there's
+          // no reason to keep re-checking it every run forever. This is
+          // also what actually catches flex-schedule moves: those only
+          // ever apply to upcoming games, never to something already
+          // played, so checking future weeks is both cheaper AND the
+          // correct scope for what this is protecting against.
+          async function cacheFullSeasonSchedule() {
+            const currentWeek = await getGlobalCurrentWeek();
+            const seasonTypes = [
+              { type: 'Preseason', weeks: [0, 1, 2, 3] }, // short enough (4 weeks) that filtering isn't worth the complexity
+              { type: 'Regular',   weeks: Array.from({ length: 18 }, (_, i) => i + 1).filter(w => w >= currentWeek) }
+            ];
+            for (const { type, weeks } of seasonTypes) {
+              // Start from whatever's already cached — past weeks we're
+              // deliberately not re-fetching this run still need to stay
+              // in place, not get wiped out by this write.
+              let byWeek = {};
+              try {
+                const existing = await firebaseGet(`/nflSchedule/${SEASON}/${type}.json`);
+                if (existing && existing.weeks) byWeek = existing.weeks;
+              } catch(e) { /* nothing cached yet */ }
+
+              let fetchedCount = 0;
+              for (const week of weeks) {
+                try {
+                  const res = await fetch(`${WORKER}/schedule?week=${week}&season=${SEASON}&seasonType=${type}`);
+                  if (!res.ok) continue;
+                  const data = await res.json();
+                  if (data && Array.isArray(data.games) && data.games.length) {
+                    byWeek[`week${week}`] = data.games;
+                    fetchedCount++;
+                  }
+                } catch(e) {
+                  console.error(`  Schedule cache: failed ${type} week ${week}:`, e.message);
+                }
+              }
+              if (fetchedCount > 0) {
+                await firebasePut(`/nflSchedule/${SEASON}/${type}.json`, { weeks: byWeek, updatedAt: Date.now() });
+                console.log(`✓ Cached ${type} schedule: refreshed ${fetchedCount} upcoming week(s), ${Object.keys(byWeek).length} total in cache`);
+              } else {
+                console.log(`  ${type} schedule: nothing new to refresh (current week: ${currentWeek})`);
+              }
+            }
+          }
+
           (async () => {
             if (!FB_TOKEN) {
               console.error('❌ FIREBASE_AUTH_TOKEN secret is missing or empty.');
@@ -311,6 +368,7 @@ jobs:
               process.exit(1);
             }
             const pool = await refreshPlayerPool();
+            try { await cacheFullSeasonSchedule(); } catch(e) { console.error('Schedule caching failed:', e.message); }
             const leagues = await getActiveLeagues();
             console.log(`Active leagues: ${leagues.map(l => l.id).join(', ')}`);
             for (const { id, settings } of leagues) {
