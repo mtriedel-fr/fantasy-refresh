@@ -117,6 +117,19 @@ jobs:
             return { games: (res && res.games) || [] };
           }
 
+          let playerPosLookup = null;
+          async function getPlayerPosLookup() {
+            if (playerPosLookup) return playerPosLookup;
+            playerPosLookup = {};
+            try {
+              const pool = await firebaseGet(`/playerPool/${SEASON}/players.json`);
+              Object.values(pool || {}).forEach(p => {
+                if (p && p.name) playerPosLookup[p.name.toLowerCase()] = p.pos || '';
+              });
+            } catch(e) { console.error('  Could not load player pool for position lookup:', e.message); }
+            return playerPosLookup;
+          }
+
           async function backfillWeek(season, week) {
             const { games } = await getHistoricalWeekGames(week, season);
             if (!games.length) {
@@ -126,6 +139,7 @@ jobs:
 
             const gameList = games.map(g => ({ gameId: g.gameId, home: g.home, away: g.away }));
             const players = {};
+            const posLookup = await getPlayerPosLookup();
 
             for (const g of gameList) {
               if (!g.gameId) continue;
@@ -133,14 +147,16 @@ jobs:
                 const data = await fetchJson(`${WORKER}/score?gameId=${g.gameId}`);
                 const stats = data.playerStats || {};
                 if (TEST_ONLY && !global.__loggedRawStat) {
-                  // One raw, completely unprocessed sample straight from
-                  // Tank01 — the actual field names, not what our own
-                  // extraction code assumes they are. This is what
-                  // actually tells us why pos/stats came back empty
-                  // instead of guessing at a fix a fourth time.
-                  global.__loggedRawStat = true;
-                  console.log('  [RAW SAMPLE] First unprocessed player stat entry from Tank01:');
-                  console.log('  ', JSON.stringify(Object.values(stats)[0] || {}, null, 2));
+                  // Find a genuine skill-position player with real
+                  // production, not just whichever entry happens to be
+                  // first — that was a long snapper with nothing to show,
+                  // not a useful sample.
+                  const skillSample = Object.values(stats).find(s => parseFloat(s.fantasyPoints || 0) > 0);
+                  if (skillSample) {
+                    global.__loggedRawStat = true;
+                    console.log('  [RAW SAMPLE] A skill-position player with real production:');
+                    console.log('  ', JSON.stringify(skillSample, null, 2));
+                  }
                 }
                 Object.values(stats).forEach(s => {
                   const name = (s.longName || s.playerName || '').toLowerCase();
@@ -148,7 +164,11 @@ jobs:
                   const team = s.team || s.teamAbv || '';
                   const game = gameList.find(x => x.home === team || x.away === team);
                   players[name] = {
-                    team, pos: s.pos || '',
+                    team,
+                    // pos genuinely isn't in the box score response at all
+                    // (confirmed) — sourced from the player pool instead,
+                    // which already has it for every rostered player.
+                    pos: posLookup[name] || '',
                     opp:    game ? (game.home === team ? game.away : game.home) : '',
                     isHome: game ? game.home === team : null,
                     pts:      parseFloat(s.fantasyPoints || 0),
