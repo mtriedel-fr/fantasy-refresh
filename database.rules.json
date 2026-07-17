@@ -54,6 +54,14 @@
       ".read": true,
       ".write": "auth != null && root.child('leagues/fr_refresh26/settings/commissioners/' + auth.uid).val() === true"
     },
+    "nflStatsArchive": {
+      ".read": true,
+      ".write": "auth != null && root.child('leagues/fr_refresh26/settings/commissioners/' + auth.uid).val() === true"
+    },
+    "nflSchedule": {
+      ".read": true,
+      ".write": "auth != null && root.child('leagues/fr_refresh26/settings/commissioners/' + auth.uid).val() === true"
+    },
     "waitlist": {
       ".read": "auth != null && root.child('leagues/fr_refresh26/settings/commissioners/' + auth.uid).val() === true",
       "$entryId": {
