@@ -275,17 +275,31 @@ jobs:
 
             const projPlayers = await getProjections(week);
             let result = projPlayers.length ? buildSalariesFromProjections(projPlayers, poolPlayers, min, max) : { salaries: {}, count: 0 };
+            let usedFlat = false;
 
             if (result.count === 0) {
+              // Real, already-generated data existing here is strictly
+              // better than flat fallback — this run failing to fetch
+              // fresh projections (Tank01 outage, RapidAPI issue, etc.)
+              // says nothing about whether the PREVIOUS successful run's
+              // data is still good. It is. Never downgrade good data to
+              // flat pricing just because a later regeneration attempt
+              // happened to fail — only use flat as a first-time safety
+              // net when there's genuinely nothing better in place yet.
+              if (existingMeta && existingMeta.count > 0 && !existingMeta.flat) {
+                console.log(`  ${leagueId}: no usable projections for week ${week} — but real salaries already exist, leaving them in place (not downgrading to flat)`);
+                return;
+              }
               console.log(`  ${leagueId}: no usable projections for week ${week} — using flat fallback`);
               result = buildFlatSalaries(poolPlayers);
+              usedFlat = true;
             }
 
             await firebasePut(`/leagues/${leagueId}/salaries/${SEASON}/week${week}.json`, {
               players: result.salaries,
-              meta: { week, count: result.count, generated: Date.now(), locked: false, cap, automated: true }
+              meta: { week, count: result.count, generated: Date.now(), locked: false, cap, automated: true, flat: usedFlat }
             });
-            console.log(`✓ ${leagueId}: ${result.count} salaries generated for week ${week}`);
+            console.log(`✓ ${leagueId}: ${result.count} salaries generated for week ${week}${usedFlat ? ' (flat)' : ''}`);
           }
 
           (async () => {
