@@ -1,0 +1,286 @@
+name: Backfill Historical Stats
+
+# ── ONE-TIME / MANUALLY TRIGGERED — not on a schedule ──────────────────
+# Backfills raw weekly stat lines for past seasons into the SAME
+# /nflStatsArchive/{season}/{week} schema that auto-scoring.yml already
+# writes to going forward for the current season. Once this has run,
+# both current-season and historical data live in one place and read the
+# exact same way everywhere in the app.
+#
+# Raw stats only — no fantasy points baked in beyond the one convenience
+# "pts" field already used elsewhere. The whole point of storing raw
+# components (passYds, rushTD, etc.) is that a future league with
+# different scoring rules can compute ITS OWN historical fantasy points
+# from this same stored data, with zero additional Tank01 calls — a pure
+# math operation on facts that are already saved.
+#
+# IMPORTANT — run test_only=true FIRST. We've never actually verified
+# that Tank01's schedule-lookup endpoint (getNFLGamesForWeek) correctly
+# returns historical-season data the same way the box-score endpoint
+# does (box scores are looked up by a specific game ID that already
+# encodes the date, so that part should be safe regardless of season —
+# the schedule lookup, which is what finds those game IDs in the first
+# place, is the genuinely unverified piece). Test mode pulls exactly one
+# real historical week, writes nothing, and logs the raw response so you
+# can confirm it looks right before committing to the full backfill.
+
+on:
+  workflow_dispatch:
+    inputs:
+      season:
+        description: 'Season to backfill (e.g. 2025)'
+        required: true
+        default: '2025'
+      test_only:
+        description: 'Test mode — fetch one sample week only, write nothing'
+        required: true
+        default: 'true'
+        type: choice
+        options: ['true', 'false']
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Backfill historical stats
+        env:
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+
+          const FB_URL       = 'https://fantasy-refresh-default-rtdb.firebaseio.com';
+          const FB_TOKEN      = process.env.FIREBASE_AUTH_TOKEN;
+          const WORKER        = 'https://fantasy-refresh-news.mtriedel.workers.dev';
+          const SEASON         = '${{ inputs.season }}';
+          const TEST_ONLY       = '${{ inputs.test_only }}' === 'true';
+
+          function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+          function fetchJson(url) {
+            return new Promise((resolve, reject) => {
+              https.get(url, res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => {
+                  try { resolve(JSON.parse(data)); } catch(e) { reject(e); }
+                });
+              }).on('error', reject);
+            });
+          }
+
+          function firebasePut(path, payload) {
+            return new Promise((resolve, reject) => {
+              const url = new URL(FB_URL + path + '?auth=' + FB_TOKEN);
+              const body = JSON.stringify(payload);
+              const req = https.request(url, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+              }, res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => {
+                  if (res.statusCode < 200 || res.statusCode >= 300) {
+                    reject(new Error(`Firebase PUT ${path} failed: ${res.statusCode} ${data}`));
+                  } else {
+                    resolve(JSON.parse(data || '{}'));
+                  }
+                });
+              });
+              req.on('error', reject);
+              req.write(body);
+              req.end();
+            });
+          }
+
+          function firebaseGet(path) {
+            return fetchJson(FB_URL + path);
+          }
+
+          // Historical box scores, keyed by a specific game ID that already
+          // encodes the date — this part doesn't depend on any season
+          // parameter working correctly, unlike the schedule lookup below.
+          const scoring = [
+            'passYds=0.04','passTD=4','passInt=-1',
+            'rushYds=0.1','rushTD=6',
+            'recYds=0.1','recTD=6','rec=1',
+            'fumbLost=-1','twoPt=2',
+            'fantasyPoints=true','PPRScoring=true'
+          ].join('&');
+
+          async function getHistoricalWeekGames(week, season) {
+            // The Worker's /schedule now tries both a plain `season` param
+            // and `archiveSeason` internally (see fantasy-refresh-worker.js
+            // getWeekGames) — this just calls it once and trusts whichever
+            // attempt succeeded. No need to replicate that logic here.
+            const res = await fetchJson(`${WORKER}/schedule?week=${week}&season=${season}&seasonType=Regular`);
+            return { games: (res && res.games) || [] };
+          }
+
+          // The player pool only ever exists for the CURRENT active
+          // season (it's a live roster resource for this year's draft,
+          // never a historical archive) — so this always checks the
+          // current season regardless of which season is being backfilled.
+          // A player's position is stable enough for this to work fine
+          // even when backfilling old stats: Baker Mayfield is a QB
+          // whether we're looking at his 2025 production or his 2026
+          // roster listing.
+          const CURRENT_SEASON_FOR_POOL = '2026';
+
+          let playerPosLookup = null;
+          async function getPlayerPosLookup() {
+            if (playerPosLookup) return playerPosLookup;
+            playerPosLookup = {};
+            try {
+              const pool = await firebaseGet(`/playerPool/${CURRENT_SEASON_FOR_POOL}/players.json`);
+              Object.values(pool || {}).forEach(p => {
+                if (p && p.name) playerPosLookup[p.name.toLowerCase()] = p.pos || '';
+              });
+              if (TEST_ONLY) {
+                console.log(`  [POS LOOKUP] Loaded ${Object.keys(playerPosLookup).length} names from /playerPool/${CURRENT_SEASON_FOR_POOL}/players.json`);
+                console.log(`  [POS LOOKUP] "baker mayfield" found: ${playerPosLookup.hasOwnProperty('baker mayfield')} (value: "${playerPosLookup['baker mayfield']}")`);
+                const sampleKeys = Object.keys(playerPosLookup).slice(0, 3);
+                console.log(`  [POS LOOKUP] Sample keys actually in the pool:`, sampleKeys);
+              }
+            } catch(e) { console.error('  Could not load player pool for position lookup:', e.message); }
+            return playerPosLookup;
+          }
+
+          async function backfillWeek(season, week) {
+            const { games } = await getHistoricalWeekGames(week, season);
+            if (!games.length) {
+              console.log(`  Week ${week}: no schedule data returned from Worker (tried both season params internally) — skipping`);
+              return { week, gameCount: 0 };
+            }
+
+            const gameList = games.map(g => ({ gameId: g.gameId, home: g.home, away: g.away }));
+            const players = {};
+            const posLookup = await getPlayerPosLookup();
+
+            for (const g of gameList) {
+              if (!g.gameId) continue;
+              try {
+                const data = await fetchJson(`${WORKER}/score?gameId=${g.gameId}`);
+                const stats = data.playerStats || {};
+                let skillSampleName = null;
+                if (TEST_ONLY && !global.__loggedRawStat) {
+                  // Find a genuine skill-position player with real
+                  // production, not just whichever entry happens to be
+                  // first — that was a long snapper with nothing to show,
+                  // not a useful sample.
+                  const skillSample = Object.values(stats).find(s => parseFloat(s.fantasyPoints || 0) > 0);
+                  if (skillSample) {
+                    global.__loggedRawStat = true;
+                    skillSampleName = (skillSample.longName || skillSample.playerName || '').toLowerCase();
+                    global.__skillSampleName = skillSampleName;
+                    console.log('  [RAW SAMPLE] A skill-position player with real production:');
+                    console.log('  ', JSON.stringify(skillSample, null, 2));
+                  }
+                }
+                Object.values(stats).forEach(s => {
+                  const name = (s.longName || s.playerName || '').toLowerCase();
+                  if (!name || players[name]) return;
+                  const team = s.team || s.teamAbv || '';
+                  const game = gameList.find(x => x.home === team || x.away === team);
+                  // Confirmed via a real sample (Baker Mayfield, week 18
+                  // 2025): stats are nested under Passing/Rushing/
+                  // Receiving/Defense sub-objects, not flat top-level
+                  // fields — same shape already handled correctly in the
+                  // projections endpoint, just missed here originally.
+                  const pass = s.Passing   || {};
+                  const rush = s.Rushing   || {};
+                  const recv = s.Receiving || {};
+                  const def  = s.Defense   || {};
+                  players[name] = {
+                    team,
+                    // pos genuinely isn't in the box score response at all
+                    // (confirmed) — sourced from the player pool instead,
+                    // which already has it for every rostered player.
+                    pos: posLookup[name] || '',
+                    opp:    game ? (game.home === team ? game.away : game.home) : '',
+                    isHome: game ? game.home === team : null,
+                    pts:      parseFloat(s.fantasyPoints || 0),
+                    passYds:  parseFloat(pass.passYds || 0),
+                    passTD:   parseFloat(pass.passTD  || 0),
+                    passInt:  parseFloat(pass.int     || 0),
+                    rushYds:  parseFloat(rush.rushYds || 0),
+                    rushTD:   parseFloat(rush.rushTD  || 0),
+                    recYds:   parseFloat(recv.recYds       || 0),
+                    recTD:    parseFloat(recv.recTD        || 0),
+                    rec:      parseFloat(recv.receptions   || 0),
+                    fumbLost: parseFloat(def.fumblesLost   || 0),
+                    twoPt:    parseFloat(s.twoPt || 0) // not seen in any sample yet — unverified, kept as a harmless best-effort attempt
+                  };
+                });
+              } catch(e) {
+                console.error(`    Game ${g.gameId} failed:`, e.message);
+              }
+              await sleep(400); // pacing — spread calls out, don't burst
+            }
+
+            if (TEST_ONLY) {
+              console.log(`  [TEST MODE] Week ${week}: would write ${Object.keys(players).length} players from ${gameList.length} games`);
+              const compareRecord = (global.__skillSampleName && players[global.__skillSampleName]) || Object.values(players)[0] || {};
+              console.log(`  Processed record for the SAME player shown in the raw sample above (${global.__skillSampleName || 'first available'}):`);
+              console.log('  ', JSON.stringify(compareRecord, null, 2));
+              return { week, gameCount: gameList.length, playerCount: Object.keys(players).length };
+            }
+
+            if (!Object.keys(players).length) return { week, gameCount: gameList.length, playerCount: 0 };
+
+            await firebasePut(`/nflStatsArchive/${season}/Regular_wk${week}.json`, {
+              games: gameList, players, archivedAt: Date.now(), backfilled: true
+            });
+            console.log(`✓ Week ${week}: archived ${Object.keys(players).length} players`);
+            return { week, gameCount: gameList.length, playerCount: Object.keys(players).length };
+          }
+
+          (async () => {
+            if (!TEST_ONLY && !FB_TOKEN) {
+              console.error('❌ FIREBASE_AUTH_TOKEN secret is missing — required for a real (non-test) backfill run.');
+              process.exit(1);
+            }
+            console.log(`=== Historical backfill: season ${SEASON} | mode: ${TEST_ONLY ? 'TEST (week 18 only, no writes)' : 'REAL (weeks 1-18, writing to Firebase)'} ===`);
+
+            if (TEST_ONLY) {
+              await backfillWeek(SEASON, 18);
+              console.log('\n=== TEST COMPLETE ===');
+              console.log('Check the sample record above. If it has real stat numbers (not all zeros)');
+              console.log('and a real opponent/team, the schedule lookup worked and it is safe to');
+              console.log('re-run this workflow with test_only=false for the full season.');
+              console.log('If it came back empty, paste this log back for a fix before running for real.');
+              return;
+            }
+
+            for (let week = 1; week <= 18; week++) {
+              // Resumable — skip weeks that are already archived, so a
+              // re-run (or a run that gets interrupted) doesn't waste
+              // calls re-fetching what it already has.
+              try {
+                const existing = await firebaseGet(`/nflStatsArchive/${SEASON}/Regular_wk${week}/players.json`);
+                if (week === 1) {
+                  console.log(`  [SKIP-CHECK DEBUG] Week 1 existing value:`, JSON.stringify(existing));
+                }
+                // A Firebase permission error comes back as a real JSON
+                // object ({"error":"Permission denied"}) — not a thrown
+                // exception — so it was passing the same truthy/has-keys
+                // check real archived data would, and getting treated as
+                // "already archived" instead of the actual problem it is.
+                if (existing && existing.error) {
+                  console.log(`  Week ${week}: Firebase returned an error, not data — "${existing.error}". This usually means the database rules for nflStatsArchive were never actually published (uploading to GitHub doesn't publish Firebase rules — that's a separate manual step in the Rules tab). Stopping rather than silently skipping every week.`);
+                  return;
+                }
+                if (existing && Object.keys(existing).length > 0) {
+                  console.log(`  Week ${week}: already archived — skipping`);
+                  continue;
+                }
+              } catch(e) {
+                if (week === 1) console.log(`  [SKIP-CHECK DEBUG] Week 1 threw:`, e.message);
+              }
+
+              await backfillWeek(SEASON, week);
+              await sleep(800); // pacing between weeks, on top of per-game pacing above
+            }
+            console.log(`\n✓ Backfill complete for season ${SEASON}`);
+          })();
+          SCRIPT
