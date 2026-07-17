@@ -109,40 +109,18 @@ jobs:
           ].join('&');
 
           async function getHistoricalWeekGames(week, season) {
-            // The genuinely unverified call — does Tank01's schedule
-            // endpoint accept a past season the same way? Try plain
-            // `season` first (works for current-season schedule lookups
-            // today), fall back to `archiveSeason` (the parameter name
-            // confirmed working for historical PROJECTIONS earlier this
-            // build) if that comes back empty.
-            const attempts = [
-              `/schedule?week=${week}&season=${season}&seasonType=Regular`,
-              null // second attempt built below once we know the first failed
-            ];
-            let res = await fetchJson(`${WORKER}${attempts[0]}`);
-            if (res && Array.isArray(res.games) && res.games.length) {
-              return { games: res.games, paramUsed: 'season (direct)' };
-            }
-            // The Worker's /schedule doesn't currently support archiveSeason
-            // as a passthrough — direct Tank01 call as the fallback attempt.
-            try {
-              const direct = await fetchJson(
-                `https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLGamesForWeek?week=${week}&seasonType=Regular&archiveSeason=${season}`
-              );
-              // Note: this direct call has no RapidAPI key attached here —
-              // it's expected to fail with 401/403. This branch exists so
-              // the test-mode log clearly shows whether the Worker's plain
-              // `season` param path is sufficient on its own, or whether
-              // the Worker itself needs an archiveSeason passthrough added
-              // before the real backfill can run. See test-mode output.
-            } catch(e) {}
-            return { games: [], paramUsed: 'neither worked' };
+            // The Worker's /schedule now tries both a plain `season` param
+            // and `archiveSeason` internally (see fantasy-refresh-worker.js
+            // getWeekGames) — this just calls it once and trusts whichever
+            // attempt succeeded. No need to replicate that logic here.
+            const res = await fetchJson(`${WORKER}/schedule?week=${week}&season=${season}&seasonType=Regular`);
+            return { games: (res && res.games) || [] };
           }
 
           async function backfillWeek(season, week) {
-            const { games, paramUsed } = await getHistoricalWeekGames(week, season);
+            const { games } = await getHistoricalWeekGames(week, season);
             if (!games.length) {
-              console.log(`  Week ${week}: no schedule data returned (tried: ${paramUsed}) — skipping`);
+              console.log(`  Week ${week}: no schedule data returned from Worker (tried both season params internally) — skipping`);
               return { week, gameCount: 0 };
             }
 
@@ -183,7 +161,7 @@ jobs:
             }
 
             if (TEST_ONLY) {
-              console.log(`  [TEST MODE] Week ${week}: would write ${Object.keys(players).length} players from ${gameList.length} games (schedule param used: ${paramUsed})`);
+              console.log(`  [TEST MODE] Week ${week}: would write ${Object.keys(players).length} players from ${gameList.length} games`);
               console.log('  Sample player record:', JSON.stringify(Object.values(players)[0] || {}, null, 2));
               return { week, gameCount: gameList.length, playerCount: Object.keys(players).length };
             }
