@@ -172,17 +172,21 @@ jobs:
                 const data = await fetchJson(`${WORKER}/score?gameId=${g.gameId}`);
                 const stats = data.playerStats || {};
                 let skillSampleName = null;
-                if (TEST_ONLY && !global.__loggedRawStat) {
+                if (TEST_ONLY && !global['__loggedRawStat_' + seasonType]) {
                   // Find a genuine skill-position player with real
                   // production, not just whichever entry happens to be
                   // first — that was a long snapper with nothing to show,
-                  // not a useful sample.
+                  // not a useful sample. Tracked per season type (not once
+                  // for the whole run) since a player found in the regular
+                  // season sample might not even be in the playoffs if
+                  // their team didn't make it — that's not a bug, just a
+                  // reason each needs its own real check.
                   const skillSample = Object.values(stats).find(s => parseFloat(s.fantasyPoints || 0) > 0);
                   if (skillSample) {
-                    global.__loggedRawStat = true;
+                    global['__loggedRawStat_' + seasonType] = true;
                     skillSampleName = (skillSample.longName || skillSample.playerName || '').toLowerCase();
-                    global.__skillSampleName = skillSampleName;
-                    console.log('  [RAW SAMPLE] A skill-position player with real production:');
+                    global['__skillSampleName_' + seasonType] = skillSampleName;
+                    console.log(`  [RAW SAMPLE, ${seasonType}] A skill-position player with real production:`);
                     console.log('  ', JSON.stringify(skillSample, null, 2));
                   }
                 }
@@ -239,8 +243,9 @@ jobs:
 
             if (TEST_ONLY) {
               console.log(`  [TEST MODE] ${seasonType} week ${week}: would write ${Object.keys(players).length} players from ${gameList.length} games`);
-              const compareRecord = (global.__skillSampleName && players[sanitizeFirebaseKey(global.__skillSampleName)]) || Object.values(players)[0] || {};
-              console.log(`  Processed record for the SAME player shown in the raw sample above (${global.__skillSampleName || 'first available'}):`);
+              const sampleName = global['__skillSampleName_' + seasonType];
+              const compareRecord = (sampleName && players[sanitizeFirebaseKey(sampleName)]) || Object.values(players)[0] || {};
+              console.log(`  Processed record for the SAME player shown in the raw sample above (${sampleName || 'first available'}):`);
               console.log('  ', JSON.stringify(compareRecord, null, 2));
               return { week, gameCount: gameList.length, playerCount: Object.keys(players).length };
             }
