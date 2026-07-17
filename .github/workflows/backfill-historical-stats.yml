@@ -146,6 +146,7 @@ jobs:
               try {
                 const data = await fetchJson(`${WORKER}/score?gameId=${g.gameId}`);
                 const stats = data.playerStats || {};
+                let skillSampleName = null;
                 if (TEST_ONLY && !global.__loggedRawStat) {
                   // Find a genuine skill-position player with real
                   // production, not just whichever entry happens to be
@@ -154,6 +155,8 @@ jobs:
                   const skillSample = Object.values(stats).find(s => parseFloat(s.fantasyPoints || 0) > 0);
                   if (skillSample) {
                     global.__loggedRawStat = true;
+                    skillSampleName = (skillSample.longName || skillSample.playerName || '').toLowerCase();
+                    global.__skillSampleName = skillSampleName;
                     console.log('  [RAW SAMPLE] A skill-position player with real production:');
                     console.log('  ', JSON.stringify(skillSample, null, 2));
                   }
@@ -201,7 +204,9 @@ jobs:
 
             if (TEST_ONLY) {
               console.log(`  [TEST MODE] Week ${week}: would write ${Object.keys(players).length} players from ${gameList.length} games`);
-              console.log('  Sample player record:', JSON.stringify(Object.values(players)[0] || {}, null, 2));
+              const compareRecord = (global.__skillSampleName && players[global.__skillSampleName]) || Object.values(players)[0] || {};
+              console.log(`  Processed record for the SAME player shown in the raw sample above (${global.__skillSampleName || 'first available'}):`);
+              console.log('  ', JSON.stringify(compareRecord, null, 2));
               return { week, gameCount: gameList.length, playerCount: Object.keys(players).length };
             }
 
