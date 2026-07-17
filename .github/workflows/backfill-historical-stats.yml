@@ -57,6 +57,14 @@ jobs:
 
           function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
+          // Firebase RTDB keys can't contain . $ # [ ] / — strips them out
+          // for use as a dictionary key. The real, correctly-formatted
+          // name is always kept as a separate field in the record itself,
+          // so nothing ever displays using this stripped-down version.
+          function sanitizeFirebaseKey(name) {
+            return (name || '').replace(/[.$#\[\]\/]/g, '');
+          }
+
           function fetchJson(url) {
             return new Promise((resolve, reject) => {
               https.get(url, res => {
@@ -178,8 +186,9 @@ jobs:
                   }
                 }
                 Object.values(stats).forEach(s => {
-                  const name = (s.longName || s.playerName || '').toLowerCase();
-                  if (!name || players[name]) return;
+                  const displayName = s.longName || s.playerName || '';
+                  const name = displayName.toLowerCase();
+                  if (!name || players[sanitizeFirebaseKey(name)]) return;
                   const team = s.team || s.teamAbv || '';
                   const game = gameList.find(x => x.home === team || x.away === team);
                   // Confirmed via a real sample (Baker Mayfield, week 18
@@ -191,7 +200,16 @@ jobs:
                   const rush = s.Rushing   || {};
                   const recv = s.Receiving || {};
                   const def  = s.Defense   || {};
-                  players[name] = {
+                  // Firebase RTDB keys can't contain . $ # [ ] / — and NFL
+                  // player names very often do ("A.J. Brown", "T.J. Watt",
+                  // "Odell Beckham Jr."). Using the raw name as a key broke
+                  // the ENTIRE week's write the moment any one player had
+                  // one of those characters, not just that player's own
+                  // record. The sanitized version is used as the key; the
+                  // real, correctly-formatted name is kept as a field in
+                  // the record itself so nothing downstream displays wrong.
+                  players[sanitizeFirebaseKey(name)] = {
+                    name: displayName,
                     team,
                     // pos genuinely isn't in the box score response at all
                     // (confirmed) — sourced from the player pool instead,
@@ -220,7 +238,7 @@ jobs:
 
             if (TEST_ONLY) {
               console.log(`  [TEST MODE] Week ${week}: would write ${Object.keys(players).length} players from ${gameList.length} games`);
-              const compareRecord = (global.__skillSampleName && players[global.__skillSampleName]) || Object.values(players)[0] || {};
+              const compareRecord = (global.__skillSampleName && players[sanitizeFirebaseKey(global.__skillSampleName)]) || Object.values(players)[0] || {};
               console.log(`  Processed record for the SAME player shown in the raw sample above (${global.__skillSampleName || 'first available'}):`);
               console.log('  ', JSON.stringify(compareRecord, null, 2));
               return { week, gameCount: gameList.length, playerCount: Object.keys(players).length };
@@ -259,13 +277,16 @@ jobs:
               try {
                 const existing = await firebaseGet(`/nflStatsArchive/${SEASON}/Regular_wk${week}/players.json`);
                 if (week === 1) {
-                  // One-time diagnostic — the skip check reported every
-                  // week as already archived even though the folder
-                  // apparently doesn't exist in the database at all, which
-                  // means this check has a real bug worth seeing directly
-                  // rather than guessing at again.
                   console.log(`  [SKIP-CHECK DEBUG] Week 1 existing value:`, JSON.stringify(existing));
-                  console.log(`  [SKIP-CHECK DEBUG] typeof:`, typeof existing, '| truthy:', !!existing, '| keys:', existing ? Object.keys(existing).length : 'n/a');
+                }
+                // A Firebase permission error comes back as a real JSON
+                // object ({"error":"Permission denied"}) — not a thrown
+                // exception — so it was passing the same truthy/has-keys
+                // check real archived data would, and getting treated as
+                // "already archived" instead of the actual problem it is.
+                if (existing && existing.error) {
+                  console.log(`  Week ${week}: Firebase returned an error, not data — "${existing.error}". This usually means the database rules for nflStatsArchive were never actually published (uploading to GitHub doesn't publish Firebase rules — that's a separate manual step in the Rules tab). Stopping rather than silently skipping every week.`);
+                  return;
                 }
                 if (existing && Object.keys(existing).length > 0) {
                   console.log(`  Week ${week}: already archived — skipping`);

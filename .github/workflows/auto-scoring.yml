@@ -118,6 +118,14 @@ jobs:
             return FB_TOKEN ? `${path}${sep}auth=${FB_TOKEN}` : path;
           }
 
+          // Firebase RTDB keys can't contain . $ # [ ] / — strips them out
+          // for use as a dictionary key. The real, correctly-formatted
+          // name is always kept as a separate field in the record itself,
+          // so nothing ever displays using this stripped-down version.
+          function sanitizeFirebaseKey(name) {
+            return (name || '').replace(/[.$#\[\]\/]/g, '');
+          }
+
           function firebasePut(path, payload) {
             return new Promise((resolve, reject) => {
               const body = JSON.stringify(payload);
@@ -731,26 +739,47 @@ jobs:
             // historical data both read the same way everywhere else.
             const players = {};
             Object.values(playerStats).forEach(stats => {
-              const name = (stats.longName || stats.playerName || '').toLowerCase();
-              if (!name || players[name]) return;
+              const displayName = stats.longName || stats.playerName || '';
+              const name = displayName.toLowerCase();
+              if (!name || players[sanitizeFirebaseKey(name)]) return;
               const team = stats.team || stats.teamAbv || '';
               const game = gameList.find(g => g.home === team || g.away === team);
-              players[name] = {
+              // Stats are nested under Passing/Rushing/Receiving/Defense
+              // sub-objects, not flat top-level fields — confirmed via a
+              // real sample while building the historical backfill (see
+              // backfill-historical-stats.yml for the full story). This
+              // function predates that discovery, so it never got the fix
+              // — meaning the current season's live archive would have
+              // stored all-zero stats the first time it actually ran
+              // against a real game, exactly like the historical backfill
+              // did before this was caught.
+              const pass = stats.Passing   || {};
+              const rush = stats.Rushing   || {};
+              const recv = stats.Receiving || {};
+              const def  = stats.Defense   || {};
+              // Firebase RTDB keys can't contain . $ # [ ] / — and NFL
+              // player names very often do ("A.J. Brown", "T.J. Watt",
+              // "Odell Beckham Jr."). Using the raw name as a key broke
+              // the ENTIRE week's write the moment any one player had one
+              // of those characters. Sanitized version used as the key;
+              // the real, correctly-formatted name kept as a field.
+              players[sanitizeFirebaseKey(name)] = {
+                name:    displayName,
                 team,
                 pos:     stats.pos || '',
                 opp:     game ? (game.home === team ? game.away : game.home) : '',
                 isHome:  game ? game.home === team : null,
                 pts:     parseFloat(stats.fantasyPoints || 0),
-                passYds: parseFloat(stats.passYds || 0),
-                passTD:  parseFloat(stats.passTD || 0),
-                passInt: parseFloat(stats.passInt || 0),
-                rushYds: parseFloat(stats.rushYds || 0),
-                rushTD:  parseFloat(stats.rushTD || 0),
-                recYds:  parseFloat(stats.recYds || 0),
-                recTD:   parseFloat(stats.recTD || 0),
-                rec:     parseFloat(stats.rec || 0),
-                fumbLost:parseFloat(stats.fumbLost || 0),
-                twoPt:   parseFloat(stats.twoPt || 0)
+                passYds: parseFloat(pass.passYds || 0),
+                passTD:  parseFloat(pass.passTD  || 0),
+                passInt: parseFloat(pass.int     || 0),
+                rushYds: parseFloat(rush.rushYds || 0),
+                rushTD:  parseFloat(rush.rushTD  || 0),
+                recYds:  parseFloat(recv.recYds     || 0),
+                recTD:   parseFloat(recv.recTD      || 0),
+                rec:     parseFloat(recv.receptions || 0),
+                fumbLost:parseFloat(def.fumblesLost || 0),
+                twoPt:   parseFloat(stats.twoPt || 0) // not confirmed in any real sample yet — kept as a best-effort attempt
               };
             });
 
