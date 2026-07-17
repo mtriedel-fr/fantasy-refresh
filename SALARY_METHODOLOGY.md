@@ -211,6 +211,15 @@ QB no longer leads the pack. TE ticked down proportionally to $8,100
 not as steep as the first pass. 3-stud ceiling re-verified and still
 holds ($3,100 to spare at 3 studs, $3,700 over at 4).
 
+**Final TE calibration:** TE 575→525. The issue: at 575, a mid-tier TE
+(10 projected points) priced at $5,800 — more than an equally productive
+mid-tier RB ($5,300) or WR ($5,100) scoring the identical 10 points. TE's
+elite ceiling being lower than RB/WR is appropriate (14pt elite TE vs
+19-22pt elite RB/WR), but a *mediocre* TE shouldn't cost more than an
+equally productive RB or WR. At 525 — identical to RB's own multiplier —
+that mid-tier TE now prices at exactly $5,300, matching RB precisely at
+the same point total. Elite TE comes down to $7,400 (from $8,900).
+
 ## Where this is implemented in code
 
 The per-position multiplier table lives in three places, kept in sync
