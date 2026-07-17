@@ -258,11 +258,22 @@ jobs:
               // calls re-fetching what it already has.
               try {
                 const existing = await firebaseGet(`/nflStatsArchive/${SEASON}/Regular_wk${week}/players.json`);
+                if (week === 1) {
+                  // One-time diagnostic — the skip check reported every
+                  // week as already archived even though the folder
+                  // apparently doesn't exist in the database at all, which
+                  // means this check has a real bug worth seeing directly
+                  // rather than guessing at again.
+                  console.log(`  [SKIP-CHECK DEBUG] Week 1 existing value:`, JSON.stringify(existing));
+                  console.log(`  [SKIP-CHECK DEBUG] typeof:`, typeof existing, '| truthy:', !!existing, '| keys:', existing ? Object.keys(existing).length : 'n/a');
+                }
                 if (existing && Object.keys(existing).length > 0) {
                   console.log(`  Week ${week}: already archived — skipping`);
                   continue;
                 }
-              } catch(e) { /* nothing archived yet — proceed */ }
+              } catch(e) {
+                if (week === 1) console.log(`  [SKIP-CHECK DEBUG] Week 1 threw:`, e.message);
+              }
 
               await backfillWeek(SEASON, week);
               await sleep(800); // pacing between weeks, on top of per-game pacing above
