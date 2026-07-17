@@ -719,6 +719,16 @@ jobs:
             // pid, sleeperBotID, AND lowercased name — collapse back down to
             // one record per real player, keyed by name to match how the
             // client already looks players up).
+            //
+            // Stores RAW stat components (passYds, rushTD, etc.), not just
+            // the pre-computed fantasy points for today's one scoring
+            // formula — "pts" stays for convenience/backward compatibility,
+            // but the raw numbers are what let a future league with
+            // different scoring rules compute ITS OWN fantasy points from
+            // this same stored data, with no new Tank01 calls needed. Same
+            // schema used by the historical backfill (see
+            // backfill-historical-stats.yml), so current-season and
+            // historical data both read the same way everywhere else.
             const players = {};
             Object.values(playerStats).forEach(stats => {
               const name = (stats.longName || stats.playerName || '').toLowerCase();
@@ -727,9 +737,20 @@ jobs:
               const game = gameList.find(g => g.home === team || g.away === team);
               players[name] = {
                 team,
-                opp:    game ? (game.home === team ? game.away : game.home) : '',
-                isHome: game ? game.home === team : null,
-                pts:    parseFloat(stats.fantasyPoints || 0)
+                pos:     stats.pos || '',
+                opp:     game ? (game.home === team ? game.away : game.home) : '',
+                isHome:  game ? game.home === team : null,
+                pts:     parseFloat(stats.fantasyPoints || 0),
+                passYds: parseFloat(stats.passYds || 0),
+                passTD:  parseFloat(stats.passTD || 0),
+                passInt: parseFloat(stats.passInt || 0),
+                rushYds: parseFloat(stats.rushYds || 0),
+                rushTD:  parseFloat(stats.rushTD || 0),
+                recYds:  parseFloat(stats.recYds || 0),
+                recTD:   parseFloat(stats.recTD || 0),
+                rec:     parseFloat(stats.rec || 0),
+                fumbLost:parseFloat(stats.fumbLost || 0),
+                twoPt:   parseFloat(stats.twoPt || 0)
               };
             });
 
