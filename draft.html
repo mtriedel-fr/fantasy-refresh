@@ -2127,11 +2127,12 @@ function loadLiveSeasonSchedule(p){
 // handlePlayerHistory for how points get computed from the raw stored
 // stats). Cache is checked BEFORE calling the Worker at all, so a season
 // that's already been looked up by anyone costs nothing on repeat views.
+var HISTORY_CACHE_SCHEMA = 2; // bumped when the shape of cached data changes (2 = added rank + snapPct) — older cached entries are treated as a miss and recomputed, not served incomplete
 function loadHistoricalSeason(p, season){
   var cacheKey = '/computedFantasyHistory/standard/' + season + '/' + sanitizeKeyClient(p.name.toLowerCase());
 
   FR.fb.get(cacheKey).then(function(cached){
-    if(cached && cached.weeks && cached.weeks.length){
+    if(cached && cached.weeks && cached.weeks.length && cached.schemaVersion === HISTORY_CACHE_SCHEMA){
       renderHistoricalWeeks(cached.weeks, season);
       return;
     }
@@ -2143,7 +2144,7 @@ function loadHistoricalSeason(p, season){
           // Cache for next time — any signed-in user can write this cache
           // (see database.rules.json), since it's pure deterministic math
           // re-derived from already-trusted archive data, not user input.
-          FR.fb.put(cacheKey, { weeks: data.weeks, cachedAt: Date.now() }).catch(function(){});
+          FR.fb.put(cacheKey, { weeks: data.weeks, cachedAt: Date.now(), schemaVersion: HISTORY_CACHE_SCHEMA }).catch(function(){});
         }
       });
   }).catch(function(){
@@ -2152,26 +2153,123 @@ function loadHistoricalSeason(p, season){
   });
 }
 
+// Cell coloring driven primarily by RANK, since it's already
+// position-relative and meaningful (top-5 vs bottom of the position group
+// that week) — a genuinely better signal than arbitrary stat thresholds.
+// Individual counting stats (yards, INTs, etc.) get simple, reasonable
+// thresholds per stat type for a quick color scan, not a rigorous
+// percentile computation against every player — that would need
+// recomputing every stat's distribution, not just fantasy points.
+function rankColor(rank){
+  if(rank == null) return '';
+  if(rank <= 5)  return 'background:rgba(0,229,212,.18);color:var(--or);';
+  if(rank <= 15) return 'background:rgba(255,200,80,.16);color:#FFC850;';
+  return 'background:rgba(255,95,160,.14);color:var(--pk);';
+}
+function statColor(val, good, ok, invert){
+  if(val == null || isNaN(val)) return '';
+  var hit = invert ? val <= good : val >= good;
+  var mid = invert ? val <= ok   : val >= ok;
+  if(hit) return 'background:rgba(0,229,212,.14);color:var(--ink);';
+  if(mid) return 'background:rgba(255,200,80,.12);color:var(--ink);';
+  return 'background:rgba(255,95,160,.10);color:var(--ink);';
+}
+
+function statCell(val, good, ok, invert, suffix){
+  var display = (val == null || isNaN(val)) ? '—' : val + (suffix||'');
+  return '<td style="padding:9px 10px;text-align:center;font-family:var(--fd);font-weight:700;font-size:12.5px;'+statColor(val, good, ok, invert)+'">'+display+'</td>';
+}
+
 function renderHistoricalWeeks(weeks, season){
   if(!weeks.length){
     document.getElementById('news-body').innerHTML = buildSeasonSelectorHtml()
       + '<div class="news-loading" style="padding:32px 20px;text-align:center;color:var(--ink3);">No '+season+' data for this player</div>';
     return;
   }
-  var html = '<div style="padding:4px 20px 16px;">' + weeks.map(function(g){
-    var vsAt = g.isHome === true ? 'vs' : g.isHome === false ? '@' : '';
-    var roundLabel = g.seasonType === 'Postseason' ? 'Playoffs Wk '+g.week : 'Wk '+g.week;
-    var right = typeof g.pts === 'number'
-      ? '<span style="font-family:var(--fd);font-weight:800;font-size:15px;color:var(--or);">'+g.pts.toFixed(1)+'<span style="font-size:10px;color:var(--ink3);font-weight:500;"> PTS</span></span>'
-      : '<span style="font-family:var(--fd);font-size:12px;color:var(--ink3);">—</span>';
-    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--bdr);">'
-      + '<div><span style="font-family:var(--fd);font-weight:700;font-size:13px;color:var(--ink);">'+roundLabel+'</span>'
-      + '<span style="font-size:12px;color:var(--ink3);margin-left:8px;">'+vsAt+' '+(g.opp||'—')+'</span>'
-      + '</div>'
-      + right
-      + '</div>';
-  }).join('') + '</div>';
-  document.getElementById('news-body').innerHTML = buildSeasonSelectorHtml() + html;
+
+  var pos = weeks.find(function(w){ return w.pos; });
+  pos = pos ? pos.pos : '';
+
+  // Column groups by position — fixed per position rather than checking
+  // whether this particular player happened to produce in a category,
+  // so the table shape stays predictable week to week.
+  var showPass = pos === 'QB';
+  var showRush = pos === 'QB' || pos === 'RB';
+  var showRec  = pos === 'RB' || pos === 'WR' || pos === 'TE';
+
+  function groupHeader(){
+    var groups = '<th style="padding:6px 10px;"></th><th style="padding:6px 10px;"></th>'
+      + '<th colspan="3" style="padding:4px 10px;text-align:center;font-family:var(--fd);font-size:10px;letter-spacing:.6px;color:var(--ink3);text-transform:uppercase;border-bottom:1px solid var(--bdr);">Fantasy</th>';
+    if(showPass) groups += '<th colspan="5" style="padding:4px 10px;text-align:center;font-family:var(--fd);font-size:10px;letter-spacing:.6px;color:var(--ink3);text-transform:uppercase;border-bottom:1px solid var(--bdr);">Pass</th>';
+    if(showRush) groups += '<th colspan="3" style="padding:4px 10px;text-align:center;font-family:var(--fd);font-size:10px;letter-spacing:.6px;color:var(--ink3);text-transform:uppercase;border-bottom:1px solid var(--bdr);">Rush</th>';
+    if(showRec)  groups += '<th colspan="4" style="padding:4px 10px;text-align:center;font-family:var(--fd);font-size:10px;letter-spacing:.6px;color:var(--ink3);text-transform:uppercase;border-bottom:1px solid var(--bdr);">Rec</th>';
+    return '<tr>'+groups+'</tr>';
+  }
+
+  function colHeader(){
+    var cols = '<th style="padding:6px 10px;text-align:left;font-family:var(--fd);font-size:10.5px;color:var(--ink3);">WK</th>'
+      + '<th style="padding:6px 10px;text-align:left;font-family:var(--fd);font-size:10.5px;color:var(--ink3);">OPP</th>'
+      + '<th style="padding:6px 10px;text-align:center;font-family:var(--fd);font-size:10.5px;color:var(--ink3);">FPTS</th>'
+      + '<th style="padding:6px 10px;text-align:center;font-family:var(--fd);font-size:10.5px;color:var(--ink3);">SNP%</th>'
+      + '<th style="padding:6px 10px;text-align:center;font-family:var(--fd);font-size:10.5px;color:var(--ink3);">RK</th>';
+    if(showPass) cols += ['ATT','CMP','YD','TD','INT'].map(function(l){ return '<th style="padding:6px 10px;text-align:center;font-family:var(--fd);font-size:10.5px;color:var(--ink3);">'+l+'</th>'; }).join('');
+    if(showRush) cols += ['ATT','YD','TD'].map(function(l){ return '<th style="padding:6px 10px;text-align:center;font-family:var(--fd);font-size:10.5px;color:var(--ink3);">'+l+'</th>'; }).join('');
+    if(showRec)  cols += ['TAR','REC','YD','TD'].map(function(l){ return '<th style="padding:6px 10px;text-align:center;font-family:var(--fd);font-size:10.5px;color:var(--ink3);">'+l+'</th>'; }).join('');
+    return '<tr>'+cols+'</tr>';
+  }
+
+  function rows(list){
+    return list.map(function(g){
+      var vsAt = g.isHome === true ? 'vs' : g.isHome === false ? '@' : '';
+      var wkLabel = g.seasonType === 'Postseason'
+        ? (['WC','DIV','CONF','SB'][g.week-1] || ('P'+g.week))
+        : g.week;
+      var ptsStyle = rankColor(g.rank);
+      var snapDisplay = (typeof g.snapPct === 'number') ? g.snapPct : null;
+
+      var cells = '<td style="padding:9px 10px;font-family:var(--fd);font-weight:800;font-size:12.5px;color:var(--ink);">'+wkLabel+'</td>'
+        + '<td style="padding:9px 10px;font-family:var(--fd);font-size:12px;color:var(--ink2);">'+vsAt+' '+(g.opp||'—')+'</td>'
+        + '<td style="padding:9px 10px;text-align:center;font-family:var(--fd);font-weight:800;font-size:13px;'+ptsStyle+'">'+(typeof g.pts==='number'?g.pts.toFixed(2):'—')+'</td>'
+        + statCell(snapDisplay, 90, 60, false, '')
+        + '<td style="padding:9px 10px;text-align:center;font-family:var(--fd);font-weight:800;font-size:12.5px;'+ptsStyle+'">'+(g.rank!=null?g.rank:'—')+'</td>';
+
+      if(showPass){
+        cells += statCell(g.passAtt, 35, 25, false, '')
+          + statCell(g.passCmp, 22, 15, false, '')
+          + statCell(g.passYds, 280, 200, false, '')
+          + statCell(g.passTD, 3, 1, false, '')
+          + statCell(g.passInt, 0, 1, true, '');
+      }
+      if(showRush){
+        cells += statCell(g.carries, 15, 8, false, '')
+          + statCell(g.rushYds, 80, 40, false, '')
+          + statCell(g.rushTD, 1, 0, false, '');
+      }
+      if(showRec){
+        cells += statCell(g.targets, 8, 5, false, '')
+          + statCell(g.rec, 6, 3, false, '')
+          + statCell(g.recYds, 80, 40, false, '')
+          + statCell(g.recTD, 1, 0, false, '');
+      }
+      return '<tr>'+cells+'</tr>';
+    }).join('');
+  }
+
+  var playoffs = weeks.filter(function(w){ return w.seasonType === 'Postseason'; });
+  var regular  = weeks.filter(function(w){ return w.seasonType === 'Regular'; });
+
+  var sectionsHtml = '';
+  if(playoffs.length){
+    sectionsHtml += '<div style="padding:14px 20px 6px;font-family:var(--fd);font-weight:800;font-size:13px;letter-spacing:.5px;color:var(--ink2);text-transform:uppercase;">Playoffs</div>'
+      + '<table style="width:100%;border-collapse:collapse;"><thead>'+groupHeader()+colHeader()+'</thead><tbody>'+rows(playoffs)+'</tbody></table>';
+  }
+  if(regular.length){
+    sectionsHtml += '<div style="padding:14px 20px 6px;font-family:var(--fd);font-weight:800;font-size:13px;letter-spacing:.5px;color:var(--ink2);text-transform:uppercase;">Regular Season</div>'
+      + '<table style="width:100%;border-collapse:collapse;"><thead>'+groupHeader()+colHeader()+'</thead><tbody>'+rows(regular)+'</tbody></table>';
+  }
+
+  document.getElementById('news-body').innerHTML = buildSeasonSelectorHtml()
+    + '<div style="overflow-x:auto;padding-bottom:8px;">' + sectionsHtml + '</div>';
 }
 
 
