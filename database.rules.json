@@ -62,6 +62,10 @@
       ".read": true,
       ".write": "auth != null && root.child('leagues/fr_refresh26/settings/commissioners/' + auth.uid).val() === true"
     },
+    "nflNewsArchive": {
+      ".read": true,
+      ".write": "auth != null && root.child('leagues/fr_refresh26/settings/commissioners/' + auth.uid).val() === true"
+    },
     "computedFantasyHistory": {
       ".read": true,
       ".write": "auth != null"
