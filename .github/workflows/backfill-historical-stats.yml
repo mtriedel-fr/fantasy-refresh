@@ -37,6 +37,12 @@ on:
         default: 'true'
         type: choice
         options: ['true', 'false']
+      force_refresh:
+        description: 'Re-fetch weeks even if already archived (use when a new field was added and existing data needs it too)'
+        required: true
+        default: 'false'
+        type: choice
+        options: ['true', 'false']
 
 jobs:
   backfill:
@@ -54,6 +60,7 @@ jobs:
           const WORKER        = 'https://fantasy-refresh-news.mtriedel.workers.dev';
           const SEASON         = '${{ inputs.season }}';
           const TEST_ONLY       = '${{ inputs.test_only }}' === 'true';
+          const FORCE_REFRESH   = '${{ inputs.force_refresh }}' === 'true';
 
           function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
@@ -205,6 +212,11 @@ jobs:
                   const rush = s.Rushing   || {};
                   const recv = s.Receiving || {};
                   const def  = s.Defense   || {};
+                  // Confirmed real via an earlier raw sample (Baker
+                  // Mayfield): offensive snap percentage lives under
+                  // snapCounts.offSnapPct, already a 0-1 fraction as a
+                  // string in Tank01's response.
+                  const snapPct = s.snapCounts ? parseFloat(s.snapCounts.offSnapPct || 0) : null;
                   // Firebase RTDB keys can't contain . $ # [ ] / — and NFL
                   // player names very often do ("A.J. Brown", "T.J. Watt",
                   // "Odell Beckham Jr."). Using the raw name as a key broke
@@ -226,13 +238,18 @@ jobs:
                     passYds:  parseFloat(pass.passYds || 0),
                     passTD:   parseFloat(pass.passTD  || 0),
                     passInt:  parseFloat(pass.int     || 0),
+                    passAtt:  parseFloat(pass.passAttempts    || 0),
+                    passCmp:  parseFloat(pass.passCompletions || 0),
                     rushYds:  parseFloat(rush.rushYds || 0),
                     rushTD:   parseFloat(rush.rushTD  || 0),
+                    carries:  parseFloat(rush.carries || 0),
                     recYds:   parseFloat(recv.recYds       || 0),
                     recTD:    parseFloat(recv.recTD        || 0),
                     rec:      parseFloat(recv.receptions   || 0),
+                    targets:  parseFloat(recv.targets      || 0),
                     fumbLost: parseFloat(def.fumblesLost   || 0),
-                    twoPt:    parseFloat(s.twoPt || 0) // not seen in any sample yet — unverified, kept as a harmless best-effort attempt
+                    twoPt:    parseFloat(s.twoPt || 0), // not seen in any sample yet — unverified, kept as a harmless best-effort attempt
+                    snapPct:  snapPct
                   };
                 });
               } catch(e) {
@@ -263,23 +280,28 @@ jobs:
             for (let week = 1; week <= weekCount; week++) {
               // Resumable — skip weeks that are already archived, so a
               // re-run (or a run that gets interrupted) doesn't waste
-              // calls re-fetching what it already has.
-              try {
-                const existing = await firebaseGet(`/nflStatsArchive/${season}/${seasonType}_wk${week}/players.json`);
-                // A Firebase permission error comes back as a real JSON
-                // object ({"error":"Permission denied"}) — not a thrown
-                // exception — so it was passing the same truthy/has-keys
-                // check real archived data would, and getting treated as
-                // "already archived" instead of the actual problem it is.
-                if (existing && existing.error) {
-                  console.log(`  ${seasonType} week ${week}: Firebase returned an error, not data — "${existing.error}". This usually means the database rules for nflStatsArchive were never actually published (uploading to GitHub doesn't publish Firebase rules — that's a separate manual step in the Rules tab). Stopping rather than silently skipping every week.`);
-                  return;
-                }
-                if (existing && Object.keys(existing).length > 0) {
-                  console.log(`  ${seasonType} week ${week}: already archived — skipping`);
-                  continue;
-                }
-              } catch(e) { /* nothing archived yet — proceed */ }
+              // calls re-fetching what it already has. FORCE_REFRESH
+              // bypasses this entirely — used when a new field (like
+              // snapPct) was added and existing archived weeks need it
+              // added retroactively, not just new weeks going forward.
+              if (!FORCE_REFRESH) {
+                try {
+                  const existing = await firebaseGet(`/nflStatsArchive/${season}/${seasonType}_wk${week}/players.json`);
+                  // A Firebase permission error comes back as a real JSON
+                  // object ({"error":"Permission denied"}) — not a thrown
+                  // exception — so it was passing the same truthy/has-keys
+                  // check real archived data would, and getting treated as
+                  // "already archived" instead of the actual problem it is.
+                  if (existing && existing.error) {
+                    console.log(`  ${seasonType} week ${week}: Firebase returned an error, not data — "${existing.error}". This usually means the database rules for nflStatsArchive were never actually published (uploading to GitHub doesn't publish Firebase rules — that's a separate manual step in the Rules tab). Stopping rather than silently skipping every week.`);
+                    return;
+                  }
+                  if (existing && Object.keys(existing).length > 0) {
+                    console.log(`  ${seasonType} week ${week}: already archived — skipping`);
+                    continue;
+                  }
+                } catch(e) { /* nothing archived yet — proceed */ }
+              }
 
               await backfillWeek(season, week, seasonType);
               await sleep(800); // pacing between weeks, on top of per-game pacing above

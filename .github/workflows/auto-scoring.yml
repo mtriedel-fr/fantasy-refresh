@@ -715,6 +715,19 @@ jobs:
             }
           }
 
+          let playerPosLookup = null;
+          async function getPlayerPosLookup() {
+            if (playerPosLookup) return playerPosLookup;
+            playerPosLookup = {};
+            try {
+              const pool = await firebaseGet(`/playerPool/${SEASON}/players.json`);
+              Object.values(pool || {}).forEach(p => {
+                if (p && p.name) playerPosLookup[p.name.toLowerCase()] = p.pos || '';
+              });
+            } catch(e) { console.error('  Could not load player pool for position lookup:', e.message); }
+            return playerPosLookup;
+          }
+
           async function archiveWeekStats(games, playerStats, seasonType, week) {
             const archiveKey = `${seasonType}_wk${week}`;
             const gameList = games.map(g => ({
@@ -738,6 +751,7 @@ jobs:
             // backfill-historical-stats.yml), so current-season and
             // historical data both read the same way everywhere else.
             const players = {};
+            const posLookup = await getPlayerPosLookup();
             Object.values(playerStats).forEach(stats => {
               const displayName = stats.longName || stats.playerName || '';
               const name = displayName.toLowerCase();
@@ -757,6 +771,9 @@ jobs:
               const rush = stats.Rushing   || {};
               const recv = stats.Receiving || {};
               const def  = stats.Defense   || {};
+              // Confirmed real via an earlier raw sample: offensive snap
+              // percentage lives under snapCounts.offSnapPct.
+              const snapPct = stats.snapCounts ? parseFloat(stats.snapCounts.offSnapPct || 0) : null;
               // Firebase RTDB keys can't contain . $ # [ ] / — and NFL
               // player names very often do ("A.J. Brown", "T.J. Watt",
               // "Odell Beckham Jr."). Using the raw name as a key broke
@@ -766,20 +783,28 @@ jobs:
               players[sanitizeFirebaseKey(name)] = {
                 name:    displayName,
                 team,
-                pos:     stats.pos || '',
+                // pos genuinely isn't in the box score response at all —
+                // sourced from the player pool instead, same fix already
+                // applied in the historical backfill.
+                pos:     posLookup[name] || '',
                 opp:     game ? (game.home === team ? game.away : game.home) : '',
                 isHome:  game ? game.home === team : null,
                 pts:     parseFloat(stats.fantasyPoints || 0),
                 passYds: parseFloat(pass.passYds || 0),
                 passTD:  parseFloat(pass.passTD  || 0),
                 passInt: parseFloat(pass.int     || 0),
+                passAtt: parseFloat(pass.passAttempts    || 0),
+                passCmp: parseFloat(pass.passCompletions || 0),
                 rushYds: parseFloat(rush.rushYds || 0),
                 rushTD:  parseFloat(rush.rushTD  || 0),
+                carries: parseFloat(rush.carries || 0),
                 recYds:  parseFloat(recv.recYds     || 0),
                 recTD:   parseFloat(recv.recTD      || 0),
                 rec:     parseFloat(recv.receptions || 0),
+                targets: parseFloat(recv.targets    || 0),
                 fumbLost:parseFloat(def.fumblesLost || 0),
-                twoPt:   parseFloat(stats.twoPt || 0) // not confirmed in any real sample yet — kept as a best-effort attempt
+                twoPt:   parseFloat(stats.twoPt || 0), // not confirmed in any real sample yet — kept as a best-effort attempt
+                snapPct: snapPct
               };
             });
 
