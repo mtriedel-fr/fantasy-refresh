@@ -2174,7 +2174,7 @@ function rankColor(rank){
 // columns that actually mattered.
 function statCell(val, suffix, grpEnd){
   var display = (val == null || isNaN(val)) ? '—' : val + (suffix||'');
-  return '<td'+(grpEnd?' class="grp-end"':'')+' style="padding:9px 10px;text-align:center;font-family:var(--fd);font-weight:700;font-size:12.5px;color:var(--ink2);">'+display+'</td>';
+  return '<td'+(grpEnd?' class="grp-end"':'')+' style="padding:9px 15px;text-align:center;font-family:var(--fd);font-weight:700;font-size:12.5px;color:var(--ink2);">'+display+'</td>';
 }
 
 function renderHistoricalWeeks(weeks, season){
@@ -2195,35 +2195,37 @@ function renderHistoricalWeeks(weeks, season){
   var showRec  = pos === 'RB' || pos === 'WR' || pos === 'TE';
 
   // Real row/column borders instead of just padding + faint background —
-  // two-tier hierarchy: a subtle line between every column, a stronger
-  // one at each group boundary (Fantasy | Pass | Rush | Rec) and under
-  // the header, so the table reads as a structured grid, not a blur.
+  // two-tier hierarchy: a light line between every column, a slightly
+  // stronger one at each group boundary (Fantasy | Pass | Rush | Rec) and
+  // under the header. Both lightened and columns widened from the first
+  // pass — rgba overlays rather than the theme border variables, for the
+  // same guaranteed-contrast reason as the row striping.
   var tableCss = '<style>'
     + '.hist-tbl{border-collapse:collapse;}'
-    + '.hist-tbl td,.hist-tbl th{border-right:1px solid var(--bdr);border-bottom:1px solid var(--bdr);}'
+    + '.hist-tbl td,.hist-tbl th{border-right:1px solid rgba(255,255,255,.06);border-bottom:1px solid rgba(255,255,255,.06);}'
     + '.hist-tbl td:last-child,.hist-tbl th:last-child{border-right:none;}'
-    + '.hist-tbl thead tr:last-child th{border-bottom:1.5px solid var(--bdr2);}'
-    + '.hist-tbl .grp-end{border-right:1.5px solid var(--bdr2) !important;}'
+    + '.hist-tbl thead tr:last-child th{border-bottom:1px solid rgba(255,255,255,.12);}'
+    + '.hist-tbl .grp-end{border-right:1px solid rgba(255,255,255,.12) !important;}'
     + '</style>';
 
   function groupHeader(){
-    var groups = '<th style="padding:6px 10px;"></th><th style="padding:6px 10px;" class="grp-end"></th>'
-      + '<th colspan="3" class="grp-end" style="padding:4px 10px;text-align:center;font-family:var(--fd);font-size:10px;letter-spacing:.6px;color:var(--ink3);text-transform:uppercase;">Fantasy</th>';
-    if(showPass) groups += '<th colspan="5" class="grp-end" style="padding:4px 10px;text-align:center;font-family:var(--fd);font-size:10px;letter-spacing:.6px;color:var(--ink3);text-transform:uppercase;">Pass</th>';
-    if(showRush) groups += '<th colspan="3" class="grp-end" style="padding:4px 10px;text-align:center;font-family:var(--fd);font-size:10px;letter-spacing:.6px;color:var(--ink3);text-transform:uppercase;">Rush</th>';
-    if(showRec)  groups += '<th colspan="4" class="grp-end" style="padding:4px 10px;text-align:center;font-family:var(--fd);font-size:10px;letter-spacing:.6px;color:var(--ink3);text-transform:uppercase;">Rec</th>';
+    var groups = '<th style="padding:6px 15px;"></th><th style="padding:6px 15px;" class="grp-end"></th>'
+      + '<th colspan="3" class="grp-end" style="padding:4px 15px;text-align:center;font-family:var(--fd);font-size:10px;letter-spacing:.6px;color:var(--ink3);text-transform:uppercase;">Fantasy</th>';
+    if(showPass) groups += '<th colspan="5" class="grp-end" style="padding:4px 15px;text-align:center;font-family:var(--fd);font-size:10px;letter-spacing:.6px;color:var(--ink3);text-transform:uppercase;">Pass</th>';
+    if(showRush) groups += '<th colspan="3" class="grp-end" style="padding:4px 15px;text-align:center;font-family:var(--fd);font-size:10px;letter-spacing:.6px;color:var(--ink3);text-transform:uppercase;">Rush</th>';
+    if(showRec)  groups += '<th colspan="4" class="grp-end" style="padding:4px 15px;text-align:center;font-family:var(--fd);font-size:10px;letter-spacing:.6px;color:var(--ink3);text-transform:uppercase;">Rec</th>';
     return '<tr>'+groups+'</tr>';
   }
 
   function colHeader(){
-    var cols = '<th style="padding:6px 10px;text-align:left;font-family:var(--fd);font-size:10.5px;color:var(--ink3);">WK</th>'
-      + '<th class="grp-end" style="padding:6px 10px;text-align:left;font-family:var(--fd);font-size:10.5px;color:var(--ink3);">OPP</th>'
-      + '<th style="padding:6px 10px;text-align:center;font-family:var(--fd);font-size:10.5px;color:var(--ink3);">FPTS</th>'
-      + '<th style="padding:6px 10px;text-align:center;font-family:var(--fd);font-size:10.5px;color:var(--ink3);">SNP%</th>'
-      + '<th class="grp-end" style="padding:6px 10px;text-align:center;font-family:var(--fd);font-size:10.5px;color:var(--ink3);">RK</th>';
-    if(showPass) cols += ['ATT','CMP','YD','TD','INT'].map(function(l, i, arr){ return '<th'+(i===arr.length-1?' class="grp-end"':'')+' style="padding:6px 10px;text-align:center;font-family:var(--fd);font-size:10.5px;color:var(--ink3);">'+l+'</th>'; }).join('');
-    if(showRush) cols += ['ATT','YD','TD'].map(function(l, i, arr){ return '<th'+(i===arr.length-1?' class="grp-end"':'')+' style="padding:6px 10px;text-align:center;font-family:var(--fd);font-size:10.5px;color:var(--ink3);">'+l+'</th>'; }).join('');
-    if(showRec)  cols += ['TAR','REC','YD','TD'].map(function(l, i, arr){ return '<th'+(i===arr.length-1?' class="grp-end"':'')+' style="padding:6px 10px;text-align:center;font-family:var(--fd);font-size:10.5px;color:var(--ink3);">'+l+'</th>'; }).join('');
+    var cols = '<th style="padding:6px 15px;text-align:left;font-family:var(--fd);font-size:10.5px;color:var(--ink3);">WK</th>'
+      + '<th class="grp-end" style="padding:6px 15px;text-align:left;font-family:var(--fd);font-size:10.5px;color:var(--ink3);">OPP</th>'
+      + '<th style="padding:6px 15px;text-align:center;font-family:var(--fd);font-size:10.5px;color:var(--ink3);">FPTS</th>'
+      + '<th style="padding:6px 15px;text-align:center;font-family:var(--fd);font-size:10.5px;color:var(--ink3);">SNP%</th>'
+      + '<th class="grp-end" style="padding:6px 15px;text-align:center;font-family:var(--fd);font-size:10.5px;color:var(--ink3);">RK</th>';
+    if(showPass) cols += ['ATT','CMP','YD','TD','INT'].map(function(l, i, arr){ return '<th'+(i===arr.length-1?' class="grp-end"':'')+' style="padding:6px 15px;text-align:center;font-family:var(--fd);font-size:10.5px;color:var(--ink3);">'+l+'</th>'; }).join('');
+    if(showRush) cols += ['ATT','YD','TD'].map(function(l, i, arr){ return '<th'+(i===arr.length-1?' class="grp-end"':'')+' style="padding:6px 15px;text-align:center;font-family:var(--fd);font-size:10.5px;color:var(--ink3);">'+l+'</th>'; }).join('');
+    if(showRec)  cols += ['TAR','REC','YD','TD'].map(function(l, i, arr){ return '<th'+(i===arr.length-1?' class="grp-end"':'')+' style="padding:6px 15px;text-align:center;font-family:var(--fd);font-size:10.5px;color:var(--ink3);">'+l+'</th>'; }).join('');
     return '<tr>'+cols+'</tr>';
   }
 
@@ -2242,11 +2244,11 @@ function renderHistoricalWeeks(weeks, season){
       // base color.
       var rowBg = idx % 2 === 1 ? 'background:rgba(255,255,255,.035);' : '';
 
-      var cells = '<td style="padding:9px 10px;font-family:var(--fd);font-weight:800;font-size:12.5px;color:var(--ink);">'+wkLabel+'</td>'
-        + '<td class="grp-end" style="padding:9px 10px;font-family:var(--fd);font-size:12px;color:var(--ink2);">'+vsAt+' '+(g.opp||'—')+'</td>'
-        + '<td style="padding:9px 10px;text-align:center;font-family:var(--fd);font-weight:800;font-size:13px;'+ptsStyle+'">'+(typeof g.pts==='number'?g.pts.toFixed(2):'—')+'</td>'
+      var cells = '<td style="padding:9px 15px;font-family:var(--fd);font-weight:800;font-size:12.5px;color:var(--ink);">'+wkLabel+'</td>'
+        + '<td class="grp-end" style="padding:9px 15px;font-family:var(--fd);font-size:12px;color:var(--ink2);">'+vsAt+' '+(g.opp||'—')+'</td>'
+        + '<td style="padding:9px 15px;text-align:center;"><span style="display:inline-block;min-width:44px;padding:4px 10px;border-radius:20px;font-family:var(--fd);font-weight:800;font-size:13px;'+ptsStyle+'">'+(typeof g.pts==='number'?g.pts.toFixed(2):'—')+'</span></td>'
         + statCell(snapDisplay, '')
-        + '<td class="grp-end" style="padding:9px 10px;text-align:center;font-family:var(--fd);font-weight:800;font-size:12.5px;'+ptsStyle+'">'+(g.rank!=null?g.rank:'—')+'</td>';
+        + '<td class="grp-end" style="padding:9px 15px;text-align:center;"><span style="display:inline-block;min-width:28px;padding:4px 10px;border-radius:20px;font-family:var(--fd);font-weight:800;font-size:12.5px;'+ptsStyle+'">'+(g.rank!=null?g.rank:'—')+'</span></td>';
 
       if(showPass){
         cells += statCell(g.passAtt, '')
