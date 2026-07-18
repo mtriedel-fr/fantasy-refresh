@@ -2166,18 +2166,15 @@ function rankColor(rank){
   if(rank <= 15) return 'background:rgba(255,200,80,.16);color:#FFC850;';
   return 'background:rgba(255,95,160,.14);color:var(--pk);';
 }
-function statColor(val, good, ok, invert){
-  if(val == null || isNaN(val)) return '';
-  var hit = invert ? val <= good : val >= good;
-  var mid = invert ? val <= ok   : val >= ok;
-  if(hit) return 'background:rgba(0,229,212,.14);color:var(--ink);';
-  if(mid) return 'background:rgba(255,200,80,.12);color:var(--ink);';
-  return 'background:rgba(255,95,160,.10);color:var(--ink);';
-}
 
-function statCell(val, good, ok, invert, suffix){
+// Plain stat cell — no background color. Color is reserved for FPTS and
+// RANK only (the two things that actually convey "was this good or bad"
+// at a glance); every other stat is just a number to read, and coloring
+// all of them turned the table into visual noise competing with the two
+// columns that actually mattered.
+function statCell(val, suffix){
   var display = (val == null || isNaN(val)) ? '—' : val + (suffix||'');
-  return '<td style="padding:9px 10px;text-align:center;font-family:var(--fd);font-weight:700;font-size:12.5px;'+statColor(val, good, ok, invert)+'">'+display+'</td>';
+  return '<td style="padding:9px 10px;text-align:center;font-family:var(--fd);font-weight:700;font-size:12.5px;color:var(--ink2);">'+display+'</td>';
 }
 
 function renderHistoricalWeeks(weeks, season){
@@ -2219,39 +2216,42 @@ function renderHistoricalWeeks(weeks, season){
   }
 
   function rows(list){
-    return list.map(function(g){
+    return list.map(function(g, idx){
       var vsAt = g.isHome === true ? 'vs' : g.isHome === false ? '@' : '';
       var wkLabel = g.seasonType === 'Postseason'
         ? (['WC','DIV','CONF','SB'][g.week-1] || ('P'+g.week))
         : g.week;
       var ptsStyle = rankColor(g.rank);
       var snapDisplay = (typeof g.snapPct === 'number') ? g.snapPct : null;
+      // Subtle alternating row background — keeps the table scannable
+      // horizontally without needing every cell to carry its own color.
+      var rowBg = idx % 2 === 1 ? 'background:var(--bg2);' : '';
 
       var cells = '<td style="padding:9px 10px;font-family:var(--fd);font-weight:800;font-size:12.5px;color:var(--ink);">'+wkLabel+'</td>'
         + '<td style="padding:9px 10px;font-family:var(--fd);font-size:12px;color:var(--ink2);">'+vsAt+' '+(g.opp||'—')+'</td>'
         + '<td style="padding:9px 10px;text-align:center;font-family:var(--fd);font-weight:800;font-size:13px;'+ptsStyle+'">'+(typeof g.pts==='number'?g.pts.toFixed(2):'—')+'</td>'
-        + statCell(snapDisplay, 90, 60, false, '')
+        + statCell(snapDisplay, '')
         + '<td style="padding:9px 10px;text-align:center;font-family:var(--fd);font-weight:800;font-size:12.5px;'+ptsStyle+'">'+(g.rank!=null?g.rank:'—')+'</td>';
 
       if(showPass){
-        cells += statCell(g.passAtt, 35, 25, false, '')
-          + statCell(g.passCmp, 22, 15, false, '')
-          + statCell(g.passYds, 280, 200, false, '')
-          + statCell(g.passTD, 3, 1, false, '')
-          + statCell(g.passInt, 0, 1, true, '');
+        cells += statCell(g.passAtt, '')
+          + statCell(g.passCmp, '')
+          + statCell(g.passYds, '')
+          + statCell(g.passTD, '')
+          + statCell(g.passInt, '');
       }
       if(showRush){
-        cells += statCell(g.carries, 15, 8, false, '')
-          + statCell(g.rushYds, 80, 40, false, '')
-          + statCell(g.rushTD, 1, 0, false, '');
+        cells += statCell(g.carries, '')
+          + statCell(g.rushYds, '')
+          + statCell(g.rushTD, '');
       }
       if(showRec){
-        cells += statCell(g.targets, 8, 5, false, '')
-          + statCell(g.rec, 6, 3, false, '')
-          + statCell(g.recYds, 80, 40, false, '')
-          + statCell(g.recTD, 1, 0, false, '');
+        cells += statCell(g.targets, '')
+          + statCell(g.rec, '')
+          + statCell(g.recYds, '')
+          + statCell(g.recTD, '');
       }
-      return '<tr>'+cells+'</tr>';
+      return '<tr style="'+rowBg+'">'+cells+'</tr>';
     }).join('');
   }
 
