@@ -1,9 +1,9 @@
 name: Sweep Player News
 
 # ── SCHEDULED — every 4 hours, plus manual trigger for testing ──────────
-# Keeps a permanent, growing news archive fresh for players who are
-# actually rostered somewhere, without depending on anyone happening to
-# open that specific player's card. Tank01 only ever hands back a
+# Keeps a permanent, growing news archive fresh for every player someone
+# could realistically draft, without depending on anyone happening to
+# open that specific player's card first. Tank01 only ever hands back a
 # handful of the most recent items per player (maxItems=6) — anything
 # older just falls off and is gone forever unless captured here. This
 # job checks what's current each run and adds only genuinely NEW items
@@ -11,12 +11,18 @@ name: Sweep Player News
 # accumulates real history over time instead of only ever showing
 # "today's top few."
 #
-# Scoped to rostered players only (not the whole player pool) — a much
-# smaller, bounded set, so this stays cheap regardless of how large the
-# player pool grows. Reuses the Worker's own /news endpoint rather than
-# calling Tank01 directly, so once the field-name mapping there is fixed
-# (it's currently unverified — see the _debug output added to /news),
-# this sweep automatically benefits with no separate fix needed here.
+# Scoped to the salary-eligible pool (~500-600 players — the exact same
+# list already populating the draft picker), not the full player pool
+# (~3,200) and not just already-rostered players — news matters most
+# exactly when someone's deciding whether to DRAFT a player, which is
+# before they're rostered, so "rostered only" was missing the actual
+# highest-value moment. The full pool would run ~19,000+ calls/day on
+# this schedule, well over the daily cap — this scope keeps it a small
+# fraction of that while still covering everyone actually draftable.
+# Reuses the Worker's own /news endpoint rather than calling Tank01
+# directly, so once the field-name mapping there is fixed (it's
+# currently unverified — see the _debug output added to /news), this
+# sweep automatically benefits with no separate fix needed here.
 
 on:
   schedule:
@@ -92,37 +98,23 @@ jobs:
             return (s || '').replace(/[.$#\[\]\/]/g, '');
           }
 
-          async function getActiveLeagues() {
-            try {
-              const leagues = await firebaseGet('/leagues.json?shallow=true');
-              if (!leagues || leagues.error) return [{ id: 'fr_refresh26' }];
-              const ids = Object.keys(leagues);
-              const out = [];
-              for (const id of ids) {
-                try {
-                  const settings = await firebaseGet(`/leagues/${id}/settings.json`);
-                  if (!(settings && settings.active === false)) out.push({ id });
-                } catch(e) { out.push({ id }); }
-              }
-              return out;
-            } catch(e) {
-              return [{ id: 'fr_refresh26' }];
-            }
-          }
-
-          async function getRosteredPlayers(leagueId, week) {
+          async function getSalaryEligiblePlayers(week) {
+            // Same list already used to populate the draft picker itself —
+            // sourced from the salary data weekly-prep.yml already
+            // generates, not a separate lookup. fr_refresh26 used as the
+            // canonical source (same default used throughout this app
+            // whenever a single source of truth is needed), since the
+            // eligible player SET is broadly the same regardless of which
+            // league happens to be asking.
             const players = new Map(); // name (lowercase) -> {name, team}
             try {
-              const lineups = await firebaseGet(`/leagues/${leagueId}/lineups/${SEASON}/week${week}.json`);
-              if (!lineups || lineups.error) return players;
-              Object.values(lineups).forEach(lineup => {
-                if (!lineup || !lineup.slots) return;
-                Object.values(lineup.slots).forEach(p => {
-                  if (!p || !p.name) return;
-                  players.set(p.name.toLowerCase(), { name: p.name, team: p.team || '' });
-                });
+              const salaryData = await firebaseGet(`/leagues/fr_refresh26/salaries/${SEASON}/week${week}.json`);
+              if (!salaryData || salaryData.error || !salaryData.players) return players;
+              Object.values(salaryData.players).forEach(p => {
+                if (!p || !p.name) return;
+                players.set(p.name.toLowerCase(), { name: p.name, team: p.team || '' });
               });
-            } catch(e) { console.error(`  Could not read lineups for ${leagueId} week ${week}:`, e.message); }
+            } catch(e) { console.error('  Could not read salary-eligible player list:', e.message); }
             return players;
           }
 
@@ -184,15 +176,9 @@ jobs:
             }
 
             const week = await getCurrentWeek();
-            const leagues = await getActiveLeagues();
-            console.log(`=== News sweep | week ${week} | mode: ${TEST_ONLY ? 'TEST (one league, no writes)' : 'REAL'} | leagues: ${leagues.map(l => l.id).join(', ')} ===`);
+            console.log(`=== News sweep | week ${week} | mode: ${TEST_ONLY ? 'TEST (10 players, no writes)' : 'REAL'} | scope: salary-eligible pool ===`);
 
-            const allPlayers = new Map();
-            const leaguesToSweep = TEST_ONLY ? leagues.slice(0, 1) : leagues;
-            for (const { id } of leaguesToSweep) {
-              const rostered = await getRosteredPlayers(id, week);
-              rostered.forEach((v, k) => allPlayers.set(k, v));
-            }
+            const allPlayers = await getSalaryEligiblePlayers(week);
 
             console.log(`Found ${allPlayers.size} unique rostered player(s) to check.`);
 
