@@ -2128,7 +2128,7 @@ function loadLiveSeasonSchedule(p){
 // stats). Cache is checked BEFORE calling the Worker at all, so a season
 // that's already been looked up by anyone costs nothing on repeat views.
 function loadHistoricalSeason(p, season){
-  var cacheKey = 'computedFantasyHistory/standard/' + season + '/' + sanitizeKeyClient(p.name.toLowerCase());
+  var cacheKey = '/computedFantasyHistory/standard/' + season + '/' + sanitizeKeyClient(p.name.toLowerCase());
 
   FR.fb.get(cacheKey).then(function(cached){
     if(cached && cached.weeks && cached.weeks.length){
