@@ -1,0 +1,216 @@
+name: Sweep Player News
+
+# ── SCHEDULED — every 4 hours, plus manual trigger for testing ──────────
+# Keeps a permanent, growing news archive fresh for players who are
+# actually rostered somewhere, without depending on anyone happening to
+# open that specific player's card. Tank01 only ever hands back a
+# handful of the most recent items per player (maxItems=6) — anything
+# older just falls off and is gone forever unless captured here. This
+# job checks what's current each run and adds only genuinely NEW items
+# to /nflNewsArchive, skipping anything already saved, so the archive
+# accumulates real history over time instead of only ever showing
+# "today's top few."
+#
+# Scoped to rostered players only (not the whole player pool) — a much
+# smaller, bounded set, so this stays cheap regardless of how large the
+# player pool grows. Reuses the Worker's own /news endpoint rather than
+# calling Tank01 directly, so once the field-name mapping there is fixed
+# (it's currently unverified — see the _debug output added to /news),
+# this sweep automatically benefits with no separate fix needed here.
+
+on:
+  schedule:
+    - cron: '17 */4 * * *'  # every 4 hours, offset from the hour so it doesn't pile up with other scheduled jobs
+  workflow_dispatch:
+    inputs:
+      test_only:
+        description: 'Test mode — sweep one league only, write nothing'
+        required: true
+        default: 'true'
+        type: choice
+        options: ['true', 'false']
+
+jobs:
+  sweep-news:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sweep rostered player news
+        env:
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+
+          const FB_URL   = 'https://fantasy-refresh-default-rtdb.firebaseio.com';
+          const FB_TOKEN  = process.env.FIREBASE_AUTH_TOKEN;
+          const WORKER    = 'https://fantasy-refresh-news.mtriedel.workers.dev';
+          const SEASON    = process.env.FR_SEASON || '2026';
+          const TEST_ONLY = '${{ inputs.test_only }}' === 'true' || !('${{ inputs.test_only }}');
+
+          function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+          function fetchJson(url) {
+            return new Promise((resolve, reject) => {
+              https.get(url, res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => {
+                  try { resolve(JSON.parse(data)); } catch(e) { reject(e); }
+                });
+              }).on('error', reject);
+            });
+          }
+
+          function firebaseGet(path) { return fetchJson(FB_URL + path); }
+
+          function firebasePut(path, payload) {
+            return new Promise((resolve, reject) => {
+              const url = new URL(FB_URL + path + '?auth=' + FB_TOKEN);
+              const body = JSON.stringify(payload);
+              const req = https.request(url, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+              }, res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => {
+                  if (res.statusCode < 200 || res.statusCode >= 300) {
+                    reject(new Error(`Firebase PUT ${path} failed: ${res.statusCode} ${data}`));
+                  } else {
+                    resolve(JSON.parse(data || '{}'));
+                  }
+                });
+              });
+              req.on('error', reject);
+              req.write(body);
+              req.end();
+            });
+          }
+
+          // Firebase RTDB keys can't contain . $ # [ ] /
+          function sanitizeFirebaseKey(s) {
+            return (s || '').replace(/[.$#\[\]\/]/g, '');
+          }
+
+          async function getActiveLeagues() {
+            try {
+              const leagues = await firebaseGet('/leagues.json?shallow=true');
+              if (!leagues || leagues.error) return [{ id: 'fr_refresh26' }];
+              const ids = Object.keys(leagues);
+              const out = [];
+              for (const id of ids) {
+                try {
+                  const settings = await firebaseGet(`/leagues/${id}/settings.json`);
+                  if (!(settings && settings.active === false)) out.push({ id });
+                } catch(e) { out.push({ id }); }
+              }
+              return out;
+            } catch(e) {
+              return [{ id: 'fr_refresh26' }];
+            }
+          }
+
+          async function getRosteredPlayers(leagueId, week) {
+            const players = new Map(); // name (lowercase) -> {name, team}
+            try {
+              const lineups = await firebaseGet(`/leagues/${leagueId}/lineups/${SEASON}/week${week}.json`);
+              if (!lineups || lineups.error) return players;
+              Object.values(lineups).forEach(lineup => {
+                if (!lineup || !lineup.slots) return;
+                Object.values(lineup.slots).forEach(p => {
+                  if (!p || !p.name) return;
+                  players.set(p.name.toLowerCase(), { name: p.name, team: p.team || '' });
+                });
+              });
+            } catch(e) { console.error(`  Could not read lineups for ${leagueId} week ${week}:`, e.message); }
+            return players;
+          }
+
+          async function getCurrentWeek() {
+            try {
+              const meta = await firebaseGet(`/leagues/fr_refresh26/season/${SEASON}/meta.json`);
+              return (meta && meta.week) || 1;
+            } catch(e) { return 1; }
+          }
+
+          // A news item has no stable ID from Tank01 — dedupe using a
+          // sanitized version of its own title + date, which is
+          // deterministic (the same real item always produces the same
+          // key) without needing an ID Tank01 doesn't provide.
+          function itemKey(item) {
+            const raw = (item.title || '').toLowerCase() + '_' + (item.date || '');
+            return sanitizeFirebaseKey(raw).replace(/\s+/g, '_').slice(0, 120) || ('item_' + Date.now());
+          }
+
+          async function sweepPlayer(name, team) {
+            let data;
+            try {
+              data = await fetchJson(`${WORKER}/news?name=${encodeURIComponent(name)}`);
+            } catch(e) {
+              console.error(`  ${name}: news fetch failed —`, e.message);
+              return { added: 0 };
+            }
+            const items = data.items || [];
+            if (!items.length) return { added: 0 };
+
+            const playerKey = sanitizeFirebaseKey(name.toLowerCase());
+            let existing = {};
+            try {
+              existing = await firebaseGet(`/nflNewsArchive/${playerKey}.json`) || {};
+              if (existing.error) existing = {};
+            } catch(e) { /* nothing archived yet for this player */ }
+
+            let added = 0;
+            for (const item of items) {
+              const key = itemKey(item);
+              if (existing[key]) continue; // already archived — genuinely new items only
+              if (TEST_ONLY) { added++; continue; }
+              try {
+                await firebasePut(`/nflNewsArchive/${playerKey}/${key}.json`, {
+                  ...item, playerName: name, team, archivedAt: Date.now()
+                });
+                added++;
+              } catch(e) {
+                console.error(`    Failed to archive item for ${name}:`, e.message);
+              }
+            }
+            return { added, totalSeen: items.length };
+          }
+
+          (async () => {
+            if (!TEST_ONLY && !FB_TOKEN) {
+              console.error('❌ FIREBASE_AUTH_TOKEN secret is missing — required for a real (non-test) sweep.');
+              process.exit(1);
+            }
+
+            const week = await getCurrentWeek();
+            const leagues = await getActiveLeagues();
+            console.log(`=== News sweep | week ${week} | mode: ${TEST_ONLY ? 'TEST (one league, no writes)' : 'REAL'} | leagues: ${leagues.map(l => l.id).join(', ')} ===`);
+
+            const allPlayers = new Map();
+            const leaguesToSweep = TEST_ONLY ? leagues.slice(0, 1) : leagues;
+            for (const { id } of leaguesToSweep) {
+              const rostered = await getRosteredPlayers(id, week);
+              rostered.forEach((v, k) => allPlayers.set(k, v));
+            }
+
+            console.log(`Found ${allPlayers.size} unique rostered player(s) to check.`);
+
+            let totalAdded = 0, checked = 0;
+            for (const { name, team } of allPlayers.values()) {
+              const result = await sweepPlayer(name, team);
+              if (result.added > 0) {
+                console.log(`  ${TEST_ONLY ? '[TEST] would add' : '✓ added'} ${result.added} new item(s) for ${name}`);
+                totalAdded += result.added;
+              }
+              checked++;
+              await sleep(500); // pacing — spread calls out, don't burst
+              if (TEST_ONLY && checked >= 10) {
+                console.log('  [TEST MODE] Stopping after 10 players — enough to confirm this works.');
+                break;
+              }
+            }
+
+            console.log(`\n✓ Sweep complete — checked ${checked} player(s), ${TEST_ONLY ? 'would add' : 'added'} ${totalAdded} new news item(s).`);
+          })();
+          SCRIPT
