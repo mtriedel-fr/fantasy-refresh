@@ -2172,9 +2172,10 @@ function rankColor(rank){
 // at a glance); every other stat is just a number to read, and coloring
 // all of them turned the table into visual noise competing with the two
 // columns that actually mattered.
-function statCell(val, suffix, grpEnd){
+function statCell(val, suffix, grpEnd, grpClass){
   var display = (val == null || isNaN(val)) ? '—' : val + (suffix||'');
-  return '<td'+(grpEnd?' class="grp-end"':'')+' style="padding:9px 15px;text-align:center;font-family:var(--fd);font-weight:700;font-size:12.5px;color:var(--ink2);">'+display+'</td>';
+  var cls = (grpClass||'') + (grpEnd?' grp-end':'');
+  return '<td'+(cls.trim()?' class="'+cls.trim()+'"':'')+' style="padding:6px 15px;text-align:center;font-family:var(--fd);font-weight:700;font-size:12.5px;color:var(--ink2);">'+display+'</td>';
 }
 
 function renderHistoricalWeeks(weeks, season){
@@ -2206,26 +2207,30 @@ function renderHistoricalWeeks(weeks, season){
     + '.hist-tbl td:last-child,.hist-tbl th:last-child{border-right:none;}'
     + '.hist-tbl thead tr:last-child th{border-bottom:1px solid rgba(255,255,255,.12);}'
     + '.hist-tbl .grp-end{border-right:1px solid rgba(255,255,255,.12) !important;}'
+    + '.hist-tbl .grp-fantasy{background:rgba(0,229,212,.05);}'
+    + '.hist-tbl .grp-pass{background:rgba(120,170,255,.05);}'
+    + '.hist-tbl .grp-rush{background:rgba(255,170,90,.05);}'
+    + '.hist-tbl .grp-rec{background:rgba(255,95,160,.05);}'
     + '</style>';
 
   function groupHeader(){
-    var groups = '<th style="padding:6px 15px;"></th><th style="padding:6px 15px;" class="grp-end"></th>'
-      + '<th colspan="3" class="grp-end" style="padding:4px 15px;text-align:center;font-family:var(--fd);font-size:10px;letter-spacing:.6px;color:var(--ink3);text-transform:uppercase;">Fantasy</th>';
-    if(showPass) groups += '<th colspan="5" class="grp-end" style="padding:4px 15px;text-align:center;font-family:var(--fd);font-size:10px;letter-spacing:.6px;color:var(--ink3);text-transform:uppercase;">Pass</th>';
-    if(showRush) groups += '<th colspan="3" class="grp-end" style="padding:4px 15px;text-align:center;font-family:var(--fd);font-size:10px;letter-spacing:.6px;color:var(--ink3);text-transform:uppercase;">Rush</th>';
-    if(showRec)  groups += '<th colspan="4" class="grp-end" style="padding:4px 15px;text-align:center;font-family:var(--fd);font-size:10px;letter-spacing:.6px;color:var(--ink3);text-transform:uppercase;">Rec</th>';
+    var groups = '<th style="padding:4px 15px;"></th><th style="padding:4px 15px;" class="grp-end"></th>'
+      + '<th colspan="3" class="grp-end grp-fantasy" style="padding:4px 15px;text-align:center;font-family:var(--fd);font-size:10px;letter-spacing:.6px;color:var(--ink3);text-transform:uppercase;">Fantasy</th>';
+    if(showPass) groups += '<th colspan="5" class="grp-end grp-pass" style="padding:4px 15px;text-align:center;font-family:var(--fd);font-size:10px;letter-spacing:.6px;color:var(--ink3);text-transform:uppercase;">Pass</th>';
+    if(showRush) groups += '<th colspan="3" class="grp-end grp-rush" style="padding:4px 15px;text-align:center;font-family:var(--fd);font-size:10px;letter-spacing:.6px;color:var(--ink3);text-transform:uppercase;">Rush</th>';
+    if(showRec)  groups += '<th colspan="4" class="grp-end grp-rec" style="padding:4px 15px;text-align:center;font-family:var(--fd);font-size:10px;letter-spacing:.6px;color:var(--ink3);text-transform:uppercase;">Rec</th>';
     return '<tr>'+groups+'</tr>';
   }
 
   function colHeader(){
-    var cols = '<th style="padding:6px 15px;text-align:left;font-family:var(--fd);font-size:10.5px;color:var(--ink3);">WK</th>'
-      + '<th class="grp-end" style="padding:6px 15px;text-align:left;font-family:var(--fd);font-size:10.5px;color:var(--ink3);">OPP</th>'
-      + '<th style="padding:6px 15px;text-align:center;font-family:var(--fd);font-size:10.5px;color:var(--ink3);">FPTS</th>'
-      + '<th style="padding:6px 15px;text-align:center;font-family:var(--fd);font-size:10.5px;color:var(--ink3);">SNP%</th>'
-      + '<th class="grp-end" style="padding:6px 15px;text-align:center;font-family:var(--fd);font-size:10.5px;color:var(--ink3);">RK</th>';
-    if(showPass) cols += ['ATT','CMP','YD','TD','INT'].map(function(l, i, arr){ return '<th'+(i===arr.length-1?' class="grp-end"':'')+' style="padding:6px 15px;text-align:center;font-family:var(--fd);font-size:10.5px;color:var(--ink3);">'+l+'</th>'; }).join('');
-    if(showRush) cols += ['ATT','YD','TD'].map(function(l, i, arr){ return '<th'+(i===arr.length-1?' class="grp-end"':'')+' style="padding:6px 15px;text-align:center;font-family:var(--fd);font-size:10.5px;color:var(--ink3);">'+l+'</th>'; }).join('');
-    if(showRec)  cols += ['TAR','REC','YD','TD'].map(function(l, i, arr){ return '<th'+(i===arr.length-1?' class="grp-end"':'')+' style="padding:6px 15px;text-align:center;font-family:var(--fd);font-size:10.5px;color:var(--ink3);">'+l+'</th>'; }).join('');
+    var cols = '<th style="padding:4px 15px;text-align:left;font-family:var(--fd);font-size:10.5px;color:var(--ink3);">WK</th>'
+      + '<th class="grp-end" style="padding:4px 15px;text-align:left;font-family:var(--fd);font-size:10.5px;color:var(--ink3);">OPP</th>'
+      + '<th class="grp-fantasy" style="padding:4px 15px;text-align:center;font-family:var(--fd);font-size:10.5px;color:var(--ink3);">FPTS</th>'
+      + '<th class="grp-fantasy" style="padding:4px 15px;text-align:center;font-family:var(--fd);font-size:10.5px;color:var(--ink3);">SNP%</th>'
+      + '<th class="grp-end grp-fantasy" style="padding:4px 15px;text-align:center;font-family:var(--fd);font-size:10.5px;color:var(--ink3);">RK</th>';
+    if(showPass) cols += ['ATT','CMP','YD','TD','INT'].map(function(l, i, arr){ return '<th class="grp-pass'+(i===arr.length-1?' grp-end':'')+'" style="padding:4px 15px;text-align:center;font-family:var(--fd);font-size:10.5px;color:var(--ink3);">'+l+'</th>'; }).join('');
+    if(showRush) cols += ['ATT','YD','TD'].map(function(l, i, arr){ return '<th class="grp-rush'+(i===arr.length-1?' grp-end':'')+'" style="padding:4px 15px;text-align:center;font-family:var(--fd);font-size:10.5px;color:var(--ink3);">'+l+'</th>'; }).join('');
+    if(showRec)  cols += ['TAR','REC','YD','TD'].map(function(l, i, arr){ return '<th class="grp-rec'+(i===arr.length-1?' grp-end':'')+'" style="padding:4px 15px;text-align:center;font-family:var(--fd);font-size:10.5px;color:var(--ink3);">'+l+'</th>'; }).join('');
     return '<tr>'+cols+'</tr>';
   }
 
@@ -2244,29 +2249,29 @@ function renderHistoricalWeeks(weeks, season){
       // base color.
       var rowBg = idx % 2 === 1 ? 'background:rgba(255,255,255,.035);' : '';
 
-      var cells = '<td style="padding:9px 15px;font-family:var(--fd);font-weight:800;font-size:12.5px;color:var(--ink);">'+wkLabel+'</td>'
-        + '<td class="grp-end" style="padding:9px 15px;font-family:var(--fd);font-size:12px;color:var(--ink2);">'+vsAt+' '+(g.opp||'—')+'</td>'
-        + '<td style="padding:9px 15px;text-align:center;"><span style="display:inline-block;min-width:44px;padding:4px 10px;border-radius:20px;font-family:var(--fd);font-weight:800;font-size:13px;'+ptsStyle+'">'+(typeof g.pts==='number'?g.pts.toFixed(2):'—')+'</span></td>'
-        + statCell(snapDisplay, '')
-        + '<td class="grp-end" style="padding:9px 15px;text-align:center;"><span style="display:inline-block;min-width:28px;padding:4px 10px;border-radius:20px;font-family:var(--fd);font-weight:800;font-size:12.5px;'+ptsStyle+'">'+(g.rank!=null?g.rank:'—')+'</span></td>';
+      var cells = '<td style="padding:6px 15px;font-family:var(--fd);font-weight:800;font-size:12.5px;color:var(--ink);">'+wkLabel+'</td>'
+        + '<td class="grp-end" style="padding:6px 15px;font-family:var(--fd);font-size:12px;color:var(--ink2);">'+vsAt+' '+(g.opp||'—')+'</td>'
+        + '<td class="grp-fantasy" style="padding:6px 15px;text-align:center;"><span style="display:inline-block;min-width:44px;padding:4px 10px;border-radius:20px;font-family:var(--fd);font-weight:800;font-size:13px;'+ptsStyle+'">'+(typeof g.pts==='number'?g.pts.toFixed(2):'—')+'</span></td>'
+        + statCell(snapDisplay, '', false, 'grp-fantasy')
+        + '<td class="grp-end grp-fantasy" style="padding:6px 15px;text-align:center;"><span style="display:inline-block;min-width:28px;padding:4px 10px;border-radius:20px;font-family:var(--fd);font-weight:800;font-size:12.5px;'+ptsStyle+'">'+(g.rank!=null?g.rank:'—')+'</span></td>';
 
       if(showPass){
-        cells += statCell(g.passAtt, '')
-          + statCell(g.passCmp, '')
-          + statCell(g.passYds, '')
-          + statCell(g.passTD, '')
-          + statCell(g.passInt, '', true);
+        cells += statCell(g.passAtt, '', false, 'grp-pass')
+          + statCell(g.passCmp, '', false, 'grp-pass')
+          + statCell(g.passYds, '', false, 'grp-pass')
+          + statCell(g.passTD, '', false, 'grp-pass')
+          + statCell(g.passInt, '', true, 'grp-pass');
       }
       if(showRush){
-        cells += statCell(g.carries, '')
-          + statCell(g.rushYds, '')
-          + statCell(g.rushTD, '', true);
+        cells += statCell(g.carries, '', false, 'grp-rush')
+          + statCell(g.rushYds, '', false, 'grp-rush')
+          + statCell(g.rushTD, '', true, 'grp-rush');
       }
       if(showRec){
-        cells += statCell(g.targets, '')
-          + statCell(g.rec, '')
-          + statCell(g.recYds, '')
-          + statCell(g.recTD, '', true);
+        cells += statCell(g.targets, '', false, 'grp-rec')
+          + statCell(g.rec, '', false, 'grp-rec')
+          + statCell(g.recYds, '', false, 'grp-rec')
+          + statCell(g.recTD, '', true, 'grp-rec');
       }
       return '<tr style="'+rowBg+'">'+cells+'</tr>';
     }).join('');
