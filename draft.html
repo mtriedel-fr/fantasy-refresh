@@ -2082,40 +2082,17 @@ function loadScoresTab(){
   }
 }
 
+// Current season now uses the exact same rich table as historical seasons
+// (see renderHistoricalWeeks) — same Worker endpoint too, just without the
+// long-term cache historical lookups get. Deliberately NOT cached: unlike
+// a finished historical season, part of this data (the current/upcoming
+// week) is projections that genuinely change day to day as the week goes
+// on, and caching that the same way as immutable history would mean
+// serving a stale projection instead of an updated one.
 function loadLiveSeasonSchedule(p){
-  fetch(WORKER+'/playerschedule?name='+encodeURIComponent(p.name)+'&team='+encodeURIComponent(p.team)+'&season=2026')
+  fetch(WORKER+'/playerhistory?name='+encodeURIComponent(p.name)+'&team='+encodeURIComponent(p.team)+'&season=2026&currentWeek='+currentWeek)
     .then(function(r){ return r.json(); })
-    .then(function(data){
-      if(!data.schedule || !data.schedule.length){
-        document.getElementById('news-body').innerHTML = buildSeasonSelectorHtml()
-          + '<div class="news-loading" style="padding:32px 20px;text-align:center;color:var(--ink3);">Schedule not available yet</div>';
-        return;
-      }
-      var html = '<div style="padding:4px 20px 16px;">' + data.schedule.map(function(g){
-        var isBye = g.opp === 'BYE';
-        var noData = g.noData;
-        var vsAt  = g.isHome === true ? 'vs' : g.isHome === false ? '@' : '';
-        var right;
-        if(noData){
-          right = '<span style="font-family:var(--fd);font-size:11px;color:var(--ink3);opacity:.6;">No data yet</span>';
-        } else if(isBye){
-          right = '<span style="font-family:var(--fd);font-size:12px;color:var(--ink3);font-weight:700;">BYE</span>';
-        } else if(g.played && typeof g.pts === 'number'){
-          right = '<span style="font-family:var(--fd);font-weight:800;font-size:15px;color:var(--or);">'+g.pts.toFixed(1)+'<span style="font-size:10px;color:var(--ink3);font-weight:500;"> PTS</span></span>';
-        } else if(g.played){
-          right = '<span style="font-family:var(--fd);font-size:12px;color:var(--ink3);">—</span>';
-        } else {
-          right = '<span style="font-family:var(--fd);font-size:11px;color:var(--ink3);">Upcoming</span>';
-        }
-        return '<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--bdr);'+((isBye||noData)?'opacity:.5;':'')+'">'
-          + '<div><span style="font-family:var(--fd);font-weight:700;font-size:13px;color:var(--ink);">Wk '+g.week+'</span>'
-          + ((isBye||noData) ? '' : '<span style="font-size:12px;color:var(--ink3);margin-left:8px;">'+vsAt+' '+(g.opp||'—')+'</span>')
-          + '</div>'
-          + right
-          + '</div>';
-      }).join('') + '</div>';
-      document.getElementById('news-body').innerHTML = buildSeasonSelectorHtml() + html;
-    })
+    .then(function(data){ renderHistoricalWeeks(data.weeks || [], '2026'); })
     .catch(function(){
       document.getElementById('news-body').innerHTML = buildSeasonSelectorHtml()
         + '<div class="news-loading" style="padding:32px 20px;text-align:center;color:var(--ink3);">Could not load season schedule</div>';
@@ -2127,7 +2104,7 @@ function loadLiveSeasonSchedule(p){
 // handlePlayerHistory for how points get computed from the raw stored
 // stats). Cache is checked BEFORE calling the Worker at all, so a season
 // that's already been looked up by anyone costs nothing on repeat views.
-var HISTORY_CACHE_SCHEMA = 2; // bumped when the shape of cached data changes (2 = added rank + snapPct) — older cached entries are treated as a miss and recomputed, not served incomplete
+var HISTORY_CACHE_SCHEMA = 3; // bumped when the shape of cached data changes (2 = added rank + snapPct, 3 = bye/no-stat weeks now show as real rows instead of being silently omitted) — older cached entries are treated as a miss and recomputed, not served incomplete
 function loadHistoricalSeason(p, season){
   var cacheKey = '/computedFantasyHistory/standard/' + season + '/' + sanitizeKeyClient(p.name.toLowerCase());
 
@@ -2248,8 +2225,15 @@ function renderHistoricalWeeks(weeks, season){
       // contrast is guaranteed visible regardless of the underlying
       // base color.
       var rowBg = idx % 2 === 1 ? 'background:rgba(255,255,255,.035);' : '';
+      // Projection rows (the current/upcoming week, before it's actually
+      // been played) get a clearly different look — a dashed left border
+      // and a "PROJ" tag next to the week number — so it's unmistakable
+      // this is an estimate, not a confirmed result. rank/snap% naturally
+      // don't apply to a projection either, so those columns just show —.
+      if(g.isProjection) rowBg = 'background:rgba(255,255,255,.02);border-left:2px dashed rgba(255,255,255,.25);';
+      var projTag = g.isProjection ? '<span style="font-size:9px;font-weight:800;color:var(--ink3);letter-spacing:.4px;margin-left:6px;vertical-align:middle;">PROJ</span>' : '';
 
-      var cells = '<td style="padding:6px 15px;font-family:var(--fd);font-weight:800;font-size:12.5px;color:var(--ink);">'+wkLabel+'</td>'
+      var cells = '<td style="padding:6px 15px;font-family:var(--fd);font-weight:800;font-size:12.5px;color:var(--ink);">'+wkLabel+projTag+'</td>'
         + '<td class="grp-end" style="padding:6px 15px;font-family:var(--fd);font-size:12px;color:var(--ink2);">'+vsAt+' '+(g.opp||'—')+'</td>'
         + '<td class="grp-fantasy" style="padding:6px 15px;text-align:center;"><span style="display:inline-block;min-width:44px;padding:4px 10px;border-radius:20px;font-family:var(--fd);font-weight:800;font-size:13px;'+ptsStyle+'">'+(typeof g.pts==='number'?g.pts.toFixed(2):'—')+'</span></td>'
         + statCell(snapDisplay, '', false, 'grp-fantasy')
