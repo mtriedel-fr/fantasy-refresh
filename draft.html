@@ -457,6 +457,13 @@ function fmtKickoff(iso){
   return day + ' ' + time;
 }
 
+function fmtGameDay(iso){
+  if(!iso) return '';
+  var d = new Date(iso);
+  if(isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('en-US', { weekday: 'short' });
+}
+
 // ── BOOT ──────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', function(){
   try{
@@ -2204,8 +2211,8 @@ function renderHistoricalWeeks(weeks, season){
       + '<th style="padding:4px 15px;text-align:left;font-family:var(--fd);font-size:10.5px;color:var(--ink3);">DATE</th>'
       + '<th class="grp-end" style="padding:4px 15px;text-align:left;font-family:var(--fd);font-size:10.5px;color:var(--ink3);">OPP</th>'
       + '<th class="grp-fantasy" style="padding:4px 15px;text-align:center;font-family:var(--fd);font-size:10.5px;color:var(--ink3);">FPTS</th>'
-      + '<th class="grp-fantasy" style="padding:4px 15px;text-align:center;font-family:var(--fd);font-size:10.5px;color:var(--ink3);">SNP%</th>'
-      + '<th class="grp-end grp-fantasy" style="padding:4px 15px;text-align:center;font-family:var(--fd);font-size:10.5px;color:var(--ink3);">RK</th>';
+      + '<th class="grp-fantasy" style="padding:4px 15px;text-align:center;font-family:var(--fd);font-size:10.5px;color:var(--ink3);">RK</th>'
+      + '<th class="grp-end grp-fantasy" style="padding:4px 15px;text-align:center;font-family:var(--fd);font-size:10.5px;color:var(--ink3);">SNP%</th>';
     if(showPass) cols += ['ATT','CMP','YD','TD','INT'].map(function(l, i, arr){ return '<th class="grp-pass'+(i===arr.length-1?' grp-end':'')+'" style="padding:4px 15px;text-align:center;font-family:var(--fd);font-size:10.5px;color:var(--ink3);">'+l+'</th>'; }).join('');
     if(showRush) cols += ['ATT','YD','TD'].map(function(l, i, arr){ return '<th class="grp-rush'+(i===arr.length-1?' grp-end':'')+'" style="padding:4px 15px;text-align:center;font-family:var(--fd);font-size:10.5px;color:var(--ink3);">'+l+'</th>'; }).join('');
     if(showRec)  cols += ['TAR','REC','YD','TD'].map(function(l, i, arr){ return '<th class="grp-rec'+(i===arr.length-1?' grp-end':'')+'" style="padding:4px 15px;text-align:center;font-family:var(--fd);font-size:10.5px;color:var(--ink3);">'+l+'</th>'; }).join('');
@@ -2234,14 +2241,14 @@ function renderHistoricalWeeks(weeks, season){
       if(g.isProjection) rowBg = 'background:rgba(255,255,255,.02);border-left:2px dashed rgba(255,255,255,.25);';
       var projTag = g.isProjection ? '<span style="font-size:9px;font-weight:800;color:var(--ink3);letter-spacing:.4px;margin-left:6px;vertical-align:middle;">PROJ</span>' : '';
 
-      var dateLabel = g.gameDate ? fmtKickoff(g.gameDate) : '—';
+      var dateLabel = g.gameDate ? fmtGameDay(g.gameDate) : '—';
 
       var cells = '<td style="padding:6px 15px;font-family:var(--fd);font-weight:800;font-size:12.5px;color:var(--ink);">'+wkLabel+projTag+'</td>'
         + '<td style="padding:6px 15px;font-family:var(--fd);font-size:12px;color:var(--ink2);">'+dateLabel+'</td>'
         + '<td class="grp-end" style="padding:6px 15px;font-family:var(--fd);font-size:12px;color:var(--ink2);">'+vsAt+' '+(g.opp||'—')+'</td>'
         + '<td class="grp-fantasy" style="padding:6px 15px;text-align:center;"><span style="display:inline-block;min-width:44px;padding:4px 10px;border-radius:20px;font-family:var(--fd);font-weight:800;font-size:13px;'+ptsStyle+'">'+(typeof g.pts==='number'?g.pts.toFixed(2):'—')+'</span></td>'
-        + statCell(snapDisplay, '', false, 'grp-fantasy')
-        + '<td class="grp-end grp-fantasy" style="padding:6px 15px;text-align:center;"><span style="display:inline-block;min-width:28px;padding:4px 10px;border-radius:20px;font-family:var(--fd);font-weight:800;font-size:12.5px;'+ptsStyle+'">'+(g.rank!=null?g.rank:'—')+'</span></td>';
+        + '<td class="grp-fantasy" style="padding:6px 15px;text-align:center;"><span style="display:inline-block;min-width:28px;padding:4px 10px;border-radius:20px;font-family:var(--fd);font-weight:800;font-size:12.5px;'+ptsStyle+'">'+(g.rank!=null?g.rank:'—')+'</span></td>'
+        + statCell(snapDisplay, '', true, 'grp-fantasy');
 
       if(showPass){
         cells += statCell(g.passAtt, '', false, 'grp-pass')
