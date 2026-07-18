@@ -2203,14 +2203,14 @@ function renderHistoricalWeeks(weeks, season){
   // same guaranteed-contrast reason as the row striping.
   var tableCss = '<style>'
     + '.hist-tbl{border-collapse:collapse;}'
-    + '.hist-tbl td,.hist-tbl th{border-right:1px solid rgba(255,255,255,.06);border-bottom:1px solid rgba(255,255,255,.06);}'
+    + '.hist-tbl td,.hist-tbl th{border-right:1px solid rgba(255,255,255,.06);border-bottom:1px solid rgba(255,255,255,.06);white-space:nowrap;}'
     + '.hist-tbl td:last-child,.hist-tbl th:last-child{border-right:none;}'
     + '.hist-tbl thead tr:last-child th{border-bottom:1px solid rgba(255,255,255,.12);}'
-    + '.hist-tbl .grp-end{border-right:1px solid rgba(255,255,255,.12) !important;}'
-    + '.hist-tbl .grp-fantasy{background:rgba(0,229,212,.05);}'
-    + '.hist-tbl .grp-pass{background:rgba(120,170,255,.05);}'
-    + '.hist-tbl .grp-rush{background:rgba(255,170,90,.05);}'
-    + '.hist-tbl .grp-rec{background:rgba(255,95,160,.05);}'
+    + '.hist-tbl .grp-end{border-right:1px solid rgba(255,255,255,.16) !important;}'
+    + '.hist-tbl .grp-fantasy{background:rgba(0,229,212,.16);}'
+    + '.hist-tbl .grp-pass{background:rgba(90,150,255,.18);}'
+    + '.hist-tbl .grp-rush{background:rgba(255,150,50,.18);}'
+    + '.hist-tbl .grp-rec{background:rgba(255,70,150,.18);}'
     + '</style>';
 
   function groupHeader(){
