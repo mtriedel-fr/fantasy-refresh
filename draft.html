@@ -368,8 +368,17 @@ function playerPhotoOrBadge(p, fallbackHtml){
     badge = '<div class="p-pos" style="background:'+posColor+'18;color:'+posColor+'">'+(p.pos||'')+'</div>';
   }
   if(!p || !p.headshot) return badge;
-  var badgeEscaped = badge.replace(/'/g, "\\'");
-  return '<img class="p-photo" src="'+p.headshot+'" alt="" onerror="this.outerHTML=\''+badgeEscaped+'\';">';
+  // display:contents makes this wrapper invisible to the flex layout
+  // around it (its children act as direct flex items), while still
+  // letting onerror toggle which one is visible via plain CSS instead
+  // of injecting the badge's own HTML — which contains double quotes —
+  // as a string inside an onerror="..." attribute. That's what broke
+  // visibly last time: the badge's own quotes closed the attribute early
+  // and spilled the rest out as literal text on the page.
+  return '<span style="display:contents;">'
+    + '<img class="p-photo" src="'+p.headshot+'" alt="" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'\';">'
+    + '<span style="display:none;">'+badge+'</span>'
+    + '</span>';
 }
 
 // Builds SLOT_DEFS from the league's rosterConfig instead of the hardcoded
@@ -2052,15 +2061,16 @@ function loadNewsTab(){
       if(data.items && data.items.length){
         var html = data.items.map(function(item){
           // Confirmed real shape: title (a full readable sentence, not
-          // just a short headline), link (to the full article), image,
-          // source (derived from the link's own domain). No separate
-          // body or date field exists on this endpoint.
-          return '<a class="news-item" href="'+(item.link||'#')+'" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;display:flex;gap:10px;align-items:flex-start;">'
+          // just a short headline), link (to the source article, kept
+          // as a small text credit rather than a click-through), image,
+          // source. No separate body or date field exists on this
+          // endpoint — title already IS the complete blurb.
+          return '<div class="news-item" style="display:flex;gap:10px;align-items:flex-start;">'
             +(item.image?'<img src="'+item.image+'" alt="" style="width:44px;height:44px;border-radius:8px;object-fit:cover;flex-shrink:0;background:var(--bg2);" onerror="this.style.display=\'none\';">':'')
             +'<div style="flex:1;min-width:0;">'
             +(item.title?'<div class="news-item-title">'+item.title+'</div>':'')
             +'<div class="news-item-meta">'+(item.source||'')+'</div>'
-            +'</div></a>';
+            +'</div></div>';
         }).join('');
         document.getElementById('news-body').innerHTML = html;
       } else {

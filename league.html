@@ -2072,8 +2072,10 @@ var LINEUP_POS_COLORS = {QB:'var(--or)', RB:'var(--pk)', WR:'var(--pu)', TE:'#FF
 // when Tank01 returns a URL for it).
 function lineupPhotoOrBadge(p, fallbackHtml){
   if(!p || !p.headshot) return fallbackHtml;
-  var badgeEscaped = fallbackHtml.replace(/'/g, "\\'");
-  return '<img class="lineup-card-photo" src="'+p.headshot+'" alt="" onerror="this.outerHTML=\''+badgeEscaped+'\';">';
+  return '<span style="display:contents;">'
+    + '<img class="lineup-card-photo" src="'+p.headshot+'" alt="" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'\';">'
+    + '<span style="display:none;">'+fallbackHtml+'</span>'
+    + '</span>';
 }
 
 // Canonical roster order — QB, RB, WR, TE, FLEX, DEF — regardless of
