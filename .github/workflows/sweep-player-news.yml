@@ -106,13 +106,13 @@ jobs:
             // whenever a single source of truth is needed), since the
             // eligible player SET is broadly the same regardless of which
             // league happens to be asking.
-            const players = new Map(); // name (lowercase) -> {name, team}
+            const players = new Map(); // name (lowercase) -> {name, team, tank01PlayerID}
             try {
               const salaryData = await firebaseGet(`/leagues/fr_refresh26/salaries/${SEASON}/week${week}.json`);
               if (!salaryData || salaryData.error || !salaryData.players) return players;
               Object.values(salaryData.players).forEach(p => {
                 if (!p || !p.name) return;
-                players.set(p.name.toLowerCase(), { name: p.name, team: p.team || '' });
+                players.set(p.name.toLowerCase(), { name: p.name, team: p.team || '', tank01PlayerID: p.tank01PlayerID || null });
               });
             } catch(e) { console.error('  Could not read salary-eligible player list:', e.message); }
             return players;
@@ -136,10 +136,12 @@ jobs:
             return sanitizeFirebaseKey(raw).replace(/\s+/g, '_').slice(0, 120) || ('item_' + Date.now());
           }
 
-          async function sweepPlayer(name, team) {
+          async function sweepPlayer(name, team, tank01PlayerID) {
             let data;
             try {
-              data = await fetchJson(`${WORKER}/news?name=${encodeURIComponent(name)}`);
+              var newsUrl = `${WORKER}/news?name=${encodeURIComponent(name)}`;
+              if (tank01PlayerID) newsUrl += `&playerID=${encodeURIComponent(tank01PlayerID)}`;
+              data = await fetchJson(newsUrl);
             } catch(e) {
               console.error(`  ${name}: news fetch failed —`, e.message);
               return { added: 0 };
@@ -185,8 +187,8 @@ jobs:
             console.log(`Found ${allPlayers.size} unique rostered player(s) to check.`);
 
             let totalAdded = 0, checked = 0;
-            for (const { name, team } of allPlayers.values()) {
-              const result = await sweepPlayer(name, team);
+            for (const { name, team, tank01PlayerID } of allPlayers.values()) {
+              const result = await sweepPlayer(name, team, tank01PlayerID);
               if (result.added > 0) {
                 console.log(`  ${TEST_ONLY ? '[TEST] would add' : '✓ added'} ${result.added} new item(s) for ${name}`);
                 totalAdded += result.added;

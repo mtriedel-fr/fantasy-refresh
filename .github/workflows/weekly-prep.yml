@@ -180,6 +180,35 @@ jobs:
               };
               count++;
             });
+
+            // Enrich with real Tank01 playerID + headshot — confirmed via
+            // real testing that Tank01's playerID IS the same value as
+            // espnID, and that this bulk list includes sleeperBotID
+            // directly, matching exactly the ID system this pool is
+            // already keyed by. One bulk call (via the Worker, which
+            // holds the Tank01 key), matched by an EXACT ID instead of
+            // fuzzy name-guessing. This is what makes targeted, reliable
+            // per-player news requests (and real headshots) possible.
+            try {
+              const tankList = await fetchJson(`${WORKER}/playerlist`);
+              const bySleeperID = {};
+              (tankList.players || []).forEach(p => {
+                if (p.sleeperBotID) bySleeperID[p.sleeperBotID] = p;
+              });
+              let enriched = 0;
+              Object.keys(pool).forEach(id => {
+                const match = bySleeperID[id];
+                if (match) {
+                  pool[id].tank01PlayerID = match.playerID;
+                  pool[id].headshot = match.headshot || '';
+                  enriched++;
+                }
+              });
+              console.log(`  Enriched ${enriched}/${count} players with real Tank01 ID + headshot`);
+            } catch(e) {
+              console.error('  Could not enrich player pool with Tank01 IDs:', e.message);
+            }
+
             await firebasePut(`/playerPool/${SEASON}/players.json`, pool);
             await firebasePut(`/playerPool/${SEASON}/count.json`, count);
             await firebasePut(`/playerPool/${SEASON}/updated.json`, Date.now());
@@ -238,7 +267,7 @@ jobs:
               // "Round-up + multiplier recalibration" for why.
               let sal = Math.ceil((p.proj * mult) / SAL_ROUND) * SAL_ROUND;
               sal = Math.max(min, Math.min(max, sal));
-              salaries[pid] = { id: pid, name: p.name, pos: p.pos, team: p.team, proj: Math.round(p.proj*10)/10, salary: sal, status: inj };
+              salaries[pid] = { id: pid, name: p.name, pos: p.pos, team: p.team, proj: Math.round(p.proj*10)/10, salary: sal, status: inj, tank01PlayerID: poolP ? poolP.tank01PlayerID : null, headshot: poolP ? poolP.headshot : null };
               count++;
             });
             return { salaries, count };
@@ -251,7 +280,7 @@ jobs:
               if (!p || !p.pos || !FLAT[p.pos]) return;
               if (!p.team || !p.name) return;
               if (p.status === 'O' || p.status === 'IR') return;
-              salaries[p.id] = { id: p.id, name: p.name, pos: p.pos, team: p.team, proj: null, salary: FLAT[p.pos], status: p.status || null };
+              salaries[p.id] = { id: p.id, name: p.name, pos: p.pos, team: p.team, proj: null, salary: FLAT[p.pos], status: p.status || null, tank01PlayerID: p.tank01PlayerID || null, headshot: p.headshot || null };
               count++;
             });
             return { salaries, count };
