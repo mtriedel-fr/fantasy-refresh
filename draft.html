@@ -1991,6 +1991,15 @@ function openNews(playerId, event){
   document.getElementById('news-player-name').textContent = p.name;
   document.getElementById('news-player-meta').textContent =
     (p.pos||'') + (p.team ? ' · '+p.team : '') + (p.salary ? ' · $'+p.salary.toLocaleString() : '');
+  var headshotEl = document.getElementById('news-player-headshot');
+  if(headshotEl){
+    if(p.headshot){
+      headshotEl.src = p.headshot;
+      headshotEl.style.display = 'block';
+    } else {
+      headshotEl.style.display = 'none';
+    }
+  }
   document.getElementById('news-overlay').classList.add('open');
 
   // Always reset to the News tab when opening a new player
@@ -2016,16 +2025,24 @@ function loadNewsTab(){
   if(!p) return;
   document.getElementById('news-body').innerHTML = '<div class="news-loading">Loading news…</div>';
 
-  fetch(WORKER+'/news?name='+encodeURIComponent(p.name))
+  var newsUrl = WORKER+'/news?name='+encodeURIComponent(p.name);
+  if(p.tank01PlayerID) newsUrl += '&playerID='+encodeURIComponent(p.tank01PlayerID);
+
+  fetch(newsUrl)
     .then(function(r){ return r.json(); })
     .then(function(data){
       if(data.items && data.items.length){
         var html = data.items.map(function(item){
-          return '<div class="news-item">'
+          // Confirmed real shape: title (a full readable sentence, not
+          // just a short headline), link (to the full article), image,
+          // source (derived from the link's own domain). No separate
+          // body or date field exists on this endpoint.
+          return '<a class="news-item" href="'+(item.link||'#')+'" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;display:flex;gap:10px;align-items:flex-start;">'
+            +(item.image?'<img src="'+item.image+'" alt="" style="width:44px;height:44px;border-radius:8px;object-fit:cover;flex-shrink:0;background:var(--bg2);" onerror="this.style.display=\'none\';">':'')
+            +'<div style="flex:1;min-width:0;">'
             +(item.title?'<div class="news-item-title">'+item.title+'</div>':'')
-            +(item.body ?'<div class="news-item-body">'+item.body+'</div>':'')
-            +'<div class="news-item-meta">'+(item.date?item.date+' · ':'')+(item.source||'')+'</div>'
-            +'</div>';
+            +'<div class="news-item-meta">'+(item.source||'')+'</div>'
+            +'</div></a>';
         }).join('');
         document.getElementById('news-body').innerHTML = html;
       } else {
@@ -2345,6 +2362,7 @@ function goBack(){
 <div class="news-overlay" id="news-overlay" onclick="if(event.target===this)closeNews()">
   <div class="news-sheet">
     <div class="news-sheet-hdr">
+      <img id="news-player-headshot" src="" alt="" style="display:none;width:52px;height:52px;border-radius:50%;object-fit:cover;margin-right:12px;background:var(--bg2);flex-shrink:0;" onerror="this.style.display='none';">
       <div>
         <div class="news-sheet-name" id="news-player-name"></div>
         <div class="news-sheet-meta" id="news-player-meta"></div>
