@@ -125,12 +125,14 @@ jobs:
             } catch(e) { return 1; }
           }
 
-          // A news item has no stable ID from Tank01 — dedupe using a
-          // sanitized version of its own title + date, which is
+          // A news item has no stable ID from Tank01, and — confirmed via
+          // a real sample — no date field either, just title and link.
+          // Dedupe using a sanitized version of the title alone, which is
           // deterministic (the same real item always produces the same
-          // key) without needing an ID Tank01 doesn't provide.
+          // key) and specific enough on its own, since Tank01's titles
+          // here are full sentences, not short generic headlines.
           function itemKey(item) {
-            const raw = (item.title || '').toLowerCase() + '_' + (item.date || '');
+            const raw = (item.title || '').toLowerCase();
             return sanitizeFirebaseKey(raw).replace(/\s+/g, '_').slice(0, 120) || ('item_' + Date.now());
           }
 
