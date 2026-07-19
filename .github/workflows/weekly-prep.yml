@@ -250,15 +250,31 @@ jobs:
             return projCache[week];
           }
 
+          // Tank01 (projections) and Sleeper (the pool) don't necessarily
+          // format suffixes the same way — "Michael Pittman Jr." on one
+          // side, "Michael Pittman" on the other, for example. A plain
+          // name match silently fails for any suffixed player, losing the
+          // pool match (and the tank01PlayerID/headshot already correctly
+          // stored there) even though nothing about the underlying data
+          // was actually wrong. Stripping suffixes before comparing fixes
+          // this without needing either source to agree on formatting.
+          function normalizeNameForMatch(name) {
+            return (name || '')
+              .toLowerCase()
+              .replace(/[.,']/g, '')
+              .replace(/\s+(jr|sr|ii|iii|iv|v)$/i, '')
+              .trim();
+          }
+
           function buildSalariesFromProjections(projPlayers, poolPlayers, min, max) {
             const nameMap = {};
-            Object.values(poolPlayers || {}).forEach(p => { if (p && p.name) nameMap[p.name.toLowerCase()] = p; });
+            Object.values(poolPlayers || {}).forEach(p => { if (p && p.name) nameMap[normalizeNameForMatch(p.name)] = p; });
             const salaries = {};
             let count = 0;
             projPlayers.forEach(p => {
               if (!p.proj || p.proj <= 0) return;
               if (!['QB','RB','WR','TE','DEF'].includes(p.pos)) return;
-              const poolP = nameMap[p.name.toLowerCase()];
+              const poolP = nameMap[normalizeNameForMatch(p.name)];
               const pid = poolP ? poolP.id : ('t01_' + p.id);
               const inj = poolP ? (poolP.status || p.status || null) : (p.status || null);
               if (inj === 'O' || inj === 'IR') return;
