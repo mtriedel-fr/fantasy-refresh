@@ -368,8 +368,9 @@ jobs:
           async function cacheFullSeasonSchedule() {
             const currentWeek = await getGlobalCurrentWeek();
             const seasonTypes = [
-              { type: 'Preseason', weeks: [0, 1, 2, 3] }, // short enough (4 weeks) that filtering isn't worth the complexity
-              { type: 'Regular',   weeks: Array.from({ length: 18 }, (_, i) => i + 1).filter(w => w >= currentWeek) }
+              { type: 'Preseason',  weeks: [0, 1, 2, 3] }, // short enough (4 weeks) that filtering isn't worth the complexity
+              { type: 'Regular',    weeks: Array.from({ length: 18 }, (_, i) => i + 1).filter(w => w >= currentWeek) },
+              { type: 'Postseason', weeks: [1, 2, 3, 4] } // same reasoning as preseason — short enough not to bother filtering
             ];
             for (const { type, weeks } of seasonTypes) {
               // Start from whatever's already cached — past weeks we're
