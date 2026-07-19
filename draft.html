@@ -983,7 +983,6 @@ function renderGamePreview(game){
     var spentExRepl = getSpent() - currentOccupantSalary;
     var wouldOvr2 = !isIn2 && (spentExRepl + p.salary > CAP);
     var disabled2 = isOut || locked2 || wouldOvr2;
-    var posColor = POS_COLORS[p.pos] || 'var(--ink2)';
     var injBadge = (p.status && p.status !== 'Active')
       ? '<span class="p-inj inj-'+p.status+'">'+p.status+'</span>' : '';
     var draftLbl2 = isIn2 ? '✓ Drafted' : locked2 ? '🔒 Locked' : wouldOvr2 ? '💰 Can\'t Afford' : '+ Draft';
@@ -997,9 +996,9 @@ function renderGamePreview(game){
     }
 
     return '<div class="'+cls+'"'+rowIdAttr+'>'
-      + '<div class="p-pos" style="background:'+posColor+'18;color:'+posColor+'">'+p.pos+'</div>'
+      + playerPhotoOrBadge(p)
       + '<div class="p-info" onclick="openNews(\''+p.id+'\',event)" style="cursor:pointer;">'
-      +   '<div class="p-name">'+p.name+(p.team&&p.pos!=='DEF'?' - '+p.team:'')+injBadge+'</div>'
+      +   '<div class="p-name">'+p.name+(p.pos?' · '+p.pos:'')+(p.team&&p.pos!=='DEF'?' · '+p.team:'')+injBadge+'</div>'
       +   '<div class="p-meta">'+(p.proj?p.proj+' proj':'')+'</div>'
       + '</div>'
       + '<div class="p-sal">$'+(p.salary||0).toLocaleString()+'</div>'
@@ -2157,7 +2156,7 @@ function loadLiveSeasonSchedule(p){
 // handlePlayerHistory for how points get computed from the raw stored
 // stats). Cache is checked BEFORE calling the Worker at all, so a season
 // that's already been looked up by anyone costs nothing on repeat views.
-var HISTORY_CACHE_SCHEMA = 4; // bumped when the shape of cached data changes (2 = added rank + snapPct, 3 = bye/no-stat weeks now show as real rows instead of being silently omitted, 4 = added gameDate, future weeks now show real schedule info even without stats) — older cached entries are treated as a miss and recomputed, not served incomplete
+var HISTORY_CACHE_SCHEMA = 5; // bumped when the shape of cached data changes (2 = added rank + snapPct, 3 = bye/no-stat weeks now show as real rows instead of being silently omitted, 4 = added gameDate, future weeks now show real schedule info even without stats, 5 = postseason weeks now get real dates too, matching regular season) — older cached entries are treated as a miss and recomputed, not served incomplete
 function loadHistoricalSeason(p, season){
   var cacheKey = '/computedFantasyHistory/standard/' + season + '/' + sanitizeKeyClient(p.name.toLowerCase());
 
