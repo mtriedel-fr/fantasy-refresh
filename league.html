@@ -184,6 +184,7 @@ tr:hover td{background:var(--or4);}
 .lineup-card-list{display:flex;flex-direction:column;gap:6px;}
 .lineup-card{display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--bg4);border:1px solid var(--bdr);border-radius:10px;}
 .lineup-card-pos{flex-shrink:0;font-family:var(--fd);font-size:12.5px;font-weight:800;padding:6px 9px;border-radius:7px;border:1.5px solid;text-align:center;min-width:44px;}
+.lineup-card-photo{width:38px;height:38px;border-radius:50%;object-fit:cover;flex-shrink:0;background:var(--bg2);}
 .lineup-card-status-col{flex-shrink:0;width:96px;text-align:center;}
 .lineup-card-footer{display:flex;align-items:center;gap:8px;flex-shrink:0;}
 .lineup-card-mid{flex:1;min-width:0;}
@@ -2064,6 +2065,17 @@ function toggleH2HRoster(idx, homeUid, awayUid){
 
 var LINEUP_POS_COLORS = {QB:'var(--or)', RB:'var(--pk)', WR:'var(--pu)', TE:'#FF9A3A', FLEX:'var(--ink2)', DEF:'#69BE28', SUPERFLEX:'#FFD23F'};
 
+// Same "photo or badge" pattern as the draft page's picker/roster panel —
+// a real headshot when the player has one, falling back to the existing
+// badge (here, the slot label) when they don't, or if the image itself
+// 404s (not every playerID has a headshot on file at ESPN's CDN even
+// when Tank01 returns a URL for it).
+function lineupPhotoOrBadge(p, fallbackHtml){
+  if(!p || !p.headshot) return fallbackHtml;
+  var badgeEscaped = fallbackHtml.replace(/'/g, "\\'");
+  return '<img class="lineup-card-photo" src="'+p.headshot+'" alt="" onerror="this.outerHTML=\''+badgeEscaped+'\';">';
+}
+
 // Canonical roster order — QB, RB, WR, TE, FLEX, DEF — regardless of
 // however the slot keys happen to be ordered in the stored data. Scales
 // automatically if a league has more or fewer slots of any position
@@ -2231,10 +2243,11 @@ function buildLineupPlayerCard(p, pts, hasStarted, gameMap, showNotStartedTag, s
     statusTag = '🔒 Locked';
   }
 
+  var posBadgeHtml = '<div class="lineup-card-pos" style="background:' + posColor + '1f;color:' + posColor + ';border-color:' + posColor + '40;">' + escapeHtmlFR(slotLabel) + '</div>';
   return '<div class="lineup-card' + (hasStarted ? ' started' : '') + '">'
-    + '<div class="lineup-card-pos" style="background:' + posColor + '1f;color:' + posColor + ';border-color:' + posColor + '40;">' + escapeHtmlFR(slotLabel) + '</div>'
+    + lineupPhotoOrBadge(p, posBadgeHtml)
     + '<div class="lineup-card-mid">'
-    +   '<div class="lineup-card-name">' + escapeHtmlFR(p.name || '') + teamTag + '</div>'
+    +   '<div class="lineup-card-name">' + escapeHtmlFR(p.name || '') + (p.pos ? ' · ' + escapeHtmlFR(p.pos) : '') + teamTag + '</div>'
     +   gameLine
     + '</div>'
     + '<div class="lineup-card-pts-stack">'

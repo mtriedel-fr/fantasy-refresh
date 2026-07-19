@@ -122,6 +122,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
 .player-row.selected{background:rgba(0,229,212,.06);border-left:3px solid var(--or);}
 .player-row.disabled{opacity:.4;cursor:not-allowed;pointer-events:none;}
 .p-pos{font-family:var(--fd);font-size:12.5px;font-weight:800;width:34px;text-align:center;padding:4px 0;border-radius:5px;flex-shrink:0;}
+.p-photo{width:38px;height:38px;border-radius:50%;object-fit:cover;flex-shrink:0;background:var(--bg2);}
 .p-info{flex:1;min-width:0;}
 .p-name{font-family:var(--fd);font-size:17px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .p-meta{font-family:var(--fd);font-size:12.5px;color:var(--ink3);text-transform:uppercase;letter-spacing:.3px;}
@@ -353,6 +354,23 @@ var SLOT_DEFS = [
   {id:'df1', pos:'DEF',  label:'DEF',  eligible:['DEF']}
 ];
 var POS_COLORS = {QB:'var(--or)',RB:'var(--pk)',WR:'var(--pu)',TE:'#FF9A3A',DEF:'#69BE28',FLEX:'var(--ink2)',SUPERFLEX:'#FFD23F'};
+
+// Shared "photo or badge" pattern — a real headshot when the player has
+// one, gracefully falling back to the existing colored position badge
+// when they don't (still a large share of the pool) or if the image URL
+// itself 404s (not every playerID has a headshot on file at ESPN's CDN
+// even when Tank01 returns a URL for it). Reused everywhere a player
+// card shows up, not just the draft picker.
+function playerPhotoOrBadge(p, fallbackHtml){
+  var badge = fallbackHtml;
+  if(badge == null){
+    var posColor = POS_COLORS[p.pos] || 'var(--ink2)';
+    badge = '<div class="p-pos" style="background:'+posColor+'18;color:'+posColor+'">'+(p.pos||'')+'</div>';
+  }
+  if(!p || !p.headshot) return badge;
+  var badgeEscaped = badge.replace(/'/g, "\\'");
+  return '<img class="p-photo" src="'+p.headshot+'" alt="" onerror="this.outerHTML=\''+badgeEscaped+'\';">';
+}
 
 // Builds SLOT_DEFS from the league's rosterConfig instead of the hardcoded
 // 9-slot default — any count beyond the standard baseline (1 QB, 2 RB,
@@ -1224,7 +1242,8 @@ function renderRoster(){
     // naturally sits vertically centered against the whole card via the
     // outer .roster-slot's own align-items:center, matching the My Team
     // card exactly instead of being pinned to the top.
-    html += '<span class="slot-pos-tag" style="background:'+color+'1f;color:'+color+';border-color:'+color+'40;">'+s.label+'</span>';
+    var slotBadge = '<span class="slot-pos-tag" style="background:'+color+'1f;color:'+color+';border-color:'+color+'40;">'+s.label+'</span>';
+    html += p ? playerPhotoOrBadge(p, slotBadge) : slotBadge;
     if(p){
       // Team abbreviation on the name — skipped for DEF, since a defense
       // "player" IS the team already ("PHI", "SEA", etc.), so appending
@@ -1248,7 +1267,7 @@ function renderRoster(){
       // (.slot-mid), so the date lines up directly under the name instead
       // of starting at the card's left edge under the badge.
       html += '<div class="slot-mid">';
-      html +=   '<div class="slot-player-name">'+p.name+teamTag+'</div>';
+      html +=   '<div class="slot-player-name">'+p.name+(p.pos?' · '+p.pos:'')+teamTag+'</div>';
       if(gameLine) html += '<div class="slot-player-game">'+gameLine+'</div>';
       html += '</div>';
 
@@ -1463,7 +1482,6 @@ function renderPicker(){
     var disabled   = isOut || locked || (wouldOvr && !isSelected);
     var injBadge   = (p.status && p.status !== 'Active')
       ? '<span class="p-inj inj-'+p.status+'">'+p.status+'</span>' : '';
-    var posColor   = POS_COLORS[p.pos] || 'var(--ink2)';
     var draftLabel = isSelected ? '✓ Drafted' : locked ? '🔒 Locked' : wouldOvr ? '💰 Can\'t Afford' : '+ Draft';
     var draftCls   = 'draft-btn' + (isSelected || locked || wouldOvr ? ' drafted' : '');
     var rowCls     = 'player-row'+(isSelected?' selected':'')+(disabled?' disabled':'');
@@ -1495,9 +1513,9 @@ function renderPicker(){
     }
 
     html += '<div class="'+rowCls+'"'+rowIdAttr+'>'
-      + '<div class="p-pos" style="background:'+posColor+'18;color:'+posColor+'">'+p.pos+'</div>'
+      + playerPhotoOrBadge(p)
       + '<div class="p-info" onclick="openNews(\''+p.id+'\',event)" style="cursor:pointer;">'
-      +   '<div class="p-name">'+p.name+(p.team&&p.pos!=='DEF'?' - '+p.team:'')+injBadge+(isElsewhere?' <span style="font-size:10px;color:var(--ink3)">(in lineup)</span>':'')+'</div>'
+      +   '<div class="p-name">'+p.name+(p.pos?' · '+p.pos:'')+(p.team&&p.pos!=='DEF'?' · '+p.team:'')+injBadge+(isElsewhere?' <span style="font-size:10px;color:var(--ink3)">(in lineup)</span>':'')+'</div>'
       +   '<div class="p-meta">'+gameMeta+(p.proj?(gameMeta?' · ':'')+p.proj+' proj':'')+'</div>'
       + '</div>'
       + '<div class="p-sal">$'+(p.salary||0).toLocaleString()+'</div>'
