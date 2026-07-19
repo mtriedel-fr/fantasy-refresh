@@ -184,7 +184,8 @@ tr:hover td{background:var(--or4);}
 .lineup-card-list{display:flex;flex-direction:column;gap:6px;}
 .lineup-card{display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--bg4);border:1px solid var(--bdr);border-radius:10px;}
 .lineup-card-pos{flex-shrink:0;font-family:var(--fd);font-size:12.5px;font-weight:800;padding:6px 9px;border-radius:7px;border:1.5px solid;text-align:center;min-width:44px;}
-.lineup-card-photo{width:38px;height:38px;border-radius:50%;object-fit:cover;flex-shrink:0;background:var(--bg2);}
+.lineup-card-photo{width:38px;height:38px;border-radius:50%;object-fit:cover;flex-shrink:0;background:var(--bg2);opacity:0;transition:opacity .25s ease;}
+.lineup-card-photo.loaded{opacity:1;}
 .lineup-card-status-col{flex-shrink:0;width:96px;text-align:center;}
 .lineup-card-footer{display:flex;align-items:center;gap:8px;flex-shrink:0;}
 .lineup-card-mid{flex:1;min-width:0;}
@@ -2073,7 +2074,7 @@ var LINEUP_POS_COLORS = {QB:'var(--or)', RB:'var(--pk)', WR:'var(--pu)', TE:'#FF
 function lineupPhotoOrBadge(p, fallbackHtml){
   if(!p || !p.headshot) return fallbackHtml;
   return '<span style="display:contents;">'
-    + '<img class="lineup-card-photo" src="'+p.headshot+'" alt="" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'\';">'
+    + '<img class="lineup-card-photo" src="'+p.headshot+'" alt="" loading="lazy" decoding="async" onload="this.classList.add(\'loaded\');" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'\';">'
     + '<span style="display:none;">'+fallbackHtml+'</span>'
     + '</span>';
 }
