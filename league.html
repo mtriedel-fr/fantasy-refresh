@@ -807,6 +807,20 @@ body{padding-bottom:calc(76px + env(safe-area-inset-bottom));}
 .share-copy-btn{flex:1;padding:10px;background:var(--or);color:#050808;border:none;border-radius:8px;font-family:var(--fd);font-size:13px;font-weight:800;cursor:pointer;text-transform:uppercase;}
 .share-close-btn{padding:10px 14px;background:transparent;border:1px solid var(--bdr2);color:var(--ink3);border-radius:8px;cursor:pointer;font-size:13px;}
 
+/* ── WEEKLY REVIEW MODAL ── */
+.recap-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);z-index:99998;display:none;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;}
+.recap-overlay.open{display:flex;}
+.recap-box{background:#080E0E;border:2px solid var(--or);border-radius:16px;max-width:460px;width:100%;max-height:85vh;display:flex;flex-direction:column;color:var(--ink);overflow:hidden;}
+.recap-hdr{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--bdr);flex-shrink:0;}
+.recap-close-btn{background:transparent;border:1px solid var(--bdr2);color:var(--ink3);border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:14px;}
+.recap-body{overflow-y:auto;padding:16px 20px 24px;}
+.recap-section{margin-bottom:16px;padding:14px;background:var(--bg2);border-radius:10px;border:1px solid var(--bdr);}
+.recap-section-label{font-family:var(--fd);font-size:10.5px;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;}
+.recap-section-main{font-family:var(--fd);font-size:16px;font-weight:800;color:var(--ink);}
+.recap-section-sub{font-size:12.5px;color:var(--ink2);margin-top:3px;}
+.recap-roster-row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--bdr);font-size:12.5px;}
+.recap-roster-row:last-child{border-bottom:none;}
+
 /* ── EMOJI REACTIONS ── */
 .react-section{display:flex;align-items:center;gap:4px;flex-wrap:nowrap;position:relative;padding:4px 0;}
 .react-trigger{background:none;border:1px solid var(--bdr2);border-radius:20px;padding:3px 9px;font-size:14px;cursor:pointer;color:var(--ink3);transition:all .15s;line-height:1;}
@@ -1023,7 +1037,10 @@ setTimeout(function(){
     </div>
   </div>
   <div class="h2h-section h2h-section-standings">
-    <div class="h2h-section-hdr">🏆 Weekly Standings</div>
+    <div class="h2h-section-hdr" style="display:flex;align-items:center;justify-content:space-between;">
+      <span>🏆 Weekly Standings</span>
+      <button onclick="openRecap()" style="font-family:var(--fd);font-size:11px;font-weight:800;padding:6px 12px;border-radius:20px;border:1.5px solid var(--or);background:rgba(0,229,212,.1);color:var(--or);cursor:pointer;">📰 Weekly Review</button>
+    </div>
     <div id="cum-standings-wrap"></div>
     <div id="cum-standings-pager" style="display:flex;gap:6px;justify-content:center;margin-top:12px;flex-wrap:wrap;"></div>
   </div>
@@ -6561,6 +6578,111 @@ function closeShare(){
   document.getElementById('share-overlay').style.display = 'none';
 }
 
+// ── WEEKLY REVIEW ──────────────────────────────────────────────
+function openRecap(week){
+  var ctx      = FRAuth.getLeagueCtx();
+  var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+  var w = week || currentWeek;
+
+  document.getElementById('recap-title').textContent = 'Week ' + w + ' Review';
+  document.getElementById('recap-body').innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--ink3);font-size:13px;">Loading…</div>';
+  document.getElementById('recap-overlay').classList.add('open');
+
+  fetch(FB_DB_URL + '/leagues/' + leagueId + '/recaps/' + FR_SEASON + '/week' + w + '.json')
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      if(!data || data.error){
+        document.getElementById('recap-body').innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--ink3);font-size:13px;">No recap available for this week yet — check back once the week is finalized.</div>';
+        return;
+      }
+      renderRecapBody(data);
+    })
+    .catch(function(){
+      document.getElementById('recap-body').innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--ink3);font-size:13px;">Couldn\'t load this week\'s recap.</div>';
+    });
+}
+
+function closeRecap(){
+  document.getElementById('recap-overlay').classList.remove('open');
+}
+
+function renderRecapBody(r){
+  var html = '';
+
+  if(r.leagueLeader){
+    html += '<div class="recap-section">'
+      + '<div class="recap-section-label">👑 League Leader</div>'
+      + '<div class="recap-section-main">' + escapeHtmlFR(r.leagueLeader.team) + '</div>'
+      + '<div class="recap-section-sub">' + fmtScore(r.leagueLeader.total) + ' total points</div>'
+      + '</div>';
+  }
+
+  if(r.topScore || r.lowScore){
+    html += '<div class="recap-section">'
+      + '<div class="recap-section-label">📈 This Week</div>';
+    if(r.topScore) html += '<div class="recap-section-sub">🔥 High: <b style="color:var(--ink);">' + escapeHtmlFR(r.topScore.team) + '</b> — ' + fmtScore(r.topScore.score) + ' pts</div>';
+    if(r.lowScore) html += '<div class="recap-section-sub">🥶 Low: <b style="color:var(--ink);">' + escapeHtmlFR(r.lowScore.team) + '</b> — ' + fmtScore(r.lowScore.score) + ' pts</div>';
+    html += '</div>';
+  }
+
+  if(r.biggestRiser || r.biggestFaller){
+    html += '<div class="recap-section">'
+      + '<div class="recap-section-label">🎢 Standings Movement</div>';
+    if(r.biggestRiser) html += '<div class="recap-section-sub">⬆️ <b style="color:var(--ink);">' + escapeHtmlFR(r.biggestRiser.team) + '</b> jumped ' + r.biggestRiser.movement + ' spot' + (r.biggestRiser.movement > 1 ? 's' : '') + ' (#' + r.biggestRiser.fromRank + ' → #' + r.biggestRiser.toRank + ')</div>';
+    if(r.biggestFaller) html += '<div class="recap-section-sub">⬇️ <b style="color:var(--ink);">' + escapeHtmlFR(r.biggestFaller.team) + '</b> dropped ' + Math.abs(r.biggestFaller.movement) + ' spot' + (Math.abs(r.biggestFaller.movement) > 1 ? 's' : '') + ' (#' + r.biggestFaller.fromRank + ' → #' + r.biggestFaller.toRank + ')</div>';
+    html += '</div>';
+  }
+
+  if(r.closestRace){
+    html += '<div class="recap-section">'
+      + '<div class="recap-section-label">🤏 Closest Race</div>'
+      + '<div class="recap-section-sub">#' + r.closestRace.rank + ' <b style="color:var(--ink);">' + escapeHtmlFR(r.closestRace.higher.team) + '</b> vs #' + (r.closestRace.rank+1) + ' <b style="color:var(--ink);">' + escapeHtmlFR(r.closestRace.lower.team) + '</b> — just ' + fmtScore(r.closestRace.gap) + ' points apart</div>'
+      + '</div>';
+  }
+
+  if(r.mvp){
+    html += '<div class="recap-section">'
+      + '<div class="recap-section-label">🌟 League MVP</div>'
+      + '<div class="recap-section-main">' + escapeHtmlFR(r.mvp.name) + '<span style="font-size:12px;color:var(--ink3);font-weight:600;"> · ' + escapeHtmlFR(r.mvp.pos) + '</span></div>'
+      + '<div class="recap-section-sub">' + fmtScore(r.mvp.pts) + ' pts, rostered by ' + escapeHtmlFR(r.mvp.rosteredBy) + '</div>'
+      + '</div>';
+  }
+
+  if(r.bestValue){
+    html += '<div class="recap-section">'
+      + '<div class="recap-section-label">💎 Best Value</div>'
+      + '<div class="recap-section-main">' + escapeHtmlFR(r.bestValue.name) + '<span style="font-size:12px;color:var(--ink3);font-weight:600;"> · ' + escapeHtmlFR(r.bestValue.pos) + '</span></div>'
+      + '<div class="recap-section-sub">' + fmtScore(r.bestValue.pts) + ' pts on a $' + r.bestValue.salary.toLocaleString() + ' salary (' + r.bestValue.ptsPerK + ' pts/$1K)</div>'
+      + '</div>';
+  }
+
+  if(r.bust){
+    html += '<div class="recap-section">'
+      + '<div class="recap-section-label">💩 Bust of the Week</div>'
+      + '<div class="recap-section-main">' + escapeHtmlFR(r.bust.name) + '<span style="font-size:12px;color:var(--ink3);font-weight:600;"> · ' + escapeHtmlFR(r.bust.pos) + '</span></div>'
+      + '<div class="recap-section-sub">Just ' + fmtScore(r.bust.pts) + ' pts on a $' + r.bust.salary.toLocaleString() + ' salary</div>'
+      + '</div>';
+  }
+
+  if(r.perfectRoster && r.perfectRoster.picks){
+    var slotOrder = { QB: 0, RB: 1, WR: 2, TE: 3, FLEX: 4, DEF: 5 };
+    var sortedPicks = r.perfectRoster.picks.slice().sort(function(a,b){ return (slotOrder[a.slot]||9) - (slotOrder[b.slot]||9); });
+    html += '<div class="recap-section">'
+      + '<div class="recap-section-label">🏆 The Perfect Roster</div>'
+      + '<div class="recap-section-sub" style="margin-bottom:8px;">Best possible lineup this week, across every eligible player — ' + fmtScore(r.perfectRoster.points) + ' pts, $' + r.perfectRoster.salaryUsed.toLocaleString() + ' of $60,000</div>'
+      + sortedPicks.map(function(p){
+          return '<div class="recap-roster-row"><span style="color:var(--ink3);width:38px;flex-shrink:0;">' + p.slot + '</span><span style="flex:1;color:var(--ink);">' + escapeHtmlFR(p.name) + '</span><span style="color:var(--ink2);">' + (p.pts||0) + ' pts</span></div>';
+        }).join('')
+      + '</div>';
+  }
+
+  if(!html){
+    html = '<div style="text-align:center;padding:40px 0;color:var(--ink3);font-size:13px;">Not enough data yet for a full recap this week.</div>';
+  }
+
+  document.getElementById('recap-body').innerHTML = html;
+}
+
 // ── EMOJI REACTIONS ────────────────────────────────────────────
 var REACTIONS = ['🔥','💀','👑','😤','🤡','💩'];
 var CHIP_COLORS = {'🔥':'var(--pk)','💀':'var(--pu)','👑':'var(--or)','😤':'#FF9A3A','🤡':'#69BE28','💩':'#8B9B2A'};
@@ -8692,6 +8814,17 @@ function removeCommissioner(uid){
       <button class="share-close-btn" onclick="closeShare()">✕</button>
     </div>
     <div style="font-size:10px;color:var(--ink3);margin-top:8px;text-transform:uppercase;letter-spacing:.5px;" id="share-copy-confirm"></div>
+  </div>
+</div>
+
+<!-- WEEKLY REVIEW MODAL -->
+<div class="recap-overlay" id="recap-overlay" onclick="if(event.target===this)closeRecap()">
+  <div class="recap-box">
+    <div class="recap-hdr">
+      <div style="font-family:var(--fd);font-size:16px;font-weight:900;color:var(--or);text-transform:uppercase;letter-spacing:.5px;" id="recap-title">Weekly Review</div>
+      <button class="recap-close-btn" onclick="closeRecap()">✕</button>
+    </div>
+    <div class="recap-body" id="recap-body"></div>
   </div>
 </div>
 </div>
