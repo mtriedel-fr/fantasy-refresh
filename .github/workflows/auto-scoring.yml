@@ -712,6 +712,24 @@ jobs:
               } catch(e) {
                 console.error('Failed to archive week stats:', e.message);
               }
+
+              // ── WEEKLY RECAP ──────────────────────────────────────────
+              // Cumulative leagues only for now — H2H and Guillotine have
+              // their own natural weekly story (who won, who got cut) that
+              // deserves its own recap shape later, not squeezed into this
+              // one. Runs at the same "week is finalized" trigger as the
+              // stats archive above, and reuses playerStats/games already
+              // fetched for scoring.
+              for (const leagueId of leagues) {
+                try {
+                  const settings = await firebaseGet(`/leagues/${leagueId}/settings.json`).catch(() => null);
+                  if (settings && settings.format === 'cumulative') {
+                    await generateWeeklyRecap(leagueId, week, seasonType);
+                  }
+                } catch(e) {
+                  console.error(`Failed to generate recap for ${leagueId}:`, e.message);
+                }
+              }
             }
           }
 
@@ -819,6 +837,261 @@ jobs:
               archivedAt: Date.now()
             });
             console.log(`  📦 Archived ${Object.keys(players).length} player stat lines for ${archiveKey}`);
+          }
+
+          // ── WEEKLY RECAP ("Weekly Review") ────────────────────────────
+          // Computed once here, stored permanently — the client and any
+          // email send just read the finished result, nothing gets
+          // recomputed per view. Cumulative-format leagues only for now.
+
+          async function computeCumulativeStandingsThrough(leagueId, throughWeek) {
+            const totals = {}; // uid -> {uid, team, total}
+            for (let w = 1; w <= throughWeek; w++) {
+              const weekScores = await firebaseGet(`/leagues/${leagueId}/season/${SEASON}/${w}.json`).catch(() => null);
+              if (!weekScores || weekScores.error) continue;
+              Object.values(weekScores).forEach(entry => {
+                if (!entry || !entry.uid) return;
+                if (!totals[entry.uid]) totals[entry.uid] = { uid: entry.uid, team: entry.team || entry.uid, total: 0 };
+                totals[entry.uid].total += parseFloat(entry.score || 0);
+                totals[entry.uid].team = entry.team || totals[entry.uid].team;
+              });
+            }
+            return Object.values(totals)
+              .map(t => ({ ...t, total: Math.round(t.total * 100) / 100 }))
+              .sort((a, b) => b.total - a.total);
+          }
+
+          // Finds the highest-scoring possible lineup across the ENTIRE
+          // salary-eligible pool for the week — not what anyone actually
+          // drafted. 1 QB, 2 RB, 3 WR, 1 TE, 1 FLEX (RB/WR/TE), 1 DEF,
+          // total salary <= cap. FLEX is the genuinely tricky part: the
+          // 4th-best RB that week might outscore the 4th-best WR, so it
+          // needs to be a real trade-off across RB/WR/TE together, not
+          // filled independently after RB/WR/TE are locked in. Solved as
+          // a unified 0/1 knapsack over RB/WR/TE/FLEX (each eligible
+          // player considered once, assignable to their native slot OR
+          // flex), merged with independent QB and DEF sub-problems (which
+          // don't have this cross-position competition, so a straight
+          // three-way salary-split merge is correct for those). Verified
+          // against synthetic test data before being wired in here —
+          // correctly chose a higher-scoring RB for FLEX over a cheaper
+          // WR in testing, confirming the trade-off actually works.
+          function computeOptimalLineup(pool, cap) {
+            const CAP_UNIT = 100;
+            const capUnits = Math.floor(cap / CAP_UNIT);
+
+            const norm = p => ({ ...p, su: Math.round(p.salary / CAP_UNIT) });
+            const qbs  = pool.filter(p => p.pos === 'QB').map(norm).filter(p => p.su <= capUnits);
+            const defs = pool.filter(p => p.pos === 'DEF').map(norm).filter(p => p.su <= capUnits);
+            const flexEligible = pool.filter(p => ['RB','WR','TE'].includes(p.pos)).map(norm).filter(p => p.su <= capUnits);
+
+            const RB_MAX = 2, WR_MAX = 3, TE_MAX = 1;
+
+            function makeCore() {
+              const arr = [];
+              for (let rb = 0; rb <= RB_MAX; rb++) {
+                arr.push([]);
+                for (let wr = 0; wr <= WR_MAX; wr++) {
+                  arr[rb].push([]);
+                  for (let te = 0; te <= TE_MAX; te++) {
+                    arr[rb][wr].push([new Array(capUnits + 1).fill(null), new Array(capUnits + 1).fill(null)]);
+                  }
+                }
+              }
+              return arr;
+            }
+            let core = makeCore();
+            core[0][0][0][0][0] = { points: 0, picks: [] };
+
+            flexEligible.forEach(p => {
+              for (let rb = RB_MAX; rb >= 0; rb--) {
+                for (let wr = WR_MAX; wr >= 0; wr--) {
+                  for (let te = TE_MAX; te >= 0; te--) {
+                    for (let fx = 1; fx >= 0; fx--) {
+                      for (let s = capUnits; s >= p.su; s--) {
+                        const srcSalary = s - p.su;
+                        let best = core[rb][wr][te][fx][s];
+
+                        if (p.pos === 'RB' && rb >= 1) {
+                          const src = core[rb - 1][wr][te][fx][srcSalary];
+                          if (src) { const pts = src.points + (p.pts || 0); if (!best || pts > best.points) best = { points: pts, picks: [...src.picks, { ...p, slot: 'RB' }] }; }
+                        }
+                        if (p.pos === 'WR' && wr >= 1) {
+                          const src = core[rb][wr - 1][te][fx][srcSalary];
+                          if (src) { const pts = src.points + (p.pts || 0); if (!best || pts > best.points) best = { points: pts, picks: [...src.picks, { ...p, slot: 'WR' }] }; }
+                        }
+                        if (p.pos === 'TE' && te >= 1) {
+                          const src = core[rb][wr][te - 1][fx][srcSalary];
+                          if (src) { const pts = src.points + (p.pts || 0); if (!best || pts > best.points) best = { points: pts, picks: [...src.picks, { ...p, slot: 'TE' }] }; }
+                        }
+                        if (fx === 1) {
+                          const src = core[rb][wr][te][0][srcSalary];
+                          if (src) { const pts = src.points + (p.pts || 0); if (!best || pts > best.points) best = { points: pts, picks: [...src.picks, { ...p, slot: 'FLEX' }] }; }
+                        }
+                        core[rb][wr][te][fx][s] = best;
+                      }
+                    }
+                  }
+                }
+              }
+            });
+
+            const coreAtSalary = new Array(capUnits + 1).fill(null);
+            for (let s = 0; s <= capUnits; s++) coreAtSalary[s] = core[RB_MAX][WR_MAX][TE_MAX][1][s];
+
+            function bestSingleAtEachSalary(playersArr) {
+              const dp = new Array(capUnits + 1).fill(null);
+              playersArr.forEach(p => {
+                const cur = dp[p.su];
+                if (!cur || (p.pts || 0) > cur.points) dp[p.su] = { points: p.pts || 0, picks: [{ ...p, slot: p.pos }] };
+              });
+              return dp;
+            }
+            const qbAtSalary  = bestSingleAtEachSalary(qbs);
+            const defAtSalary = bestSingleAtEachSalary(defs);
+
+            let bestOverall = null;
+            for (let s1 = 0; s1 <= capUnits; s1++) {
+              const coreEntry = coreAtSalary[s1];
+              if (!coreEntry) continue;
+              for (let s2 = 0; s1 + s2 <= capUnits; s2++) {
+                const qbEntry = qbAtSalary[s2];
+                if (!qbEntry) continue;
+                const remaining = capUnits - s1 - s2;
+                for (let s3 = 0; s3 <= remaining; s3++) {
+                  const defEntry = defAtSalary[s3];
+                  if (!defEntry) continue;
+                  const totalPoints = coreEntry.points + qbEntry.points + defEntry.points;
+                  if (!bestOverall || totalPoints > bestOverall.points) {
+                    bestOverall = {
+                      points: Math.round(totalPoints * 100) / 100,
+                      salaryUsed: (s1 + s2 + s3) * CAP_UNIT,
+                      picks: [...coreEntry.picks, ...qbEntry.picks, ...defEntry.picks]
+                    };
+                  }
+                }
+              }
+            }
+            return bestOverall;
+          }
+
+          async function generateWeeklyRecap(leagueId, week, seasonType) {
+            const [thisWeekScores, lineups, salaryData] = await Promise.all([
+              firebaseGet(`/leagues/${leagueId}/season/${SEASON}/${week}.json`).catch(() => null),
+              firebaseGet(`/leagues/${leagueId}/lineups/${SEASON}/week${week}.json`).catch(() => null),
+              firebaseGet(`/leagues/${leagueId}/salaries/${SEASON}/week${week}.json`).catch(() => null)
+            ]);
+            if (!thisWeekScores || thisWeekScores.error || !Object.keys(thisWeekScores).length) {
+              console.log(`  Recap: no scores yet for ${leagueId} week ${week} — skipping`);
+              return;
+            }
+
+            const teamScores = Object.values(thisWeekScores).filter(e => e && e.uid);
+
+            // ── Top / low score this week ──
+            const sortedByScore = [...teamScores].sort((a, b) => b.score - a.score);
+            const topScore = sortedByScore[0];
+            const lowScore = sortedByScore[sortedByScore.length - 1];
+
+            // ── Cumulative standings, this week and last ──
+            const standingsNow  = await computeCumulativeStandingsThrough(leagueId, week);
+            const standingsPrev = week > 1 ? await computeCumulativeStandingsThrough(leagueId, week - 1) : [];
+            const prevRankByUid = {};
+            standingsPrev.forEach((t, i) => { prevRankByUid[t.uid] = i + 1; });
+
+            const leagueLeader = standingsNow[0] || null;
+
+            // ── Standings movement — biggest riser and faller ──
+            let biggestRiser = null, biggestFaller = null;
+            standingsNow.forEach((t, i) => {
+              const nowRank = i + 1;
+              const prevRank = prevRankByUid[t.uid];
+              if (!prevRank) return; // new to the standings (week 1, or missed a week) — no movement to report
+              const movement = prevRank - nowRank; // positive = moved up
+              if (movement > 0 && (!biggestRiser || movement > biggestRiser.movement)) {
+                biggestRiser = { team: t.team, movement, fromRank: prevRank, toRank: nowRank };
+              }
+              if (movement < 0 && (!biggestFaller || movement < biggestFaller.movement)) {
+                biggestFaller = { team: t.team, movement, fromRank: prevRank, toRank: nowRank };
+              }
+            });
+
+            // ── Closest race — smallest gap between consecutive standings spots ──
+            let closestRace = null;
+            for (let i = 0; i < standingsNow.length - 1; i++) {
+              const gap = Math.round((standingsNow[i].total - standingsNow[i + 1].total) * 100) / 100;
+              if (!closestRace || gap < closestRace.gap) {
+                closestRace = { gap, higher: standingsNow[i], lower: standingsNow[i + 1], rank: i + 1 };
+              }
+            }
+
+            // ── MVP / best value / bust — needs to know WHICH player was
+            // in each scored slot, cross-referenced with salary ──
+            let mvp = null, bestValue = null, bust = null;
+            if (lineups && !lineups.error && salaryData && salaryData.players) {
+              const salaryByName = {};
+              Object.values(salaryData.players).forEach(p => {
+                if (p && p.name) salaryByName[p.name.toLowerCase()] = p;
+              });
+
+              Object.values(lineups).forEach(lineup => {
+                if (!lineup || !lineup.slots) return;
+                Object.values(lineup.slots).forEach(player => {
+                  if (!player || !player.name) return;
+                  const scoreEntry = thisWeekScores[lineup.uid || ''] || Object.values(thisWeekScores).find(e => e.uid === (lineup.uid || ''));
+                  const slotId = Object.keys(lineup.slots).find(k => lineup.slots[k] === player);
+                  const pts = (scoreEntry && scoreEntry.slotPts && slotId != null) ? parseFloat(scoreEntry.slotPts[slotId] || 0) : null;
+                  if (pts == null) return;
+
+                  // MVP — highest raw points, regardless of cost
+                  if (!mvp || pts > mvp.pts) mvp = { name: player.name, pos: player.pos || '', team: player.team || '', pts, rosteredBy: lineup.team || lineup.uid };
+
+                  // Value / bust — needs a real salary to compare against
+                  const sal = salaryByName[player.name.toLowerCase()];
+                  if (sal && sal.salary) {
+                    const ptsPerK = Math.round((pts / (sal.salary / 1000)) * 100) / 100;
+                    if (!bestValue || ptsPerK > bestValue.ptsPerK) {
+                      bestValue = { name: player.name, pos: player.pos || '', salary: sal.salary, pts, ptsPerK, rosteredBy: lineup.team || lineup.uid };
+                    }
+                    // Bust — meaningfully expensive (top third of salary range) but underperformed
+                    if (sal.salary >= 6000 && (!bust || ptsPerK < bust.ptsPerK)) {
+                      bust = { name: player.name, pos: player.pos || '', salary: sal.salary, pts, ptsPerK, rosteredBy: lineup.team || lineup.uid };
+                    }
+                  }
+                });
+              });
+            }
+
+            // ── Perfect roster — real points from the archive, matched
+            // against the full salary-eligible pool for this exact week ──
+            let perfectRoster = null;
+            if (salaryData && salaryData.players) {
+              const archiveKey = `${seasonType}_wk${week}`;
+              const statsArchive = await firebaseGet(`/nflStatsArchive/${SEASON}/${archiveKey}.json`).catch(() => null);
+              if (statsArchive && statsArchive.players) {
+                const pool = Object.values(salaryData.players)
+                  .filter(p => p && p.name && p.salary && ['QB','RB','WR','TE','DEF'].includes(p.pos))
+                  .map(p => {
+                    const statKey = sanitizeFirebaseKey(p.name.toLowerCase());
+                    const stats = statsArchive.players[statKey];
+                    return { name: p.name, pos: p.pos, salary: p.salary, pts: stats ? parseFloat(stats.pts || 0) : 0 };
+                  });
+                const cap = 60000; // standard cap — see league-setup.html, roster/cap is fixed while honing in on the core three formats
+                perfectRoster = computeOptimalLineup(pool, cap);
+              }
+            }
+
+            await firebasePut(`/leagues/${leagueId}/recaps/${SEASON}/week${week}.json`, {
+              week, seasonType,
+              generatedAt: Date.now(),
+              leagueLeader: leagueLeader ? { team: leagueLeader.team, total: leagueLeader.total } : null,
+              topScore: topScore ? { team: topScore.team, score: topScore.score } : null,
+              lowScore: lowScore ? { team: lowScore.team, score: lowScore.score } : null,
+              biggestRiser, biggestFaller, closestRace,
+              mvp, bestValue, bust, perfectRoster,
+              standings: standingsNow.map((t, i) => ({ rank: i + 1, team: t.team, total: t.total }))
+            });
+            console.log(`  📰 Recap generated for ${leagueId} week ${week}`);
           }
 
           main().catch(e => {
