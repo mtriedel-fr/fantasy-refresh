@@ -654,7 +654,8 @@ function loadFlatSalariesFromPool(){
         .filter(function(p){ return p && p.name && p.pos && p.team && FLAT[p.pos] && p.status !== 'O' && p.status !== 'IR'; })
         .map(function(p){
           return {id:p.id, name:p.name, pos:p.pos, team:p.team,
-                  salary:FLAT[p.pos], proj:null, status:p.status||null};
+                  salary:FLAT[p.pos], proj:null, status:p.status||null,
+                  tank01PlayerID:p.tank01PlayerID||null, headshot:p.headshot||null};
         });
       // In preseason mode — filter to only teams playing this week
       if(PS_MODE && schedule.length){
