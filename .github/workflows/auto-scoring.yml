@@ -65,20 +65,30 @@ jobs:
           // ── DraftKings Scoring ─────────────────────────────────
           function calcDKPoints(p, pos) {
             if (!p) return 0;
+            // Confirmed months ago (and already fixed in weekly-prep.yml
+            // and backfill-historical-stats.yml, but never here): Tank01's
+            // box score nests stats under Passing/Rushing/Receiving/
+            // Defense sub-objects, never flat. This was reading p.passYds
+            // directly, which is always undefined, silently zeroing out
+            // every offensive stat regardless of what a player actually did.
+            const pass = p.Passing   || {};
+            const rush = p.Rushing   || {};
+            const recv = p.Receiving || {};
+            const def  = p.Defense   || {};
             let pts = 0;
-            pts += (parseFloat(p.passYds)  || 0) * 0.04;
-            pts += (parseFloat(p.passTD)   || 0) * 4;
-            pts += (parseFloat(p.passInt)  || 0) * -1;
-            pts += (parseFloat(p.pass300)  || 0) * 3;
-            pts += (parseFloat(p.rushYds)  || 0) * 0.1;
-            pts += (parseFloat(p.rushTD)   || 0) * 6;
-            pts += (parseFloat(p.rush100)  || 0) * 3;
-            pts += (parseFloat(p.rec)      || 0) * 1;
-            pts += (parseFloat(p.recYds)   || 0) * 0.1;
-            pts += (parseFloat(p.recTD)    || 0) * 6;
-            pts += (parseFloat(p.rec100)   || 0) * 3;
-            pts += (parseFloat(p.fumbLost) || 0) * -1;
-            pts += (parseFloat(p.twoPt)    || 0) * 2;
+            pts += (parseFloat(pass.passYds)  || 0) * 0.04;
+            pts += (parseFloat(pass.passTD)   || 0) * 4;
+            pts += (parseFloat(pass.int)      || 0) * -1;
+            pts += (parseFloat(p.pass300)     || 0) * 3;
+            pts += (parseFloat(rush.rushYds)  || 0) * 0.1;
+            pts += (parseFloat(rush.rushTD)   || 0) * 6;
+            pts += (parseFloat(p.rush100)     || 0) * 3;
+            pts += (parseFloat(recv.receptions) || 0) * 1;
+            pts += (parseFloat(recv.recYds)     || 0) * 0.1;
+            pts += (parseFloat(recv.recTD)      || 0) * 6;
+            pts += (parseFloat(p.rec100)      || 0) * 3;
+            pts += (parseFloat(def.fumblesLost) || 0) * -1;
+            pts += (parseFloat(p.twoPt)       || 0) * 2;
             if (pos === 'DEF') {
               pts += (parseFloat(p.sacks)   || 0) * 1;
               pts += (parseFloat(p.defInt)  || 0) * 2;
@@ -315,11 +325,13 @@ jobs:
                 if (!stats) {
                   console.log(`    ❌ NO MATCH: lineup has "${player.name}" (id: ${player.id}) — not found in playerStats`);
                 }
-                let pts = 0;
-                if (stats) {
-                  pts = parseFloat(stats.fantasyPoints || stats.fantasy_points || 0);
-                  if (!pts) pts = calcDKPoints(stats, player.pos);
-                }
+                // Always use our own calculation, not Tank01's own
+                // fantasyPoints value — confirmed earlier (Baker Mayfield,
+                // real stat line) that Tank01's own number doesn't
+                // reliably match our specific scoring weights, so
+                // trusting it first was silently masking real production
+                // whenever it disagreed with our actual scoring rules.
+                let pts = stats ? calcDKPoints(stats, player.pos) : 0;
                 slotPts[slotId] = Math.round(pts * 100) / 100;
                 totalPts += pts;
               }
