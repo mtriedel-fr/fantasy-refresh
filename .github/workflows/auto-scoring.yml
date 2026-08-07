@@ -312,6 +312,9 @@ jobs:
               for (const [slotId, player] of Object.entries(lineup.slots)) {
                 if (!player) continue;
                 let stats = playerStats[player.id] || playerStats[(player.name || '').toLowerCase()];
+                if (!stats) {
+                  console.log(`    ❌ NO MATCH: lineup has "${player.name}" (id: ${player.id}) — not found in playerStats`);
+                }
                 let pts = 0;
                 if (stats) {
                   pts = parseFloat(stats.fantasyPoints || stats.fantasy_points || 0);
@@ -718,6 +721,8 @@ jobs:
                 if (name) playerStats[name] = stats;
               });
             });
+            const realNames = Object.values(playerStats).map(s => s.longName || s.playerName).filter(Boolean);
+            console.log(`  Sample of real names in this game's box score: ${[...new Set(realNames)].slice(0, 10).join(', ')}`);
 
             // Score all leagues
             for (const leagueId of leagues) {
