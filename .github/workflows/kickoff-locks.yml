@@ -200,14 +200,48 @@ jobs:
             const week = await getCurrentWeek();
             console.log(`Checking locks for Week ${week}...`);
 
-            const gamesData = await fetchJson(
-              `https://${T01_HOST}/getNFLGamesForWeek?week=${week}&seasonType=Regular&season=${SEASON}`,
-              { 'X-RapidAPI-Key': T01_KEY, 'X-RapidAPI-Host': T01_HOST }
-            );
+            // Auto-detect preseason vs regular by date, same logic as
+            // auto-scoring.yml — this was hardcoded to seasonType=Regular
+            // before, meaning it was checking regular-season Week 1 games
+            // (which don't exist until September) instead of tonight's
+            // real preseason game. Also applies the confirmed-correct
+            // lowercase Tank01 value ('reg'/'pre', not 'Regular'/
+            // 'Preseason') at the actual API call.
+            const now = new Date();
+            const month = now.getUTCMonth() + 1;
+            const day = now.getUTCDate();
+            const isPreseasonWindow = month === 8 || (month === 9 && day <= 8);
+            const seasonType = isPreseasonWindow ? 'Preseason' : 'Regular';
+            function toTank01SeasonType(s) {
+              const v = (s || '').toLowerCase();
+              if (v.startsWith('pre')) return 'pre';
+              if (v.startsWith('post')) return 'post';
+              return 'reg';
+            }
 
-            const games = Array.isArray(gamesData.body)
-              ? gamesData.body
-              : Object.values(gamesData.body || {});
+            // Preseason week-numbering offset between this app and Tank01
+            // isn't confirmed (unlike the seasonType casing fix above,
+            // which IS confirmed) — trying both 0 and the raw week value
+            // rather than betting on one under time pressure tonight.
+            let games = [];
+            const weekCandidates = isPreseasonWindow ? [0, week] : [week];
+            for (const apiWeek of weekCandidates) {
+              try {
+                const gamesData = await fetchJson(
+                  `https://${T01_HOST}/getNFLGamesForWeek?week=${apiWeek}&seasonType=${toTank01SeasonType(seasonType)}&season=${SEASON}`,
+                  { 'X-RapidAPI-Key': T01_KEY, 'X-RapidAPI-Host': T01_HOST }
+                );
+                const candidate = Array.isArray(gamesData.body) ? gamesData.body : Object.values(gamesData.body || {});
+                if (candidate.length) {
+                  console.log(`Found ${candidate.length} game(s) using week=${apiWeek}, seasonType=${toTank01SeasonType(seasonType)}`);
+                  games = candidate;
+                  break;
+                }
+              } catch(e) {
+                console.log(`  week=${apiWeek} attempt failed: ${e.message}`);
+              }
+            }
+            if (!games.length) console.log('⚠️  No games found for any week candidate — check seasonType/week manually if this persists.');
 
             const leagues = await getActiveLeagues();
             console.log(`Leagues to lock: ${leagues.join(', ')}`);

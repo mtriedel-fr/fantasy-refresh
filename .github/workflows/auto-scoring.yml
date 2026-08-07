@@ -178,6 +178,18 @@ jobs:
             });
           }
 
+          // Confirmed via real testing earlier today: Tank01 wants short,
+          // lowercase season-type codes ('reg', not 'Regular') — this fix
+          // was only ever applied to the Cloudflare Worker, never ported
+          // here, meaning this file has been silently sending a value
+          // Tank01 doesn't recognize for game lookups the whole time.
+          function toTank01SeasonType(s) {
+            const v = (s || '').toLowerCase();
+            if (v.startsWith('pre')) return 'pre';
+            if (v.startsWith('post')) return 'post';
+            return 'reg';
+          }
+
           // ── Auto-detect season type ───────────────────────────
           // Returns { week, seasonType } — detects preseason automatically
           async function getCurrentWeekInfo() {
@@ -584,7 +596,7 @@ jobs:
             // Tank01 numbers preseason weeks starting at 0 (HOF = week 0).
             // Our app's week numbers are 1-4 (1=HOF, 2=PS Wk1, etc) — translate for the API call.
             const apiWeek = seasonType === 'Preseason' ? (week - 1) : week;
-            const gamesData = await t01(`/getNFLGamesForWeek?week=${apiWeek}&seasonType=${seasonType}&season=${SEASON}`);
+            const gamesData = await t01(`/getNFLGamesForWeek?week=${apiWeek}&seasonType=${toTank01SeasonType(seasonType)}&season=${SEASON}`);
             const games = Array.isArray(gamesData.body)
               ? gamesData.body : Object.values(gamesData.body || {});
 
