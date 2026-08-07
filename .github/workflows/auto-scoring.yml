@@ -1165,7 +1165,35 @@ jobs:
             console.log(`  📰 Recap generated for ${leagueId} week ${week}`);
           }
 
-          main().catch(e => {
+          function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+          // GitHub Actions' cron scheduler only supports 1-minute
+          // granularity — there's no way to trigger a workflow every 90
+          // seconds directly. This is what actually achieves that real
+          // 90-second cadence: each 5-minute cron trigger runs main()
+          // repeatedly with a 90-second sleep between calls, for about 4
+          // minutes, before naturally ending — leaving a clean buffer
+          // before the next scheduled trigger fires, so runs don't
+          // overlap. IS_LOCK_RUN (the one-time Tuesday morning lock,
+          // unrelated to live scoring) only ever runs once, not looped.
+          async function runLoop() {
+            const startedAt = Date.now();
+            const MAX_RUN_MS = 4 * 60 * 1000; // stop with a clean buffer before the next 5-minute cron trigger
+            let iteration = 0;
+            while (true) {
+              iteration++;
+              console.log(`\n🔁 Scoring iteration ${iteration} (${Math.round((Date.now() - startedAt) / 1000)}s into this run)`);
+              await main();
+              if (IS_LOCK_RUN) break; // one-time run, not a live-scoring loop
+              if (Date.now() - startedAt >= MAX_RUN_MS) {
+                console.log('⏹️  Ending this run — next scheduled trigger will pick up from here in ~90s or less.');
+                break;
+              }
+              await sleep(90 * 1000);
+            }
+          }
+
+          runLoop().catch(e => {
             console.error('Scoring job failed:', e);
             process.exit(1);
           });
