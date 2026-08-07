@@ -720,6 +720,27 @@ jobs:
                 const name = (stats.longName || stats.playerName || '').toLowerCase();
                 if (name) playerStats[name] = stats;
               });
+              // Team defense (DST) lives in a completely separate object
+              // from playerStats — confirmed via real testing earlier
+              // today. Lineup slots store a defense's id as the team
+              // abbreviation itself (e.g. "CAR"), so keying by that here
+              // is what makes the scoreLeague() lookup succeed. Field
+              // names mapped to what calcDKPoints() already expects.
+              console.log(`  DST raw check — bs.DST exists: ${!!bs.DST}, keys: ${bs.DST ? Object.keys(bs.DST).join(',') : 'n/a'}`);
+              if (bs.DST) console.log(`  DST sample: ${JSON.stringify(bs.DST).slice(0, 300)}`);
+              ['home', 'away'].forEach(side => {
+                const d = bs.DST && bs.DST[side];
+                if (!d || !d.teamAbv) return;
+                playerStats[d.teamAbv] = {
+                  sacks:      d.sacks,
+                  defInt:     d.defensiveInterceptions,
+                  fumbRec:    d.fumblesRecovered,
+                  defTD:      d.defTD,
+                  safety:     d.safeties,
+                  ptsAllowed: d.ptsAllowed
+                };
+                console.log(`  ✓ Mapped defense: ${d.teamAbv}`);
+              });
             });
             const realNames = Object.values(playerStats).map(s => s.longName || s.playerName).filter(Boolean);
             console.log(`  Sample of real names in this game's box score: ${[...new Set(realNames)].slice(0, 10).join(', ')}`);
