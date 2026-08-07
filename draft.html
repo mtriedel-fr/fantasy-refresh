@@ -362,24 +362,61 @@ var POS_COLORS = {QB:'var(--or)',RB:'var(--pk)',WR:'var(--pu)',TE:'#FF9A3A',DEF:
 // itself 404s (not every playerID has a headshot on file at ESPN's CDN
 // even when Tank01 returns a URL for it). Reused everywhere a player
 // card shows up, not just the draft picker.
+// Generic person silhouette — shown for individual players who don't
+// have a real headshot yet, instead of just a bare position badge.
+// Colored by position so it still conveys something at a glance.
+// class="loaded" is added directly since inline SVG renders instantly —
+// no onload event exists for a plain span to trigger the normal photo
+// fade-in, so without this the icon would be permanently invisible
+// (p-photo starts at opacity:0 by default).
+function genericHeadSvg(pos){
+  var color = POS_COLORS[pos] || 'var(--ink2)';
+  return '<span class="p-photo loaded" style="display:flex;align-items:center;justify-content:center;background:'+color+'18;">'
+    + '<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" fill="'+color+'"/><path d="M4 20c0-4.4 3.6-8 8-8s8 3.6 8 8" fill="'+color+'"/></svg>'
+    + '</span>';
+}
+
 function playerPhotoOrBadge(p, fallbackHtml){
   var badge = fallbackHtml;
   if(badge == null){
     var posColor = POS_COLORS[p.pos] || 'var(--ink2)';
     badge = '<div class="p-pos" style="background:'+posColor+'18;color:'+posColor+'">'+(p.pos||'')+'</div>';
   }
-  if(!p || !p.headshot) return badge;
-  // display:contents makes this wrapper invisible to the flex layout
-  // around it (its children act as direct flex items), while still
-  // letting onerror toggle which one is visible via plain CSS instead
-  // of injecting the badge's own HTML — which contains double quotes —
-  // as a string inside an onerror="..." attribute. That's what broke
-  // visibly last time: the badge's own quotes closed the attribute early
-  // and spilled the rest out as literal text on the page.
-  return '<span style="display:contents;">'
-    + '<img class="p-photo" src="'+p.headshot+'" alt="" loading="lazy" decoding="async" onload="this.classList.add(\'loaded\');" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'\';">'
-    + '<span style="display:none;">'+badge+'</span>'
-    + '</span>';
+  if(!p) return badge;
+
+  // Team defense — real team logo, confirmed working URL pattern
+  // (a.espncdn.com/i/teamlogos/nfl/500/{lowercase abbreviation}.png,
+  // live-verified). Falls back to the existing badge if a specific
+  // team's logo happens to 404, same graceful pattern as player photos.
+  if(p.pos === 'DEF'){
+    var teamAbbr = (p.team || p.name || '').toLowerCase().replace(/[^a-z]/g, '');
+    if(teamAbbr){
+      var logoUrl = 'https://a.espncdn.com/i/teamlogos/nfl/500/' + teamAbbr + '.png';
+      return '<span style="display:contents;">'
+        + '<img class="p-photo" src="'+logoUrl+'" alt="" loading="lazy" decoding="async" style="object-fit:contain;background:var(--bg2);" onload="this.classList.add(\'loaded\');" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'\';">'
+        + '<span style="display:none;">'+badge+'</span>'
+        + '</span>';
+    }
+    return badge;
+  }
+
+  // Real headshot when available
+  if(p.headshot){
+    // display:contents makes this wrapper invisible to the flex layout
+    // around it (its children act as direct flex items), while still
+    // letting onerror toggle which one is visible via plain CSS instead
+    // of injecting the badge's own HTML — which contains double quotes —
+    // as a string inside an onerror="..." attribute. That's what broke
+    // visibly last time: the badge's own quotes closed the attribute early
+    // and spilled the rest out as literal text on the page.
+    return '<span style="display:contents;">'
+      + '<img class="p-photo" src="'+p.headshot+'" alt="" loading="lazy" decoding="async" onload="this.classList.add(\'loaded\');" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'\';">'
+      + '<span style="display:none;">'+genericHeadSvg(p.pos)+'</span>'
+      + '</span>';
+  }
+
+  // No real headshot — generic silhouette instead of a bare badge
+  return genericHeadSvg(p.pos);
 }
 
 // Builds SLOT_DEFS from the league's rosterConfig instead of the hardcoded
