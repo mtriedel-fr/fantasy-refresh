@@ -2213,7 +2213,7 @@ function lineupSlotStructuralLabel(slotId, playerPos){
   return playerPos || prefix.toUpperCase();
 }
 
-function buildLineupPlayerCard(p, pts, hasStarted, gameMap, showNotStartedTag, slotId){
+function buildLineupPlayerCard(p, pts, hasStarted, gameMap, showNotStartedTag, slotId, breakdown){
   var slotLabel = slotId ? lineupSlotStructuralLabel(slotId, p.pos) : (p.pos || '');
   var posColor = LINEUP_POS_COLORS[slotLabel] || LINEUP_POS_COLORS[p.pos] || 'var(--ink2)';
   var ptsLabel = (typeof pts === 'number') ? pts.toFixed(1) : '0.0';
@@ -2246,11 +2246,6 @@ function buildLineupPlayerCard(p, pts, hasStarted, gameMap, showNotStartedTag, s
   // liveStatusCode/quarter/clock come from auto-scoring.yml's box-score
   // capture (see that file — statusCode is a confirmed Tank01 field,
   // quarter/clock are a best-guess pending real live-game testing).
-  //
-  // No per-player Swap button anymore — editing is handled entirely by
-  // the single Draft Team/Finish Lineup/Edit Lineup button above the
-  // roster, which always goes to the draft page. These cards are now
-  // pure display: what you have, how they're doing, nothing to click.
   var statusTag = '';
   var statusClass = '';
   var liveCode = game ? game.liveStatusCode : null;
@@ -2264,17 +2259,38 @@ function buildLineupPlayerCard(p, pts, hasStarted, gameMap, showNotStartedTag, s
   }
 
   var posBadgeHtml = '<div class="lineup-card-pos" style="background:' + posColor + '1f;color:' + posColor + ';border-color:' + posColor + '40;">' + escapeHtmlFR(slotLabel) + '</div>';
-  return '<div class="lineup-card' + (hasStarted ? ' started' : '') + '">'
+
+  // Points breakdown — click to expand. Only clickable when there's
+  // actually something to show; a card with no real breakdown data
+  // (game hasn't started, no stats yet) stays plain rather than opening
+  // to an empty panel.
+  var hasBreakdown = breakdown && breakdown.length > 0;
+  var breakdownId = 'bd-' + (slotId || Math.random().toString(36).slice(2));
+  var breakdownRows = hasBreakdown ? breakdown.map(function(b){
+    var ptsColor = b.points > 0 ? 'var(--or)' : (b.points < 0 ? 'var(--pk)' : 'var(--ink3)');
+    var sign = b.points > 0 ? '+' : '';
+    return '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;">'
+      + '<span style="color:var(--ink2);">' + escapeHtmlFR(b.label) + (b.stat != null && typeof b.stat !== 'string' ? ' (' + b.stat + ')' : '') + '</span>'
+      + '<span style="color:' + ptsColor + ';font-weight:700;">' + sign + b.points.toFixed(2) + '</span>'
+      + '</div>';
+  }).join('') : '';
+  var breakdownPanel = hasBreakdown
+    ? '<div id="' + breakdownId + '" style="display:none;padding:8px 12px 10px;margin-top:2px;background:var(--bg2);border-radius:8px;border:1px solid var(--bdr);">' + breakdownRows + '</div>'
+    : '';
+  var cardClick = hasBreakdown ? ' onclick="var el=document.getElementById(\'' + breakdownId + '\');el.style.display=el.style.display===\'none\'?\'block\':\'none\';" style="cursor:pointer;"' : '';
+
+  return '<div class="lineup-card' + (hasStarted ? ' started' : '') + '"' + cardClick + '>'
     + lineupPhotoOrBadge(p, posBadgeHtml)
     + '<div class="lineup-card-mid">'
     +   '<div class="lineup-card-name">' + escapeHtmlFR(p.name || '') + (p.pos ? ' · ' + escapeHtmlFR(p.pos) : '') + teamTag + '</div>'
     +   gameLine
     + '</div>'
     + '<div class="lineup-card-pts-stack">'
-    +   '<div class="lineup-card-pts">' + ptsLabel + '</div>'
+    +   '<div class="lineup-card-pts">' + ptsLabel + (hasBreakdown ? ' <span style="font-size:10px;color:var(--ink3);">▾</span>' : '') + '</div>'
     +   (statusTag ? '<span class="lineup-card-status-tag' + statusClass + '">' + escapeHtmlFR(statusTag) + '</span>' : '')
     + '</div>'
-    + '</div>';
+    + '</div>'
+    + breakdownPanel;
 }
 
 function rosterColumn(lineup, scoreEntry, locks, isMine, gameMap){
@@ -2293,6 +2309,7 @@ function rosterColumn(lineup, scoreEntry, locks, isMine, gameMap){
       + '<div class="h2h-roster-empty" style="text-align:center;padding:20px 12px;">No lineup set.' + (isMine ? '<br>' : '') + draftCta + '</div></div>';
   }
   var slotPts = (scoreEntry && scoreEntry.slotPts) || {};
+  var slotBreakdown = (scoreEntry && scoreEntry.slotBreakdown) || {};
 
   // Viewing your own team — no opponent to hide anything from, so show
   // every rostered player regardless of kickoff status. The hide-until-
@@ -2302,7 +2319,7 @@ function rosterColumn(lineup, scoreEntry, locks, isMine, gameMap){
       var p = lineup.slots[slotId];
       if(!p) return '';
       var hasStarted = !!(p.team && locks && locks[p.team]);
-      return buildLineupPlayerCard(p, slotPts[slotId], hasStarted, gameMap, true, slotId);
+      return buildLineupPlayerCard(p, slotPts[slotId], hasStarted, gameMap, true, slotId, slotBreakdown[slotId]);
     }).join('');
 
     // Budget remaining — sum actual drafted salaries against the league cap.
