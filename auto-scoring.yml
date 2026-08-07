@@ -1,0 +1,1157 @@
+name: Auto Scoring
+
+on:
+  schedule:
+    # Every 5 min Thursday night (TNF) — UTC
+    - cron: '*/5 23 * * 4'
+    - cron: '*/5 0-4 * * 5'
+    # Every 5 min Sunday (all day games + SNF)
+    - cron: '*/5 17-23 * * 0'
+    - cron: '*/5 0-5 * * 1'
+    # Every 5 min Monday night (MNF)
+    - cron: '*/5 23 * * 1'
+    - cron: '*/5 0-5 * * 2'
+    # International games Fri/Sat
+    - cron: '*/5 12-20 * * 5'
+    - cron: '*/5 12-20 * * 6'
+    # Preseason — same windows August only (cron can't filter by month,
+    # the script detects season type automatically)
+    # Tuesday 9am ET (13:00 UTC) — lock final scores
+    - cron: '0 13 * * 2'
+  workflow_dispatch:
+    inputs:
+      week:
+        description: 'Week number (leave blank for auto-detect)'
+        required: false
+      season_type:
+        description: 'Season type: Regular or Preseason (leave blank for auto-detect)'
+        required: false
+        default: ''
+      lock_scores:
+        description: 'Set to "true" to lock scores immediately'
+        required: false
+        default: 'false'
+      league_id:
+        description: 'Specific league ID to score (leave blank for all active leagues)'
+        required: false
+        default: ''
+
+jobs:
+  score-lineups:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Calculate and write fantasy scores
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+          TANK01_KEY: ${{ secrets.TANK01_KEY }}
+          FR_SEASON: "2026"
+          MANUAL_WEEK: ${{ inputs.week }}
+          MANUAL_SEASON_TYPE: ${{ inputs.season_type }}
+          LOCK_SCORES: ${{ inputs.lock_scores }}
+          MANUAL_LEAGUE: ${{ inputs.league_id }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+
+          const FB_URL      = process.env.FIREBASE_DB_URL;
+          const FB_TOKEN    = process.env.FIREBASE_AUTH_TOKEN;
+          const T01_KEY     = process.env.TANK01_KEY;
+          const SEASON      = process.env.FR_SEASON || '2026';
+          const T01_HOST    = 'tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com';
+          const IS_LOCK_RUN = process.env.LOCK_SCORES === 'true' ||
+                              new Date().getUTCDay() === 2; // Tuesday
+
+          // ── DraftKings Scoring ─────────────────────────────────
+          function calcDKPoints(p, pos) {
+            if (!p) return 0;
+            let pts = 0;
+            pts += (parseFloat(p.passYds)  || 0) * 0.04;
+            pts += (parseFloat(p.passTD)   || 0) * 4;
+            pts += (parseFloat(p.passInt)  || 0) * -1;
+            pts += (parseFloat(p.pass300)  || 0) * 3;
+            pts += (parseFloat(p.rushYds)  || 0) * 0.1;
+            pts += (parseFloat(p.rushTD)   || 0) * 6;
+            pts += (parseFloat(p.rush100)  || 0) * 3;
+            pts += (parseFloat(p.rec)      || 0) * 1;
+            pts += (parseFloat(p.recYds)   || 0) * 0.1;
+            pts += (parseFloat(p.recTD)    || 0) * 6;
+            pts += (parseFloat(p.rec100)   || 0) * 3;
+            pts += (parseFloat(p.fumbLost) || 0) * -1;
+            pts += (parseFloat(p.twoPt)    || 0) * 2;
+            if (pos === 'DEF') {
+              pts += (parseFloat(p.sacks)   || 0) * 1;
+              pts += (parseFloat(p.defInt)  || 0) * 2;
+              pts += (parseFloat(p.fumbRec) || 0) * 2;
+              pts += (parseFloat(p.defTD)   || 0) * 6;
+              pts += (parseFloat(p.safety)  || 0) * 2;
+              pts += (parseFloat(p.blkKick) || 0) * 2;
+              const pa = parseFloat(p.ptsAllowed || p.pointsAllowed) || null;
+              if (pa !== null) {
+                if      (pa === 0)  pts += 10;
+                else if (pa <= 6)   pts += 7;
+                else if (pa <= 13)  pts += 4;
+                else if (pa <= 20)  pts += 1;
+                else if (pa <= 27)  pts += 0;
+                else if (pa <= 34)  pts -= 1;
+                else                pts -= 4;
+              }
+            }
+            return Math.round(pts * 100) / 100;
+          }
+
+          // ── HTTP helpers ───────────────────────────────────────
+          function fetchJson(url, headers) {
+            return new Promise((resolve, reject) => {
+              const u = new URL(url);
+              https.get({ hostname: u.hostname, path: u.pathname + u.search, headers: headers || {} }, res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+
+          // Firebase write — appends ?auth=token for authentication
+          function fbAuth(path) {
+            const sep = path.includes('?') ? '&' : '?';
+            return FB_TOKEN ? `${path}${sep}auth=${FB_TOKEN}` : path;
+          }
+
+          // Firebase RTDB keys can't contain . $ # [ ] / — strips them out
+          // for use as a dictionary key. The real, correctly-formatted
+          // name is always kept as a separate field in the record itself,
+          // so nothing ever displays using this stripped-down version.
+          function sanitizeFirebaseKey(name) {
+            return (name || '').replace(/[.$#\[\]\/]/g, '');
+          }
+
+          function firebasePut(path, payload) {
+            return new Promise((resolve, reject) => {
+              const body = JSON.stringify(payload);
+              const fullPath = fbAuth(FB_URL + path);
+              const u = new URL(fullPath);
+              const req = https.request({
+                hostname: u.hostname, path: u.pathname + u.search, method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+              }, res => {
+                let d = '';
+                res.on('data', c => d += c);
+                res.on('end', () => {
+                  if (res.statusCode >= 200 && res.statusCode < 300) resolve(d);
+                  else reject(new Error(`Firebase PUT REJECTED (HTTP ${res.statusCode}) at ${path} — ${d.slice(0,200)}`));
+                });
+              });
+              req.on('error', reject);
+              req.write(body); req.end();
+            });
+          }
+
+          function firebasePatch(path, payload) {
+            return new Promise((resolve, reject) => {
+              const body = JSON.stringify(payload);
+              const fullPath = fbAuth(FB_URL + path);
+              const u = new URL(fullPath);
+              const req = https.request({
+                hostname: u.hostname, path: u.pathname + u.search, method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+              }, res => {
+                let d = '';
+                res.on('data', c => d += c);
+                res.on('end', () => {
+                  if (res.statusCode >= 200 && res.statusCode < 300) resolve(d);
+                  else reject(new Error(`Firebase PATCH REJECTED (HTTP ${res.statusCode}) at ${path} — ${d.slice(0,200)}`));
+                });
+              });
+              req.on('error', reject);
+              req.write(body); req.end();
+            });
+          }
+
+          function firebaseGet(path) {
+            return fetchJson(FB_URL + path, {});
+          }
+
+          function t01(path) {
+            return fetchJson(`https://${T01_HOST}${path}`, {
+              'X-RapidAPI-Key': T01_KEY, 'X-RapidAPI-Host': T01_HOST
+            });
+          }
+
+          // Confirmed via real testing earlier today: Tank01 wants short,
+          // lowercase season-type codes ('reg', not 'Regular') — this fix
+          // was only ever applied to the Cloudflare Worker, never ported
+          // here, meaning this file has been silently sending a value
+          // Tank01 doesn't recognize for game lookups the whole time.
+          function toTank01SeasonType(s) {
+            const v = (s || '').toLowerCase();
+            if (v.startsWith('pre')) return 'pre';
+            if (v.startsWith('post')) return 'post';
+            return 'reg';
+          }
+
+          // ── Auto-detect season type ───────────────────────────
+          // Returns { week, seasonType } — detects preseason automatically
+          async function getCurrentWeekInfo() {
+            // Manual override from workflow_dispatch
+            if (process.env.MANUAL_WEEK) {
+              const seasonType = process.env.MANUAL_SEASON_TYPE || 'Regular';
+              return { week: parseInt(process.env.MANUAL_WEEK), seasonType };
+            }
+
+            try {
+              // Try regular season first
+              const d = await t01('/getNFLCurrentWeek');
+              if (d.body && d.body.week) {
+                const week = parseInt(d.body.week);
+                const seasonType = d.body.seasonType || 'Regular';
+                console.log(`Tank01 current week: ${week} (${seasonType})`);
+                return { week, seasonType };
+              }
+            } catch(e) {
+              console.log('Could not detect current week:', e.message);
+            }
+
+            // Check if we're in preseason window (Aug 1 - Sep 8)
+            const now = new Date();
+            const month = now.getUTCMonth() + 1; // 1-based
+            const day = now.getUTCDate();
+            if (month === 8 || (month === 9 && day <= 8)) {
+              // Estimate preseason week based on date
+              // Preseason Week 1 typically starts ~Aug 7
+              const aug1 = new Date(`${now.getUTCFullYear()}-08-01`);
+              const daysSinceAug1 = Math.floor((now - aug1) / (1000 * 60 * 60 * 24));
+              const psWeek = Math.min(4, Math.max(1, Math.floor(daysSinceAug1 / 7) + 1));
+              console.log(`Preseason detected — estimated week ${psWeek}`);
+              return { week: psWeek, seasonType: 'Preseason' };
+            }
+
+            return { week: 1, seasonType: 'Regular' };
+          }
+
+          // ── Get all active leagues ─────────────────────────────
+          async function getActiveLeagues() {
+            // If manually specified, use that
+            if (process.env.MANUAL_LEAGUE) {
+              return [process.env.MANUAL_LEAGUE];
+            }
+
+            try {
+              const leagues = await firebaseGet('/leagues.json?shallow=true');
+              if (!leagues || leagues.error) {
+                console.log('Could not fetch leagues, falling back to fr_refresh26');
+                return ['fr_refresh26'];
+              }
+              const leagueIds = Object.keys(leagues);
+              console.log(`Found ${leagueIds.length} league(s): ${leagueIds.join(', ')}`);
+
+              // Filter to active leagues only.
+              // FIXED: previously excluded any league silently if `settings`
+              // was missing, if `active` was anything but explicitly-not-false,
+              // OR if `settings.season` didn't exactly match SEASON — three
+              // separate ways a real league could vanish with zero logging.
+              // This is scoring/locks — silently dropping a league here means
+              // that league's users see no live scores on game day. Now:
+              // default to active unless explicitly disabled, and log every
+              // inclusion/exclusion so a miss is visible in the Actions log
+              // instead of only discovered by a user reporting missing scores.
+              const active = [];
+              for (const id of leagueIds) {
+                try {
+                  const settings = await firebaseGet(`/leagues/${id}/settings.json`);
+                  if (settings && settings.active === false) {
+                    console.log(`  ⊘ ${id}: skipped — settings.active is explicitly false`);
+                    continue;
+                  }
+                  if (settings && settings.season != null && String(settings.season) !== String(SEASON)) {
+                    console.log(`  ⊘ ${id}: skipped — settings.season (${settings.season}) doesn't match current season (${SEASON})`);
+                    continue;
+                  }
+                  active.push(id);
+                  console.log(`  ✓ ${id}: included${settings ? '' : ' (no settings node — defaulting to active)'}`);
+                } catch(e) {
+                  console.log(`  ⚠️  ${id}: could not read settings (${e.message}) — including anyway, defaulting to active`);
+                  active.push(id);
+                }
+              }
+              if (!active.length) console.log('⚠️  No leagues survived filtering — falling back to fr_refresh26 only');
+              return active.length ? active : ['fr_refresh26'];
+            } catch(e) {
+              console.log('Error fetching leagues:', e.message);
+              return ['fr_refresh26'];
+            }
+          }
+
+          // ── Score a single league ──────────────────────────────
+          async function scoreLeague(leagueId, week, seasonType, activeGames, allFinal, playerStats) {
+            console.log(`\n--- Scoring league: ${leagueId} ---`);
+
+            // Load lineups
+            const lineups = await firebaseGet(`/leagues/${leagueId}/lineups/${SEASON}/week${week}.json`).catch(() => null);
+            if (!lineups) {
+              console.log(`  No lineups for ${leagueId} week ${week}`);
+              return;
+            }
+
+            // Load existing scores to preserve locked ones
+            const existingScores = await firebaseGet(`/leagues/${leagueId}/season/${SEASON}/${week}.json`).catch(() => ({}));
+            const scoreUpdates = {};
+
+            for (const [uid, lineup] of Object.entries(lineups)) {
+              if (!lineup || !lineup.slots) continue;
+
+              const existing = existingScores && existingScores[uid];
+              if (existing && existing.locked) {
+                console.log(`  ⏭️  ${lineup.team || uid}: locked`);
+                continue;
+              }
+
+              let totalPts = 0;
+              const slotPts = {};
+
+              for (const [slotId, player] of Object.entries(lineup.slots)) {
+                if (!player) continue;
+                let stats = playerStats[player.id] || playerStats[(player.name || '').toLowerCase()];
+                if (!stats) {
+                  console.log(`    ❌ NO MATCH: lineup has "${player.name}" (id: ${player.id}) — not found in playerStats`);
+                }
+                let pts = 0;
+                if (stats) {
+                  pts = parseFloat(stats.fantasyPoints || stats.fantasy_points || 0);
+                  if (!pts) pts = calcDKPoints(stats, player.pos);
+                }
+                slotPts[slotId] = Math.round(pts * 100) / 100;
+                totalPts += pts;
+              }
+
+              totalPts = Math.round(totalPts * 100) / 100;
+              scoreUpdates[uid] = {
+                uid,
+                team:      lineup.team || uid,
+                week,
+                score:     totalPts,
+                slotPts,
+                status:    allFinal ? 'final' : 'live',
+                updatedAt: Date.now(),
+                locked:    false
+              };
+              console.log(`  ${allFinal ? '✅' : '📡'} ${lineup.team || uid}: ${totalPts} pts`);
+            }
+
+            if (Object.keys(scoreUpdates).length) {
+              await firebasePatch(`/leagues/${leagueId}/season/${SEASON}/${week}.json`, scoreUpdates);
+              console.log(`  ✅ Wrote ${Object.keys(scoreUpdates).length} scores`);
+            }
+
+            // Update week meta
+            await firebasePut(`/leagues/${leagueId}/season/${SEASON}/meta.json`, {
+              week, lastScored: Date.now(), allFinal,
+              gamesActive: activeGames.length
+            });
+
+            // ── HEAD-TO-HEAD: compute matchup results when this league uses that format ──
+            const settings = await firebaseGet(`/leagues/${leagueId}/settings.json`).catch(() => null);
+            if (settings && settings.format === 'headtohead' && allFinal) {
+              await computeH2HMatchupResults(leagueId, week, scoreUpdates, existingScores);
+              await advancePlayoffsIfNeeded(leagueId, week, settings);
+            }
+          }
+
+          // Reads the week's matchup schedule, merges in newly written + existing
+          // scores, and tags each matchup with a winner — written back so the
+          // app's standings can read a server-confirmed result without recomputing
+          // from scratch every time, and so other automation (e.g. playoff
+          // advancement) can rely on it.
+          async function computeH2HMatchupResults(leagueId, week, scoreUpdates, existingScores) {
+            const matchups = await firebaseGet(`/leagues/${leagueId}/matchups/${SEASON}/week${week}.json`).catch(() => null);
+            if (!matchups || !Array.isArray(matchups)) {
+              console.log(`  No H2H schedule for week ${week} — skipping matchup results.`);
+              return;
+            }
+
+            const allScores = { ...existingScores, ...scoreUpdates };
+            const scoreByTeamName = {};
+            const seenTeamNames = new Set();
+            Object.values(allScores).forEach(entry => {
+              if (!entry || !entry.team) return;
+              if (seenTeamNames.has(entry.team)) {
+                console.warn(`  ⚠️  Duplicate team name detected: "${entry.team}" — scores may be merging incorrectly. Check for two members with the same team name.`);
+              }
+              seenTeamNames.add(entry.team);
+              scoreByTeamName[entry.team] = entry.score;
+            });
+
+            const results = matchups.map(m => {
+              const homeScore = scoreByTeamName[m.homeName];
+              const awayScore = m.awayName === 'BYE' ? null : scoreByTeamName[m.awayName];
+              let winner = null;
+              if (homeScore !== undefined && awayScore !== undefined && awayScore !== null) {
+                if (homeScore > awayScore) winner = 'home';
+                else if (homeScore < awayScore) winner = 'away';
+                else winner = 'tie';
+              } else if (m.awayName === 'BYE') {
+                winner = 'home';
+              }
+              return { ...m, homeScore: homeScore ?? null, awayScore: awayScore ?? null, winner };
+            });
+
+            await firebasePut(`/leagues/${leagueId}/matchups/${SEASON}/week${week}.json`, results);
+            console.log(`  ⚔️  Computed ${results.length} H2H matchup result(s) for week ${week}`);
+          }
+
+          // Standard single-elimination bracket pairing: best seed vs worst seed,
+          // 2nd vs 2nd-worst, etc. Mirrors the same logic used client-side when
+          // a commissioner first seeds the bracket.
+          function buildBracketPairings(seeds) {
+            const n = seeds.length;
+            const pairs = [];
+            for (let i = 0; i < n / 2; i++) {
+              pairs.push([seeds[i], seeds[n - 1 - i]]);
+            }
+            return pairs;
+          }
+
+          // Same fixed-bracket "slot order" used client-side so the server-
+          // automated advancement produces identical results to a manual
+          // commissioner "Force Check" — keeps both code paths in lockstep.
+          const BRACKET_SLOT_ORDER = {
+            2:  [1, 2],
+            4:  [1, 4, 2, 3],
+            6:  [1, 6, 3, 4, 2, 5],
+            8:  [1, 8, 4, 5, 2, 7, 3, 6],
+            10: [1, 10, 5, 6, 3, 8, 2, 9, 4, 7],
+            12: [1, 12, 6, 7, 3, 10, 2, 11, 5, 8, 4, 9],
+            16: [1, 16, 8, 9, 4, 13, 5, 12, 2, 15, 7, 10, 3, 14, 6, 11]
+          };
+
+          function buildFixedNextRoundPairs(winnersInSlotOrder) {
+            const pairs = [];
+            for (let i = 0; i < winnersInSlotOrder.length; i += 2) {
+              pairs.push([winnersInSlotOrder[i], winnersInSlotOrder[i + 1]]);
+            }
+            return pairs;
+          }
+
+          // Checks whether the league is currently in a playoff week, and if so,
+          // whether every matchup in the active bracket round has a confirmed
+          // winner. If yes, automatically builds and writes the next round —
+          // or crowns the champion if this was the final round. Runs after every
+          // scoring pass, so this fires the moment the last playoff game of the
+          // week goes final, with zero manual steps.
+          async function advancePlayoffsIfNeeded(leagueId, week, settings) {
+            const playoffData = await firebaseGet(`/leagues/${leagueId}/playoffs/${SEASON}.json`).catch(() => null);
+            if (!playoffData || !playoffData.seeds || !playoffData.rounds) {
+              return; // playoffs not seeded yet — nothing to advance
+            }
+            if (playoffData.champion) {
+              return; // already crowned, nothing left to do
+            }
+
+            const playoffStartWeek = playoffData.playoffStartWeek || settings.playoffStartWeek || 15;
+            const expectedWeekForCurrentRound = playoffStartWeek + (playoffData.currentRound - 1);
+
+            // Only act when the scoring run we just did corresponds to the
+            // week this round is actually being played in.
+            if (parseInt(week) !== expectedWeekForCurrentRound) return;
+
+            const roundKey = `round${playoffData.currentRound}`;
+            const round = playoffData.rounds[roundKey];
+            if (!round) return;
+
+            const matchups = await firebaseGet(`/leagues/${leagueId}/matchups/${SEASON}/week${week}.json`).catch(() => null);
+            const scoreByTeamName = {};
+            if (matchups) {
+              matchups.forEach(m => {
+                if (m.homeScore !== null && m.homeScore !== undefined) scoreByTeamName[m.homeName] = m.homeScore;
+                if (m.awayScore !== null && m.awayScore !== undefined) scoreByTeamName[m.awayName] = m.awayScore;
+              });
+            }
+            // Fall back to season scores directly if a playoff matchup
+            // wasn't part of the regular schedule writer (e.g. seeded fresh).
+            const seasonScores = await firebaseGet(`/leagues/${leagueId}/season/${SEASON}/${week}.json`).catch(() => ({}));
+            Object.values(seasonScores || {}).forEach(entry => {
+              if (entry && entry.team && scoreByTeamName[entry.team] === undefined) {
+                scoreByTeamName[entry.team] = entry.score;
+              }
+            });
+
+            let allDecided = true;
+            const updatedRound = round.map(m => {
+              if (m.winner) return m; // already decided in a prior run
+              if (!m.awayName || m.awayName === 'BYE') {
+                return { ...m, winner: m.homeUid };
+              }
+              const homeScore = scoreByTeamName[m.homeName];
+              const awayScore = scoreByTeamName[m.awayName];
+              if (homeScore === undefined || awayScore === undefined) {
+                allDecided = false;
+                return m;
+              }
+              return {
+                ...m,
+                homeScore, awayScore,
+                winner: homeScore >= awayScore ? m.homeUid : m.awayUid
+              };
+            });
+
+            if (!allDecided) {
+              // Save whichever scores we do have so the bracket UI shows live progress,
+              // but don't advance the round until every matchup is confirmed.
+              await firebasePatch(`/leagues/${leagueId}/playoffs/${SEASON}.json`, {
+                [`rounds/${roundKey}`]: updatedRound
+              });
+              console.log(`  🏆 Playoff round ${playoffData.currentRound} in progress — not all matchups final yet.`);
+              return;
+            }
+
+            if (updatedRound.length === 1) {
+              // Final round just finished — crown the champion.
+              const champUid = updatedRound[0].winner;
+              const champSeed = playoffData.seeds.find(s => s.uid === champUid);
+              await firebasePatch(`/leagues/${leagueId}/playoffs/${SEASON}.json`, {
+                [`rounds/${roundKey}`]: updatedRound,
+                champion: champSeed ? champSeed.name : null
+              });
+              console.log(`  🏆 Playoffs complete — champion: ${champSeed ? champSeed.name : champUid}`);
+              return;
+            }
+
+            const bracketFormat = playoffData.bracketFormat || 'fixed';
+            let nextPairs;
+
+            if (bracketFormat === 'fixed') {
+              // Fixed bracket — advance by bracket slot position, not by
+              // re-ranking survivors. Mirrors the client-side logic exactly
+              // so a commissioner's manual "Force Check" never disagrees
+              // with what the automated scoring run already decided.
+              const winnersInSlotOrder = updatedRound.map(m => {
+                const winnerSeed = playoffData.seeds.find(s => s.uid === m.winner);
+                if (!winnerSeed) return null;
+                const winnerSlot = (m.winner === m.homeUid) ? m.homeSlot : m.awaySlot;
+                return { ...winnerSeed, slot: winnerSlot };
+              }).filter(Boolean);
+              nextPairs = buildFixedNextRoundPairs(winnersInSlotOrder);
+            } else {
+              // Reseed mode — re-rank survivors by original seed number and
+              // re-pair best-remaining vs worst-remaining each round.
+              const winners = updatedRound
+                .map(m => playoffData.seeds.find(s => s.uid === m.winner))
+                .filter(Boolean)
+                .sort((a, b) => a.seed - b.seed);
+              nextPairs = buildBracketPairings(winners);
+            }
+
+            const nextRoundKey = `round${playoffData.currentRound + 1}`;
+            const nextRound = nextPairs.map(pair => ({
+              homeSeed: pair[0].seed, awaySeed: pair[1].seed,
+              homeUid: pair[0].uid, awayUid: pair[1].uid,
+              homeName: pair[0].name, awayName: pair[1].name,
+              homeSlot: pair[0].slot || null, awaySlot: pair[1].slot || null,
+              winner: null
+            }));
+
+            await firebasePatch(`/leagues/${leagueId}/playoffs/${SEASON}.json`, {
+              [`rounds/${roundKey}`]: updatedRound,
+              [`rounds/${nextRoundKey}`]: nextRound,
+              currentRound: playoffData.currentRound + 1
+            });
+            console.log(`  🏆 Playoff round ${playoffData.currentRound} complete — advanced to round ${playoffData.currentRound + 1}`);
+          }
+
+          // ── Lock scores for a league ───────────────────────────
+          async function lockLeague(leagueId, week) {
+            console.log(`Locking ${leagueId} week ${week}...`);
+            const scores = await firebaseGet(`/leagues/${leagueId}/season/${SEASON}/${week}.json`).catch(() => null);
+            if (!scores) { console.log('  No scores to lock.'); return; }
+
+            const updates = {};
+            Object.entries(scores).forEach(([uid, entry]) => {
+              if (entry && entry.score !== undefined && !entry.locked) {
+                updates[uid] = { ...entry, locked: true, lockedAt: Date.now() };
+              }
+            });
+
+            if (Object.keys(updates).length) {
+              await firebasePatch(`/leagues/${leagueId}/season/${SEASON}/${week}.json`, updates);
+              console.log(`  ✅ Locked ${Object.keys(updates).length} scores`);
+            } else {
+              console.log('  All scores already locked.');
+            }
+          }
+
+          // ── MAIN ───────────────────────────────────────────────
+          async function main() {
+            const { week, seasonType } = await getCurrentWeekInfo();
+            const leagues = await getActiveLeagues();
+
+            console.log(`\n=== Auto-Scoring | Week ${week} | ${seasonType} | ${new Date().toISOString()} ===`);
+            console.log(`Leagues to score: ${leagues.join(', ')}`);
+
+            // Lock run (Tuesday 9am)
+            if (IS_LOCK_RUN) {
+              for (const leagueId of leagues) {
+                await lockLeague(leagueId, week);
+              }
+              return;
+            }
+
+            // Switched from getNFLGamesForWeek to getNFLScoresOnly with a
+            // gameDate — confirmed live tonight that the "week - 1"
+            // preseason assumption above was actually wrong (week=1, not
+            // week=0, is what really works for the HOF game), and that
+            // getNFLGamesForWeek itself was intermittently unreliable.
+            // gameDate sidesteps season-type and week-numbering entirely.
+            // GitHub Actions runs in UTC, but NFL game dates are labeled
+            // by US time — trying both today's and yesterday's UTC date
+            // rather than a timezone conversion.
+            function fmtDate(d) {
+              return `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, '0')}${String(d.getUTCDate()).padStart(2, '0')}`;
+            }
+            const nowDate = new Date();
+            const yesterdayDate = new Date(nowDate.getTime() - 24 * 60 * 60 * 1000);
+            let games = [];
+            for (const gameDate of [fmtDate(nowDate), fmtDate(yesterdayDate)]) {
+              try {
+                const gamesData = await t01(`/getNFLScoresOnly?gameDate=${gameDate}`);
+                const candidate = Object.values(gamesData.body || {});
+                if (candidate.length) {
+                  console.log(`Found ${candidate.length} game(s) for ${gameDate} via getNFLScoresOnly`);
+                  games = candidate;
+                  break;
+                }
+              } catch(e) {
+                console.log(`  gameDate=${gameDate} attempt failed: ${e.message}`);
+              }
+            }
+
+            if (!games.length) {
+              console.log(`No ${seasonType} games found for week ${week} — nothing to score.`);
+              return;
+            }
+
+            // Filter to active/final games
+            const activeGames = games.filter(g => {
+              const s = (g.gameStatus || g.status || '').toLowerCase();
+              return s.includes('progress') || s.includes('final') ||
+                     s.includes('completed') || s === 'live';
+            });
+
+            if (!activeGames.length) {
+              console.log('No active games right now — nothing to score.');
+              return;
+            }
+
+            console.log(`Found ${activeGames.length} active/final game(s) of ${games.length} total`);
+
+            const allFinal = games.every(g => {
+              const s = (g.gameStatus || g.status || '').toLowerCase();
+              return s.includes('final') || s.includes('completed');
+            });
+
+            // Fetch box scores for active games
+            const boxScores = {};
+            const liveGameStatus = {}; // gameId -> {statusCode, quarter, clock, home, away}
+            for (const game of activeGames) {
+              const gameId = game.gameID || game.gameId || '';
+              if (!gameId) continue;
+              try {
+                const bs = await t01(`/getNFLBoxScore?gameID=${gameId}&fantasyPoints=true&PPRScoring=true`);
+                if (bs.body) {
+                  boxScores[gameId] = bs.body;
+                  const bsName = bs.body.playerStats || {};
+                  const sample = Object.values(bsName)[0];
+                  console.log(`  📊 ${gameId}: ${Object.keys(bsName).length} player stats` +
+                    (sample ? ` (sleeperBotID present: ${sample.sleeperBotID ? 'YES ✓' : 'no — falling back to name match'})` : ''));
+
+                  // gameStatusCode is a REAL, documented Tank01 field
+                  // (0=not started, 1=live, 2=final — see
+                  // tank01.com/Guides_Game_Status_Code_NFL.html).
+                  // quarter/clock field names below are an educated guess
+                  // based on common sports-API naming conventions —
+                  // UNVERIFIED against a real live response, since no
+                  // games were live when this was written (mid-July,
+                  // before preseason). First real Thursday/Sunday of live
+                  // games should be checked against this — if the "PMR"
+                  // (quarter + clock) display comes back blank/wrong while
+                  // scores are updating fine, this is the spot to fix,
+                  // same pattern as the projections endpoint fix earlier.
+                  liveGameStatus[gameId] = {
+                    statusCode: bs.body.gameStatusCode != null ? Number(bs.body.gameStatusCode) : null,
+                    quarter:    bs.body.quarter || bs.body.period || bs.body.gamePeriod || null,
+                    clock:      bs.body.gameClock || bs.body.clock || bs.body.timeRemaining || null,
+                    home:       game.home || game.homeTeamAbbr || game.homeTeam || '',
+                    away:       game.away || game.awayTeamAbbr || game.awayTeam || ''
+                  };
+                }
+              } catch(e) {
+                console.error(`  ❌ Failed box score ${gameId}:`, e.message);
+              }
+            }
+
+            // Write live status globally (not per-league — the same for
+            // everyone watching this week regardless of which league).
+            // Overwritten every run (every ~2 min during game windows),
+            // so it's always close to real-time without needing a
+            // separate live-polling system on the client.
+            if (Object.keys(liveGameStatus).length) {
+              try {
+                await firebasePut(`/liveGameStatus/${SEASON}/${seasonType}_wk${week}.json`, {
+                  games: liveGameStatus,
+                  updatedAt: Date.now()
+                });
+              } catch(e) {
+                console.error('Failed to write live game status:', e.message);
+              }
+            }
+
+            // Build player stats lookup
+            const playerStats = {};
+            Object.values(boxScores).forEach(bs => {
+              Object.entries(bs.playerStats || {}).forEach(([pid, stats]) => {
+                playerStats[pid] = stats;
+                // Tank01 ships a sleeperBotID field on player records in their other
+                // sport APIs (confirmed via their MLB product) — if it's present here
+                // too, this is the REAL fix for matching: our lineups store Sleeper's
+                // own player ID, which has never had any relationship to Tank01's
+                // internal numeric pid above. Indexing by it (when present) means the
+                // scoreLeague() lookup at `playerStats[player.id]` actually succeeds,
+                // instead of always silently falling through to name-matching.
+                if (stats.sleeperBotID) playerStats[stats.sleeperBotID] = stats;
+                const name = (stats.longName || stats.playerName || '').toLowerCase();
+                if (name) playerStats[name] = stats;
+              });
+              // Team defense (DST) lives in a completely separate object
+              // from playerStats — confirmed via real testing earlier
+              // today. Lineup slots store a defense's id as the team
+              // abbreviation itself (e.g. "CAR"), so keying by that here
+              // is what makes the scoreLeague() lookup succeed. Field
+              // names mapped to what calcDKPoints() already expects.
+              ['home', 'away'].forEach(side => {
+                const d = bs.DST && bs.DST[side];
+                if (!d || !d.teamAbv) return;
+                playerStats[d.teamAbv] = {
+                  sacks:      d.sacks,
+                  defInt:     d.defensiveInterceptions,
+                  fumbRec:    d.fumblesRecovered,
+                  defTD:      d.defTD,
+                  safety:     d.safeties,
+                  ptsAllowed: d.ptsAllowed
+                };
+              });
+            });
+            const realNames = Object.values(playerStats).map(s => s.longName || s.playerName).filter(Boolean);
+            console.log(`  Sample of real names in this game's box score: ${[...new Set(realNames)].slice(0, 10).join(', ')}`);
+
+            // Score all leagues
+            for (const leagueId of leagues) {
+              try {
+                await scoreLeague(leagueId, week, seasonType, activeGames, allFinal, playerStats);
+              } catch(e) {
+                console.error(`Failed scoring ${leagueId}:`, e.message);
+              }
+            }
+
+            // ── PERMANENT WEEKLY STATS ARCHIVE ──────────────────────────
+            // Once a week's games are ALL confirmed final, that data never
+            // changes again — so instead of re-fetching it from Tank01 on
+            // every single player-detail click (up to 18 calls per click,
+            // forever), write it to Firebase ONCE here and let the client
+            // read the archive instead of hitting Tank01 for any week
+            // that's already archived. Global path (not per-league) since
+            // real NFL stats are the same regardless of which league is
+            // asking — every league benefits from one shared archive.
+            // Uses playerStats/games already fetched above for scoring —
+            // zero additional Tank01 calls to build this.
+            if (allFinal) {
+              try {
+                await archiveWeekStats(games, playerStats, seasonType, week);
+              } catch(e) {
+                console.error('Failed to archive week stats:', e.message);
+              }
+
+              // ── WEEKLY RECAP ──────────────────────────────────────────
+              // Cumulative leagues only for now — H2H and Guillotine have
+              // their own natural weekly story (who won, who got cut) that
+              // deserves its own recap shape later, not squeezed into this
+              // one. Runs at the same "week is finalized" trigger as the
+              // stats archive above, and reuses playerStats/games already
+              // fetched for scoring.
+              for (const leagueId of leagues) {
+                try {
+                  const settings = await firebaseGet(`/leagues/${leagueId}/settings.json`).catch(() => null);
+                  if (settings && settings.format === 'cumulative') {
+                    await generateWeeklyRecap(leagueId, week, seasonType);
+                  }
+                } catch(e) {
+                  console.error(`Failed to generate recap for ${leagueId}:`, e.message);
+                }
+              }
+            }
+          }
+
+          let playerPosLookup = null;
+          async function getPlayerPosLookup() {
+            if (playerPosLookup) return playerPosLookup;
+            playerPosLookup = {};
+            try {
+              const pool = await firebaseGet(`/playerPool/${SEASON}/players.json`);
+              Object.values(pool || {}).forEach(p => {
+                if (p && p.name) playerPosLookup[p.name.toLowerCase()] = p.pos || '';
+              });
+            } catch(e) { console.error('  Could not load player pool for position lookup:', e.message); }
+            return playerPosLookup;
+          }
+
+          async function archiveWeekStats(games, playerStats, seasonType, week) {
+            const archiveKey = `${seasonType}_wk${week}`;
+            const gameList = games.map(g => ({
+              gameId: g.gameID || g.gameId || '',
+              home:   g.home || g.homeTeamAbbr || g.homeTeam || '',
+              away:   g.away || g.awayTeamAbbr || g.awayTeam || ''
+            })).filter(g => g.home && g.away);
+
+            // De-dupe playerStats (the same box score entry is indexed under
+            // pid, sleeperBotID, AND lowercased name — collapse back down to
+            // one record per real player, keyed by name to match how the
+            // client already looks players up).
+            //
+            // Stores RAW stat components (passYds, rushTD, etc.), not just
+            // the pre-computed fantasy points for today's one scoring
+            // formula — "pts" stays for convenience/backward compatibility,
+            // but the raw numbers are what let a future league with
+            // different scoring rules compute ITS OWN fantasy points from
+            // this same stored data, with no new Tank01 calls needed. Same
+            // schema used by the historical backfill (see
+            // backfill-historical-stats.yml), so current-season and
+            // historical data both read the same way everywhere else.
+            const players = {};
+            const posLookup = await getPlayerPosLookup();
+            Object.values(playerStats).forEach(stats => {
+              const displayName = stats.longName || stats.playerName || '';
+              const name = displayName.toLowerCase();
+              if (!name || players[sanitizeFirebaseKey(name)]) return;
+              const team = stats.team || stats.teamAbv || '';
+              const game = gameList.find(g => g.home === team || g.away === team);
+              // Stats are nested under Passing/Rushing/Receiving/Defense
+              // sub-objects, not flat top-level fields — confirmed via a
+              // real sample while building the historical backfill (see
+              // backfill-historical-stats.yml for the full story). This
+              // function predates that discovery, so it never got the fix
+              // — meaning the current season's live archive would have
+              // stored all-zero stats the first time it actually ran
+              // against a real game, exactly like the historical backfill
+              // did before this was caught.
+              const pass = stats.Passing   || {};
+              const rush = stats.Rushing   || {};
+              const recv = stats.Receiving || {};
+              const def  = stats.Defense   || {};
+              // Confirmed real via an earlier raw sample: offensive snap
+              // percentage lives under snapCounts.offSnapPct.
+              const snapPct = stats.snapCounts ? parseFloat(stats.snapCounts.offSnapPct || 0) : null;
+              // Firebase RTDB keys can't contain . $ # [ ] / — and NFL
+              // player names very often do ("A.J. Brown", "T.J. Watt",
+              // "Odell Beckham Jr."). Using the raw name as a key broke
+              // the ENTIRE week's write the moment any one player had one
+              // of those characters. Sanitized version used as the key;
+              // the real, correctly-formatted name kept as a field.
+              players[sanitizeFirebaseKey(name)] = {
+                name:    displayName,
+                team,
+                // pos genuinely isn't in the box score response at all —
+                // sourced from the player pool instead, same fix already
+                // applied in the historical backfill.
+                pos:     posLookup[name] || '',
+                opp:     game ? (game.home === team ? game.away : game.home) : '',
+                isHome:  game ? game.home === team : null,
+                pts:     parseFloat(stats.fantasyPoints || 0),
+                passYds: parseFloat(pass.passYds || 0),
+                passTD:  parseFloat(pass.passTD  || 0),
+                passInt: parseFloat(pass.int     || 0),
+                passAtt: parseFloat(pass.passAttempts    || 0),
+                passCmp: parseFloat(pass.passCompletions || 0),
+                rushYds: parseFloat(rush.rushYds || 0),
+                rushTD:  parseFloat(rush.rushTD  || 0),
+                carries: parseFloat(rush.carries || 0),
+                recYds:  parseFloat(recv.recYds     || 0),
+                recTD:   parseFloat(recv.recTD      || 0),
+                rec:     parseFloat(recv.receptions || 0),
+                targets: parseFloat(recv.targets    || 0),
+                fumbLost:parseFloat(def.fumblesLost || 0),
+                twoPt:   parseFloat(stats.twoPt || 0), // not confirmed in any real sample yet — kept as a best-effort attempt
+                snapPct: snapPct
+              };
+            });
+
+            if (!Object.keys(players).length) {
+              console.log(`  Archive: no player stats to write for ${archiveKey}`);
+              return;
+            }
+
+            await firebasePut(`/nflStatsArchive/${SEASON}/${archiveKey}.json`, {
+              games: gameList,
+              players,
+              archivedAt: Date.now()
+            });
+            console.log(`  📦 Archived ${Object.keys(players).length} player stat lines for ${archiveKey}`);
+          }
+
+          // ── WEEKLY RECAP ("Weekly Review") ────────────────────────────
+          // Computed once here, stored permanently — the client and any
+          // email send just read the finished result, nothing gets
+          // recomputed per view. Cumulative-format leagues only for now.
+
+          async function computeCumulativeStandingsThrough(leagueId, throughWeek) {
+            const totals = {}; // uid -> {uid, team, total}
+            for (let w = 1; w <= throughWeek; w++) {
+              const weekScores = await firebaseGet(`/leagues/${leagueId}/season/${SEASON}/${w}.json`).catch(() => null);
+              if (!weekScores || weekScores.error) continue;
+              Object.values(weekScores).forEach(entry => {
+                if (!entry || !entry.uid) return;
+                if (!totals[entry.uid]) totals[entry.uid] = { uid: entry.uid, team: entry.team || entry.uid, total: 0 };
+                totals[entry.uid].total += parseFloat(entry.score || 0);
+                totals[entry.uid].team = entry.team || totals[entry.uid].team;
+              });
+            }
+            return Object.values(totals)
+              .map(t => ({ ...t, total: Math.round(t.total * 100) / 100 }))
+              .sort((a, b) => b.total - a.total);
+          }
+
+          // Finds the highest-scoring possible lineup across the ENTIRE
+          // salary-eligible pool for the week — not what anyone actually
+          // drafted. 1 QB, 2 RB, 3 WR, 1 TE, 1 FLEX (RB/WR/TE), 1 DEF,
+          // total salary <= cap. FLEX is the genuinely tricky part: the
+          // 4th-best RB that week might outscore the 4th-best WR, so it
+          // needs to be a real trade-off across RB/WR/TE together, not
+          // filled independently after RB/WR/TE are locked in. Solved as
+          // a unified 0/1 knapsack over RB/WR/TE/FLEX (each eligible
+          // player considered once, assignable to their native slot OR
+          // flex), merged with independent QB and DEF sub-problems (which
+          // don't have this cross-position competition, so a straight
+          // three-way salary-split merge is correct for those). Verified
+          // against synthetic test data before being wired in here —
+          // correctly chose a higher-scoring RB for FLEX over a cheaper
+          // WR in testing, confirming the trade-off actually works.
+          function computeOptimalLineup(pool, cap) {
+            const CAP_UNIT = 100;
+            const capUnits = Math.floor(cap / CAP_UNIT);
+
+            const norm = p => ({ ...p, su: Math.round(p.salary / CAP_UNIT) });
+            const qbs  = pool.filter(p => p.pos === 'QB').map(norm).filter(p => p.su <= capUnits);
+            const defs = pool.filter(p => p.pos === 'DEF').map(norm).filter(p => p.su <= capUnits);
+            const flexEligible = pool.filter(p => ['RB','WR','TE'].includes(p.pos)).map(norm).filter(p => p.su <= capUnits);
+
+            const RB_MAX = 2, WR_MAX = 3, TE_MAX = 1;
+
+            function makeCore() {
+              const arr = [];
+              for (let rb = 0; rb <= RB_MAX; rb++) {
+                arr.push([]);
+                for (let wr = 0; wr <= WR_MAX; wr++) {
+                  arr[rb].push([]);
+                  for (let te = 0; te <= TE_MAX; te++) {
+                    arr[rb][wr].push([new Array(capUnits + 1).fill(null), new Array(capUnits + 1).fill(null)]);
+                  }
+                }
+              }
+              return arr;
+            }
+            let core = makeCore();
+            core[0][0][0][0][0] = { points: 0, picks: [] };
+
+            flexEligible.forEach(p => {
+              for (let rb = RB_MAX; rb >= 0; rb--) {
+                for (let wr = WR_MAX; wr >= 0; wr--) {
+                  for (let te = TE_MAX; te >= 0; te--) {
+                    for (let fx = 1; fx >= 0; fx--) {
+                      for (let s = capUnits; s >= p.su; s--) {
+                        const srcSalary = s - p.su;
+                        let best = core[rb][wr][te][fx][s];
+
+                        if (p.pos === 'RB' && rb >= 1) {
+                          const src = core[rb - 1][wr][te][fx][srcSalary];
+                          if (src) { const pts = src.points + (p.pts || 0); if (!best || pts > best.points) best = { points: pts, picks: [...src.picks, { ...p, slot: 'RB' }] }; }
+                        }
+                        if (p.pos === 'WR' && wr >= 1) {
+                          const src = core[rb][wr - 1][te][fx][srcSalary];
+                          if (src) { const pts = src.points + (p.pts || 0); if (!best || pts > best.points) best = { points: pts, picks: [...src.picks, { ...p, slot: 'WR' }] }; }
+                        }
+                        if (p.pos === 'TE' && te >= 1) {
+                          const src = core[rb][wr][te - 1][fx][srcSalary];
+                          if (src) { const pts = src.points + (p.pts || 0); if (!best || pts > best.points) best = { points: pts, picks: [...src.picks, { ...p, slot: 'TE' }] }; }
+                        }
+                        if (fx === 1) {
+                          const src = core[rb][wr][te][0][srcSalary];
+                          if (src) { const pts = src.points + (p.pts || 0); if (!best || pts > best.points) best = { points: pts, picks: [...src.picks, { ...p, slot: 'FLEX' }] }; }
+                        }
+                        core[rb][wr][te][fx][s] = best;
+                      }
+                    }
+                  }
+                }
+              }
+            });
+
+            const coreAtSalary = new Array(capUnits + 1).fill(null);
+            for (let s = 0; s <= capUnits; s++) coreAtSalary[s] = core[RB_MAX][WR_MAX][TE_MAX][1][s];
+
+            function bestSingleAtEachSalary(playersArr) {
+              const dp = new Array(capUnits + 1).fill(null);
+              playersArr.forEach(p => {
+                const cur = dp[p.su];
+                if (!cur || (p.pts || 0) > cur.points) dp[p.su] = { points: p.pts || 0, picks: [{ ...p, slot: p.pos }] };
+              });
+              return dp;
+            }
+            const qbAtSalary  = bestSingleAtEachSalary(qbs);
+            const defAtSalary = bestSingleAtEachSalary(defs);
+
+            let bestOverall = null;
+            for (let s1 = 0; s1 <= capUnits; s1++) {
+              const coreEntry = coreAtSalary[s1];
+              if (!coreEntry) continue;
+              for (let s2 = 0; s1 + s2 <= capUnits; s2++) {
+                const qbEntry = qbAtSalary[s2];
+                if (!qbEntry) continue;
+                const remaining = capUnits - s1 - s2;
+                for (let s3 = 0; s3 <= remaining; s3++) {
+                  const defEntry = defAtSalary[s3];
+                  if (!defEntry) continue;
+                  const totalPoints = coreEntry.points + qbEntry.points + defEntry.points;
+                  if (!bestOverall || totalPoints > bestOverall.points) {
+                    bestOverall = {
+                      points: Math.round(totalPoints * 100) / 100,
+                      salaryUsed: (s1 + s2 + s3) * CAP_UNIT,
+                      picks: [...coreEntry.picks, ...qbEntry.picks, ...defEntry.picks]
+                    };
+                  }
+                }
+              }
+            }
+            return bestOverall;
+          }
+
+          async function generateWeeklyRecap(leagueId, week, seasonType) {
+            const [thisWeekScores, lineups, salaryData] = await Promise.all([
+              firebaseGet(`/leagues/${leagueId}/season/${SEASON}/${week}.json`).catch(() => null),
+              firebaseGet(`/leagues/${leagueId}/lineups/${SEASON}/week${week}.json`).catch(() => null),
+              firebaseGet(`/leagues/${leagueId}/salaries/${SEASON}/week${week}.json`).catch(() => null)
+            ]);
+            if (!thisWeekScores || thisWeekScores.error || !Object.keys(thisWeekScores).length) {
+              console.log(`  Recap: no scores yet for ${leagueId} week ${week} — skipping`);
+              return;
+            }
+
+            const teamScores = Object.values(thisWeekScores).filter(e => e && e.uid);
+
+            // ── Top / low score this week ──
+            const sortedByScore = [...teamScores].sort((a, b) => b.score - a.score);
+            const topScore = sortedByScore[0];
+            const lowScore = sortedByScore[sortedByScore.length - 1];
+
+            // ── Cumulative standings, this week and last ──
+            const standingsNow  = await computeCumulativeStandingsThrough(leagueId, week);
+            const standingsPrev = week > 1 ? await computeCumulativeStandingsThrough(leagueId, week - 1) : [];
+            const prevRankByUid = {};
+            standingsPrev.forEach((t, i) => { prevRankByUid[t.uid] = i + 1; });
+
+            const leagueLeader = standingsNow[0] || null;
+
+            // ── Standings movement — biggest riser and faller ──
+            let biggestRiser = null, biggestFaller = null;
+            standingsNow.forEach((t, i) => {
+              const nowRank = i + 1;
+              const prevRank = prevRankByUid[t.uid];
+              if (!prevRank) return; // new to the standings (week 1, or missed a week) — no movement to report
+              const movement = prevRank - nowRank; // positive = moved up
+              if (movement > 0 && (!biggestRiser || movement > biggestRiser.movement)) {
+                biggestRiser = { team: t.team, movement, fromRank: prevRank, toRank: nowRank };
+              }
+              if (movement < 0 && (!biggestFaller || movement < biggestFaller.movement)) {
+                biggestFaller = { team: t.team, movement, fromRank: prevRank, toRank: nowRank };
+              }
+            });
+
+            // ── Closest race — smallest gap between consecutive standings spots ──
+            let closestRace = null;
+            for (let i = 0; i < standingsNow.length - 1; i++) {
+              const gap = Math.round((standingsNow[i].total - standingsNow[i + 1].total) * 100) / 100;
+              if (!closestRace || gap < closestRace.gap) {
+                closestRace = { gap, higher: standingsNow[i], lower: standingsNow[i + 1], rank: i + 1 };
+              }
+            }
+
+            // ── MVP / best value / bust — needs to know WHICH player was
+            // in each scored slot, cross-referenced with salary ──
+            let mvp = null, bestValue = null, bust = null;
+            if (lineups && !lineups.error && salaryData && salaryData.players) {
+              const salaryByName = {};
+              Object.values(salaryData.players).forEach(p => {
+                if (p && p.name) salaryByName[p.name.toLowerCase()] = p;
+              });
+
+              Object.values(lineups).forEach(lineup => {
+                if (!lineup || !lineup.slots) return;
+                Object.values(lineup.slots).forEach(player => {
+                  if (!player || !player.name) return;
+                  const scoreEntry = thisWeekScores[lineup.uid || ''] || Object.values(thisWeekScores).find(e => e.uid === (lineup.uid || ''));
+                  const slotId = Object.keys(lineup.slots).find(k => lineup.slots[k] === player);
+                  const pts = (scoreEntry && scoreEntry.slotPts && slotId != null) ? parseFloat(scoreEntry.slotPts[slotId] || 0) : null;
+                  if (pts == null) return;
+
+                  // MVP — highest raw points, regardless of cost
+                  if (!mvp || pts > mvp.pts) mvp = { name: player.name, pos: player.pos || '', team: player.team || '', pts, rosteredBy: lineup.team || lineup.uid };
+
+                  // Value / bust — needs a real salary to compare against
+                  const sal = salaryByName[player.name.toLowerCase()];
+                  if (sal && sal.salary) {
+                    const ptsPerK = Math.round((pts / (sal.salary / 1000)) * 100) / 100;
+                    if (!bestValue || ptsPerK > bestValue.ptsPerK) {
+                      bestValue = { name: player.name, pos: player.pos || '', salary: sal.salary, pts, ptsPerK, rosteredBy: lineup.team || lineup.uid };
+                    }
+                    // Bust — meaningfully expensive (top third of salary range) but underperformed
+                    if (sal.salary >= 6000 && (!bust || ptsPerK < bust.ptsPerK)) {
+                      bust = { name: player.name, pos: player.pos || '', salary: sal.salary, pts, ptsPerK, rosteredBy: lineup.team || lineup.uid };
+                    }
+                  }
+                });
+              });
+            }
+
+            // ── Perfect roster — real points from the archive, matched
+            // against the full salary-eligible pool for this exact week ──
+            let perfectRoster = null;
+            if (salaryData && salaryData.players) {
+              const archiveKey = `${seasonType}_wk${week}`;
+              const statsArchive = await firebaseGet(`/nflStatsArchive/${SEASON}/${archiveKey}.json`).catch(() => null);
+              if (statsArchive && statsArchive.players) {
+                const pool = Object.values(salaryData.players)
+                  .filter(p => p && p.name && p.salary && ['QB','RB','WR','TE','DEF'].includes(p.pos))
+                  .map(p => {
+                    const statKey = sanitizeFirebaseKey(p.name.toLowerCase());
+                    const stats = statsArchive.players[statKey];
+                    return { name: p.name, pos: p.pos, salary: p.salary, pts: stats ? parseFloat(stats.pts || 0) : 0 };
+                  });
+                const cap = 60000; // standard cap — see league-setup.html, roster/cap is fixed while honing in on the core three formats
+                perfectRoster = computeOptimalLineup(pool, cap);
+              }
+            }
+
+            await firebasePut(`/leagues/${leagueId}/recaps/${SEASON}/week${week}.json`, {
+              week, seasonType,
+              generatedAt: Date.now(),
+              leagueLeader: leagueLeader ? { team: leagueLeader.team, total: leagueLeader.total } : null,
+              topScore: topScore ? { team: topScore.team, score: topScore.score } : null,
+              lowScore: lowScore ? { team: lowScore.team, score: lowScore.score } : null,
+              biggestRiser, biggestFaller, closestRace,
+              mvp, bestValue, bust, perfectRoster,
+              standings: standingsNow.map((t, i) => ({ rank: i + 1, team: t.team, total: t.total }))
+            });
+            console.log(`  📰 Recap generated for ${leagueId} week ${week}`);
+          }
+
+          main().catch(e => {
+            console.error('Scoring job failed:', e);
+            process.exit(1);
+          });
+          SCRIPT
