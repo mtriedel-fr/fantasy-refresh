@@ -64,7 +64,7 @@ jobs:
 
           // ── DraftKings Scoring ─────────────────────────────────
           function calcDKPoints(p, pos) {
-            if (!p) return 0;
+            if (!p) return { pts: 0, breakdown: [] };
             // Confirmed months ago (and already fixed in weekly-prep.yml
             // and backfill-historical-stats.yml, but never here): Tank01's
             // box score nests stats under Passing/Rushing/Receiving/
@@ -76,39 +76,54 @@ jobs:
             const recv = p.Receiving || {};
             const def  = p.Defense   || {};
             let pts = 0;
-            pts += (parseFloat(pass.passYds)  || 0) * 0.04;
-            pts += (parseFloat(pass.passTD)   || 0) * 4;
-            pts += (parseFloat(pass.int)      || 0) * -1;
-            pts += (parseFloat(p.pass300)     || 0) * 3;
-            pts += (parseFloat(rush.rushYds)  || 0) * 0.1;
-            pts += (parseFloat(rush.rushTD)   || 0) * 6;
-            pts += (parseFloat(p.rush100)     || 0) * 3;
-            pts += (parseFloat(recv.receptions) || 0) * 1;
-            pts += (parseFloat(recv.recYds)     || 0) * 0.1;
-            pts += (parseFloat(recv.recTD)      || 0) * 6;
-            pts += (parseFloat(p.rec100)      || 0) * 3;
-            pts += (parseFloat(def.fumblesLost) || 0) * -1;
-            pts += (parseFloat(p.twoPt)       || 0) * 2;
+            const breakdown = [];
+            // Only real, non-zero contributions get added to the
+            // breakdown — a WR who only caught passes shouldn't see a
+            // wall of "Rush TD: 0 (+0)" style clutter for categories
+            // that never applied to them.
+            function add(label, statValue, multiplier, formatStat) {
+              const val = parseFloat(statValue) || 0;
+              if (!val) return;
+              const contributed = Math.round(val * multiplier * 100) / 100;
+              pts += contributed;
+              breakdown.push({ label, stat: formatStat ? formatStat(val) : val, points: contributed });
+            }
+            add('Passing Yards',  pass.passYds,       0.04);
+            add('Passing TD',     pass.passTD,         4);
+            add('Interception',   pass.int,            -1);
+            add('300+ Yard Game', p.pass300,           3);
+            add('Rushing Yards',  rush.rushYds,        0.1);
+            add('Rushing TD',     rush.rushTD,         6);
+            add('100+ Yard Game (Rush)', p.rush100,    3);
+            add('Reception',      recv.receptions,     1);
+            add('Receiving Yards',recv.recYds,         0.1);
+            add('Receiving TD',   recv.recTD,          6);
+            add('100+ Yard Game (Rec)',  p.rec100,     3);
+            add('Fumble Lost',    def.fumblesLost,     -1);
+            add('2-Point Conversion', p.twoPt,         2);
             if (pos === 'DEF') {
-              pts += (parseFloat(p.sacks)   || 0) * 1;
-              pts += (parseFloat(p.defInt)  || 0) * 2;
-              pts += (parseFloat(p.fumbRec) || 0) * 2;
-              pts += (parseFloat(p.defTD)   || 0) * 6;
-              pts += (parseFloat(p.safety)  || 0) * 2;
-              pts += (parseFloat(p.blkKick) || 0) * 2;
+              add('Sack',              p.sacks,   1);
+              add('Interception',      p.defInt,  2);
+              add('Fumble Recovery',   p.fumbRec, 2);
+              add('Defensive/ST TD',   p.defTD,   6);
+              add('Safety',            p.safety,  2);
+              add('Blocked Kick',      p.blkKick, 2);
               const rawPa = p.ptsAllowed != null ? p.ptsAllowed : p.pointsAllowed;
               const pa = rawPa != null ? parseFloat(rawPa) : null;
               if (pa !== null) {
-                if      (pa === 0)  pts += 10;
-                else if (pa <= 6)   pts += 7;
-                else if (pa <= 13)  pts += 4;
-                else if (pa <= 20)  pts += 1;
-                else if (pa <= 27)  pts += 0;
-                else if (pa <= 34)  pts -= 1;
-                else                pts -= 4;
+                let paBonus = 0;
+                if      (pa === 0)  paBonus = 10;
+                else if (pa <= 6)   paBonus = 7;
+                else if (pa <= 13)  paBonus = 4;
+                else if (pa <= 20)  paBonus = 1;
+                else if (pa <= 27)  paBonus = 0;
+                else if (pa <= 34)  paBonus = -1;
+                else                paBonus = -4;
+                pts += paBonus;
+                breakdown.push({ label: `Points Allowed (${pa})`, stat: pa, points: paBonus });
               }
             }
-            return Math.round(pts * 100) / 100;
+            return { pts: Math.round(pts * 100) / 100, breakdown };
           }
 
           // ── HTTP helpers ───────────────────────────────────────
@@ -319,6 +334,7 @@ jobs:
 
               let totalPts = 0;
               const slotPts = {};
+              const slotBreakdown = {};
 
               for (const [slotId, player] of Object.entries(lineup.slots)) {
                 if (!player) continue;
@@ -332,12 +348,13 @@ jobs:
                 // reliably match our specific scoring weights, so
                 // trusting it first was silently masking real production
                 // whenever it disagreed with our actual scoring rules.
-                let pts = stats ? calcDKPoints(stats, player.pos) : 0;
-                slotPts[slotId] = Math.round(pts * 100) / 100;
+                const result = stats ? calcDKPoints(stats, player.pos) : { pts: 0, breakdown: [] };
+                slotPts[slotId] = Math.round(result.pts * 100) / 100;
+                slotBreakdown[slotId] = result.breakdown;
                 if (player.pos === 'DEF' && stats) {
                   console.log(`    🛡️  DEF check: ${player.name} — ptsAllowed in stats: ${stats.ptsAllowed}, computed pts: ${slotPts[slotId]}`);
                 }
-                totalPts += pts;
+                totalPts += result.pts;
               }
 
               totalPts = Math.round(totalPts * 100) / 100;
@@ -347,6 +364,7 @@ jobs:
                 week,
                 score:     totalPts,
                 slotPts,
+                slotBreakdown,
                 status:    allFinal ? 'final' : 'live',
                 updatedAt: Date.now(),
                 locked:    false
