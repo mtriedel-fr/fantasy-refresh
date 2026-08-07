@@ -158,9 +158,16 @@ jobs:
 
             for (const game of games) {
               const status   = (game.gameStatus || game.status || '').toLowerCase();
-              const homeTeam = game.homeTeamAbbr || game.homeTeam || '';
-              const awayTeam = game.awayTeamAbbr || game.awayTeam || '';
+              // Confirmed months ago (and only ever fixed in the Worker,
+              // never ported here): this endpoint's real field is just
+              // 'home'/'away', not 'homeTeamAbbr'/'homeTeam' — checking
+              // those first, since if they're always empty, nothing
+              // could ever match correctly regardless of status.
+              const homeTeam = game.home || game.homeTeamAbbr || game.homeTeam || '';
+              const awayTeam = game.away || game.awayTeamAbbr || game.awayTeam || '';
               const gameId   = game.gameID || '';
+
+              console.log(`  Game check: ${awayTeam}@${homeTeam} — raw status: "${game.gameStatus || game.status || '(none)'}"`);
 
               const isLocked = status.includes('in progress') ||
                                status.includes('inprogress') ||
