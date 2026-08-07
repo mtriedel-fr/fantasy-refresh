@@ -2088,12 +2088,46 @@ var LINEUP_POS_COLORS = {QB:'var(--or)', RB:'var(--pk)', WR:'var(--pu)', TE:'#FF
 // badge (here, the slot label) when they don't, or if the image itself
 // 404s (not every playerID has a headshot on file at ESPN's CDN even
 // when Tank01 returns a URL for it).
-function lineupPhotoOrBadge(p, fallbackHtml){
-  if(!p || !p.headshot) return fallbackHtml;
-  return '<span style="display:contents;">'
-    + '<img class="lineup-card-photo" src="'+p.headshot+'" alt="" loading="lazy" decoding="async" onload="this.classList.add(\'loaded\');" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'\';">'
-    + '<span style="display:none;">'+fallbackHtml+'</span>'
+// Generic person silhouette — shown for individual players who don't
+// have a real headshot yet (roughly half the pool, confirmed earlier),
+// instead of just a bare position badge. Colored by position so it
+// still conveys something at a glance even without a real photo.
+function genericHeadSvg(pos){
+  var color = LINEUP_POS_COLORS[pos] || 'var(--ink2)';
+  return '<span class="lineup-card-photo loaded" style="display:flex;align-items:center;justify-content:center;background:'+color+'18;">'
+    + '<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" fill="'+color+'"/><path d="M4 20c0-4.4 3.6-8 8-8s8 3.6 8 8" fill="'+color+'"/></svg>'
     + '</span>';
+}
+
+function lineupPhotoOrBadge(p, fallbackHtml){
+  if(!p) return fallbackHtml;
+
+  // Team defense — real team logo, confirmed working URL pattern
+  // (a.espncdn.com/i/teamlogos/nfl/500/{lowercase abbreviation}.png,
+  // live-verified). Falls back to the existing badge if a specific
+  // team's logo happens to 404, same graceful pattern as player photos.
+  if(p.pos === 'DEF'){
+    var teamAbbr = (p.team || p.name || '').toLowerCase().replace(/[^a-z]/g, '');
+    if(teamAbbr){
+      var logoUrl = 'https://a.espncdn.com/i/teamlogos/nfl/500/' + teamAbbr + '.png';
+      return '<span style="display:contents;">'
+        + '<img class="lineup-card-photo" src="'+logoUrl+'" alt="" loading="lazy" decoding="async" style="object-fit:contain;background:var(--bg2);" onload="this.classList.add(\'loaded\');" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'\';">'
+        + '<span style="display:none;">'+fallbackHtml+'</span>'
+        + '</span>';
+    }
+    return fallbackHtml;
+  }
+
+  // Real headshot when available
+  if(p.headshot){
+    return '<span style="display:contents;">'
+      + '<img class="lineup-card-photo" src="'+p.headshot+'" alt="" loading="lazy" decoding="async" onload="this.classList.add(\'loaded\');" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'\';">'
+      + '<span style="display:none;">'+genericHeadSvg(p.pos)+'</span>'
+      + '</span>';
+  }
+
+  // No real headshot — generic silhouette instead of a bare badge
+  return genericHeadSvg(p.pos);
 }
 
 // Canonical roster order — QB, RB, WR, TE, FLEX, DEF — regardless of
