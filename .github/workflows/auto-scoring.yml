@@ -592,13 +592,34 @@ jobs:
               return;
             }
 
-            // Get games for this week
-            // Tank01 numbers preseason weeks starting at 0 (HOF = week 0).
-            // Our app's week numbers are 1-4 (1=HOF, 2=PS Wk1, etc) — translate for the API call.
-            const apiWeek = seasonType === 'Preseason' ? (week - 1) : week;
-            const gamesData = await t01(`/getNFLGamesForWeek?week=${apiWeek}&seasonType=${toTank01SeasonType(seasonType)}&season=${SEASON}`);
-            const games = Array.isArray(gamesData.body)
-              ? gamesData.body : Object.values(gamesData.body || {});
+            // Switched from getNFLGamesForWeek to getNFLScoresOnly with a
+            // gameDate — confirmed live tonight that the "week - 1"
+            // preseason assumption above was actually wrong (week=1, not
+            // week=0, is what really works for the HOF game), and that
+            // getNFLGamesForWeek itself was intermittently unreliable.
+            // gameDate sidesteps season-type and week-numbering entirely.
+            // GitHub Actions runs in UTC, but NFL game dates are labeled
+            // by US time — trying both today's and yesterday's UTC date
+            // rather than a timezone conversion.
+            function fmtDate(d) {
+              return `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, '0')}${String(d.getUTCDate()).padStart(2, '0')}`;
+            }
+            const nowDate = new Date();
+            const yesterdayDate = new Date(nowDate.getTime() - 24 * 60 * 60 * 1000);
+            let games = [];
+            for (const gameDate of [fmtDate(nowDate), fmtDate(yesterdayDate)]) {
+              try {
+                const gamesData = await t01(`/getNFLScoresOnly?gameDate=${gameDate}`);
+                const candidate = Object.values(gamesData.body || {});
+                if (candidate.length) {
+                  console.log(`Found ${candidate.length} game(s) for ${gameDate} via getNFLScoresOnly`);
+                  games = candidate;
+                  break;
+                }
+              } catch(e) {
+                console.log(`  gameDate=${gameDate} attempt failed: ${e.message}`);
+              }
+            }
 
             if (!games.length) {
               console.log(`No ${seasonType} games found for week ${week} — nothing to score.`);
@@ -655,8 +676,8 @@ jobs:
                     statusCode: bs.body.gameStatusCode != null ? Number(bs.body.gameStatusCode) : null,
                     quarter:    bs.body.quarter || bs.body.period || bs.body.gamePeriod || null,
                     clock:      bs.body.gameClock || bs.body.clock || bs.body.timeRemaining || null,
-                    home:       game.homeTeamAbbr || game.homeTeam || '',
-                    away:       game.awayTeamAbbr || game.awayTeam || ''
+                    home:       game.home || game.homeTeamAbbr || game.homeTeam || '',
+                    away:       game.away || game.awayTeamAbbr || game.awayTeam || ''
                   };
                 }
               } catch(e) {
@@ -762,8 +783,8 @@ jobs:
             const archiveKey = `${seasonType}_wk${week}`;
             const gameList = games.map(g => ({
               gameId: g.gameID || g.gameId || '',
-              home:   g.homeTeamAbbr || g.homeTeam || '',
-              away:   g.awayTeamAbbr || g.awayTeam || ''
+              home:   g.home || g.homeTeamAbbr || g.homeTeam || '',
+              away:   g.away || g.awayTeamAbbr || g.awayTeam || ''
             })).filter(g => g.home && g.away);
 
             // De-dupe playerStats (the same box score entry is indexed under
