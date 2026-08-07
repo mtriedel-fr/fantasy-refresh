@@ -96,7 +96,8 @@ jobs:
               pts += (parseFloat(p.defTD)   || 0) * 6;
               pts += (parseFloat(p.safety)  || 0) * 2;
               pts += (parseFloat(p.blkKick) || 0) * 2;
-              const pa = parseFloat(p.ptsAllowed || p.pointsAllowed) || null;
+              const rawPa = p.ptsAllowed != null ? p.ptsAllowed : p.pointsAllowed;
+              const pa = rawPa != null ? parseFloat(rawPa) : null;
               if (pa !== null) {
                 if      (pa === 0)  pts += 10;
                 else if (pa <= 6)   pts += 7;
