@@ -968,6 +968,8 @@ function renderGamePreview(game){
     if(draftedInPreview[p.id]) return false;
     if(slot && slot.eligible.indexOf(p.pos) < 0) return false;
     if(slot && slot.eligible.length > 1 && activeFlexPosFilter !== 'all' && p.pos !== activeFlexPosFilter) return false;
+    // Hide players whose game has already started
+    if(p.team && teamLocks[normTeam(p.team)]) return false;
     return true;
   });
 
@@ -1454,6 +1456,10 @@ function renderPicker(){
     if(query && p.name.toLowerCase().indexOf(query)<0 && (p.team||'').toLowerCase().indexOf(query)<0) return false;
     // Hide players already drafted into other slots
     if(draftedIds[p.id]) return false;
+    // Hide players whose game has already started — same teamLocks check
+    // already used to lock them if drafted, applied here to remove them
+    // from the pool entirely rather than just disabling the draft button.
+    if(p.team && teamLocks[normTeam(p.team)]) return false;
     return true;
   }).sort(function(a,b){ return b.salary - a.salary; });
 
