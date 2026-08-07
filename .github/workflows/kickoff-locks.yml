@@ -219,21 +219,32 @@ jobs:
             // directly confirmed working tonight (real gameStatus values
             // seen in testing), unlike the flaky/ambiguous week-based one.
             const now = new Date();
-            const yyyy = now.getUTCFullYear();
-            const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
-            const dd = String(now.getUTCDate()).padStart(2, '0');
-            const gameDate = `${yyyy}${mm}${dd}`;
+            function fmtDate(d) {
+              return `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, '0')}${String(d.getUTCDate()).padStart(2, '0')}`;
+            }
+            const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+            // GitHub Actions runs in UTC, but NFL game dates are labeled by
+            // US time — a late evening US game can already be "tomorrow"
+            // in UTC. Trying both today's and yesterday's UTC date rather
+            // than a timezone conversion under this much time pressure.
+            const dateCandidates = [fmtDate(now), fmtDate(yesterday)];
 
             let games = [];
-            try {
-              const gamesData = await fetchJson(
-                `https://${T01_HOST}/getNFLScoresOnly?gameDate=${gameDate}`,
-                { 'X-RapidAPI-Key': T01_KEY, 'X-RapidAPI-Host': T01_HOST }
-              );
-              games = Object.values(gamesData.body || {});
-              console.log(`Found ${games.length} game(s) for ${gameDate} via getNFLScoresOnly`);
-            } catch(e) {
-              console.log(`  getNFLScoresOnly attempt failed: ${e.message}`);
+            for (const gameDate of dateCandidates) {
+              try {
+                const gamesData = await fetchJson(
+                  `https://${T01_HOST}/getNFLScoresOnly?gameDate=${gameDate}`,
+                  { 'X-RapidAPI-Key': T01_KEY, 'X-RapidAPI-Host': T01_HOST }
+                );
+                const candidate = Object.values(gamesData.body || {});
+                if (candidate.length) {
+                  console.log(`Found ${candidate.length} game(s) for ${gameDate} via getNFLScoresOnly`);
+                  games = candidate;
+                  break;
+                }
+              } catch(e) {
+                console.log(`  gameDate=${gameDate} attempt failed: ${e.message}`);
+              }
             }
             if (!games.length) console.log('⚠️  No games found for any week candidate — check seasonType/week manually if this persists.');
 
