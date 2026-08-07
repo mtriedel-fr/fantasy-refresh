@@ -2289,7 +2289,7 @@ function buildLineupPlayerCard(p, pts, hasStarted, gameMap, showNotStartedTag, s
     statusTag = (game.quarter ? 'Q' + game.quarter : 'Live') + (game.clock ? ' ' + game.clock : '');
     statusClass = ' live';
   } else if(hasStarted){
-    statusTag = '🔒 Locked';
+    statusTag = '🔒';
   }
 
   var posBadgeHtml = '<div class="lineup-card-pos" style="background:' + posColor + '1f;color:' + posColor + ';border-color:' + posColor + '40;">' + escapeHtmlFR(slotLabel) + '</div>';
