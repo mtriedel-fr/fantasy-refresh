@@ -738,19 +738,36 @@ jobs:
               // abbreviation itself (e.g. "CAR"), so keying by that here
               // is what makes the scoreLeague() lookup succeed. Field
               // names mapped to what calcDKPoints() already expects.
-              console.log(`  DST raw check — bs.DST exists: ${!!bs.DST}, keys: ${bs.DST ? Object.keys(bs.DST).join(',') : 'n/a'}`);
-              if (bs.DST) console.log(`  DST sample: ${JSON.stringify(bs.DST).slice(0, 300)}`);
-              ['home', 'away'].forEach(side => {
+              //
+              // ptsAllowed excludes the OPPONENT's own defensive/special
+              // teams touchdown — if ARI's defense scores a pick-six off
+              // CAR's offense, that's ARI's defense making a play, not
+              // something CAR's defense could have stopped. Counting it
+              // against CAR's points-allowed tier penalizes the wrong
+              // side of the ball. Approximated as 7 points per opponent
+              // def/ST TD (6 for the score + the standard extra point) —
+              // an approximation, not a perfect reconstruction, since a
+              // 2-point attempt after that specific score isn't visible
+              // in this data.
+              const sides = ['home', 'away'];
+              sides.forEach((side, i) => {
                 const d = bs.DST && bs.DST[side];
                 if (!d || !d.teamAbv) return;
+                const opp = bs.DST && bs.DST[sides[1 - i]];
+                const oppDefTDs = opp ? (parseFloat(opp.defTD) || 0) : 0;
+                const rawPtsAllowed = parseFloat(d.ptsAllowed) || 0;
+                const adjustedPtsAllowed = Math.max(0, rawPtsAllowed - oppDefTDs * 7);
                 playerStats[d.teamAbv] = {
                   sacks:      d.sacks,
                   defInt:     d.defensiveInterceptions,
                   fumbRec:    d.fumblesRecovered,
                   defTD:      d.defTD,
                   safety:     d.safeties,
-                  ptsAllowed: d.ptsAllowed
+                  ptsAllowed: adjustedPtsAllowed
                 };
+                if (oppDefTDs > 0) {
+                  console.log(`  🛡️  ${d.teamAbv} points-allowed adjusted: ${rawPtsAllowed} raw → ${adjustedPtsAllowed} (excluding ${oppDefTDs} opponent def/ST TD)`);
+                }
                 console.log(`  ✓ Mapped defense: ${d.teamAbv}`);
               });
             });
