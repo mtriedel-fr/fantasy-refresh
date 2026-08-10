@@ -6633,14 +6633,14 @@ function closeShare(){
 function openRecap(week){
   var ctx      = FRAuth.getLeagueCtx();
   var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+  var season   = (ctx && ctx.season) || 2026;
   var w = week || currentWeek;
 
   document.getElementById('recap-title').textContent = 'Week ' + w + ' Review';
   document.getElementById('recap-body').innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--ink3);font-size:13px;">Loading…</div>';
   document.getElementById('recap-overlay').classList.add('open');
 
-  fetch(FB_DB_URL + '/leagues/' + leagueId + '/recaps/' + FR_SEASON + '/week' + w + '.json')
-    .then(function(r){ return r.json(); })
+  FR.fb.get('/leagues/' + leagueId + '/recaps/' + season + '/week' + w)
     .then(function(data){
       if(!data || data.error){
         document.getElementById('recap-body').innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--ink3);font-size:13px;">No recap available for this week yet — check back once the week is finalized.</div>';
