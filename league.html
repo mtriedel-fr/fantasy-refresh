@@ -2468,10 +2468,14 @@ function buildWeekBarRange(sel, lastWeek){
     o.value = i;
     o.textContent = 'Week ' + i + (hasData ? ' ✓' : '');
     // Weeks beyond the current week haven't happened yet — disable them
-    // rather than letting someone pick a week with no real data. Browsers
-    // render disabled <option> elements greyed-out and unselectable by
-    // default, which matches "lighter and not clickable" with no extra CSS.
-    if(i > effectiveCurrentWeek) o.disabled = true;
+    // rather than letting someone pick a week with no real data. The
+    // immediate NEXT week is the exception: that's the active draft
+    // week, which by definition has no scores yet (it hasn't been
+    // played), but still needs to be selectable so someone can actually
+    // get in and draft for it. Browsers render disabled <option>
+    // elements greyed-out and unselectable by default, which matches
+    // "lighter and not clickable" with no extra CSS.
+    if(i > effectiveCurrentWeek + 1) o.disabled = true;
     if(i === effectiveCurrentWeek) o.selected = true;
     sel.appendChild(o);
   }
