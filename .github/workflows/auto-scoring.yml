@@ -225,20 +225,17 @@ jobs:
               return { week: parseInt(process.env.MANUAL_WEEK), seasonType };
             }
 
-            try {
-              // Try regular season first
-              const d = await t01('/getNFLCurrentWeek');
-              if (d.body && d.body.week) {
-                const week = parseInt(d.body.week);
-                const seasonType = d.body.seasonType || 'Regular';
-                console.log(`Tank01 current week: ${week} (${seasonType})`);
-                return { week, seasonType };
-              }
-            } catch(e) {
-              console.log('Could not detect current week:', e.message);
-            }
-
-            // Check if we're in preseason window (Aug 1 - Sep 8)
+            // Date-based preseason check runs FIRST — confirmed live
+            // tonight this was the actual root cause of two compounding
+            // bugs: getNFLCurrentWeek was being trusted unconditionally,
+            // and it only knows about regular-season weeks. During the
+            // real preseason window, it was returning some regular-
+            // season week number that got applied blindly, advancing a
+            // regular-season league that shouldn't have moved at all yet,
+            // while the actual preseason league never got a chance to be
+            // recognized as being in preseason mode. Calendar date is
+            // known with certainty; Tank01's own answer isn't trustworthy
+            // for "what week is it" during this specific window.
             const now = new Date();
             const month = now.getUTCMonth() + 1; // 1-based
             const day = now.getUTCDate();
@@ -248,8 +245,20 @@ jobs:
               const aug1 = new Date(`${now.getUTCFullYear()}-08-01`);
               const daysSinceAug1 = Math.floor((now - aug1) / (1000 * 60 * 60 * 24));
               const psWeek = Math.min(4, Math.max(1, Math.floor(daysSinceAug1 / 7) + 1));
-              console.log(`Preseason detected — estimated week ${psWeek}`);
+              console.log(`Preseason window (by date) — estimated week ${psWeek}`);
               return { week: psWeek, seasonType: 'Preseason' };
+            }
+
+            try {
+              const d = await t01('/getNFLCurrentWeek');
+              if (d.body && d.body.week) {
+                const week = parseInt(d.body.week);
+                const seasonType = d.body.seasonType || 'Regular';
+                console.log(`Tank01 current week: ${week} (${seasonType})`);
+                return { week, seasonType };
+              }
+            } catch(e) {
+              console.log('Could not detect current week:', e.message);
             }
 
             return { week: 1, seasonType: 'Regular' };
@@ -804,9 +813,23 @@ jobs:
             const realNames = Object.values(playerStats).map(s => s.longName || s.playerName).filter(Boolean);
             console.log(`  Sample of real names in this game's box score: ${[...new Set(realNames)].slice(0, 10).join(', ')}`);
 
-            // Score all leagues
+            // Score all leagues — but only the ones whose own season-type
+            // setting actually matches what's genuinely happening right
+            // now. Without this, a regular-season league was getting
+            // scored/advanced using preseason games during the preseason
+            // window (nothing real for it to actually be scoring against),
+            // while a preseason-toggled league wasn't recognized as such
+            // at all once the global detection got confused. Each league
+            // now only scores when its own reality matches the moment.
             for (const leagueId of leagues) {
               try {
+                const leagueSettings = await firebaseGet(`/leagues/${leagueId}/settings.json`).catch(() => null);
+                const leagueIsPreseason = !!(leagueSettings && leagueSettings.isPreseason);
+                const currentlyPreseason = seasonType === 'Preseason';
+                if (leagueIsPreseason !== currentlyPreseason) {
+                  console.log(`  ⏭️  Skipping ${leagueId} — league is ${leagueIsPreseason ? 'preseason' : 'regular season'}, but it's currently ${currentlyPreseason ? 'preseason' : 'regular season'} window.`);
+                  continue;
+                }
                 await scoreLeague(leagueId, week, seasonType, activeGames, allFinal, playerStats);
               } catch(e) {
                 console.error(`Failed scoring ${leagueId}:`, e.message);
@@ -841,6 +864,8 @@ jobs:
               for (const leagueId of leagues) {
                 try {
                   const settings = await firebaseGet(`/leagues/${leagueId}/settings.json`).catch(() => null);
+                  const leagueIsPreseason = !!(settings && settings.isPreseason);
+                  if (leagueIsPreseason !== (seasonType === 'Preseason')) continue;
                   if (settings && settings.format === 'cumulative') {
                     await generateWeeklyRecap(leagueId, week, seasonType, settings);
                   }
