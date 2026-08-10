@@ -844,6 +844,7 @@ function loadSchedule(){
     .then(function(data){
       if(!data || !data.games || !data.games.length) throw new Error('No games');
       schedule = data.games;
+      console.log('✓ Schedule loaded from live fetch:', schedule);
       buildGamesBar(schedule);
 
       // In preseason: re-filter player pool to only teams playing this week
@@ -883,10 +884,12 @@ function loadSchedule(){
         });
       }
     })
-    .catch(function(){
+    .catch(function(err){
       // API unavailable or no subscription — use hardcoded preseason schedule if applicable
+      console.log('⚠️ Live schedule fetch failed, falling back:', err && err.message);
       if(PS_MODE){
         var fallback = getHardcodedPreseasonSchedule(currentWeek);
+        console.log('  Hardcoded fallback for week', currentWeek, ':', fallback);
         if(fallback.length){
           schedule = fallback;
           buildGamesBar(schedule);
