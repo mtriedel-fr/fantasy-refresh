@@ -808,9 +808,12 @@ function loadSchedule(){
     return;
   }
   var seasonType = PS_MODE ? 'Preseason' : 'Regular';
-  // Tank01 numbers preseason weeks starting at 0 (HOF Game = week 0).
-  // Our app uses 1-4 (1=HOF, 2=PS Wk1, 3=PS Wk2, 4=PS Wk3) — translate before calling the API.
-  var apiWeek = PS_MODE ? (currentWeek - 1) : currentWeek;
+  // Confirmed directly tonight (kickoff-locks.yml testing): the real
+  // Tank01 week value for the HOF game is 1, not 0 — the "HOF = week 0"
+  // assumption below was disproven by real, live testing, but never
+  // ported to this file, meaning every preseason week request here was
+  // asking for the WRONG week's schedule (one behind what was intended).
+  var apiWeek = currentWeek;
   fetch(WORKER + '/schedule?week='+apiWeek+'&season=2026&seasonType='+seasonType)
     .then(function(r){ return r.json(); })
     .then(function(data){
