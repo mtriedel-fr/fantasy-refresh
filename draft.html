@@ -844,7 +844,6 @@ function loadSchedule(){
     .then(function(data){
       if(!data || !data.games || !data.games.length) throw new Error('No games');
       schedule = data.games;
-      console.log('✓ Schedule loaded from live fetch:', schedule);
       buildGamesBar(schedule);
 
       // In preseason: re-filter player pool to only teams playing this week
@@ -884,12 +883,10 @@ function loadSchedule(){
         });
       }
     })
-    .catch(function(err){
+    .catch(function(){
       // API unavailable or no subscription — use hardcoded preseason schedule if applicable
-      console.log('⚠️ Live schedule fetch failed, falling back:', err && err.message);
       if(PS_MODE){
         var fallback = getHardcodedPreseasonSchedule(currentWeek);
-        console.log('  Hardcoded fallback for week', currentWeek, ':', fallback);
         if(fallback.length){
           schedule = fallback;
           buildGamesBar(schedule);
@@ -911,17 +908,14 @@ function buildGamesBar(games){
     buildGamesBarFromPlayers();
     return;
   }
-  // Dedupe by team — confirmed via real data that a team can appear in
-  // TWO DIFFERENT matchups in the same response (not just the same game
-  // repeated), which a same-pairing-only dedup can't catch. A team can
-  // only genuinely play one real game per week, so once a team's been
-  // seen, any further game involving them is bad data, not a real second
-  // game — keeping the first occurrence only.
-  var seenTeams = {};
+  // Dedupe by home/away team pair — a team can only genuinely play one
+  // game in a given week, so any repeat is duplicate data, not a real
+  // second game.
+  var seenPairs = {};
   games = games.filter(function(g){
-    var h = normTeam(g.home||''), a = normTeam(g.away||'');
-    if(seenTeams[h] || seenTeams[a]) return false;
-    seenTeams[h] = true; seenTeams[a] = true;
+    var key = normTeam(g.home||'') + '@' + normTeam(g.away||'');
+    if(seenPairs[key]) return false;
+    seenPairs[key] = true;
     return true;
   });
   var html = '<button class="game-chip all active" data-game="all" onclick="setGameFilter(null,this)">All Games</button>';
@@ -935,10 +929,15 @@ function buildGamesBar(games){
       var timeStr  = d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})+' ET';
       var days     = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
       var dayLabel;
-      if(day===1&&hr>=18){       dayLabel = 'MNF';
-      } else if(day===0&&hr>=19){ dayLabel = 'SNF';
-      } else if(day===4&&hr>=18){ dayLabel = 'TNF';
-      } else {                    dayLabel = days[day]; }
+      // MNF/SNF/TNF are specific, official NFL prime-time broadcast
+      // designations tied to the regular season — a preseason game
+      // landing on a Sunday evening isn't genuinely "SNF" just because
+      // the day/time coincide, since it's not part of that actual
+      // national broadcast slate. Preseason just shows the plain day.
+      if(!PS_MODE && day===1&&hr>=18){       dayLabel = 'MNF';
+      } else if(!PS_MODE && day===0&&hr>=19){ dayLabel = 'SNF';
+      } else if(!PS_MODE && day===4&&hr>=18){ dayLabel = 'TNF';
+      } else {                                dayLabel = days[day]; }
       var intlBadge = g.international
         ? '<div style="font-size:9px;font-weight:800;color:#FF9A3A;margin-top:1px;">INT&#39;L</div>' : '';
       // O/U badge — look up by gameId
