@@ -785,7 +785,15 @@ jobs:
                   fumbRec:    d.fumblesRecovered,
                   defTD:      d.defTD,
                   safety:     d.safeties,
-                  ptsAllowed: adjustedPtsAllowed
+                  ptsAllowed: adjustedPtsAllowed,
+                  // Defense entries had no name field at all before,
+                  // which meant archiveWeekStats() silently skipped every
+                  // team defense entirely (it requires a real name to
+                  // recognize something as archivable). Team abbreviation
+                  // matches the same "id = team abbreviation" convention
+                  // already used for defenses everywhere else in the app.
+                  longName:   d.teamAbv,
+                  team:       d.teamAbv
                 };
                 if (oppDefTDs > 0) {
                   console.log(`  🛡️  ${d.teamAbv} points-allowed adjusted: ${rawPtsAllowed} raw → ${adjustedPtsAllowed} (excluding ${oppDefTDs} opponent def/ST TD)`);
@@ -834,7 +842,7 @@ jobs:
                 try {
                   const settings = await firebaseGet(`/leagues/${leagueId}/settings.json`).catch(() => null);
                   if (settings && settings.format === 'cumulative') {
-                    await generateWeeklyRecap(leagueId, week, seasonType);
+                    await generateWeeklyRecap(leagueId, week, seasonType, settings);
                   }
                 } catch(e) {
                   console.error(`Failed to generate recap for ${leagueId}:`, e.message);
@@ -908,16 +916,31 @@ jobs:
               // the ENTIRE week's write the moment any one player had one
               // of those characters. Sanitized version used as the key;
               // the real, correctly-formatted name kept as a field.
+              // Confirmed correct: uses our own calculation, not Tank01's
+              // own fantasyPoints value — same fix already applied to
+              // scoreLeague() earlier tonight (confirmed via Baker
+              // Mayfield that Tank01's own number doesn't reliably match
+              // our scoring weights). This function stores pts
+              // separately from scoreLeague(), so it needed the same fix
+              // applied here too, independently.
+              // DST-merged entries (see the defense-mapping block above)
+              // are keyed by team abbreviation, but posLookup is keyed by
+              // the player pool's full defense name (e.g. "Carolina
+              // Panthers") — those would never match, silently leaving
+              // pos empty and skipping the entire DEF-specific scoring
+              // block in calcDKPoints. ptsAllowed only ever exists on a
+              // DST-merged entry, so its presence is a reliable signal.
+              const posForScoring = (stats.ptsAllowed !== undefined) ? 'DEF' : (posLookup[name] || '');
               players[sanitizeFirebaseKey(name)] = {
                 name:    displayName,
                 team,
                 // pos genuinely isn't in the box score response at all —
                 // sourced from the player pool instead, same fix already
                 // applied in the historical backfill.
-                pos:     posLookup[name] || '',
+                pos:     posForScoring,
                 opp:     game ? (game.home === team ? game.away : game.home) : '',
                 isHome:  game ? game.home === team : null,
-                pts:     parseFloat(stats.fantasyPoints || 0),
+                pts:     calcDKPoints(stats, posForScoring).pts,
                 passYds: parseFloat(pass.passYds || 0),
                 passTD:  parseFloat(pass.passTD  || 0),
                 passInt: parseFloat(pass.int     || 0),
@@ -1085,7 +1108,92 @@ jobs:
             return bestOverall;
           }
 
-          async function generateWeeklyRecap(leagueId, week, seasonType) {
+          function teamMatch(a, b) {
+            if (!a || !b) return false;
+            return a.trim().toLowerCase() === b.trim().toLowerCase();
+          }
+
+          // Direct port of buildElimSchedule() in league.html — same
+          // spread-evenly-across-16-weeks logic, week 17 is the finale
+          // (no eliminations that week).
+          function buildElimSchedule(totalTeams, totalWeeks) {
+            const finaleWeek = 17;
+            const weeksToElim = finaleWeek - 1;
+            const toElim = totalTeams - 3;
+            const base = Math.floor(toElim / weeksToElim);
+            const extra = toElim % weeksToElim;
+            const schedule = [];
+            let remaining = totalTeams;
+            for (let w = 1; w <= totalWeeks; w++) {
+              if (w < finaleWeek) {
+                const elim = base + (w <= extra ? 1 : 0);
+                remaining -= elim;
+                schedule.push({ week: w, eliminate: elim, remaining });
+              } else {
+                schedule.push({ week: w, eliminate: 0, remaining });
+              }
+            }
+            return schedule;
+          }
+
+          // Guillotine elimination is entirely client-side computed in
+          // league.html (replayed live from season scores, never stored
+          // as a discrete "eliminated" event anywhere) — this is a
+          // faithful port of that same replay logic to the backend,
+          // using only data already available here, so the recap can
+          // report who got eliminated in this specific week. Has to
+          // replay the FULL season up to this week, not just this one
+          // week in isolation, since who's still "in" depends on every
+          // prior week's eliminations.
+          async function computeGuillotineElimination(leagueId, week) {
+            const weekScoresByWeek = {};
+            for (let w = 1; w <= week; w++) {
+              const wk = await firebaseGet(`/leagues/${leagueId}/season/${SEASON}/${w}.json`).catch(() => null);
+              if (wk && !wk.error && Object.keys(wk).length) {
+                weekScoresByWeek[w] = Object.values(wk).filter(e => e && e.team);
+              }
+            }
+            const weeks = Object.keys(weekScoresByWeek).map(Number).sort((a, b) => a - b);
+            if (!weeks.length) return null;
+
+            const week1 = weekScoresByWeek[weeks[0]];
+            const totalTeams = week1.length;
+            const totalWeeks = 18;
+            const schedule = buildElimSchedule(totalTeams, totalWeeks);
+
+            let stillIn = week1.map(e => e.team);
+            let eliminatedThisTargetWeek = [];
+
+            weeks.forEach(w => {
+              const sched = schedule.find(s => s.week === w);
+              const isFinale = sched && w === 17;
+              const wkData = weekScoresByWeek[w];
+
+              const entries = stillIn.map(team => {
+                const found = wkData.find(e => teamMatch(e.team, team));
+                return found ? found : { team, score: 0, noShow: true };
+              });
+
+              if (isFinale) return; // no eliminations in the finale week
+
+              const elimCount = sched ? sched.eliminate : 0;
+              const sorted = [...entries].sort((a, b) => a.score - b.score);
+              const elimThisWeek = sorted.slice(0, elimCount);
+
+              elimThisWeek.forEach(e => {
+                const idx = stillIn.indexOf(e.team);
+                if (idx >= 0) stillIn.splice(idx, 1);
+              });
+
+              if (w === week) {
+                eliminatedThisTargetWeek = elimThisWeek.map(e => ({ team: e.team, score: Math.round((e.score || 0) * 100) / 100, noShow: !!e.noShow }));
+              }
+            });
+
+            return { eliminated: eliminatedThisTargetWeek, remaining: stillIn.length };
+          }
+
+          async function generateWeeklyRecap(leagueId, week, seasonType, settings) {
             const [thisWeekScores, lineups, salaryData] = await Promise.all([
               firebaseGet(`/leagues/${leagueId}/season/${SEASON}/${week}.json`).catch(() => null),
               firebaseGet(`/leagues/${leagueId}/lineups/${SEASON}/week${week}.json`).catch(() => null),
@@ -1094,6 +1202,17 @@ jobs:
             if (!thisWeekScores || thisWeekScores.error || !Object.keys(thisWeekScores).length) {
               console.log(`  Recap: no scores yet for ${leagueId} week ${week} — skipping`);
               return;
+            }
+
+            // Guillotine toggle can run alongside cumulative — computed
+            // separately from the cumulative recap fields below, since
+            // it needs its own full-season replay.
+            let guillotine = null;
+            if (settings && settings.guillotine) {
+              guillotine = await computeGuillotineElimination(leagueId, week).catch(e => {
+                console.error(`  Could not compute guillotine elimination for ${leagueId}:`, e.message);
+                return null;
+              });
             }
 
             const teamScores = Object.values(thisWeekScores).filter(e => e && e.uid);
@@ -1182,7 +1301,14 @@ jobs:
                 const pool = Object.values(salaryData.players)
                   .filter(p => p && p.name && p.salary && ['QB','RB','WR','TE','DEF'].includes(p.pos))
                   .map(p => {
-                    const statKey = sanitizeFirebaseKey(p.name.toLowerCase());
+                    // Defenses are archived keyed by team abbreviation
+                    // (e.g. "car"), not a full "CAR Defense" style name —
+                    // matching the same "id = team abbreviation"
+                    // convention used for defenses everywhere else,
+                    // rather than a name-based lookup that wouldn't match.
+                    const statKey = p.pos === 'DEF'
+                      ? sanitizeFirebaseKey((p.team || p.id || p.name || '').toLowerCase())
+                      : sanitizeFirebaseKey(p.name.toLowerCase());
                     const stats = statsArchive.players[statKey];
                     return { name: p.name, pos: p.pos, salary: p.salary, pts: stats ? parseFloat(stats.pts || 0) : 0 };
                   });
@@ -1198,7 +1324,7 @@ jobs:
               topScore: topScore ? { team: topScore.team, score: topScore.score } : null,
               lowScore: lowScore ? { team: lowScore.team, score: lowScore.score } : null,
               biggestRiser, biggestFaller, closestRace,
-              mvp, bestValue, bust, perfectRoster,
+              mvp, bestValue, bust, perfectRoster, guillotine,
               standings: standingsNow.map((t, i) => ({ rank: i + 1, team: t.team, total: t.total }))
             });
             console.log(`  📰 Recap generated for ${leagueId} week ${week}`);
