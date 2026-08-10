@@ -6668,6 +6668,16 @@ function renderRecapBody(r){
       + '</div>';
   }
 
+  if(r.guillotine && r.guillotine.eliminated && r.guillotine.eliminated.length){
+    html += '<div class="recap-section" style="border-color:var(--pk);">'
+      + '<div class="recap-section-label" style="color:var(--pk);">☠️ Eliminated This Week</div>'
+      + r.guillotine.eliminated.map(function(e){
+          return '<div class="recap-section-sub">' + escapeHtmlFR(e.team) + ' — ' + fmtScore(e.score) + ' pts' + (e.noShow ? ' (no lineup submitted)' : '') + '</div>';
+        }).join('')
+      + '<div class="recap-section-sub" style="margin-top:6px;color:var(--ink3);">' + r.guillotine.remaining + ' team' + (r.guillotine.remaining !== 1 ? 's' : '') + ' remaining</div>'
+      + '</div>';
+  }
+
   if(r.topScore || r.lowScore){
     html += '<div class="recap-section">'
       + '<div class="recap-section-label">📈 This Week</div>';
