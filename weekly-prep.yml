@@ -1,0 +1,465 @@
+name: Weekly Prep (Player Pool + Salaries)
+
+# Runs Wednesday morning — after Tuesday 9am ET final-score lock, after Tuesday's
+# day-after injury/practice news has landed. This replaces two manual commissioner
+# actions ("Refresh Player Pool" + "Generate Salaries") with one automated run.
+#
+# NOTE ON DST: like your other two workflows, this cron is pinned to a fixed UTC
+# offset rather than tracking US Eastern through the DST switch. 13:00 UTC = 9am
+# EDT (Sep–early Nov) but becomes 8am EST after the November fallback — same known
+# quirk your kickoff-locks/auto-scoring crons already have. Adjust the second value
+# below (07 vs 08) manually in November if you want it pinned to 9am local exactly,
+# or leave it — an hour of slack on a Wednesday morning salary refresh is harmless.
+
+on:
+  schedule:
+    - cron: '0 13 * * 3'   # Wednesday 13:00 UTC (~9am ET)
+  workflow_dispatch:        # lets you trigger it manually to test, same as your other workflows
+
+jobs:
+  weekly-prep:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Refresh player pool + generate weekly salaries for all active leagues
+        env:
+          FIREBASE_DB_URL:     ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+          TANK01_KEY:           ${{ secrets.TANK01_KEY }}
+          FR_SEASON:            "2026"
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+
+          const FB_URL    = process.env.FIREBASE_DB_URL;
+          const FB_TOKEN  = process.env.FIREBASE_AUTH_TOKEN;
+          const T01_KEY   = process.env.TANK01_KEY;
+          const SEASON    = process.env.FR_SEASON || '2026';
+          const T01_HOST  = 'tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com';
+          const WORKER    = 'https://fantasy-refresh-news.mtriedel.workers.dev';
+
+          // ── Salary engine ──────────────────────────────────────────────
+          // Per-position multipliers, NOT a single flat number. This is
+          // deliberate — see SALARY_METHODOLOGY.md at the repo root for the
+          // full sourcing, math, and how to recalibrate. Short version:
+          //
+          // A flat multiplier (the old approach, 1800) meant any player
+          // projecting above ~6 points slammed into the $11,300 ceiling —
+          // nearly the entire startable player pool priced identically.
+          //
+          // QBs get a lower multiplier than skill positions on purpose —
+          // they're priced cheaper relative to raw points scored, because
+          // a lineup only needs one QB but several skill-position slots
+          // (roster-construction scarcity, not point-scoring ability).
+          const POSITION_MULTIPLIERS = {
+            QB:  380,  // ticked down from 400 — was outpricing RB/WR at the elite tier
+            RB:  525,
+            WR:  505,
+            TE:  525,  // ticked down from 575 — a mid-tier TE was pricing above an equally productive RB/WR; 525 matches RB's own multiplier exactly
+            DEF: 500
+          };
+          const SAL_MIN_DEFAULT = 4500; // raised from 3700 — see SALARY_METHODOLOGY.md "Floor recalibration" for why
+          const SAL_MAX_DEFAULT = 11300;
+          const SAL_ROUND = 100;
+          const FLAT = { QB: 8500, RB: 6500, WR: 6000, TE: 5500, DEF: 5000 };
+
+          function fetchJson(url, headers) {
+            return new Promise((resolve, reject) => {
+              const opts = new URL(url);
+              https.get({ hostname: opts.hostname, path: opts.pathname + opts.search, headers: headers || {} }, res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch (e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+
+          function authed(path) {
+            if (!FB_TOKEN) return path;
+            return path + (path.includes('?') ? '&' : '?') + 'auth=' + FB_TOKEN;
+          }
+
+          function firebaseGet(path) { return fetchJson(FB_URL + path); }
+
+          function firebasePut(path, payload) {
+            return new Promise((resolve, reject) => {
+              const body = JSON.stringify(payload);
+              const opts = new URL(FB_URL + authed(path));
+              const req = https.request({
+                hostname: opts.hostname,
+                path: opts.pathname + opts.search,
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+              }, res => {
+                let d = '';
+                res.on('data', c => d += c);
+                res.on('end', () => {
+                  // CRITICAL: actually check the write succeeded. A 401 from
+                  // security rules previously resolved as "success" here, which
+                  // made the log claim salaries were generated while Firebase
+                  // silently rejected every write.
+                  if (res.statusCode >= 200 && res.statusCode < 300) {
+                    resolve(d);
+                  } else {
+                    reject(new Error(`Firebase write REJECTED (HTTP ${res.statusCode}) at ${path} — ${d.slice(0, 200)}`));
+                  }
+                });
+              });
+              req.on('error', reject);
+              req.write(body);
+              req.end();
+            });
+          }
+
+          function t01(path) {
+            return fetchJson(`https://${T01_HOST}${path}`, { 'X-RapidAPI-Key': T01_KEY, 'X-RapidAPI-Host': T01_HOST });
+          }
+
+          // Same active-league discovery pattern as kickoff-locks.yml / auto-scoring.yml
+          async function getActiveLeagues() {
+            try {
+              const leagues = await firebaseGet('/leagues.json?shallow=true');
+              if (!leagues || leagues.error) {
+                console.log('⚠️  Could not read /leagues.json — falling back to fr_refresh26 only');
+                return [{ id: 'fr_refresh26', settings: null }];
+              }
+              const ids = Object.keys(leagues);
+              console.log(`Found ${ids.length} league(s) in Firebase: ${ids.join(', ')}`);
+              const out = [];
+              for (const id of ids) {
+                try {
+                  const settings = await firebaseGet(`/leagues/${id}/settings.json`);
+                  // FIXED: previously required settings to exist AND explicitly
+                  // NOT be false — meaning a league with no settings node, or a
+                  // partially-populated one missing the `active` field, was
+                  // silently dropped with zero logging. A league is now only
+                  // excluded if `active` is explicitly set to false; missing
+                  // settings entirely defaults to active (opt-out, not opt-in).
+                  if (settings && settings.active === false) {
+                    console.log(`  ⊘ ${id}: skipped — settings.active is explicitly false`);
+                  } else {
+                    out.push({ id, settings: settings || null });
+                    console.log(`  ✓ ${id}: included${settings ? '' : ' (no settings node found — defaulting to active)'}`);
+                  }
+                } catch (e) {
+                  console.log(`  ⚠️  ${id}: could not read settings (${e.message}) — including anyway, defaulting to active`);
+                  out.push({ id, settings: null });
+                }
+              }
+              if (!out.length) {
+                console.log('⚠️  No leagues survived filtering — falling back to fr_refresh26 only');
+                return [{ id: 'fr_refresh26', settings: null }];
+              }
+              return out;
+            } catch (e) {
+              console.log('Could not fetch leagues, falling back to fr_refresh26:', e.message);
+              return [{ id: 'fr_refresh26', settings: null }];
+            }
+          }
+
+          // ── Step 1: refresh the shared player pool (Sleeper) — same source/logic
+          // as league.html's refreshPlayerPool(), just running here instead of a click.
+          async function refreshPlayerPool() {
+            console.log('Fetching player pool from Sleeper…');
+            const all = await fetchJson('https://api.sleeper.app/v1/players/nfl');
+            const POOL_POSITIONS = ['QB','RB','WR','TE','DEF','K'];
+            const pool = {};
+            let count = 0;
+            Object.keys(all).forEach(id => {
+              const p = all[id];
+              if (!p || !p.active) return;
+              if (!p.position || POOL_POSITIONS.indexOf(p.position) < 0) return;
+              if (!p.full_name && p.position !== 'DEF') return;
+              pool[id] = {
+                id,
+                name: p.position === 'DEF' ? (p.full_name || p.team + ' Defense') : p.full_name,
+                pos: p.position,
+                team: p.team || '',
+                status: p.injury_status || null,
+                number: p.number || '',
+                years_exp: p.years_exp || 0
+              };
+              count++;
+            });
+
+            // Enrich with real Tank01 playerID + headshot — confirmed via
+            // real testing that Tank01's playerID IS the same value as
+            // espnID, and that this bulk list includes sleeperBotID
+            // directly, matching exactly the ID system this pool is
+            // already keyed by. One bulk call (via the Worker, which
+            // holds the Tank01 key), matched by an EXACT ID instead of
+            // fuzzy name-guessing. This is what makes targeted, reliable
+            // per-player news requests (and real headshots) possible.
+            try {
+              const tankList = await fetchJson(`${WORKER}/playerlist`);
+              const bySleeperID = {};
+              (tankList.players || []).forEach(p => {
+                if (p.sleeperBotID) bySleeperID[p.sleeperBotID] = p;
+              });
+              let enriched = 0;
+              Object.keys(pool).forEach(id => {
+                const match = bySleeperID[id];
+                if (match) {
+                  pool[id].tank01PlayerID = match.playerID;
+                  pool[id].headshot = match.headshot || '';
+                  enriched++;
+                }
+              });
+              console.log(`  Enriched ${enriched}/${count} players with real Tank01 ID + headshot`);
+            } catch(e) {
+              console.error('  Could not enrich player pool with Tank01 IDs:', e.message);
+            }
+
+            await firebasePut(`/playerPool/${SEASON}/players.json`, pool);
+            await firebasePut(`/playerPool/${SEASON}/count.json`, count);
+            await firebasePut(`/playerPool/${SEASON}/updated.json`, Date.now());
+            console.log(`✓ Player pool refreshed — ${count} players`);
+            return pool;
+          }
+
+          // ── Step 2: figure out which week each league needs salaries generated for.
+          // Ground truth is each league's own season meta (currentWeek), not a single
+          // global Tank01 week — leagues can be on different tracks (e.g. a preseason
+          // test league running HOF/PS weeks while the real-season league is on Week 6).
+          // Falls back to Tank01's getNFLCurrentWeek only if a league has no meta yet
+          // (i.e. its season hasn't started scoring).
+          let globalCurrentWeek = null;
+          async function getGlobalCurrentWeek() {
+            if (globalCurrentWeek) return globalCurrentWeek;
+            // Date-based preseason check runs first — same fix applied to
+            // auto-scoring.yml tonight, for the same reason: Tank01's own
+            // getNFLCurrentWeek only knows about regular-season weeks,
+            // and was being trusted unconditionally with no preseason
+            // awareness at all in this file.
+            const now = new Date();
+            const month = now.getUTCMonth() + 1;
+            const day = now.getUTCDate();
+            if (month === 8 || (month === 9 && day <= 8)) {
+              const aug1 = new Date(`${now.getUTCFullYear()}-08-01`);
+              const daysSinceAug1 = Math.floor((now - aug1) / (1000 * 60 * 60 * 24));
+              globalCurrentWeek = Math.min(4, Math.max(1, Math.floor(daysSinceAug1 / 7) + 1));
+              return globalCurrentWeek;
+            }
+            try {
+              const d = await t01('/getNFLCurrentWeek');
+              globalCurrentWeek = d.body ? parseInt(d.body.week) : 1;
+            } catch (e) { globalCurrentWeek = 1; }
+            return globalCurrentWeek;
+          }
+
+          async function getTargetWeek(leagueId) {
+            try {
+              const meta = await firebaseGet(`/leagues/${leagueId}/season/${SEASON}/meta.json`);
+              // Confirmed via real Firebase structure: the field is
+              // "week", not "currentWeek" — the original check for
+              // meta.currentWeek could never match anything real, so this
+              // per-league ground truth was silently never firing,
+              // always falling through to the global fallback below.
+              if (meta && typeof meta.week === 'number') return meta.week + 1;
+            } catch (e) { /* no meta yet */ }
+            return await getGlobalCurrentWeek();
+          }
+
+          // Cache projections per (week) so leagues on the same week share one Tank01 call,
+          // same efficiency property as auto-scoring.yml's per-game box-score caching.
+          const projCache = {};
+          async function getProjections(week) {
+            if (projCache[week]) return projCache[week];
+            const data = await fetchJson(`${WORKER}/projections?week=${week}&season=${SEASON}`);
+            projCache[week] = data.players || [];
+            return projCache[week];
+          }
+
+          // Tank01 (projections) and Sleeper (the pool) don't necessarily
+          // format suffixes the same way — "Michael Pittman Jr." on one
+          // side, "Michael Pittman" on the other, for example. A plain
+          // name match silently fails for any suffixed player, losing the
+          // pool match (and the tank01PlayerID/headshot already correctly
+          // stored there) even though nothing about the underlying data
+          // was actually wrong. Stripping suffixes before comparing fixes
+          // this without needing either source to agree on formatting.
+          function normalizeNameForMatch(name) {
+            return (name || '')
+              .toLowerCase()
+              .replace(/[.,']/g, '')
+              .replace(/\s+(jr|sr|ii|iii|iv|v)$/i, '')
+              .trim();
+          }
+
+          function buildSalariesFromProjections(projPlayers, poolPlayers, min, max) {
+            const nameMap = {};
+            Object.values(poolPlayers || {}).forEach(p => { if (p && p.name) nameMap[normalizeNameForMatch(p.name)] = p; });
+            const salaries = {};
+            let count = 0;
+            projPlayers.forEach(p => {
+              if (!p.proj || p.proj <= 0) return;
+              if (!['QB','RB','WR','TE','DEF'].includes(p.pos)) return;
+              const poolP = nameMap[normalizeNameForMatch(p.name)];
+              const pid = poolP ? poolP.id : ('t01_' + p.id);
+              const inj = poolP ? (poolP.status || p.status || null) : (p.status || null);
+              if (inj === 'O' || inj === 'IR') return;
+              const mult = POSITION_MULTIPLIERS[p.pos] || POSITION_MULTIPLIERS.WR; // fallback, shouldn't hit given the position filter above
+              // Round UP to the next $100 (not nearest) — see SALARY_METHODOLOGY.md
+              // "Round-up + multiplier recalibration" for why.
+              let sal = Math.ceil((p.proj * mult) / SAL_ROUND) * SAL_ROUND;
+              sal = Math.max(min, Math.min(max, sal));
+              salaries[pid] = { id: pid, name: p.name, pos: p.pos, team: p.team, proj: Math.round(p.proj*10)/10, salary: sal, status: inj, tank01PlayerID: poolP ? poolP.tank01PlayerID : null, headshot: poolP ? poolP.headshot : null };
+              count++;
+            });
+            return { salaries, count };
+          }
+
+          function buildFlatSalaries(poolPlayers) {
+            const salaries = {};
+            let count = 0;
+            Object.values(poolPlayers || {}).forEach(p => {
+              if (!p || !p.pos || !FLAT[p.pos]) return;
+              if (!p.team || !p.name) return;
+              if (p.status === 'O' || p.status === 'IR') return;
+              salaries[p.id] = { id: p.id, name: p.name, pos: p.pos, team: p.team, proj: null, salary: FLAT[p.pos], status: p.status || null, tank01PlayerID: p.tank01PlayerID || null, headshot: p.headshot || null };
+              count++;
+            });
+            return { salaries, count };
+          }
+
+          async function generateSalariesForLeague(leagueId, settings, poolPlayers) {
+            const week = await getTargetWeek(leagueId);
+            if (week > 18) { console.log(`  ${leagueId}: week ${week} is past the season — skipping`); return; }
+
+            // Don't clobber a week the commissioner already locked manually.
+            let existingMeta = null;
+            try { existingMeta = await firebaseGet(`/leagues/${leagueId}/salaries/${SEASON}/week${week}/meta.json`); } catch (e) {}
+            if (existingMeta && existingMeta.locked) {
+              console.log(`  ${leagueId}: week ${week} salaries are locked — skipping`);
+              return;
+            }
+
+            const cap = (settings && settings.cap) || 60000;
+            const min = (settings && settings.minSalary) || SAL_MIN_DEFAULT;
+            const max = (settings && settings.maxSalary) || SAL_MAX_DEFAULT;
+
+            const projPlayers = await getProjections(week);
+            let result = projPlayers.length ? buildSalariesFromProjections(projPlayers, poolPlayers, min, max) : { salaries: {}, count: 0 };
+            let usedFlat = false;
+
+            if (result.count === 0) {
+              // Real, already-generated data existing here is strictly
+              // better than flat fallback — this run failing to fetch
+              // fresh projections (Tank01 outage, RapidAPI issue, etc.)
+              // says nothing about whether the PREVIOUS successful run's
+              // data is still good. It is. Never downgrade good data to
+              // flat pricing just because a later regeneration attempt
+              // happened to fail — only use flat as a first-time safety
+              // net when there's genuinely nothing better in place yet.
+              if (existingMeta && existingMeta.count > 0 && !existingMeta.flat) {
+                console.log(`  ${leagueId}: no usable projections for week ${week} — but real salaries already exist, leaving them in place (not downgrading to flat)`);
+                return;
+              }
+              console.log(`  ${leagueId}: no usable projections for week ${week} — using flat fallback`);
+              result = buildFlatSalaries(poolPlayers);
+              usedFlat = true;
+            }
+
+            await firebasePut(`/leagues/${leagueId}/salaries/${SEASON}/week${week}.json`, {
+              players: result.salaries,
+              meta: { week, count: result.count, generated: Date.now(), locked: false, cap, automated: true, flat: usedFlat }
+            });
+            console.log(`✓ ${leagueId}: ${result.count} salaries generated for week ${week}${usedFlat ? ' (flat)' : ''}`);
+          }
+
+          // Cache the full season's schedule — this barely ever changes
+          // once the NFL publishes it (rare flex-schedule moves aside),
+          // but was being re-fetched live from Tank01 on every single page
+          // load across the app, and up to 18 times in a row for the
+          // player-card "Scores & Matchups" feature specifically. Written
+          // once here per run (piggybacking on this job's existing weekly
+          // cadence), read from Firebase everywhere else instead.
+          // Reuses the Worker's own /schedule endpoint per week rather
+          // than re-implementing its wrong-year-rejection and hardcoded
+          // Week 1 protections a second time here.
+          //
+          // Only re-fetches weeks that haven't happened yet — a week
+          // that's already been played isn't going anywhere, so there's
+          // no reason to keep re-checking it every run forever. This is
+          // also what actually catches flex-schedule moves: those only
+          // ever apply to upcoming games, never to something already
+          // played, so checking future weeks is both cheaper AND the
+          // correct scope for what this is protecting against.
+          async function cacheFullSeasonSchedule() {
+            const currentWeek = await getGlobalCurrentWeek();
+            const seasonTypes = [
+              { type: 'Preseason',  weeks: [0, 1, 2, 3] }, // short enough (4 weeks) that filtering isn't worth the complexity
+              { type: 'Regular',    weeks: Array.from({ length: 18 }, (_, i) => i + 1).filter(w => w >= currentWeek) },
+              { type: 'Postseason', weeks: [1, 2, 3, 4] } // same reasoning as preseason — short enough not to bother filtering
+            ];
+            for (const { type, weeks } of seasonTypes) {
+              // Start from whatever's already cached — past weeks we're
+              // deliberately not re-fetching this run still need to stay
+              // in place, not get wiped out by this write.
+              let byWeek = {};
+              try {
+                const existing = await firebaseGet(`/nflSchedule/${SEASON}/${type}.json`);
+                if (existing && existing.weeks) byWeek = existing.weeks;
+              } catch(e) { /* nothing cached yet */ }
+
+              let fetchedCount = 0;
+              for (const week of weeks) {
+                try {
+                  const res = await fetch(`${WORKER}/schedule?week=${week}&season=${SEASON}&seasonType=${type}&bypassCache=true`);
+                  if (!res.ok) continue;
+                  const data = await res.json();
+                  if (data && Array.isArray(data.games) && data.games.length) {
+                    byWeek[`week${week}`] = data.games;
+                    fetchedCount++;
+                  }
+                } catch(e) {
+                  console.error(`  Schedule cache: failed ${type} week ${week}:`, e.message);
+                }
+              }
+              if (fetchedCount > 0) {
+                await firebasePut(`/nflSchedule/${SEASON}/${type}.json`, { weeks: byWeek, updatedAt: Date.now() });
+                console.log(`✓ Cached ${type} schedule: refreshed ${fetchedCount} upcoming week(s), ${Object.keys(byWeek).length} total in cache`);
+              } else {
+                console.log(`  ${type} schedule: nothing new to refresh (current week: ${currentWeek})`);
+              }
+            }
+          }
+
+          (async () => {
+            if (!FB_TOKEN) {
+              console.error('❌ FIREBASE_AUTH_TOKEN secret is missing or empty.');
+              console.error('   Writes will be rejected by security rules without it.');
+              console.error('   Create it: GitHub repo → Settings → Secrets and variables → Actions');
+              console.error('   Value: Firebase console → Project settings → Service accounts → Database secrets');
+              process.exit(1);
+            }
+            const pool = await refreshPlayerPool();
+            try { await cacheFullSeasonSchedule(); } catch(e) { console.error('Schedule caching failed:', e.message); }
+            const leagues = await getActiveLeagues();
+            console.log(`Active leagues: ${leagues.map(l => l.id).join(', ')}`);
+
+            // Same safeguard added to auto-scoring.yml tonight, for the
+            // same root cause: a league should only get salaries/scoring
+            // for the kind of season actually happening right now.
+            // Without this, a non-preseason league could get salaries
+            // generated (and, via auto-scoring.yml, scored) against
+            // preseason games — exactly what happened to fr_refresh26
+            // tonight, before this fix existed.
+            const nowForWindow = new Date();
+            const windowMonth = nowForWindow.getUTCMonth() + 1;
+            const windowDay = nowForWindow.getUTCDate();
+            const currentlyPreseasonWindow = windowMonth === 8 || (windowMonth === 9 && windowDay <= 8);
+
+            for (const { id, settings } of leagues) {
+              try {
+                const leagueIsPreseason = !!(settings && settings.isPreseason);
+                if (leagueIsPreseason !== currentlyPreseasonWindow) {
+                  console.log(`  ⏭️  Skipping ${id} — league is ${leagueIsPreseason ? 'preseason' : 'regular season'}, but it's currently ${currentlyPreseasonWindow ? 'preseason' : 'regular season'} window.`);
+                  continue;
+                }
+                await generateSalariesForLeague(id, settings, pool);
+              } catch (e) {
+                console.error(`✗ ${id} failed:`, e.message);
+              }
+            }
+          })();
+          SCRIPT
