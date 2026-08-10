@@ -908,6 +908,16 @@ function buildGamesBar(games){
     buildGamesBarFromPlayers();
     return;
   }
+  // Dedupe by home/away team pair — a team can only genuinely play one
+  // game in a given week, so any repeat is duplicate data, not a real
+  // second game.
+  var seenPairs = {};
+  games = games.filter(function(g){
+    var key = normTeam(g.home||'') + '@' + normTeam(g.away||'');
+    if(seenPairs[key]) return false;
+    seenPairs[key] = true;
+    return true;
+  });
   var html = '<button class="game-chip all active" data-game="all" onclick="setGameFilter(null,this)">All Games</button>';
   games.forEach(function(g, i){
     var label = (g.away||'?') + ' @ ' + (g.home||'?');

@@ -9139,7 +9139,13 @@ function getDraftUrl(){
     ctx.weeks === 4
   );
   if(isPS){
-    return '/draft.html?mode=preseason&week=' + (currentWeek || 1);
+    // No week param — draft.html now dynamically determines the correct
+    // week itself by checking real score data, the same way the
+    // regular-season path always has. Passing one from here duplicated
+    // that logic with a DIFFERENT meaning ("last completed week" here vs
+    // "next week to draft for" there), which is exactly what caused the
+    // Edit Lineup button to open an already-finished week's roster.
+    return '/draft.html?mode=preseason';
   }
   return '/draft.html';
 }
