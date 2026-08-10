@@ -911,14 +911,17 @@ function buildGamesBar(games){
     buildGamesBarFromPlayers();
     return;
   }
-  // Dedupe by home/away team pair — a team can only genuinely play one
-  // game in a given week, so any repeat is duplicate data, not a real
-  // second game.
-  var seenPairs = {};
+  // Dedupe by team — confirmed via real data that a team can appear in
+  // TWO DIFFERENT matchups in the same response (not just the same game
+  // repeated), which a same-pairing-only dedup can't catch. A team can
+  // only genuinely play one real game per week, so once a team's been
+  // seen, any further game involving them is bad data, not a real second
+  // game — keeping the first occurrence only.
+  var seenTeams = {};
   games = games.filter(function(g){
-    var key = normTeam(g.home||'') + '@' + normTeam(g.away||'');
-    if(seenPairs[key]) return false;
-    seenPairs[key] = true;
+    var h = normTeam(g.home||''), a = normTeam(g.away||'');
+    if(seenTeams[h] || seenTeams[a]) return false;
+    seenTeams[h] = true; seenTeams[a] = true;
     return true;
   });
   var html = '<button class="game-chip all active" data-game="all" onclick="setGameFilter(null,this)">All Games</button>';
