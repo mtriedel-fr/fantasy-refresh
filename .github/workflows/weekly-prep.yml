@@ -225,6 +225,20 @@ jobs:
           let globalCurrentWeek = null;
           async function getGlobalCurrentWeek() {
             if (globalCurrentWeek) return globalCurrentWeek;
+            // Date-based preseason check runs first — same fix applied to
+            // auto-scoring.yml tonight, for the same reason: Tank01's own
+            // getNFLCurrentWeek only knows about regular-season weeks,
+            // and was being trusted unconditionally with no preseason
+            // awareness at all in this file.
+            const now = new Date();
+            const month = now.getUTCMonth() + 1;
+            const day = now.getUTCDate();
+            if (month === 8 || (month === 9 && day <= 8)) {
+              const aug1 = new Date(`${now.getUTCFullYear()}-08-01`);
+              const daysSinceAug1 = Math.floor((now - aug1) / (1000 * 60 * 60 * 24));
+              globalCurrentWeek = Math.min(4, Math.max(1, Math.floor(daysSinceAug1 / 7) + 1));
+              return globalCurrentWeek;
+            }
             try {
               const d = await t01('/getNFLCurrentWeek');
               globalCurrentWeek = d.body ? parseInt(d.body.week) : 1;
@@ -235,7 +249,12 @@ jobs:
           async function getTargetWeek(leagueId) {
             try {
               const meta = await firebaseGet(`/leagues/${leagueId}/season/${SEASON}/meta.json`);
-              if (meta && typeof meta.currentWeek === 'number') return meta.currentWeek + 1;
+              // Confirmed via real Firebase structure: the field is
+              // "week", not "currentWeek" — the original check for
+              // meta.currentWeek could never match anything real, so this
+              // per-league ground truth was silently never firing,
+              // always falling through to the global fallback below.
+              if (meta && typeof meta.week === 'number') return meta.week + 1;
             } catch (e) { /* no meta yet */ }
             return await getGlobalCurrentWeek();
           }
@@ -417,8 +436,26 @@ jobs:
             try { await cacheFullSeasonSchedule(); } catch(e) { console.error('Schedule caching failed:', e.message); }
             const leagues = await getActiveLeagues();
             console.log(`Active leagues: ${leagues.map(l => l.id).join(', ')}`);
+
+            // Same safeguard added to auto-scoring.yml tonight, for the
+            // same root cause: a league should only get salaries/scoring
+            // for the kind of season actually happening right now.
+            // Without this, a non-preseason league could get salaries
+            // generated (and, via auto-scoring.yml, scored) against
+            // preseason games — exactly what happened to fr_refresh26
+            // tonight, before this fix existed.
+            const nowForWindow = new Date();
+            const windowMonth = nowForWindow.getUTCMonth() + 1;
+            const windowDay = nowForWindow.getUTCDate();
+            const currentlyPreseasonWindow = windowMonth === 8 || (windowMonth === 9 && windowDay <= 8);
+
             for (const { id, settings } of leagues) {
               try {
+                const leagueIsPreseason = !!(settings && settings.isPreseason);
+                if (leagueIsPreseason !== currentlyPreseasonWindow) {
+                  console.log(`  ⏭️  Skipping ${id} — league is ${leagueIsPreseason ? 'preseason' : 'regular season'}, but it's currently ${currentlyPreseasonWindow ? 'preseason' : 'regular season'} window.`);
+                  continue;
+                }
                 await generateSalariesForLeague(id, settings, pool);
               } catch (e) {
                 console.error(`✗ ${id} failed:`, e.message);
