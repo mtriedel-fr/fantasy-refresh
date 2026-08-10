@@ -250,6 +250,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
   </a>
   <div class="hdr-week" id="hdr-week">Loading…</div>
   <div id="test-banner" style="display:none;background:rgba(155,109,255,.15);border:1px solid var(--pu);color:var(--pu);font-family:var(--fd);font-size:10px;font-weight:800;padding:3px 10px;border-radius:10px;text-transform:uppercase;letter-spacing:.5px;">🧪 Test Mode</div>
+  <div id="flat-sal-banner" style="display:none;background:rgba(255,150,50,.15);border:1px solid #FF9A3A;color:#FF9A3A;font-family:var(--fd);font-size:10px;font-weight:800;padding:3px 10px;border-radius:10px;text-transform:uppercase;letter-spacing:.5px;">⚠️ Salaries Not Ready — Flat Pricing</div>
   <button onclick="toggleTheme()" id="theme-btn" style="background:none;border:1px solid var(--bdr);border-radius:6px;padding:5px 10px;cursor:pointer;font-size:14px;" title="Toggle theme">🌙</button>
   <button onclick="window.location.href='/league.html'" class="hdr-back">← League</button>
 </div>
@@ -603,6 +604,16 @@ function fixMainHeightForScaledDisplays(){
   });
 }
 
+function finishPreseasonLoad(){
+  var label = 'PS Week '+currentWeek+' Draft';
+  document.getElementById('hdr-week').textContent = label;
+  document.getElementById('week-label').textContent = 'PS Week '+currentWeek;
+  loadSalaries();
+  loadSchedule();
+  loadSubmitted();
+  loadLocks();
+}
+
 // ── LOAD ──────────────────────────────────────────────────────
 function loadWeekAndData(){
   // Test mode — use mock HOF data
@@ -614,15 +625,25 @@ function loadWeekAndData(){
     loadLocks();
     return;
   }
-  // Preseason mode — week and season already set from URL params
+  // Preseason mode — dynamically determine the right week the same way
+  // the regular-season path below does, rather than blindly trusting
+  // whatever week is in the URL. A stale link or bookmark still pointing
+  // at an earlier week would otherwise load that week's already-
+  // submitted (and likely locked) roster instead of a fresh one for the
+  // week that's actually current now.
   if(PS_MODE){
-    var label = 'PS Week '+currentWeek+' Draft';
-    document.getElementById('hdr-week').textContent = label;
-    document.getElementById('week-label').textContent = 'PS Week '+currentWeek;
-    loadSalaries();
-    loadSchedule();
-    loadSubmitted();
-    loadLocks();
+    fetch(FR.paths.url(FR.paths.season()) + '?shallow=true')
+      .then(function(r){ return r.json(); })
+      .then(function(keys){
+        if(keys && typeof keys === 'object'){
+          var weeks = Object.keys(keys).filter(function(k){ return !isNaN(Number(k)); }).map(Number);
+          if(weeks.length){
+            currentWeek = Math.min(Math.max.apply(null, weeks) + 1, 4);
+          }
+        }
+        finishPreseasonLoad();
+      })
+      .catch(function(){ finishPreseasonLoad(); });
     return;
   }
   fetch(FR.paths.url(FR.paths.season()) + '?shallow=true')
@@ -666,6 +687,8 @@ function loadSalaries(){
     .then(function(r){ return r.json(); })
     .then(function(data){
       if(data && data.players && Object.keys(data.players).length){
+        var flatBanner = document.getElementById('flat-sal-banner');
+        if(flatBanner) flatBanner.style.display = 'none';
         allPlayers = Object.values(data.players).filter(function(p){ return p && p.name && p.pos; });
         if(!schedule.length) buildGamesBarFromPlayers();
         renderPicker();
@@ -683,6 +706,8 @@ function loadSalaries(){
 }
 
 function loadFlatSalariesFromPool(){
+  var banner = document.getElementById('flat-sal-banner');
+  if(banner) banner.style.display = 'inline-flex';
   var FLAT = {QB:8500, RB:6500, WR:6000, TE:5500, DEF:5000};
   FR.fb.getPlayerPool()
     .then(function(players){
