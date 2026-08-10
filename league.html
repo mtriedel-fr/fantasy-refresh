@@ -2484,6 +2484,16 @@ function buildWeekBarRange(sel, lastWeek){
 function setWeekFromSelect(val){
   currentWeek = parseInt(val);
   renderAll();
+  // The My Team dropdown only refreshes when it's opened — if it's
+  // already open while the week changes, nothing else tells it to
+  // refetch, leaving the previous week's roster showing even though
+  // currentWeek has genuinely changed. Only refresh it here if it's
+  // actually visible right now; if it's closed, the next time it opens
+  // will correctly fetch fresh data for the new week anyway.
+  var myTeamDrop = document.getElementById('myteam-drop');
+  if(myTeamDrop && !myTeamDrop.classList.contains('hidden')){
+    loadMyTeamLineup(myTeamDrop);
+  }
 }
 
 function buildWeekSelect(){
