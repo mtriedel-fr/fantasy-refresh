@@ -387,14 +387,7 @@ jobs:
           async function cacheFullSeasonSchedule() {
             const currentWeek = await getGlobalCurrentWeek();
             const seasonTypes = [
-              // Confirmed empirically tonight against the real Tank01 API:
-              // this app's own convention is 1=HOF, 2=PS Wk1, 3=PS Wk2,
-              // 4=PS Wk3 — not 0=HOF. The Worker's /schedule endpoint now
-              // passes week numbers straight through to Tank01 with no
-              // offset (after tonight's fix removing the hardcoded
-              // preseason arrays), so this needs to request the same real
-              // week numbers, not the old, disproven 0-indexed range.
-              { type: 'Preseason',  weeks: [1, 2, 3, 4] },
+              { type: 'Preseason',  weeks: [0, 1, 2, 3] }, // short enough (4 weeks) that filtering isn't worth the complexity
               { type: 'Regular',    weeks: Array.from({ length: 18 }, (_, i) => i + 1).filter(w => w >= currentWeek) },
               { type: 'Postseason', weeks: [1, 2, 3, 4] } // same reasoning as preseason — short enough not to bother filtering
             ];
@@ -411,7 +404,7 @@ jobs:
               let fetchedCount = 0;
               for (const week of weeks) {
                 try {
-                  const res = await fetch(`${WORKER}/schedule?week=${week}&season=${SEASON}&seasonType=${type}`);
+                  const res = await fetch(`${WORKER}/schedule?week=${week}&season=${SEASON}&seasonType=${type}&bypassCache=true`);
                   if (!res.ok) continue;
                   const data = await res.json();
                   if (data && Array.isArray(data.games) && data.games.length) {
