@@ -2250,7 +2250,7 @@ function lineupSlotStructuralLabel(slotId, playerPos){
 function buildLineupPlayerCard(p, pts, hasStarted, gameMap, showNotStartedTag, slotId, breakdown){
   var slotLabel = slotId ? lineupSlotStructuralLabel(slotId, p.pos) : (p.pos || '');
   var posColor = LINEUP_POS_COLORS[slotLabel] || LINEUP_POS_COLORS[p.pos] || 'var(--ink2)';
-  var ptsLabel = (typeof pts === 'number') ? pts.toFixed(1) : '0.0';
+  var ptsLabel = (typeof pts === 'number') ? pts.toFixed(2) : '0.00';
   var game = (gameMap && p.team) ? gameMap[p.team] : null;
   var gameLine = '';
   if(game){
@@ -2662,7 +2662,7 @@ function renderH2HMyLineup(){
       var p = lineup.slots[slotId];
       if(!p) return '<div class="lineup-slot"><span class="lineup-pos">' + escapeHtmlFR(slotId.toUpperCase()) + '</span><span class="lineup-player">—</span></div>';
       var pts = slotPts[slotId];
-      return '<div class="lineup-slot"><span class="lineup-pos">' + escapeHtmlFR(p.pos || '') + '</span><span class="lineup-player">' + escapeHtmlFR(p.name || '') + '</span><span class="lineup-pct">' + (typeof pts === 'number' ? pts.toFixed(1) + ' pts' : '—') + '</span></div>';
+      return '<div class="lineup-slot"><span class="lineup-pos">' + escapeHtmlFR(p.pos || '') + '</span><span class="lineup-player">' + escapeHtmlFR(p.name || '') + '</span><span class="lineup-pct">' + (typeof pts === 'number' ? pts.toFixed(2) + ' pts' : '—') + '</span></div>';
     }).join('');
 
     wt.innerHTML = '<div class="myteam-wrap"><div class="myteam-card">'
@@ -4262,7 +4262,7 @@ function renderPlayoffs(){
         html += '<div class="team-row' + (isElim ? ' eliminated' : ' advanced') + (isMe ? ' is-me' : '') + '">'
           + '<span class="t-rank">' + (i+1) + '</span>'
           + '<span class="t-name' + (isElim ? ' elim-line' : '') + '">' + teamLink(t.name) + '</span>'
-          + '<span class="t-score">' + (t.score > 0 ? t.score.toFixed(1) : '—') + '</span>'
+          + '<span class="t-score">' + (t.score > 0 ? t.score.toFixed(2) : '—') + '</span>'
           + '<span class="t-status">' + (isElim ? '❌' : '✅') + '</span>'
           + '</div>';
       });
@@ -4287,7 +4287,7 @@ function renderPlayoffs(){
         html += '<div class="team-row' + (isElim ? ' eliminated' : ' advanced') + (isMe ? ' is-me' : '') + '">'
           + '<span class="t-rank">' + (i+1) + '</span>'
           + '<span class="t-name' + (isElim ? ' elim-line' : '') + '">' + teamLink(t.name) + '</span>'
-          + '<span class="t-score">' + (t.score > 0 ? t.score.toFixed(1) : '—') + '</span>'
+          + '<span class="t-score">' + (t.score > 0 ? t.score.toFixed(2) : '—') + '</span>'
           + '<span class="t-status">' + (isElim ? '❌' : '✅') + '</span>'
           + '</div>';
       });
@@ -4313,7 +4313,7 @@ function renderPlayoffs(){
         html += '<div class="team-row' + (isChamp ? ' champion' : '') + (isMe ? ' is-me' : '') + '">'
           + '<span class="t-rank">' + crown + '</span>'
           + '<span class="t-name">' + teamLink(t.name) + '</span>'
-          + '<span class="t-score">' + (t.score > 0 ? t.score.toFixed(1) : '—') + '</span>'
+          + '<span class="t-score">' + (t.score > 0 ? t.score.toFixed(2) : '—') + '</span>'
           + '</div>';
       });
     }
@@ -4698,8 +4698,8 @@ function showEmpty(){
 // ── NUMBER FORMATTING ─────────────────────────────────────────
 function fmtScore(n){
   if(n === undefined || n === null) return '—';
-  if(n >= 1000) return n.toLocaleString('en-US', {minimumFractionDigits:1, maximumFractionDigits:1});
-  return n.toFixed(1);
+  if(n >= 1000) return n.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+  return n.toFixed(2);
 }
 function fmtTotal(n){
   if(n === undefined || n === null) return '—';
@@ -4939,7 +4939,7 @@ function renderHistory(){
   if(!weeks.length){ el.innerHTML = '<div style="color:#1A5A5A;font-size:13px;font-family:var(--fd)">No weeks imported yet.</div>'; return; }
   el.innerHTML = weeks.map(function(w){
     var scores = seasonData[String(w)].map(function(e){ return e.score; });
-    var high = Math.max.apply(null, scores).toFixed(1);
+    var high = Math.max.apply(null, scores).toFixed(2);
     return '<div class="hist-row"><div><div class="hist-wk">Week ' + w + '</div><div class="hist-info">' + seasonData[String(w)].length + ' entries · High: ' + high + '</div></div>'
       + '<button class="del-btn" onclick="deleteWeek(' + w + ')">Delete</button></div>';
   }).join('');
@@ -5726,7 +5726,7 @@ function buildDotPlot(curEntries, myEntry){
     + '<div class="dotplot-dot-lbl">' + fmtScore(myEntry.score) + '</div>'
     + '</div>'
     + '</div>'
-    + '<div class="dotplot-axis"><span>Low ' + min.toFixed(1) + '</span><span>High ' + max.toFixed(1) + '</span></div>'
+    + '<div class="dotplot-axis"><span>Low ' + min.toFixed(2) + '</span><span>High ' + max.toFixed(2) + '</span></div>'
     + '</div>';
 }
 
@@ -5779,7 +5779,7 @@ function renderMySeasonInline(){
       + '<td style="font-family:var(--fd);font-weight:700;font-size:15px;color:var(--or);text-align:right">' + fmtScore(d.score) + '</td>'
       + '<td style="text-align:center;font-family:var(--fd);font-size:14px;color:var(--pk)">#' + d.rank + ' / ' + d.total + '</td>'
       + '<td style="text-align:center;font-family:var(--fd);font-size:14px;color:var(--pu)">#' + d.cumStanding + '</td>'
-      + '<td style="text-align:right;font-size:13px;color:var(--ink2)">' + (d.score >= d.avg ? '<span style="color:var(--or)">+' : '<span style="color:var(--pk)">') + (d.score - d.avg).toFixed(1) + '</span></td>'
+      + '<td style="text-align:right;font-size:13px;color:var(--ink2)">' + (d.score >= d.avg ? '<span style="color:var(--or)">+' : '<span style="color:var(--pk)">') + (d.score - d.avg).toFixed(2) + '</span></td>'
       + '</tr>';
   }).join('');
 
