@@ -2170,10 +2170,11 @@ function totalRosterSlots(cfg){
 // page) — only the wording changes to reflect actual progress. Viewing
 // the roster itself is now a SEPARATE action (the +/- toggle next to this
 // button), no longer conflated with editing.
-function updateMyTeamLabel(filledCount, totalCount){
-  var text = filledCount === 0 ? '📝 Draft Team'
-    : filledCount < totalCount ? '🧩 Finish Lineup'
-    : '✏️ Edit Lineup';
+function updateMyTeamLabel(filledCount, totalCount, targetWeek){
+  var wk = targetWeek ? ' — Week ' + targetWeek : '';
+  var text = filledCount === 0 ? '📝 Draft Team' + wk
+    : filledCount < totalCount ? '🧩 Finish Lineup' + wk
+    : '✏️ Edit Lineup' + wk;
   document.querySelectorAll('.myteam-label').forEach(function(l){ l.textContent = text; });
 }
 
@@ -2437,6 +2438,29 @@ function boot(){
   applyArchiveVisibility();
   renderAll();
   checkFirstRun();
+
+  // 24 hours after a week has genuinely gone fully final, the default
+  // view advances to the next week — not the instant the last game
+  // ends, so there's real time to see how the week went before getting
+  // pushed toward drafting the next one. The just-finished week stays
+  // fully reviewable by hand via the week dropdown regardless; this only
+  // changes what shows by DEFAULT on a fresh page load. Runs after the
+  // initial render (using the naive "highest week with data" value) so
+  // the page shows something immediately, then corrects and re-renders
+  // only if the 24-hour condition is actually met.
+  if(currentWeek > 0){
+    var ctx = FRAuth.getLeagueCtx();
+    var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+    var season = (ctx && ctx.season) || 2026;
+    FR.fb.get('/leagues/' + leagueId + '/season/' + season + '/' + currentWeek + '/finalizedAt')
+      .then(function(finalizedAt){
+        if(typeof finalizedAt === 'number' && (Date.now() - finalizedAt) > 24 * 60 * 60 * 1000){
+          currentWeek = currentWeek + 1;
+          renderAll();
+        }
+      })
+      .catch(function(){});
+  }
 }
 
 loadPlayoffsFromCloud();
@@ -2889,7 +2913,7 @@ function updateMyTeamLabelsForCumulative(){
     var lineup = results[0];
     var settings = results[1] || {};
     var filledCount = (lineup && lineup.slots) ? Object.keys(lineup.slots).filter(function(k){ return !!lineup.slots[k]; }).length : 0;
-    updateMyTeamLabel(filledCount, totalRosterSlots(settings.rosterConfig));
+    updateMyTeamLabel(filledCount, totalRosterSlots(settings.rosterConfig), currentWeek);
     // Decided here, from the real data, rather than in renderCumHome() —
     // that ran before this fetch resolved, so it was checking a label that
     // hadn't been updated yet and could open an empty dropdown for a
@@ -3083,24 +3107,7 @@ function loadMyTeamLineup(drop){
 
   var seasonType = IS_PRESEASON_LEAGUE ? 'Preseason' : 'Regular';
 
-  // My Team specifically wants "the next week I need to draft for," not
-  // the page-wide currentWeek — which is intentionally "the last
-  // completed week" everywhere else (correct for standings/scores, but
-  // would show My Team as still-locked-and-final instead of a fresh,
-  // draftable roster). Computed independently here, same shallow-read
-  // approach draft.html already uses, so the two sections can each show
-  // the week number that actually makes sense for their own purpose.
-  fetch(FR.paths.url(FR.paths.season()) + '?shallow=true')
-    .then(function(r){ return r.json(); })
-    .then(function(keys){
-      var targetWeek = currentWeek;
-      if(keys && typeof keys === 'object'){
-        var weeks = Object.keys(keys).filter(function(k){ return !isNaN(Number(k)); }).map(Number);
-        if(weeks.length) targetWeek = Math.max.apply(null, weeks) + 1;
-      }
-      loadMyTeamLineupForWeek(drop, leagueId, season, seasonType, user, targetWeek);
-    })
-    .catch(function(){ loadMyTeamLineupForWeek(drop, leagueId, season, seasonType, user, currentWeek); });
+  loadMyTeamLineupForWeek(drop, leagueId, season, seasonType, user, currentWeek);
 }
 
 function loadMyTeamLineupForWeek(drop, leagueId, season, seasonType, user, targetWeek){
@@ -3248,7 +3255,11 @@ function renderAll(){
     el('s-mymovement-sub').textContent = mySeasonRankNow ? 'season rank #' + mySeasonRankNow : '';
   }
   if(el('s-left')) el('s-left').textContent = WEEKS - weeks.length;
-  if(el('hdr-sub')) el('hdr-sub').textContent = 'Week ' + currentWeek + ' of ' + WEEKS + ' · ' + sorted.length + ' teams';
+  if(el('hdr-sub')){
+    var weekIsLive = curEntries.some(function(e){ return e.status === 'live'; });
+    var weekStatusLabel = weekIsLive ? 'Live' : 'Final';
+    el('hdr-sub').textContent = 'Week ' + currentWeek + ' ' + weekStatusLabel + ' · ' + sorted.length + ' teams';
+  }
 
   renderStandings(sorted, prevRank, curMap, wkHighName);
   // Start live polling if current week has live scores
