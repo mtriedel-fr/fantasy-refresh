@@ -3083,13 +3083,34 @@ function loadMyTeamLineup(drop){
 
   var seasonType = IS_PRESEASON_LEAGUE ? 'Preseason' : 'Regular';
 
+  // My Team specifically wants "the next week I need to draft for," not
+  // the page-wide currentWeek — which is intentionally "the last
+  // completed week" everywhere else (correct for standings/scores, but
+  // would show My Team as still-locked-and-final instead of a fresh,
+  // draftable roster). Computed independently here, same shallow-read
+  // approach draft.html already uses, so the two sections can each show
+  // the week number that actually makes sense for their own purpose.
+  fetch(FR.paths.url(FR.paths.season()) + '?shallow=true')
+    .then(function(r){ return r.json(); })
+    .then(function(keys){
+      var targetWeek = currentWeek;
+      if(keys && typeof keys === 'object'){
+        var weeks = Object.keys(keys).filter(function(k){ return !isNaN(Number(k)); }).map(Number);
+        if(weeks.length) targetWeek = Math.max.apply(null, weeks) + 1;
+      }
+      loadMyTeamLineupForWeek(drop, leagueId, season, seasonType, user, targetWeek);
+    })
+    .catch(function(){ loadMyTeamLineupForWeek(drop, leagueId, season, seasonType, user, currentWeek); });
+}
+
+function loadMyTeamLineupForWeek(drop, leagueId, season, seasonType, user, targetWeek){
   Promise.all([
-    FR.fb.get('/leagues/' + leagueId + '/lineups/' + season + '/week' + currentWeek + '/' + user.uid),
-    FR.fb.get('/leagues/' + leagueId + '/season/' + season + '/' + currentWeek + '/' + user.uid),
-    FR.fb.get('/leagues/' + leagueId + '/locks/' + season + '/week' + currentWeek),
-    fetchWeekSchedule(currentWeek),
-    FR.fb.get('/liveGameStatus/' + season + '/' + seasonType + '_wk' + currentWeek).catch(function(){ return null; }),
-    FR.fb.get('/leagues/' + leagueId + '/season/' + season + '/' + currentWeek + '/ownership').catch(function(){ return null; })
+    FR.fb.get('/leagues/' + leagueId + '/lineups/' + season + '/week' + targetWeek + '/' + user.uid),
+    FR.fb.get('/leagues/' + leagueId + '/season/' + season + '/' + targetWeek + '/' + user.uid),
+    FR.fb.get('/leagues/' + leagueId + '/locks/' + season + '/week' + targetWeek),
+    fetchWeekSchedule(targetWeek),
+    FR.fb.get('/liveGameStatus/' + season + '/' + seasonType + '_wk' + targetWeek).catch(function(){ return null; }),
+    FR.fb.get('/leagues/' + leagueId + '/season/' + season + '/' + targetWeek + '/ownership').catch(function(){ return null; })
   ]).then(function(results){
     var lineup     = results[0];
     var scoreEntry = results[1];
