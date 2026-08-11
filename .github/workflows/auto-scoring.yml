@@ -412,6 +412,22 @@ jobs:
               console.log(`  📊 Wrote ownership % for ${Object.keys(ownership).length} players (${ownershipTeamCount} teams)`);
             }
 
+            // finalizedAt is set exactly once, the first time this
+            // specific week becomes fully final — stored per-week
+            // (sibling to this week's own score entries and ownership
+            // data), not in the single shared "current week" meta
+            // object below, which gets completely overwritten the
+            // moment scoring moves on to a different week number. This
+            // is what lets the frontend compute "24 hours after this
+            // week actually finished" — lastScored alone can't do that,
+            // since it updates on every run regardless of final status.
+            if (allFinal) {
+              const existingFinalizedAt = await firebaseGet(`/leagues/${leagueId}/season/${SEASON}/${week}/finalizedAt.json`).catch(() => null);
+              if (!existingFinalizedAt) {
+                await firebasePut(`/leagues/${leagueId}/season/${SEASON}/${week}/finalizedAt.json`, Date.now());
+              }
+            }
+
             // Update week meta
             await firebasePut(`/leagues/${leagueId}/season/${SEASON}/meta.json`, {
               week, lastScored: Date.now(), allFinal,
