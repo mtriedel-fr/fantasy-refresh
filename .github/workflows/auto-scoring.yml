@@ -386,6 +386,32 @@ jobs:
               console.log(`  ✅ Wrote ${Object.keys(scoreUpdates).length} scores`);
             }
 
+            // ── OWNERSHIP % ────────────────────────────────────────────
+            // Counts every team with a real, submitted lineup this week
+            // (not just the ones rescored above — a locked team's lineup
+            // still counts toward ownership, since "locked" only means
+            // "don't recalculate their score," not "exclude them"). One
+            // pass over the same lineups already loaded for scoring, no
+            // extra Firebase reads needed.
+            const ownershipCounts = {};
+            let ownershipTeamCount = 0;
+            for (const lineup of Object.values(lineups)) {
+              if (!lineup || !lineup.slots) continue;
+              ownershipTeamCount++;
+              for (const player of Object.values(lineup.slots)) {
+                if (!player || !player.id) continue;
+                ownershipCounts[player.id] = (ownershipCounts[player.id] || 0) + 1;
+              }
+            }
+            if (ownershipTeamCount > 0) {
+              const ownership = {};
+              for (const [playerId, count] of Object.entries(ownershipCounts)) {
+                ownership[playerId] = Math.round((count / ownershipTeamCount) * 1000) / 10;
+              }
+              await firebasePut(`/leagues/${leagueId}/season/${SEASON}/${week}/ownership.json`, ownership);
+              console.log(`  📊 Wrote ownership % for ${Object.keys(ownership).length} players (${ownershipTeamCount} teams)`);
+            }
+
             // Update week meta
             await firebasePut(`/leagues/${leagueId}/season/${SEASON}/meta.json`, {
               week, lastScored: Date.now(), allFinal,
