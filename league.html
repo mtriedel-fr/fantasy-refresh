@@ -2073,11 +2073,13 @@ function toggleH2HRoster(idx, homeUid, awayUid){
     FR.fb.get('/leagues/' + leagueId + '/lineups/' + (ctx.season || 2026) + '/week' + currentWeek + '/' + homeUid).catch(function(){ return null; }),
     FR.fb.get('/leagues/' + leagueId + '/lineups/' + (ctx.season || 2026) + '/week' + currentWeek + '/' + awayUid).catch(function(){ return null; }),
     FR.fb.get('/leagues/' + leagueId + '/locks/' + (ctx.season || 2026) + '/week' + currentWeek).catch(function(){ return {}; }),
-    fetchWeekSchedule(currentWeek)
+    fetchWeekSchedule(currentWeek),
+    FR.fb.get('/leagues/' + leagueId + '/season/' + (ctx.season || 2026) + '/' + currentWeek + '/ownership').catch(function(){ return null; })
   ]).then(function(results){
     var locks = results[2] || {};
     var gameMap = results[3] || {};
-    dropEl.innerHTML = rosterColumn(results[0], homeScoreEntry, locks, homeUid === myUid, gameMap) + rosterColumn(results[1], awayScoreEntry, locks, awayUid === myUid, gameMap);
+    var ownership = results[4] || {};
+    dropEl.innerHTML = rosterColumn(results[0], homeScoreEntry, locks, homeUid === myUid, gameMap, ownership) + rosterColumn(results[1], awayScoreEntry, locks, awayUid === myUid, gameMap, ownership);
   });
 }
 
@@ -2247,7 +2249,7 @@ function lineupSlotStructuralLabel(slotId, playerPos){
   return playerPos || prefix.toUpperCase();
 }
 
-function buildLineupPlayerCard(p, pts, hasStarted, gameMap, showNotStartedTag, slotId, breakdown){
+function buildLineupPlayerCard(p, pts, hasStarted, gameMap, showNotStartedTag, slotId, breakdown, ownership){
   var slotLabel = slotId ? lineupSlotStructuralLabel(slotId, p.pos) : (p.pos || '');
   var posColor = LINEUP_POS_COLORS[slotLabel] || LINEUP_POS_COLORS[p.pos] || 'var(--ink2)';
   var ptsLabel = (typeof pts === 'number') ? pts.toFixed(2) : '0.00';
@@ -2299,6 +2301,11 @@ function buildLineupPlayerCard(p, pts, hasStarted, gameMap, showNotStartedTag, s
   // (game hasn't started, no stats yet) stays plain rather than opening
   // to an empty panel.
   var hasBreakdown = breakdown && breakdown.length > 0;
+  // Ownership % — shown once the game has started, same timing as the
+  // lock/live status above, regardless of whether the player has
+  // recorded any stats yet (ownership itself doesn't depend on scoring).
+  var hasOwnership = hasStarted && typeof ownership === 'number';
+  var hasDropdownContent = hasBreakdown || hasOwnership;
   var breakdownId = 'bd-' + (slotId || Math.random().toString(36).slice(2));
   var breakdownRows = hasBreakdown ? breakdown.map(function(b){
     var ptsColor = b.points > 0 ? 'var(--or)' : (b.points < 0 ? 'var(--pk)' : 'var(--ink3)');
@@ -2308,10 +2315,16 @@ function buildLineupPlayerCard(p, pts, hasStarted, gameMap, showNotStartedTag, s
       + '<span style="color:' + ptsColor + ';font-weight:700;">' + sign + b.points.toFixed(2) + '</span>'
       + '</div>';
   }).join('') : '';
-  var breakdownPanel = hasBreakdown
-    ? '<div id="' + breakdownId + '" style="display:none;padding:8px 12px 10px;margin-top:2px;background:var(--bg2);border-radius:8px;border:1px solid var(--bdr);">' + breakdownRows + '</div>'
+  var ownershipRow = hasOwnership
+    ? '<div style="display:flex;justify-content:space-between;padding:4px 0 0;margin-top:4px;' + (hasBreakdown ? 'border-top:1px solid var(--bdr);' : '') + 'font-size:12px;">'
+      + '<span style="color:var(--ink3);">Owned</span>'
+      + '<span style="color:var(--ink2);font-weight:700;">' + ownership.toFixed(1) + '%</span>'
+      + '</div>'
     : '';
-  var cardClick = hasBreakdown ? ' onclick="var el=document.getElementById(\'' + breakdownId + '\');el.style.display=el.style.display===\'none\'?\'block\':\'none\';" style="cursor:pointer;"' : '';
+  var breakdownPanel = hasDropdownContent
+    ? '<div id="' + breakdownId + '" style="display:none;padding:8px 12px 10px;margin-top:2px;background:var(--bg2);border-radius:8px;border:1px solid var(--bdr);">' + breakdownRows + ownershipRow + '</div>'
+    : '';
+  var cardClick = hasDropdownContent ? ' onclick="var el=document.getElementById(\'' + breakdownId + '\');el.style.display=el.style.display===\'none\'?\'block\':\'none\';" style="cursor:pointer;"' : '';
 
   return '<div class="lineup-card' + (hasStarted ? ' started' : '') + '"' + cardClick + '>'
     + lineupPhotoOrBadge(p, posBadgeHtml)
@@ -2320,14 +2333,14 @@ function buildLineupPlayerCard(p, pts, hasStarted, gameMap, showNotStartedTag, s
     +   gameLine
     + '</div>'
     + '<div class="lineup-card-pts-stack">'
-    +   '<div class="lineup-card-pts">' + ptsLabel + (hasBreakdown ? ' <span style="font-size:10px;color:var(--ink3);">▾</span>' : '') + '</div>'
+    +   '<div class="lineup-card-pts">' + ptsLabel + (hasDropdownContent ? ' <span style="font-size:10px;color:var(--ink3);">▾</span>' : '') + '</div>'
     +   (statusTag ? '<span class="lineup-card-status-tag' + statusClass + '">' + escapeHtmlFR(statusTag) + '</span>' : '')
     + '</div>'
     + '</div>'
     + breakdownPanel;
 }
 
-function rosterColumn(lineup, scoreEntry, locks, isMine, gameMap){
+function rosterColumn(lineup, scoreEntry, locks, isMine, gameMap, ownership){
   var teamLabel = (lineup && lineup.team) || '';
   if(!lineup || !lineup.slots){
     // Only show a "go draft" CTA when this is the viewer's OWN team — this
@@ -2353,7 +2366,7 @@ function rosterColumn(lineup, scoreEntry, locks, isMine, gameMap){
       var p = lineup.slots[slotId];
       if(!p) return '';
       var hasStarted = !!(p.team && locks && locks[p.team]);
-      return buildLineupPlayerCard(p, slotPts[slotId], hasStarted, gameMap, true, slotId, slotBreakdown[slotId]);
+      return buildLineupPlayerCard(p, slotPts[slotId], hasStarted, gameMap, true, slotId, slotBreakdown[slotId], ownership ? ownership[p.id] : undefined);
     }).join('');
 
     // Budget remaining — sum actual drafted salaries against the league cap.
@@ -2385,7 +2398,7 @@ function rosterColumn(lineup, scoreEntry, locks, isMine, gameMap){
     if(!p) return;
     var hasStarted = !!(p.team && locks && locks[p.team]);
     if(!hasStarted){ notStartedCount++; return; }
-    startedRows.push(buildLineupPlayerCard(p, slotPts[slotId], hasStarted, gameMap, false, slotId));
+    startedRows.push(buildLineupPlayerCard(p, slotPts[slotId], hasStarted, gameMap, false, slotId, slotBreakdown[slotId], ownership ? ownership[p.id] : undefined));
   });
 
   var body = startedRows.length ? ('<div class="lineup-card-list">' + startedRows.join('') + '</div>') : '<div class="h2h-roster-empty">No players have kicked off yet.</div>';
@@ -3075,13 +3088,15 @@ function loadMyTeamLineup(drop){
     FR.fb.get('/leagues/' + leagueId + '/season/' + season + '/' + currentWeek + '/' + user.uid),
     FR.fb.get('/leagues/' + leagueId + '/locks/' + season + '/week' + currentWeek),
     fetchWeekSchedule(currentWeek),
-    FR.fb.get('/liveGameStatus/' + season + '/' + seasonType + '_wk' + currentWeek).catch(function(){ return null; })
+    FR.fb.get('/liveGameStatus/' + season + '/' + seasonType + '_wk' + currentWeek).catch(function(){ return null; }),
+    FR.fb.get('/leagues/' + leagueId + '/season/' + season + '/' + currentWeek + '/ownership').catch(function(){ return null; })
   ]).then(function(results){
     var lineup     = results[0];
     var scoreEntry = results[1];
     var locks      = results[2] || {};
     var gameMap    = results[3] || {};
     var liveStatus = (results[4] && results[4].games) || {};
+    var ownership  = results[5] || {};
 
     // Merge live status (statusCode/quarter/clock) into gameMap by team,
     // so buildLineupPlayerCard can read it off the same game object it
@@ -3097,7 +3112,7 @@ function loadMyTeamLineup(drop){
       });
     });
 
-    drop.innerHTML = rosterColumn(lineup, scoreEntry, locks, true, gameMap);
+    drop.innerHTML = rosterColumn(lineup, scoreEntry, locks, true, gameMap, ownership);
   }).catch(function(){
     drop.innerHTML = '<div class="myteam-empty"><div class="myteam-empty-icon">⚠️</div><div class="myteam-empty-title">Could not load lineup</div></div>';
   });
