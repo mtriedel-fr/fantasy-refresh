@@ -6018,6 +6018,8 @@ function renderFinish(sorted, curEntries, prevRank){
 }
 
 // ── WEEKLY NUMBERS VIEW ───────────────────────────────────────
+var weekLineupsCache = {}; // week -> {uid: {slots: {...}}, ...} — real lineup data, fetched separately since score entries never actually carry a lineup field (see below)
+
 function renderNumbers(curEntries){
   var el = document.getElementById('wn');
   if(!el) return;
@@ -6026,6 +6028,27 @@ function renderNumbers(curEntries){
     el.innerHTML = '<div class="empty"><div class="empty-icon">🔢</div><div class="empty-title">No data for week ' + currentWeek + '</div></div>';
     return;
   }
+
+  // Roster/Most Started need each team's actual drafted lineup, which
+  // score entries never carry — confirmed the entry.lineup field this
+  // used to read simply doesn't exist on real data (only score,
+  // slotPts, slotBreakdown do). Real lineups live at their own separate
+  // path. Fetched once per week and cached; re-renders this same
+  // section once the fetch lands, rather than restructuring this whole
+  // synchronous render pipeline into async/await.
+  var weekKey = String(currentWeek);
+  if(!weekLineupsCache[weekKey]){
+    var ctx = FRAuth.getLeagueCtx();
+    var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+    var season = (ctx && ctx.season) || 2026;
+    FR.fb.get('/leagues/' + leagueId + '/lineups/' + season + '/week' + currentWeek)
+      .then(function(data){
+        weekLineupsCache[weekKey] = data || {};
+        if(String(currentWeek) === weekKey) renderNumbers(curEntries);
+      })
+      .catch(function(){ weekLineupsCache[weekKey] = {}; });
+  }
+  var weekLineups = weekLineupsCache[weekKey] || {};
 
   var byScore = curEntries.slice().sort(function(a,b){ return b.score - a.score; });
   var scores = byScore.map(function(e){ return e.score; });
@@ -6075,8 +6098,9 @@ function renderNumbers(curEntries){
   function getMostStartedForSlotsWithFlex(entries){
     var slotCounts = slotDefs.map(function(){ return {}; });
     entries.forEach(function(entry){
-      if(!entry.lineup) return;
-      var players = parseLineup(entry.lineup);
+      var realLineup = weekLineups[entry.uid];
+      if(!realLineup || !realLineup.slots) return;
+      var players = Object.values(realLineup.slots).filter(Boolean).map(function(p){ return {player:p.name, pos:p.pos}; });
       var remaining = players.slice();
       slotDefs.forEach(function(slot, si){
         if(slot.pos === 'FLEX') return; // handle separately
@@ -6093,9 +6117,9 @@ function renderNumbers(curEntries){
       // Count each position across all entries
       var posCounts = {WR:{}, RB:{}, TE:{}};
       entries.forEach(function(entry){
-        if(!entry.lineup) return;
-        var players = parseLineup(entry.lineup);
-        var posUsed = {WR:0, RB:0, TE:0};
+        var realLineup = weekLineups[entry.uid];
+        if(!realLineup || !realLineup.slots) return;
+        var players = Object.values(realLineup.slots).filter(Boolean).map(function(p){ return {player:p.name, pos:p.pos}; });
         var seen = {};
         players.forEach(function(p){
           if(!posCounts[p.pos]) return;
@@ -6131,12 +6155,13 @@ function renderNumbers(curEntries){
 
   // Roster columns — high and low side by side using same slot format
   function rosterCol(entry, accentColor){
-    if(!entry || !entry.lineup) return slotDefs.map(function(slot){
+    var realLineup = entry ? weekLineups[entry.uid] : null;
+    if(!realLineup || !realLineup.slots) return slotDefs.map(function(slot){
       return '<div style="padding:9px 12px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:10px;background:var(--bg3);">'
         + '<span style="font-family:var(--fd);font-size:11px;font-weight:800;color:'+accentColor+';min-width:36px;text-transform:uppercase;">'+slot.label+'</span>'
         + '<span style="font-family:var(--fd);font-size:13px;color:var(--ink3);">—</span></div>';
     }).join('');
-    var players = parseLineup(entry.lineup);
+    var players = Object.values(realLineup.slots).filter(Boolean).map(function(p){ return {player:p.name, pos:p.pos}; });
     var remaining = players.slice();
     return slotDefs.map(function(slot){
       var idx = remaining.findIndex(function(p){ return p.pos === slot.pos; });
