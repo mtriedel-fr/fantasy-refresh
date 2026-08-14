@@ -4880,6 +4880,12 @@ function renderStandings(sorted, prevRank, curMap, wkHighName){
 
     var compareBtn = '<button class="cmp-btn" onclick="addToCompare(\'' + t.name.replace(/'/g,"\\'") + '\',this)" title="Add to comparison">+</button>';
 
+    var teamUid = entry ? entry.uid : '';
+    var rosterId = 'std-roster-' + i;
+    var expandBtn = teamUid
+      ? '<button onclick="toggleStandingsRoster(\'' + t.name.replace(/'/g,"\\'") + '\',\'' + teamUid + '\',' + i + ')" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--ink3);padding:2px 4px;" title="View roster">▾</button>'
+      : '';
+
     return '<tr class="' + tierClass + divider + (isMe ? ' my-team' : '') + '">'
       + '<td class="rk' + (r <= 3 ? ' g' : '') + '">' + (r <= 3 ? MED[r-1] : r) + '</td>'
       + '<td><div class="tn-wrap"><a class="season-name-link" href="player.html?team=' + encodeURIComponent(t.name) + '">' + t.name + '</a>'
@@ -4888,14 +4894,47 @@ function renderStandings(sorted, prevRank, curMap, wkHighName){
       + streakBadge
       + tierBadge
       + scoreBadge
+      + expandBtn
       + tip + '</div></td>'
       + '<td class="tp" style="text-align:right">' + fmtTotal(t.total) + '</td>'
       + '<td class="ws" style="text-align:right">' + (wk !== undefined ? fmtScore(wk) : '—') + '</td>'
       + '<td class="av" style="text-align:right">' + fmtScore(t.avg) + '</td>'
       + '<td class="move-col">' + mv + '</td>'
       + '<td style="width:32px;text-align:center">' + compareBtn + '</td>'
-      + '</tr>';
+      + '</tr>'
+      + '<tr id="' + rosterId + '" style="display:none;"><td colspan="7" style="padding:0;background:var(--bg2);"></td></tr>';
   }).join('');
+
+  // Toggles a team's roster open/closed inline in standings — fetched
+  // lazily on first expand, not for every team up front. Reuses
+  // rosterColumn(), the same function already built for H2H matchups,
+  // so this gets the exact same privacy gating (a player's identity
+  // stays hidden until their game has actually started) for free,
+  // rather than building a second, separate implementation of that rule.
+  window.toggleStandingsRoster = function(teamName, uid, idx){
+    var row = document.getElementById('std-roster-' + idx);
+    if(!row) return;
+    if(row.style.display !== 'none'){ row.style.display = 'none'; return; }
+    row.style.display = '';
+    var cell = row.querySelector('td');
+    if(cell.dataset.loaded) return;
+    cell.innerHTML = '<div style="padding:12px;font-family:var(--fd);font-size:12px;color:var(--ink3);">Loading…</div>';
+    var ctx = FRAuth.getLeagueCtx();
+    var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+    var season = (ctx && ctx.season) || 2026;
+    Promise.all([
+      FR.fb.get('/leagues/' + leagueId + '/lineups/' + season + '/week' + currentWeek + '/' + uid).catch(function(){ return null; }),
+      FR.fb.get('/leagues/' + leagueId + '/season/' + season + '/' + currentWeek + '/' + uid).catch(function(){ return null; }),
+      FR.fb.get('/leagues/' + leagueId + '/locks/' + season + '/week' + currentWeek).catch(function(){ return {}; }),
+      fetchWeekSchedule(currentWeek).catch(function(){ return {}; })
+    ]).then(function(results){
+      var lineup = results[0], scoreEntry = results[1], locks = results[2] || {}, gameMap = results[3] || {};
+      cell.innerHTML = rosterColumn(lineup, scoreEntry, locks, false, gameMap);
+      cell.dataset.loaded = '1';
+    }).catch(function(){
+      cell.innerHTML = '<div style="padding:12px;font-family:var(--fd);font-size:12px;color:var(--ink3);">Couldn\'t load this roster.</div>';
+    });
+  };
 
   var tierNote = locked
     ? '<div style="padding:10px 16px 6px;font-family:var(--fd);font-size:11px;color:var(--ink3);letter-spacing:.5px;text-transform:uppercase;background:var(--bg2);border-bottom:1px solid var(--bdr)">Playoff tiers locked after Week ' + TIER_LOCK_WEEK + ' &middot; <a href="#" onclick="handleNav(String.fromCharCode(112,108,97,121,111,102,102,115))" style="color:var(--or);text-decoration:none;">View Playoff Bracket &rarr;</a></div>'
