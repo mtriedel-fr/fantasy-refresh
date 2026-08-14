@@ -1,6 +1,9 @@
 name: Auto Scoring
 
 on:
+concurrency:
+  group: auto-scoring
+  cancel-in-progress: false
   schedule:
     # Every 5 min Thursday night (TNF) — UTC
     - cron: '*/5 23 * * 4'
