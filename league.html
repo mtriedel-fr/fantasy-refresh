@@ -2391,22 +2391,30 @@ function rosterColumn(lineup, scoreEntry, locks, isMine, gameMap, ownership){
     return '<div><div class="h2h-roster-side-hdr">' + escapeHtmlFR(teamLabel) + '</div>' + budgetLine + '<div class="lineup-card-list">' + (allRows || '<div class="h2h-roster-empty">Empty roster.</div>') + '</div></div>';
   }
 
-  var startedRows = [];
-  var notStartedCount = 0;
-
-  sortedSlotIds(lineup.slots).forEach(function(slotId){
+  var allRows2 = sortedSlotIds(lineup.slots).map(function(slotId){
     var p = lineup.slots[slotId];
-    if(!p) return;
+    if(!p) return '';
     var hasStarted = !!(p.team && locks && locks[p.team]);
-    if(!hasStarted){ notStartedCount++; return; }
-    startedRows.push(buildLineupPlayerCard(p, slotPts[slotId], hasStarted, gameMap, false, slotId, slotBreakdown[slotId], ownership ? ownership[p.id] : undefined));
-  });
+    if(hasStarted){
+      return buildLineupPlayerCard(p, slotPts[slotId], hasStarted, gameMap, false, slotId, slotBreakdown[slotId], ownership ? ownership[p.id] : undefined);
+    }
+    // Masked row — same visual shape as a real player card, but never
+    // reveals identity before that player's game has actually started.
+    // Replaces the earlier behavior of omitting unstarted players from
+    // the list entirely (just counted in a footer) — full roster is now
+    // always visible, with unstarted slots plainly marked instead of
+    // hidden.
+    var slotLabelOnly = slotId ? lineupSlotStructuralLabel(slotId, p.pos) : (p.pos || '');
+    return '<div class="lineup-card">'
+      + '<span class="lineup-card-photo loaded" style="display:flex;align-items:center;justify-content:center;background:var(--bg3);font-size:16px;">🔒</span>'
+      + '<div class="lineup-card-mid">'
+      +   '<div class="lineup-card-name" style="color:var(--ink3);">' + escapeHtmlFR(slotLabelOnly) + ' — Yet to play</div>'
+      + '</div>'
+      + '</div>';
+  }).join('');
 
-  var body = startedRows.length ? ('<div class="lineup-card-list">' + startedRows.join('') + '</div>') : '<div class="h2h-roster-empty">No players have kicked off yet.</div>';
-  var footer = notStartedCount
-    ? '<div class="h2h-roster-pending">' + notStartedCount + ' more player' + (notStartedCount > 1 ? 's' : '') + ' not started yet — still swappable.</div>'
-    : '';
-  return '<div><div class="h2h-roster-side-hdr">' + escapeHtmlFR(teamLabel) + '</div>' + body + footer + '</div>';
+  var body = '<div class="lineup-card-list">' + (allRows2 || '<div class="h2h-roster-empty">Empty roster.</div>') + '</div>';
+  return '<div><div class="h2h-roster-side-hdr">' + escapeHtmlFR(teamLabel) + '</div>' + body + '</div>';
 }
 
 // ── BOOT ───────────────────────────────────────────────────────
@@ -6239,13 +6247,22 @@ function renderNumbers(curEntries){
       // whether any of those games had even kicked off, same privacy
       // standard already enforced everywhere else a player card shows.
       var hasStarted = player && player.team && weekLocks[player.team];
-      var displayName = player ? (hasStarted ? player.name : '🔒 Not started') : '—';
-      var nameColor = player && !hasStarted ? 'var(--ink3)' : 'var(--ink)';
-      var pts = (hasStarted && entry && entry.slotPts) ? entry.slotPts[slotIds[i]] : undefined;
+      var rowBg = i % 2 ? 'var(--bg3)' : 'transparent';
+      if(!player || !hasStarted){
+        // Minimal, quiet treatment for empty/not-started slots — the
+        // previous full "🔒 Not started" text repeated on every row
+        // added a lot of visual noise without conveying more than a
+        // simple dash does at a glance.
+        return '<div style="padding:8px 12px;display:flex;align-items:center;gap:10px;background:'+rowBg+';">'
+          + '<span style="font-family:var(--fd);font-size:10px;font-weight:800;color:var(--ink3);min-width:34px;text-transform:uppercase;opacity:.6;">'+slot.label+'</span>'
+          + '<span style="font-family:var(--fd);font-size:12px;color:var(--ink3);opacity:.55;flex:1;">—</span>'
+          + '</div>';
+      }
+      var pts = (entry && entry.slotPts) ? entry.slotPts[slotIds[i]] : undefined;
       var ptsDisplay = (typeof pts === 'number') ? '<span style="font-family:var(--fd);font-size:12px;font-weight:700;color:var(--ink2);white-space:nowrap;">' + pts.toFixed(2) + '</span>' : '';
-      return '<div style="padding:9px 12px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:10px;background:var(--bg3);">'
-        + '<span style="font-family:var(--fd);font-size:11px;font-weight:800;color:'+accentColor+';min-width:36px;text-transform:uppercase;">'+slot.label+'</span>'
-        + '<span style="font-family:var(--fd);font-size:13px;font-weight:600;color:'+nameColor+';flex:1;">'+displayName+'</span>'
+      return '<div style="padding:9px 12px;display:flex;align-items:center;gap:10px;background:'+rowBg+';border-left:2px solid '+accentColor+';">'
+        + '<span style="font-family:var(--fd);font-size:11px;font-weight:800;color:'+accentColor+';min-width:34px;text-transform:uppercase;">'+slot.label+'</span>'
+        + '<span style="font-family:var(--fd);font-size:13px;font-weight:600;color:var(--ink);flex:1;">'+player.name+'</span>'
         + ptsDisplay
         + '</div>';
     }).join('');
@@ -6255,16 +6272,22 @@ function renderNumbers(curEntries){
   var mostStartedCol = slotStarters.map(function(d, si){
     var slot = slotDefs[si];
     var pct = d ? Math.round(d.count/d.total*100) : 0;
-    var displayName = d ? (d.player || '🔒 Not started') : '—';
-    var nameColor = d && !d.player ? 'var(--ink3)' : 'var(--ink)';
-    var ptsDisplay = (d && d.player && typeof d.pts === 'number')
+    var rowBg = si % 2 ? 'var(--bg3)' : 'transparent';
+    if(!d || !d.player){
+      return '<div style="padding:8px 12px;display:flex;align-items:center;gap:10px;background:'+rowBg+';">'
+        + '<span style="font-family:var(--fd);font-size:10px;font-weight:800;color:var(--ink3);min-width:34px;text-transform:uppercase;opacity:.6;">'+slot.label+'</span>'
+        + '<span style="font-family:var(--fd);font-size:12px;color:var(--ink3);opacity:.55;flex:1;">—</span>'
+        + (d ? '<span style="font-family:var(--fd);font-size:10px;color:var(--ink3);opacity:.6;white-space:nowrap;">'+d.count+' ('+pct+'%)</span>' : '')
+        + '</div>';
+    }
+    var ptsDisplay = (typeof d.pts === 'number')
       ? '<span style="font-family:var(--fd);font-size:12px;font-weight:700;color:var(--ink2);white-space:nowrap;">'+d.pts.toFixed(2)+'</span>'
       : '';
-    return '<div style="padding:9px 12px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:10px;background:var(--bg3);">'
-      + '<span style="font-family:var(--fd);font-size:11px;font-weight:800;color:var(--pu);min-width:36px;text-transform:uppercase;">'+slot.label+'</span>'
-      + '<span style="font-family:var(--fd);font-size:13px;font-weight:600;color:'+nameColor+';flex:1;">'+displayName+'</span>'
+    return '<div style="padding:9px 12px;display:flex;align-items:center;gap:10px;background:'+rowBg+';border-left:2px solid var(--pu);">'
+      + '<span style="font-family:var(--fd);font-size:11px;font-weight:800;color:var(--pu);min-width:34px;text-transform:uppercase;">'+slot.label+'</span>'
+      + '<span style="font-family:var(--fd);font-size:13px;font-weight:600;color:var(--ink);flex:1;">'+d.player+'</span>'
       + ptsDisplay
-      + (d ? '<span style="font-family:var(--fd);font-size:11px;color:var(--ink3);white-space:nowrap;">'+d.count+' ('+pct+'%)</span>' : '')
+      + '<span style="font-family:var(--fd);font-size:11px;color:var(--ink3);white-space:nowrap;">'+d.count+' ('+pct+'%)</span>'
       + '</div>';
   }).join('');
 
@@ -6293,7 +6316,7 @@ function renderNumbers(curEntries){
 
     // THREE COLUMNS SIDE BY SIDE
     + '<div class="num-section"><div class="num-section-hdr">📋 Rosters & Most Started</div>'
-    + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;background:var(--bdr);">'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:2px;background:var(--bdr);">'
 
     // Column 1 — High scorer
     + '<div>'
