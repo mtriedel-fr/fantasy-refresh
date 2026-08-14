@@ -686,27 +686,28 @@ jobs:
             // week=0, is what really works for the HOF game), and that
             // getNFLGamesForWeek itself was intermittently unreliable.
             // gameDate sidesteps season-type and week-numbering entirely.
-            // GitHub Actions runs in UTC, but NFL game dates are labeled
-            // by US time — trying both today's and yesterday's UTC date
-            // rather than a timezone conversion.
-            function fmtDate(d) {
-              return `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, '0')}${String(d.getUTCDate()).padStart(2, '0')}`;
-            }
+            //
+            // Date computed directly in US Eastern time — confirmed
+            // tonight (in kickoff-locks.yml, which has this exact same
+            // bug) that the earlier "try today's UTC date, fall back to
+            // yesterday's" heuristic breaks specifically when multiple
+            // different days in the same week all have real games
+            // scheduled: once UTC crosses midnight, "today" quietly
+            // becomes tomorrow, and since tomorrow ALSO has real games,
+            // the fallback to yesterday never triggers — it just
+            // confidently locks onto the wrong day entirely.
             const nowDate = new Date();
-            const yesterdayDate = new Date(nowDate.getTime() - 24 * 60 * 60 * 1000);
+            const etDate = new Intl.DateTimeFormat('en-CA', {
+              timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit'
+            }).format(nowDate).replace(/-/g, '');
+            console.log(`Today in US Eastern time: ${etDate}`);
             let games = [];
-            for (const gameDate of [fmtDate(nowDate), fmtDate(yesterdayDate)]) {
-              try {
-                const gamesData = await t01(`/getNFLScoresOnly?gameDate=${gameDate}`);
-                const candidate = Object.values(gamesData.body || {});
-                if (candidate.length) {
-                  console.log(`Found ${candidate.length} game(s) for ${gameDate} via getNFLScoresOnly`);
-                  games = candidate;
-                  break;
-                }
-              } catch(e) {
-                console.log(`  gameDate=${gameDate} attempt failed: ${e.message}`);
-              }
+            try {
+              const gamesData = await t01(`/getNFLScoresOnly?gameDate=${etDate}`);
+              games = Object.values(gamesData.body || {});
+              console.log(`Found ${games.length} game(s) for ${etDate} via getNFLScoresOnly`);
+            } catch(e) {
+              console.log(`  gameDate=${etDate} attempt failed: ${e.message}`);
             }
 
             if (!games.length) {
