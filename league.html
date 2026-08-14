@@ -3329,7 +3329,14 @@ function renderAll(){
   if(el('s-myfinish')){
     el('s-myfinish').textContent = myWkRank ? '#' + myWkRank : '—';
     el('s-myfinish').style.color = myWkRank && myWkRank <= 3 ? 'var(--or)' : myWkRank && myWkRank > sortedEntries.length * 0.66 ? 'var(--pk)' : 'var(--ink)';
-    el('s-myfinish-sub').textContent = myWkRank ? 'of ' + sortedEntries.length + ' teams' : '';
+    // Total reflects the real league size (every active member), not
+    // just teams that happen to already have a score entry — reuses the
+    // same full member list already fetched for standings, rather than
+    // building this a second, separate way. Falls back to the raw
+    // score-entry count if that full list hasn't loaded yet.
+    var fullList = fullStandingsCache[String(currentWeek)];
+    var totalTeamCount = fullList ? fullList.length : sortedEntries.length;
+    el('s-myfinish-sub').textContent = myWkRank ? 'of ' + totalTeamCount + ' teams' : '';
     // Update label — Final Place if scores are locked, Current Place if still live
     var placeLbl = el('s-place-lbl');
     if(placeLbl){
