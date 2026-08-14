@@ -635,13 +635,32 @@ function loadWeekAndData(){
     fetch(FR.paths.url(FR.paths.season()) + '?shallow=true')
       .then(function(r){ return r.json(); })
       .then(function(keys){
-        if(keys && typeof keys === 'object'){
-          var weeks = Object.keys(keys).filter(function(k){ return !isNaN(Number(k)); }).map(Number);
-          if(weeks.length){
-            currentWeek = Math.min(Math.max.apply(null, weeks) + 1, 4);
-          }
-        }
-        finishPreseasonLoad();
+        if(!keys || typeof keys !== 'object'){ finishPreseasonLoad(); return; }
+        var weeks = Object.keys(keys).filter(function(k){ return !isNaN(Number(k)); }).map(Number);
+        if(!weeks.length){ finishPreseasonLoad(); return; }
+        var highestWeek = Math.max.apply(null, weeks);
+        // Same 24-hour-after-final rule already used on the home page —
+        // without this, "does the next week have ANY score data" alone
+        // would advance here the instant a week starts being scored live,
+        // not once it's actually finished. That pushed people toward
+        // drafting the week after next while their current week's game
+        // was still genuinely in progress, not done.
+        // Path built directly, appended to FR.paths.season()'s own path
+        // string before URL conversion — not appended after (which would
+        // land after the .json suffix and be invalid). Uses FR.fb.get(),
+        // the same safe pattern already proven working elsewhere in this
+        // file, rather than the FR_SEASON client variable (which gets
+        // overridden to a mismatched value for preseason leagues).
+        FR.fb.get(FR.paths.season() + '/' + highestWeek + '/finalizedAt')
+          .then(function(finalizedAt){
+            if(typeof finalizedAt === 'number' && (Date.now() - finalizedAt) > 24 * 60 * 60 * 1000){
+              currentWeek = Math.min(highestWeek + 1, 4);
+            } else {
+              currentWeek = highestWeek;
+            }
+            finishPreseasonLoad();
+          })
+          .catch(function(){ currentWeek = highestWeek; finishPreseasonLoad(); });
       })
       .catch(function(){ finishPreseasonLoad(); });
     return;
@@ -649,18 +668,38 @@ function loadWeekAndData(){
   fetch(FR.paths.url(FR.paths.season()) + '?shallow=true')
     .then(function(r){ return r.json(); })
     .then(function(keys){
-      if(keys && typeof keys === 'object'){
-        var weeks = Object.keys(keys).filter(function(k){ return !isNaN(Number(k)); }).map(Number);
-        currentWeek = weeks.length ? Math.min(Math.max.apply(null,weeks)+1, 18) : 1;
+      var weeks = (keys && typeof keys === 'object') ? Object.keys(keys).filter(function(k){ return !isNaN(Number(k)); }).map(Number) : [];
+      if(!weeks.length){
+        currentWeek = 1;
+        finishRegularLoad();
+        return;
       }
-      document.getElementById('hdr-week').textContent = 'Week '+currentWeek+' Draft';
-      document.getElementById('week-label').textContent = 'Week '+currentWeek;
-      loadSalaries();
-      loadSchedule();
-      loadSubmitted();
-      loadLocks();
+      var highestWeek = Math.max.apply(null, weeks);
+      // Same 24-hour-after-final rule as the preseason path above and
+      // the home page — "does the next week have any score data" alone
+      // would advance the instant a week starts being scored live, not
+      // once it's actually finished.
+      FR.fb.get(FR.paths.season() + '/' + highestWeek + '/finalizedAt')
+        .then(function(finalizedAt){
+          if(typeof finalizedAt === 'number' && (Date.now() - finalizedAt) > 24 * 60 * 60 * 1000){
+            currentWeek = Math.min(highestWeek + 1, 18);
+          } else {
+            currentWeek = highestWeek;
+          }
+          finishRegularLoad();
+        })
+        .catch(function(){ currentWeek = highestWeek; finishRegularLoad(); });
     })
     .catch(function(){ currentWeek=1; loadSalaries(); loadSchedule(); });
+
+  function finishRegularLoad(){
+    document.getElementById('hdr-week').textContent = 'Week '+currentWeek+' Draft';
+    document.getElementById('week-label').textContent = 'Week '+currentWeek;
+    loadSalaries();
+    loadSchedule();
+    loadSubmitted();
+    loadLocks();
+  }
 }
 
 
