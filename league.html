@@ -2993,9 +2993,58 @@ function renderCumHome(){
   renderCumStandingsPage(0);
 }
 
+var fullStandingsCache = {}; // week -> full merged list (every real member, not just ones with a score entry)
+
 function computeCumStandings(){
   var entries = seasonData[String(currentWeek)] || [];
-  return entries.slice().sort(function(a,b){ return b.score - a.score; });
+  var scored = entries.slice().sort(function(a,b){ return b.score - a.score; });
+
+  var weekKey = String(currentWeek);
+  if(fullStandingsCache[weekKey]) return fullStandingsCache[weekKey];
+
+  // Build the full list once, in the background — every real league
+  // member should always show here, not just the ones who happen to
+  // already have a score entry written. A member who hasn't submitted a
+  // lineup at all reads "Roster Not Submitted" instead of a score; one
+  // who has submitted but hasn't been scored yet (or scored 0) shows
+  // 0.00 like anyone else. Re-renders standings once this resolves.
+  var ctx = FRAuth.getLeagueCtx();
+  var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+  var season = (ctx && ctx.season) || 2026;
+  Promise.all([
+    FR.fb.get('/leagues/' + leagueId + '/members').catch(function(){ return {}; }),
+    FR.fb.get('/leagues/' + leagueId + '/lineups/' + season + '/week' + currentWeek + '?shallow=true').catch(function(){ return {}; })
+  ]).then(function(results){
+    var members = results[0] || {};
+    var lineupUids = results[1] || {};
+    var scoredByUid = {};
+    scored.forEach(function(e){ if(e.uid) scoredByUid[e.uid] = e; });
+
+    var full = Object.keys(members).map(function(uid){
+      var m = members[uid] || {};
+      if(m.active === false) return null; // inactive/removed members don't show
+      if(scoredByUid[uid]) return scoredByUid[uid];
+      var hasLineup = !!lineupUids[uid];
+      return {
+        name: m.teamName || 'Unnamed Team',
+        uid: uid,
+        score: hasLineup ? 0 : null, // null signals "not submitted" vs a real 0.00
+        notSubmitted: !hasLineup
+      };
+    }).filter(Boolean);
+
+    full.sort(function(a,b){
+      // Real scores (including 0.00) rank above "not submitted" entries
+      if(a.notSubmitted && !b.notSubmitted) return 1;
+      if(!a.notSubmitted && b.notSubmitted) return -1;
+      return (b.score||0) - (a.score||0);
+    });
+
+    fullStandingsCache[weekKey] = full;
+    if(String(currentWeek) === weekKey && typeof renderCumStandingsPage === 'function') renderCumStandingsPage(0);
+  });
+
+  return scored; // fallback shown immediately while the full list loads
 }
 
 function renderCumStandingsPage(page){
@@ -3019,13 +3068,16 @@ function renderCumStandingsPage(page){
   var rows = pageRows.map(function(t, i){
     var isMe = myTeam && teamMatch(t.name, myTeam);
     var rosterId = 'cum-home-roster-' + page + '-' + i;
-    var expandBtn = t.uid
+    var expandBtn = (t.uid && !t.notSubmitted)
       ? '<button onclick="toggleStandingsRoster(\'' + t.name.replace(/'/g,"\\'") + '\',\'' + t.uid + '\',\'' + rosterId + '\')" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--ink3);padding:2px 4px;vertical-align:middle;" title="View roster">▾</button>'
       : '';
+    var scoreCell = t.notSubmitted
+      ? '<span style="font-family:var(--fd);font-size:12px;font-style:italic;color:var(--ink3);">Roster Not Submitted</span>'
+      : fmtScore(t.score);
     return '<tr' + (isMe ? ' class="my-team"' : '') + '>'
       + '<td class="rk">' + (page*perPage + i + 1) + '</td>'
       + '<td style="font-family:var(--fd);font-size:14px;font-weight:700;color:' + (isMe ? 'var(--or)' : 'var(--ink)') + ';">' + escapeHtmlFR(t.name) + ' ' + expandBtn + '</td>'
-      + '<td style="text-align:right;font-family:var(--fd);color:var(--ink2);">' + fmtScore(t.score) + '</td>'
+      + '<td style="text-align:right;font-family:var(--fd);color:var(--ink2);">' + scoreCell + '</td>'
       + '</tr>'
       + '<tr id="' + rosterId + '" style="display:none;"><td colspan="3" style="padding:0;background:var(--bg2);"></td></tr>';
   }).join('');
