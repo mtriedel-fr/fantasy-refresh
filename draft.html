@@ -2090,9 +2090,11 @@ function loadLocks(){
     return;
   }
   var path = FR.paths.url(FR.paths.weekLocks(currentWeek));
+  console.log('🔒 loadLocks fetching for currentWeek=' + currentWeek + ' path=' + path);
   fetch(path)
     .then(function(r){ return r.json(); })
     .then(function(data){
+      console.log('🔒 loadLocks received:', JSON.stringify(data));
       teamLocks = data || {};
       renderRoster();
       renderPicker();
