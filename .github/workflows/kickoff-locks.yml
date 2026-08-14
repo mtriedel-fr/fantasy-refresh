@@ -1,19 +1,15 @@
 name: Kickoff Locks
 
+concurrency:
+  group: kickoff-locks
+  cancel-in-progress: false
+
 on:
-  schedule:
-    # Thursday Night Football (Thu 7pm-midnight ET = Thu 23:00-04:00 UTC)
-    - cron: '*/5 23 * * 4'
-    - cron: '*/5 0-4 * * 5'
-    # Sunday games (Sun 12:55pm-midnight ET = Sun 16:55-04:00 UTC)
-    - cron: '*/5 17-23 * * 0'
-    - cron: '*/5 0-4 * * 1'
-    # Monday Night Football (Mon 7:55pm-midnight ET = Mon 23:55-04:00 UTC)
-    - cron: '*/5 23 * * 1'
-    - cron: '*/5 0-4 * * 2'
-    # International games - Friday/Saturday
-    - cron: '*/5 12-20 * * 5'
-    - cron: '*/5 12-20 * * 6'
+  # Schedule triggers removed — this workflow is now triggered
+  # externally on a reliable cadence (cron-job.org), which supersedes
+  # GitHub's own unreliable high-frequency scheduling (confirmed tonight
+  # it was actually only firing about once an hour despite asking for
+  # every 5 minutes).
   workflow_dispatch:
 
 jobs:
@@ -282,35 +278,13 @@ jobs:
             }
           }
 
-          function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
-
-          // GitHub Actions' scheduler isn't reliably honoring the 5-minute
-          // cron interval this workflow asks for — confirmed tonight it
-          // was actually only firing about once an hour, which meant a
-          // game could go from "not started" to "almost over" between
-          // checks, with locks never getting written in that whole gap.
-          // Same fix already proven working in auto-scoring.yml tonight
-          // for the identical problem: each actual run now keeps
-          // checking every 90 seconds internally for several minutes,
-          // rather than depending entirely on the outer scheduler's own
-          // timing reliability.
-          async function runLoop() {
-            const startedAt = Date.now();
-            const MAX_RUN_MS = 4 * 60 * 1000; // stop with a clean buffer before the next scheduled trigger
-            let iteration = 0;
-            while (true) {
-              iteration++;
-              console.log(`\n🔁 Lock-check iteration ${iteration} (${Math.round((Date.now() - startedAt) / 1000)}s into this run)`);
-              await main();
-              if (Date.now() - startedAt >= MAX_RUN_MS) {
-                console.log('⏹️  Ending this run — next scheduled trigger will pick up from here.');
-                break;
-              }
-              await sleep(90 * 1000);
-            }
-          }
-
-          runLoop().catch(e => {
+          // Internal loop removed — this workflow will be triggered
+          // externally on a reliable cadence (cron-job.org), same as
+          // auto-scoring.yml, which supersedes GitHub's own unreliable
+          // high-frequency scheduling entirely. Looping internally on
+          // top of a reliable external trigger would cause overlapping
+          // runs and wasted Tank01 API calls for no benefit.
+          main().catch(e => {
             console.error('Lock job failed:', e);
             process.exit(1);
           });
