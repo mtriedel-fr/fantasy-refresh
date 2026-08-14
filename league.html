@@ -5356,6 +5356,13 @@ function buildCompareScoreChart(teamStats, weeks){
   if(!allScores.length) return '';
   var minV = Math.min.apply(null,allScores)*0.95, maxV = Math.max.apply(null,allScores)*1.03;
 
+  // Confirmed via real testing: this chart was calling xp()/yp() without
+  // ever defining them locally — a genuine "can't find variable" error
+  // the moment this specific chart tried to render, not something from
+  // tonight's own changes.
+  function xp(i){return PAD.l+(i/(weeks.length-1||1))*iW;}
+  function yp(v){return PAD.t+iH-((v-minV)/(maxV-minV||1))*iH;}
+
   
   
 
@@ -5404,6 +5411,11 @@ function buildCompareRankChart(teamStats, weeks){
   })());
 
   var maxRank = allNames.length || Object.keys(seasonData[curKey]||{}).length || 10;
+
+  // Same missing-definitions bug as buildCompareScoreChart above,
+  // adapted for rank values (1 = best = highest on chart).
+  function xp(i){return PAD.l+(i/(weeks.length-1||1))*iW;}
+  function yp(r){return PAD.t+iH-((maxRank-r)/(maxRank-1||1))*iH;}
   
   
 
@@ -5701,6 +5713,9 @@ function buildScoreChartInline(weekData){
   var iW=W-PAD.l-PAD.r, iH=H-PAD.t-PAD.b;
   var scores=weekData.map(function(d){return d.score;}), avgs=weekData.map(function(d){return d.avg;});
   var minV=Math.min.apply(null,scores.concat(avgs))*0.92, maxV=Math.max.apply(null,scores.concat(avgs))*1.05;
+  // Same missing-definitions bug as the other chart functions above.
+  function xp(i){return PAD.l+(i/(weekData.length-1||1))*iW;}
+  function yp(v){return PAD.t+iH-((v-minV)/(maxV-minV||1))*iH;}
   
   
   var sp=weekData.map(function(d,i){return(i?'L':'M')+xp(i).toFixed(1)+' '+yp(d.score).toFixed(1);}).join(' ');
@@ -6030,6 +6045,7 @@ function renderFinish(sorted, curEntries, prevRank){
 
 // ── WEEKLY NUMBERS VIEW ───────────────────────────────────────
 var weekLineupsCache = {}; // week -> {uid: {slots: {...}}, ...} — real lineup data, fetched separately since score entries never actually carry a lineup field (see below)
+var weekLocksCache = {}; // week -> {team: true, ...} — which teams have locked (kicked off), used to gate player identity in Roster/Most Started until their game has actually started
 
 function renderNumbers(curEntries){
   var el = document.getElementById('wn');
@@ -6047,11 +6063,18 @@ function renderNumbers(curEntries){
   // path. Fetched once per week and cached; re-renders this same
   // section once the fetch lands, rather than restructuring this whole
   // synchronous render pipeline into async/await.
+  //
+  // Locks fetched the same way — needed so this panel can hide a
+  // player's identity until their game has actually started, same
+  // privacy standard already used everywhere else a player card shows
+  // up. Without this, this panel was showing every other team's full,
+  // real roster regardless of whether any of those games had even
+  // kicked off yet.
   var weekKey = String(currentWeek);
+  var ctx = FRAuth.getLeagueCtx();
+  var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+  var season = (ctx && ctx.season) || 2026;
   if(!weekLineupsCache[weekKey]){
-    var ctx = FRAuth.getLeagueCtx();
-    var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
-    var season = (ctx && ctx.season) || 2026;
     FR.fb.get('/leagues/' + leagueId + '/lineups/' + season + '/week' + currentWeek)
       .then(function(data){
         weekLineupsCache[weekKey] = data || {};
@@ -6059,7 +6082,16 @@ function renderNumbers(curEntries){
       })
       .catch(function(){ weekLineupsCache[weekKey] = {}; });
   }
+  if(!weekLocksCache[weekKey]){
+    FR.fb.get('/leagues/' + leagueId + '/locks/' + season + '/week' + currentWeek)
+      .then(function(data){
+        weekLocksCache[weekKey] = data || {};
+        if(String(currentWeek) === weekKey) renderNumbers(curEntries);
+      })
+      .catch(function(){ weekLocksCache[weekKey] = {}; });
+  }
   var weekLineups = weekLineupsCache[weekKey] || {};
+  var weekLocks = weekLocksCache[weekKey] || {};
 
   var byScore = curEntries.slice().sort(function(a,b){ return b.score - a.score; });
   var scores = byScore.map(function(e){ return e.score; });
@@ -6107,58 +6139,32 @@ function renderNumbers(curEntries){
 
   // For FLEX slot: find most-started eligible player (WR/RB/TE) NOT already in a prior slot
   function getMostStartedForSlotsWithFlex(entries){
-    var slotCounts = slotDefs.map(function(){ return {}; });
+    // Real slot IDs, confirmed from draft.html's own SLOT_DEFS — counting
+    // directly by these instead of inferring FLEX assignment from
+    // position counts (the old approach's whole reason for existing).
+    // The real lineup data already says exactly who's in each slot.
+    var slotIds = ['qb1','rb1','rb2','wr1','wr2','wr3','te1','fx1','df1'];
+    var slotCounts = slotIds.map(function(){ return {}; }); // {playerName: {count, hasStarted}}
+
     entries.forEach(function(entry){
       var realLineup = weekLineups[entry.uid];
       if(!realLineup || !realLineup.slots) return;
-      var players = Object.values(realLineup.slots).filter(Boolean).map(function(p){ return {player:p.name, pos:p.pos}; });
-      var remaining = players.slice();
-      slotDefs.forEach(function(slot, si){
-        if(slot.pos === 'FLEX') return; // handle separately
-        var idx = remaining.findIndex(function(p){ return p.pos === slot.pos; });
-        if(idx < 0) return;
-        var p = remaining.splice(idx,1)[0];
-        slotCounts[si][p.player] = (slotCounts[si][p.player]||0) + 1;
+      slotIds.forEach(function(slotId, si){
+        var p = realLineup.slots[slotId];
+        if(!p || !p.name) return;
+        var hasStarted = !!(p.team && weekLocks[p.team]);
+        if(!slotCounts[si][p.name]) slotCounts[si][p.name] = { count: 0, hasStarted: hasStarted };
+        slotCounts[si][p.name].count++;
       });
     });
-
-    // FLEX: use same logic as season wrap — 4th WR, 3rd RB, or 2nd TE (highest starts)
-    var flexIdx = slotDefs.findIndex(function(s){ return s.pos === 'FLEX'; });
-    if(flexIdx >= 0){
-      // Count each position across all entries
-      var posCounts = {WR:{}, RB:{}, TE:{}};
-      entries.forEach(function(entry){
-        var realLineup = weekLineups[entry.uid];
-        if(!realLineup || !realLineup.slots) return;
-        var players = Object.values(realLineup.slots).filter(Boolean).map(function(p){ return {player:p.name, pos:p.pos}; });
-        var seen = {};
-        players.forEach(function(p){
-          if(!posCounts[p.pos]) return;
-          var key = p.player;
-          if(!seen[key]){
-            seen[key] = true;
-            posCounts[p.pos][p.player] = (posCounts[p.pos][p.player]||0) + 1;
-          }
-        });
-      });
-      // Get 4th WR, 3rd RB, 2nd TE
-      function nthTop(pos, n){
-        var sorted = Object.keys(posCounts[pos]).sort(function(a,b){ return posCounts[pos][b]-posCounts[pos][a]; });
-        return sorted[n-1] ? {player:sorted[n-1], count:posCounts[pos][sorted[n-1]]} : null;
-      }
-      var candidates = [nthTop('WR',4), nthTop('RB',3), nthTop('TE',2)].filter(Boolean);
-      if(candidates.length){
-        var best = candidates.reduce(function(a,b){ return a.count>=b.count?a:b; });
-        slotCounts[flexIdx] = {};
-        slotCounts[flexIdx][best.player] = best.count;
-      }
-    }
 
     return slotCounts.map(function(counts){
       var players = Object.keys(counts);
       if(!players.length) return null;
-      var top = players.reduce(function(a,b){ return counts[a]>=counts[b]?a:b; });
-      return {player:top, count:counts[top], total:entries.length};
+      var top = players.reduce(function(a,b){ return counts[a].count>=counts[b].count?a:b; });
+      // Same privacy gate as the roster columns — hide identity until
+      // that player's game has actually started, only reveal the count.
+      return { player: counts[top].hasStarted ? top : null, count: counts[top].count, total: entries.length };
     });
   }
 
@@ -6166,20 +6172,27 @@ function renderNumbers(curEntries){
 
   // Roster columns — high and low side by side using same slot format
   function rosterCol(entry, accentColor){
+    // Real slot IDs, confirmed from draft.html's own SLOT_DEFS — matching
+    // by position alone (the old approach) could never find FLEX (no
+    // real player has pos==='FLEX', they keep their real RB/WR/TE
+    // position regardless of which slot they're rostered in) or DEF
+    // (this array had 'DST', but real defense players are stored as
+    // 'DEF' — a plain typo/mismatch, everywhere else in this app uses
+    // 'DEF').
+    var slotIds = ['qb1','rb1','rb2','wr1','wr2','wr3','te1','fx1','df1'];
     var realLineup = entry ? weekLineups[entry.uid] : null;
-    if(!realLineup || !realLineup.slots) return slotDefs.map(function(slot){
+    return slotDefs.map(function(slot, i){
+      var player = (realLineup && realLineup.slots) ? realLineup.slots[slotIds[i]] : null;
+      // Hide identity until the game has actually started — this was
+      // showing every other team's full, real roster regardless of
+      // whether any of those games had even kicked off, same privacy
+      // standard already enforced everywhere else a player card shows.
+      var hasStarted = player && player.team && weekLocks[player.team];
+      var displayName = player ? (hasStarted ? player.name : '🔒 Not started') : '—';
+      var nameColor = player && !hasStarted ? 'var(--ink3)' : 'var(--ink)';
       return '<div style="padding:9px 12px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:10px;background:var(--bg3);">'
         + '<span style="font-family:var(--fd);font-size:11px;font-weight:800;color:'+accentColor+';min-width:36px;text-transform:uppercase;">'+slot.label+'</span>'
-        + '<span style="font-family:var(--fd);font-size:13px;color:var(--ink3);">—</span></div>';
-    }).join('');
-    var players = Object.values(realLineup.slots).filter(Boolean).map(function(p){ return {player:p.name, pos:p.pos}; });
-    var remaining = players.slice();
-    return slotDefs.map(function(slot){
-      var idx = remaining.findIndex(function(p){ return p.pos === slot.pos; });
-      var player = idx >= 0 ? remaining.splice(idx,1)[0] : null;
-      return '<div style="padding:9px 12px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:10px;background:var(--bg3);">'
-        + '<span style="font-family:var(--fd);font-size:11px;font-weight:800;color:'+accentColor+';min-width:36px;text-transform:uppercase;">'+slot.label+'</span>'
-        + '<span style="font-family:var(--fd);font-size:13px;font-weight:600;color:var(--ink);">'+(player?player.player:'—')+'</span>'
+        + '<span style="font-family:var(--fd);font-size:13px;font-weight:600;color:'+nameColor+';">'+displayName+'</span>'
         + '</div>';
     }).join('');
   }
@@ -6188,9 +6201,11 @@ function renderNumbers(curEntries){
   var mostStartedCol = slotStarters.map(function(d, si){
     var slot = slotDefs[si];
     var pct = d ? Math.round(d.count/d.total*100) : 0;
+    var displayName = d ? (d.player || '🔒 Not started') : '—';
+    var nameColor = d && !d.player ? 'var(--ink3)' : 'var(--ink)';
     return '<div style="padding:9px 12px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:10px;background:var(--bg3);">'
       + '<span style="font-family:var(--fd);font-size:11px;font-weight:800;color:var(--pu);min-width:36px;text-transform:uppercase;">'+slot.label+'</span>'
-      + '<span style="font-family:var(--fd);font-size:13px;font-weight:600;color:var(--ink);flex:1;">'+(d?d.player:'—')+'</span>'
+      + '<span style="font-family:var(--fd);font-size:13px;font-weight:600;color:'+nameColor+';flex:1;">'+displayName+'</span>'
       + (d ? '<span style="font-family:var(--fd);font-size:11px;color:var(--ink3);white-space:nowrap;">'+d.count+' ('+pct+'%)</span>' : '')
       + '</div>';
   }).join('');
