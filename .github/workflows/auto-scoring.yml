@@ -1,27 +1,9 @@
 name: Auto Scoring
 
 on:
-concurrency:
-  group: auto-scoring
-  cancel-in-progress: false
   schedule:
-    # Every 5 min Thursday night (TNF) — UTC
-    - cron: '*/5 23 * * 4'
-    - cron: '*/5 0-4 * * 5'
-    # Every 5 min Sunday (all day games + SNF)
-    - cron: '*/5 17-23 * * 0'
-    - cron: '*/5 0-5 * * 1'
-    # Every 5 min Monday night (MNF)
-    - cron: '*/5 23 * * 1'
-    - cron: '*/5 0-5 * * 2'
-    # International games Fri/Sat
-    - cron: '*/5 12-20 * * 5'
-    - cron: '*/5 12-20 * * 6'
-    # Preseason — same windows August only (cron can't filter by month,
-    # the script detects season type automatically)
-    # Tuesday 9am ET (13:00 UTC) — lock final scores
     - cron: '0 13 * * 2'
-  workflow_dispatch:
+  workflow_dispatch:  workflow_dispatch:
     inputs:
       week:
         description: 'Week number (leave blank for auto-detect)'
@@ -1412,25 +1394,8 @@ jobs:
           // before the next scheduled trigger fires, so runs don't
           // overlap. IS_LOCK_RUN (the one-time Tuesday morning lock,
           // unrelated to live scoring) only ever runs once, not looped.
-          async function runLoop() {
-            const startedAt = Date.now();
-            const MAX_RUN_MS = 4 * 60 * 1000; // stop with a clean buffer before the next 5-minute cron trigger
-            let iteration = 0;
-            while (true) {
-              iteration++;
-              console.log(`\n🔁 Scoring iteration ${iteration} (${Math.round((Date.now() - startedAt) / 1000)}s into this run)`);
-              await main();
-              if (IS_LOCK_RUN) break; // one-time run, not a live-scoring loop
-              if (Date.now() - startedAt >= MAX_RUN_MS) {
-                console.log('⏹️  Ending this run — next scheduled trigger will pick up from here in ~90s or less.');
-                break;
-              }
-              await sleep(90 * 1000);
-            }
-          }
-
-          runLoop().catch(e => {
-            console.error('Scoring job failed:', e);
-            process.exit(1);
-          });
+          main().catch(e => {
+  console.error('Scoring job failed:', e);
+  process.exit(1);
+});
           SCRIPT
