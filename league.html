@@ -3013,10 +3013,16 @@ function computeCumStandings(){
   var season = (ctx && ctx.season) || 2026;
   Promise.all([
     FR.fb.get('/leagues/' + leagueId + '/members').catch(function(){ return {}; }),
-    FR.fb.get('/leagues/' + leagueId + '/lineups/' + season + '/week' + currentWeek + '?shallow=true').catch(function(){ return {}; })
+    // Full fetch, not a shallow query-string variant — FR.fb.get()
+    // likely doesn't support a query string appended to the path this
+    // way (confirmed a working shallow-read pattern elsewhere uses raw
+    // fetch() + FR.paths.url() instead, never FR.fb.get() with a
+    // query string tacked on). This is the same full-lineup-fetch
+    // pattern already proven correct elsewhere in this file.
+    FR.fb.get('/leagues/' + leagueId + '/lineups/' + season + '/week' + currentWeek).catch(function(){ return {}; })
   ]).then(function(results){
     var members = results[0] || {};
-    var lineupUids = results[1] || {};
+    var lineups = results[1] || {};
     var scoredByUid = {};
     scored.forEach(function(e){ if(e.uid) scoredByUid[e.uid] = e; });
 
@@ -3024,7 +3030,7 @@ function computeCumStandings(){
       var m = members[uid] || {};
       if(m.active === false) return null; // inactive/removed members don't show
       if(scoredByUid[uid]) return scoredByUid[uid];
-      var hasLineup = !!lineupUids[uid];
+      var hasLineup = !!(lineups[uid] && lineups[uid].slots);
       return {
         name: m.teamName || 'Unnamed Team',
         uid: uid,
