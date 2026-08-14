@@ -93,6 +93,25 @@ jobs:
           }
 
           async function getCurrentWeek() {
+            // Date-based preseason check runs FIRST — same fix already
+            // applied to auto-scoring.yml and weekly-prep.yml earlier
+            // tonight, for the same reason: Tank01's own getNFLCurrentWeek
+            // only knows about regular-season weeks, and this file's own
+            // copy of this function never got the same fix, meaning it
+            // was still unconditionally trusting a regular-season-only
+            // week number during the genuine preseason window — which is
+            // very likely why locks were being written to the wrong week
+            // path entirely.
+            const now = new Date();
+            const month = now.getUTCMonth() + 1;
+            const day = now.getUTCDate();
+            if (month === 8 || (month === 9 && day <= 8)) {
+              const aug1 = new Date(`${now.getUTCFullYear()}-08-01`);
+              const daysSinceAug1 = Math.floor((now - aug1) / (1000 * 60 * 60 * 24));
+              const psWeek = Math.min(4, Math.max(1, Math.floor(daysSinceAug1 / 7) + 1));
+              console.log(`Preseason window (by date) — estimated week ${psWeek}`);
+              return psWeek;
+            }
             try {
               const data = await fetchJson(
                 `https://${T01_HOST}/getNFLCurrentWeek`,
