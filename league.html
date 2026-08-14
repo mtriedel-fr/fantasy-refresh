@@ -2172,7 +2172,14 @@ function totalRosterSlots(cfg){
 // button), no longer conflated with editing.
 function updateMyTeamLabel(filledCount, totalCount, targetWeek){
   var wk = targetWeek ? ' — Week ' + targetWeek : '';
-  var text = filledCount === 0 ? '📝 Draft Team' + wk
+  // Same check goToDraft() uses — keeps what the button SAYS and what it
+  // actually DOES in agreement. A past, already-final week isn't
+  // editable, so "Edit Lineup" would be misleading once clicking it
+  // opens that week's recap instead of an editor.
+  var myEntry = myTeam ? (seasonData[String(currentWeek)] || []).find(function(e){ return teamMatch(e.name, myTeam); }) : null;
+  var isPastFinal = myEntry && (myEntry.status === 'final' || myEntry.locked);
+  var text = isPastFinal ? '📰 Week ' + currentWeek + ' Review'
+    : filledCount === 0 ? '📝 Draft Team' + wk
     : filledCount < totalCount ? '🧩 Finish Lineup' + wk
     : '✏️ Edit Lineup' + wk;
   document.querySelectorAll('.myteam-label').forEach(function(l){ l.textContent = text; });
@@ -2465,6 +2472,16 @@ function boot(){
         if(typeof finalizedAt === 'number' && (Date.now() - finalizedAt) > 24 * 60 * 60 * 1000){
           currentWeek = currentWeek + 1;
           renderAll();
+          // Same fix as setWeekFromSelect() — renderAll() alone doesn't
+          // refresh an already-open My Team dropdown, since it only
+          // fetches when it's opened, not when currentWeek changes
+          // programmatically. Without this, the auto-advance correctly
+          // updates the header/standings while My Team stays stuck
+          // showing the just-finished week's roster.
+          var myTeamDrop = document.getElementById('myteam-drop');
+          if(myTeamDrop && !myTeamDrop.classList.contains('hidden')){
+            loadMyTeamLineup(myTeamDrop);
+          }
         }
       })
       .catch(function(){});
@@ -9333,6 +9350,17 @@ function getDraftUrl(){
 }
 
 function goToDraft(){
+  // A past, already-final week isn't editable — redirect to that week's
+  // Weekly Review instead of the draft page, rather than offering an
+  // "Edit Lineup" action that doesn't actually make sense once a week
+  // is done. Only redirects when this specific team's own entry for the
+  // currently-viewed week is genuinely final; a live or upcoming week
+  // still goes to the draft page as normal.
+  var myEntry = myTeam ? (seasonData[String(currentWeek)] || []).find(function(e){ return teamMatch(e.name, myTeam); }) : null;
+  if(myEntry && (myEntry.status === 'final' || myEntry.locked)){
+    openRecap(currentWeek);
+    return;
+  }
   window.location.href = getDraftUrl();
 }
 
