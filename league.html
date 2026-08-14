@@ -3111,6 +3111,7 @@ function loadMyTeamLineup(drop){
 }
 
 function loadMyTeamLineupForWeek(drop, leagueId, season, seasonType, user, targetWeek){
+  console.log('🔍 loadMyTeamLineupForWeek called with: leagueId=' + leagueId + ' season=' + season + ' targetWeek=' + targetWeek + ' uid=' + user.uid);
   Promise.all([
     FR.fb.get('/leagues/' + leagueId + '/lineups/' + season + '/week' + targetWeek + '/' + user.uid),
     FR.fb.get('/leagues/' + leagueId + '/season/' + season + '/' + targetWeek + '/' + user.uid),
@@ -3119,6 +3120,7 @@ function loadMyTeamLineupForWeek(drop, leagueId, season, seasonType, user, targe
     FR.fb.get('/liveGameStatus/' + season + '/' + seasonType + '_wk' + targetWeek).catch(function(){ return null; }),
     FR.fb.get('/leagues/' + leagueId + '/season/' + season + '/' + targetWeek + '/ownership').catch(function(){ return null; })
   ]).then(function(results){
+    console.log('🔍 loadMyTeamLineupForWeek received lineup:', JSON.stringify(results[0]));
     var lineup     = results[0];
     var scoreEntry = results[1];
     var locks      = results[2] || {};
