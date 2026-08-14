@@ -2993,11 +2993,16 @@ function renderCumStandingsPage(page){
   var pageRows = all.slice(page*perPage, page*perPage + perPage);
   var rows = pageRows.map(function(t, i){
     var isMe = myTeam && teamMatch(t.name, myTeam);
+    var rosterId = 'cum-home-roster-' + page + '-' + i;
+    var expandBtn = t.uid
+      ? '<button onclick="toggleStandingsRoster(\'' + t.name.replace(/'/g,"\\'") + '\',\'' + t.uid + '\',\'' + rosterId + '\')" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--ink3);padding:2px 4px;vertical-align:middle;" title="View roster">▾</button>'
+      : '';
     return '<tr' + (isMe ? ' class="my-team"' : '') + '>'
       + '<td class="rk">' + (page*perPage + i + 1) + '</td>'
-      + '<td style="font-family:var(--fd);font-size:14px;font-weight:700;color:' + (isMe ? 'var(--or)' : 'var(--ink)') + ';">' + escapeHtmlFR(t.name) + '</td>'
+      + '<td style="font-family:var(--fd);font-size:14px;font-weight:700;color:' + (isMe ? 'var(--or)' : 'var(--ink)') + ';">' + escapeHtmlFR(t.name) + ' ' + expandBtn + '</td>'
       + '<td style="text-align:right;font-family:var(--fd);color:var(--ink2);">' + fmtScore(t.score) + '</td>'
-      + '</tr>';
+      + '</tr>'
+      + '<tr id="' + rosterId + '" style="display:none;"><td colspan="3" style="padding:0;background:var(--bg2);"></td></tr>';
   }).join('');
 
   wrap.innerHTML = '<table class="st-table"><thead><tr><th class="rk">#</th><th>Team</th><th style="text-align:right;">Score</th></tr></thead><tbody>' + rows + '</tbody></table>';
@@ -4883,7 +4888,7 @@ function renderStandings(sorted, prevRank, curMap, wkHighName){
     var teamUid = entry ? entry.uid : '';
     var rosterId = 'std-roster-' + i;
     var expandBtn = teamUid
-      ? '<button onclick="toggleStandingsRoster(\'' + t.name.replace(/'/g,"\\'") + '\',\'' + teamUid + '\',' + i + ')" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--ink3);padding:2px 4px;" title="View roster">▾</button>'
+      ? '<button onclick="toggleStandingsRoster(\'' + t.name.replace(/'/g,"\\'") + '\',\'' + teamUid + '\',\'' + rosterId + '\')" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--ink3);padding:2px 4px;" title="View roster">▾</button>'
       : '';
 
     return '<tr class="' + tierClass + divider + (isMe ? ' my-team' : '') + '">'
@@ -4911,8 +4916,8 @@ function renderStandings(sorted, prevRank, curMap, wkHighName){
   // so this gets the exact same privacy gating (a player's identity
   // stays hidden until their game has actually started) for free,
   // rather than building a second, separate implementation of that rule.
-  window.toggleStandingsRoster = function(teamName, uid, idx){
-    var row = document.getElementById('std-roster-' + idx);
+  window.toggleStandingsRoster = function(teamName, uid, rosterId){
+    var row = document.getElementById(rosterId);
     if(!row) return;
     if(row.style.display !== 'none'){ row.style.display = 'none'; return; }
     row.style.display = '';
@@ -6194,8 +6199,13 @@ function renderNumbers(curEntries){
         var p = realLineup.slots[slotId];
         if(!p || !p.name) return;
         var hasStarted = !!(p.team && weekLocks[p.team]);
-        if(!slotCounts[si][p.name]) slotCounts[si][p.name] = { count: 0, hasStarted: hasStarted };
+        if(!slotCounts[si][p.name]) slotCounts[si][p.name] = { count: 0, hasStarted: hasStarted, pts: undefined };
         slotCounts[si][p.name].count++;
+        // A player's own score is the same no matter which team's entry
+        // we happen to read it from — capture it whenever available.
+        if(hasStarted && entry.slotPts && typeof entry.slotPts[slotId] === 'number'){
+          slotCounts[si][p.name].pts = entry.slotPts[slotId];
+        }
       });
     });
 
@@ -6205,7 +6215,7 @@ function renderNumbers(curEntries){
       var top = players.reduce(function(a,b){ return counts[a].count>=counts[b].count?a:b; });
       // Same privacy gate as the roster columns — hide identity until
       // that player's game has actually started, only reveal the count.
-      return { player: counts[top].hasStarted ? top : null, count: counts[top].count, total: entries.length };
+      return { player: counts[top].hasStarted ? top : null, count: counts[top].count, total: entries.length, pts: counts[top].pts };
     });
   }
 
@@ -6231,9 +6241,12 @@ function renderNumbers(curEntries){
       var hasStarted = player && player.team && weekLocks[player.team];
       var displayName = player ? (hasStarted ? player.name : '🔒 Not started') : '—';
       var nameColor = player && !hasStarted ? 'var(--ink3)' : 'var(--ink)';
+      var pts = (hasStarted && entry && entry.slotPts) ? entry.slotPts[slotIds[i]] : undefined;
+      var ptsDisplay = (typeof pts === 'number') ? '<span style="font-family:var(--fd);font-size:12px;font-weight:700;color:var(--ink2);white-space:nowrap;">' + pts.toFixed(2) + '</span>' : '';
       return '<div style="padding:9px 12px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:10px;background:var(--bg3);">'
         + '<span style="font-family:var(--fd);font-size:11px;font-weight:800;color:'+accentColor+';min-width:36px;text-transform:uppercase;">'+slot.label+'</span>'
-        + '<span style="font-family:var(--fd);font-size:13px;font-weight:600;color:'+nameColor+';">'+displayName+'</span>'
+        + '<span style="font-family:var(--fd);font-size:13px;font-weight:600;color:'+nameColor+';flex:1;">'+displayName+'</span>'
+        + ptsDisplay
         + '</div>';
     }).join('');
   }
@@ -6244,9 +6257,13 @@ function renderNumbers(curEntries){
     var pct = d ? Math.round(d.count/d.total*100) : 0;
     var displayName = d ? (d.player || '🔒 Not started') : '—';
     var nameColor = d && !d.player ? 'var(--ink3)' : 'var(--ink)';
+    var ptsDisplay = (d && d.player && typeof d.pts === 'number')
+      ? '<span style="font-family:var(--fd);font-size:12px;font-weight:700;color:var(--ink2);white-space:nowrap;">'+d.pts.toFixed(2)+'</span>'
+      : '';
     return '<div style="padding:9px 12px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:10px;background:var(--bg3);">'
       + '<span style="font-family:var(--fd);font-size:11px;font-weight:800;color:var(--pu);min-width:36px;text-transform:uppercase;">'+slot.label+'</span>'
       + '<span style="font-family:var(--fd);font-size:13px;font-weight:600;color:'+nameColor+';flex:1;">'+displayName+'</span>'
+      + ptsDisplay
       + (d ? '<span style="font-family:var(--fd);font-size:11px;color:var(--ink3);white-space:nowrap;">'+d.count+' ('+pct+'%)</span>' : '')
       + '</div>';
   }).join('');
