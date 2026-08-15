@@ -40,7 +40,8 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
 .picker-cap-lbl{font-family:var(--fd);font-size:9.5px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:2px;}
 .cap-amount{font-family:var(--fd);font-size:26px;font-weight:900;color:var(--or);line-height:1;}
 .cap-amount.tight{color:#FF9A3A;}
-.cap-amount.over{color:var(--pk);}
+.cap-amount.over{color:var(--pk);text-shadow:0 0 12px rgba(255,60,120,.6);animation:capOverPulse 1.4s ease-in-out infinite;}
+@keyframes capOverPulse{0%,100%{opacity:1;}50%{opacity:.55;}}
 .cap-slots-info{font-family:var(--fd);font-size:13px;font-weight:700;color:var(--ink2);}
 .cap-track{height:3px;background:var(--bdr);border-radius:2px;overflow:hidden;}
 .cap-track-fill{height:3px;background:linear-gradient(90deg,var(--or),var(--pk));border-radius:2px;transition:width .3s;}
@@ -101,6 +102,8 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
 .picker-game-filter{font-family:var(--fd);font-size:12px;color:var(--pk);background:rgba(255,95,160,.1);border:1px solid rgba(255,95,160,.3);padding:3px 10px;border-radius:12px;}
 .picker-clear-btn{margin-left:auto;background:none;border:none;font-family:var(--fd);font-size:12px;color:var(--ink3);cursor:pointer;text-transform:uppercase;letter-spacing:.5px;padding:4px 8px;border-radius:6px;border:1px solid var(--bdr);}
 .picker-clear-btn:hover{color:var(--or);border-color:var(--or);}
+.picker-clear-btn.way-out{color:#fff;background:var(--pk);border-color:var(--pk);box-shadow:0 0 14px rgba(255,60,120,.7);animation:wayOutPulse 1.4s ease-in-out infinite;}
+@keyframes wayOutPulse{0%,100%{box-shadow:0 0 8px rgba(255,60,120,.5);}50%{box-shadow:0 0 20px rgba(255,60,120,.9);}}
 .picker-search-bar{padding:10px 16px;border-bottom:1px solid var(--bdr);background:var(--bg2);flex-shrink:0;position:relative;}
 .picker-search{width:100%;padding:8px 12px 8px 36px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:8px;color:var(--or);font-family:var(--fb);font-size:14px;outline:none;}
 .picker-search:focus{border-color:var(--or);}
@@ -290,7 +293,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
     <div class="picker-header">
       <div class="picker-slot-label" id="picker-slot-label" style="color:var(--ink2)">All Players</div>
       <div class="picker-game-filter" id="picker-game-filter" style="display:none;"></div>
-      <button class="picker-clear-btn" onclick="closePicker()">✕ Close</button>
+      <button id="picker-close-btn" class="picker-clear-btn" onclick="closePicker()">✕ Close</button>
     </div>
     <!-- Games bar inside picker — mobile only -->
     <div class="games-bar" id="picker-games-bar" style="border-bottom:1px solid var(--bdr);border-top:1px solid var(--bdr);display:none;"></div>
@@ -306,7 +309,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
     <div class="picker-cap-bar" style="padding:8px 14px;border-bottom:1px solid var(--bdr);background:var(--bg2);">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
         <div><div class="picker-cap-lbl">Cap Remaining</div><span class="cap-amount" id="picker-cap-amt" style="font-family:var(--fd);font-size:16px;font-weight:800;color:var(--or);">$60,000</span></div>
-        <div style="text-align:center;"><div class="picker-cap-lbl">Avg / Slot</div><span id="picker-avg-per-slot" style="font-family:var(--fd);font-size:14px;font-weight:800;color:var(--ink2);">$6,667</span></div>
+        <div style="text-align:center;"><div class="picker-cap-lbl">Avg / Slot</div><span id="picker-avg-per-slot" style="font-family:var(--fd);font-size:17px;font-weight:800;color:var(--ink2);">$6,667</span></div>
         <div style="text-align:right;"><div class="picker-cap-lbl">Roster</div><span style="font-family:var(--fd);font-size:14px;font-weight:800;color:var(--ink2);"><span id="picker-slots-n">0</span>/9 filled</span></div>
       </div>
     </div>
@@ -1889,14 +1892,28 @@ function updateCap(){
     } else {
       var avg = Math.floor(remaining / slotsLeft);
       avgEl.textContent = (avg < 0 ? '-$' : '$') + Math.abs(avg).toLocaleString();
-      avgEl.style.color = avg < 4000 ? 'var(--pk)' : avg < 5500 ? '#FF9A3A' : 'var(--ink2)';
-      if(pickerAvgEl){ pickerAvgEl.textContent = avgEl.textContent; pickerAvgEl.style.color = avgEl.style.color; }
+      var avgColor = avg < 4000 ? 'var(--pk)' : avg < 5500 ? '#FF9A3A' : 'var(--ink2)';
+      var avgGlow  = avg < 4000 ? '0 0 10px rgba(255,60,120,.6)' : 'none';
+      avgEl.style.color = avgColor;
+      avgEl.style.textShadow = avgGlow;
+      if(pickerAvgEl){
+        pickerAvgEl.textContent = avgEl.textContent;
+        pickerAvgEl.style.color = avgColor;
+        pickerAvgEl.style.textShadow = avgGlow;
+      }
     }
   }
 
   var fill = document.getElementById('cap-fill');
   fill.style.width = pct+'%';
   fill.className = 'cap-track-fill'+(remaining<0?' over':'');
+
+  // Draw attention to the picker's own way out (the Close button) when
+  // over budget — real feedback from a league member who got stuck on
+  // the Defenses filter, over budget, unable to afford anyone, without
+  // realizing this button was their way back out to swap someone else.
+  var closeBtn = document.getElementById('picker-close-btn');
+  if(closeBtn) closeBtn.classList.toggle('way-out', remaining < 0);
 }
 
 function updateSubmitBtn(){
