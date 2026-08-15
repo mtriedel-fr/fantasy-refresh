@@ -225,17 +225,23 @@ jobs:
           let globalCurrentWeek = null;
           async function getGlobalCurrentWeek() {
             if (globalCurrentWeek) return globalCurrentWeek;
-            // Date-based preseason check runs first — same fix applied to
-            // auto-scoring.yml tonight, for the same reason: Tank01's own
-            // getNFLCurrentWeek only knows about regular-season weeks,
-            // and was being trusted unconditionally with no preseason
-            // awareness at all in this file.
+            // Date computed in real US Eastern time — identical fix just
+            // applied and directly verified in auto-scoring.yml tonight,
+            // for the identical reason: this file's own copy of the same
+            // formula was still doing raw UTC math, vulnerable to the
+            // same midnight-crossover bug (a run happening just after
+            // UTC midnight would compute one day, and one full week
+            // boundary, too far ahead while it was still the prior day
+            // in ET).
             const now = new Date();
-            const month = now.getUTCMonth() + 1;
-            const day = now.getUTCDate();
-            if (month === 8 || (month === 9 && day <= 8)) {
-              const aug1 = new Date(`${now.getUTCFullYear()}-08-01`);
-              const daysSinceAug1 = Math.floor((now - aug1) / (1000 * 60 * 60 * 24));
+            const etParts = new Intl.DateTimeFormat('en-CA', {
+              timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit'
+            }).format(now).split('-').map(Number);
+            const [etYear, etMonth, etDay] = etParts;
+            if (etMonth === 8 || (etMonth === 9 && etDay <= 8)) {
+              const aug1 = new Date(Date.UTC(etYear, 7, 1));
+              const todayUTC = new Date(Date.UTC(etYear, etMonth - 1, etDay));
+              const daysSinceAug1 = Math.floor((todayUTC - aug1) / (1000 * 60 * 60 * 24));
               globalCurrentWeek = Math.min(4, Math.max(1, Math.floor(daysSinceAug1 / 7) + 1));
               return globalCurrentWeek;
             }
@@ -445,8 +451,11 @@ jobs:
             // preseason games — exactly what happened to fr_refresh26
             // tonight, before this fix existed.
             const nowForWindow = new Date();
-            const windowMonth = nowForWindow.getUTCMonth() + 1;
-            const windowDay = nowForWindow.getUTCDate();
+            const windowEtParts = new Intl.DateTimeFormat('en-CA', {
+              timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit'
+            }).format(nowForWindow).split('-').map(Number);
+            const windowMonth = windowEtParts[1];
+            const windowDay = windowEtParts[2];
             const currentlyPreseasonWindow = windowMonth === 8 || (windowMonth === 9 && windowDay <= 8);
 
             for (const { id, settings } of leagues) {

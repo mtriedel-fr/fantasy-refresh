@@ -229,16 +229,29 @@ jobs:
             // recognized as being in preseason mode. Calendar date is
             // known with certainty; Tank01's own answer isn't trustworthy
             // for "what week is it" during this specific window.
+            // Date computed in real US Eastern time throughout — same
+            // fix already proven correct for the game-finding logic and
+            // kickoff-locks.yml tonight. This function's own date math
+            // was never updated to match, and was still vulnerable to
+            // the identical UTC-midnight-crossover bug: confirmed
+            // directly tonight that a run's own log timestamp was
+            // already Aug 15 in UTC while still Aug 14 in ET, pushing
+            // the estimated week one day (and one full week boundary)
+            // too far ahead — which meant scoring looked for lineups
+            // under the wrong week entirely and silently found none.
             const now = new Date();
-            const month = now.getUTCMonth() + 1; // 1-based
-            const day = now.getUTCDate();
-            if (month === 8 || (month === 9 && day <= 8)) {
+            const etParts = new Intl.DateTimeFormat('en-CA', {
+              timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit'
+            }).format(now).split('-').map(Number);
+            const [etYear, etMonth, etDay] = etParts;
+            if (etMonth === 8 || (etMonth === 9 && etDay <= 8)) {
               // Estimate preseason week based on date
               // Preseason Week 1 typically starts ~Aug 7
-              const aug1 = new Date(`${now.getUTCFullYear()}-08-01`);
-              const daysSinceAug1 = Math.floor((now - aug1) / (1000 * 60 * 60 * 24));
+              const aug1 = new Date(Date.UTC(etYear, 7, 1)); // month is 0-indexed, so 7 = August
+              const todayUTC = new Date(Date.UTC(etYear, etMonth - 1, etDay));
+              const daysSinceAug1 = Math.floor((todayUTC - aug1) / (1000 * 60 * 60 * 24));
               const psWeek = Math.min(4, Math.max(1, Math.floor(daysSinceAug1 / 7) + 1));
-              console.log(`Preseason window (by date) — estimated week ${psWeek}`);
+              console.log(`Preseason window (by ET date ${etYear}-${String(etMonth).padStart(2,'0')}-${String(etDay).padStart(2,'0')}) — estimated week ${psWeek}`);
               return { week: psWeek, seasonType: 'Preseason' };
             }
 
