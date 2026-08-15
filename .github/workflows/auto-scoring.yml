@@ -28,6 +28,10 @@ on:
         description: 'Specific league ID to score (leave blank for all active leagues)'
         required: false
         default: ''
+      game_date:
+        description: 'Re-score a specific past date instead of today (format YYYYMMDD, e.g. 20260814) — use this to recover a day that was scored incorrectly due to a since-fixed bug, then let normal runs resume covering today going forward.'
+        required: false
+        default: ''
 
 jobs:
   score-lineups:
@@ -43,6 +47,7 @@ jobs:
           MANUAL_SEASON_TYPE: ${{ inputs.season_type }}
           LOCK_SCORES: ${{ inputs.lock_scores }}
           MANUAL_LEAGUE: ${{ inputs.league_id }}
+          MANUAL_GAME_DATE: ${{ inputs.game_date }}
         run: |
           node << 'SCRIPT'
           const https = require('https');
@@ -716,10 +721,15 @@ jobs:
             // the fallback to yesterday never triggers — it just
             // confidently locks onto the wrong day entirely.
             const nowDate = new Date();
-            const etDate = new Intl.DateTimeFormat('en-CA', {
+            const autoEtDate = new Intl.DateTimeFormat('en-CA', {
               timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit'
             }).format(nowDate).replace(/-/g, '');
-            console.log(`Today in US Eastern time: ${etDate}`);
+            // Manual override — re-score a specific past date on demand,
+            // for recovering a day that scored incorrectly due to a
+            // since-fixed bug. Normal runs (no override) always use
+            // today's real date, computed above.
+            const etDate = process.env.MANUAL_GAME_DATE || autoEtDate;
+            console.log(etDate === autoEtDate ? `Today in US Eastern time: ${etDate}` : `⚠️  Manual override — re-scoring date ${etDate} instead of today (${autoEtDate})`);
             let games = [];
             try {
               const gamesData = await t01(`/getNFLScoresOnly?gameDate=${etDate}`);
