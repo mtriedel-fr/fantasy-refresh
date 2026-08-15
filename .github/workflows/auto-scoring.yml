@@ -874,7 +874,9 @@ jobs:
 
             // Build player stats lookup
             const playerStats = {};
-            Object.values(boxScores).forEach(bs => {
+            const gameDetailedStats = {}; // gameId -> [{name, team, pos, pts, breakdown}, ...] — every player in that game, not just rostered ones
+            Object.entries(boxScores).forEach(([gameId, bs]) => {
+              const thisGameStats = [];
               Object.entries(bs.playerStats || {}).forEach(([pid, stats]) => {
                 playerStats[pid] = stats;
                 // Tank01 ships a sleeperBotID field on player records in their other
@@ -890,6 +892,26 @@ jobs:
                   playerStats[name] = stats;
                   const stripped = stripNameSuffix(name);
                   if (stripped && stripped !== name && !playerStats[stripped]) playerStats[stripped] = stats;
+                }
+                // Detailed stats for EVERY player in this game, not just
+                // rostered ones — for the "click into a completed game"
+                // stats view. calcDKPoints()'s position argument only
+                // ever changes DEF-specific scoring (see that function),
+                // so offensive players score correctly here regardless
+                // of whether their exact position is confirmed — 'pos'
+                // below is display-only, tried from a few plausible
+                // field names since Tank01 doesn't document this
+                // response shape, with 'FLEX' as an honest fallback
+                // label rather than guessing wrong.
+                const result = calcDKPoints(stats, null);
+                if (result.pts !== 0 || result.breakdown.length) {
+                  thisGameStats.push({
+                    name: stats.longName || stats.playerName || 'Unknown',
+                    team: stats.team || stats.teamAbv || '',
+                    pos: stats.pos || stats.position || stats.playerPosition || 'FLEX',
+                    pts: result.pts,
+                    breakdown: result.breakdown
+                  });
                 }
               });
               // Team defense (DST) lives in a completely separate object
@@ -937,7 +959,30 @@ jobs:
                   console.log(`  🛡️  ${d.teamAbv} points-allowed adjusted: ${rawPtsAllowed} raw → ${adjustedPtsAllowed} (excluding ${oppDefTDs} opponent def/ST TD)`);
                 }
                 console.log(`  ✓ Mapped defense: ${d.teamAbv}`);
+                // Defense uses the real 'DEF' position, unlike offensive
+                // players above — this is the one case where the
+                // position argument to calcDKPoints() actually changes
+                // the scoring math (points-allowed tiers, sacks, etc.),
+                // and it's known with certainty here (not a guess).
+                const defResult = calcDKPoints(playerStats[d.teamAbv], 'DEF');
+                thisGameStats.push({
+                  name: d.teamAbv, team: d.teamAbv, pos: 'DEF',
+                  pts: defResult.pts, breakdown: defResult.breakdown
+                });
               });
+
+              // Persisted per-game (not merged across all of today's
+              // games) so the draft page can fetch "everyone who played
+              // in this specific game" when a completed game is
+              // selected — real fantasy points and stat breakdown for
+              // every player, not just whoever happens to be rostered.
+              if (thisGameStats.length) {
+                thisGameStats.sort((a, b) => b.pts - a.pts);
+                firebasePut(`/gameStats/${SEASON}/${gameId}.json`, {
+                  players: thisGameStats,
+                  updatedAt: Date.now()
+                }).catch(e => console.error(`Failed to write game stats for ${gameId}:`, e.message));
+              }
             });
             const realNames = Object.values(playerStats).map(s => s.longName || s.playerName).filter(Boolean);
             console.log(`  Sample of real names in this game's box score: ${[...new Set(realNames)].slice(0, 10).join(', ')}`);
