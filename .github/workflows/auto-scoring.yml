@@ -52,6 +52,22 @@ jobs:
           node << 'SCRIPT'
           const https = require('https');
 
+          // Strips a trailing name suffix (Jr, Sr, II, III, IV, V —
+          // with or without a period) for matching purposes only.
+          // Confirmed as a real, recurring failure mode tonight: Ted
+          // Hurst III's lineup entry stores the plain "Ted Hurst",
+          // while Tank01's own data likely carries the full suffixed
+          // name, so an exact-string match silently failed even though
+          // both clearly refer to the same real player. This is a
+          // general risk for any player with a suffix, not a one-off
+          // fix specific to this one name. Placed at true top-level
+          // scope (not nested inside main() or scoreLeague()) so both
+          // functions can actually call it — they're siblings, not
+          // nested within each other.
+          function stripNameSuffix(name) {
+            return (name || '').replace(/\s+(jr|sr|ii|iii|iv|v)\.?$/i, '').trim();
+          }
+
           const FB_URL      = process.env.FIREBASE_DB_URL;
           const FB_TOKEN    = process.env.FIREBASE_AUTH_TOKEN;
           const T01_KEY     = process.env.TANK01_KEY;
@@ -358,7 +374,7 @@ jobs:
 
               for (const [slotId, player] of Object.entries(lineup.slots)) {
                 if (!player) continue;
-                let stats = playerStats[player.id] || playerStats[(player.name || '').toLowerCase()];
+                let stats = playerStats[player.id] || playerStats[(player.name || '').toLowerCase()] || playerStats[stripNameSuffix((player.name || '').toLowerCase())];
                 let result;
                 if (stats) {
                   result = calcDKPoints(stats, player.pos);
@@ -866,7 +882,11 @@ jobs:
                 // instead of always silently falling through to name-matching.
                 if (stats.sleeperBotID) playerStats[stats.sleeperBotID] = stats;
                 const name = (stats.longName || stats.playerName || '').toLowerCase();
-                if (name) playerStats[name] = stats;
+                if (name) {
+                  playerStats[name] = stats;
+                  const stripped = stripNameSuffix(name);
+                  if (stripped && stripped !== name && !playerStats[stripped]) playerStats[stripped] = stats;
+                }
               });
               // Team defense (DST) lives in a completely separate object
               // from playerStats — confirmed via real testing earlier
