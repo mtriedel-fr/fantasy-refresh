@@ -329,6 +329,23 @@ function openCommSettings(leagueId, e) {
     });
 }
 
+// ── SEASON/WEEK TOGGLE ────────────────────────────────────────────
+function switchCardView(cardIdSuffix, view) {
+  var wkStats  = document.getElementById('wk-stats-' + cardIdSuffix);
+  var sznStats = document.getElementById('szn-stats-' + cardIdSuffix);
+  var wkBtn    = document.getElementById('tgl-wk-' + cardIdSuffix);
+  var sznBtn   = document.getElementById('tgl-szn-' + cardIdSuffix);
+  if (!wkStats || !sznStats || !wkBtn || !sznBtn) return;
+
+  var showWeek = view === 'week';
+  wkStats.style.display  = showWeek ? '' : 'none';
+  sznStats.style.display = showWeek ? 'none' : '';
+  wkBtn.style.background  = showWeek ? 'var(--pk)' : 'transparent';
+  wkBtn.style.color       = showWeek ? '#fff' : 'var(--ink2)';
+  sznBtn.style.background = showWeek ? 'transparent' : 'var(--pk)';
+  sznBtn.style.color      = showWeek ? 'var(--ink2)' : '#fff';
+}
+
 // ── FORMAT HELPERS ───────────────────────────────────────────────
 function formatBadge(s) {
   if (s.guillotine) return '<span class="badge badge-guillotine">☠️ Guillotine</span>';
@@ -342,6 +359,111 @@ function barClass(s) {
   return '';
 }
 
+// ── SEASON-LONG STATS ────────────────────────────────────────────
+// Pulls real entries out of a week's raw Firebase object (keyed by
+// team uid, with an "ownership" sibling key that isn't a real team).
+function weekEntries(seasonData, wk) {
+  var raw = (seasonData && seasonData[String(wk)]) || {};
+  return Object.keys(raw)
+    .filter(function(k) { return k !== 'ownership' && raw[k] && raw[k].team; })
+    .map(function(k) { return raw[k]; });
+}
+
+// Same elimination-schedule formula already proven correct twice
+// tonight — once in league.html's own live client-side view, once
+// ported to auto-scoring.yml for the recap feature. Reused here as-is
+// rather than writing a third, separate version that could drift from
+// the other two over time.
+function buildElimSchedule(totalTeams, totalWeeks) {
+  var finaleWeek = 17;
+  var weeksToElim = finaleWeek - 1;
+  var toElim = totalTeams - 3;
+  var base = Math.floor(toElim / weeksToElim);
+  var extra = toElim % weeksToElim;
+  var schedule = [];
+  var remaining = totalTeams;
+  for (var w = 1; w <= totalWeeks; w++) {
+    if (w < finaleWeek) {
+      var elim = base + (w <= extra ? 1 : 0);
+      remaining -= elim;
+      schedule.push({ week: w, eliminate: elim, remaining: remaining });
+    } else {
+      schedule.push({ week: w, eliminate: 0, remaining: remaining });
+    }
+  }
+  return schedule;
+}
+
+// Replays the full season's real scores to determine who's still alive
+// — guillotine elimination is never stored as a discrete event
+// anywhere, only ever computed live from score history.
+function computeGuillotineAlive(seasonData, weeks) {
+  var week1 = weekEntries(seasonData, weeks[0]);
+  var totalTeams = week1.length;
+  if (!totalTeams) return null;
+  var schedule = buildElimSchedule(totalTeams, 18);
+  var stillIn = week1.map(function(e) { return e.team; });
+
+  weeks.forEach(function(w) {
+    if (w === 17) return; // finale week — no eliminations
+    var sched = schedule.filter(function(s) { return s.week === w; })[0];
+    var elimCount = sched ? sched.eliminate : 0;
+    if (!elimCount) return;
+    var wk = weekEntries(seasonData, w);
+    var entries = stillIn.map(function(team) {
+      var found = wk.filter(function(e) { return e.team && e.team.toLowerCase() === team.toLowerCase(); })[0];
+      return found || { team: team, score: 0 };
+    });
+    var sorted = entries.slice().sort(function(a, b) { return a.score - b.score; });
+    sorted.slice(0, elimCount).forEach(function(e) {
+      var idx = stillIn.indexOf(e.team);
+      if (idx >= 0) stillIn.splice(idx, 1);
+    });
+  });
+
+  return stillIn;
+}
+
+// Season totals (sum of every week's real score) and season rank,
+// computed from the same seasonData already fetched for the weekly
+// view — no extra fetch needed. Guillotine status is only meaningful
+// once real weeks have actually been played, hence the weeks.length
+// check before attempting the replay.
+function computeSeasonStats(l, teamName) {
+  var out = { total: '—', rank: '—', guillotineStatus: null };
+  if (!l.seasonData) return out;
+  var weeks = Object.keys(l.seasonData).filter(function(k) {
+    return !isNaN(Number(k)) && l.seasonData[k] && Object.keys(l.seasonData[k]).length;
+  }).map(Number).sort(function(a, b) { return a - b; });
+  if (!weeks.length) return out;
+
+  var totals = {}; // team name (lowercase) -> {team, total}
+  weeks.forEach(function(w) {
+    weekEntries(l.seasonData, w).forEach(function(e) {
+      var key = e.team.toLowerCase();
+      if (!totals[key]) totals[key] = { team: e.team, total: 0 };
+      totals[key].total += (typeof e.score === 'number' ? e.score : 0);
+    });
+  });
+  var totalsList = Object.keys(totals).map(function(k) { return totals[k]; });
+  var mine = totalsList.filter(function(t) { return teamName && t.team.toLowerCase() === teamName.toLowerCase(); })[0];
+  if (mine) {
+    out.total = mine.total.toFixed(1);
+    var sorted = totalsList.slice().sort(function(a, b) { return b.total - a.total; });
+    var r = sorted.findIndex(function(t) { return t.team.toLowerCase() === mine.team.toLowerCase(); });
+    out.rank = r >= 0 ? '#' + (r + 1) : '—';
+  }
+
+  if (l.settings && l.settings.guillotine) {
+    var alive = computeGuillotineAlive(l.seasonData, weeks);
+    if (alive && teamName) {
+      out.guillotineStatus = alive.some(function(t) { return t.toLowerCase() === teamName.toLowerCase(); }) ? 'alive' : 'eliminated';
+    }
+  }
+
+  return out;
+}
+
 // ── BUILD LEAGUE CARD ────────────────────────────────────────────
 function buildCard(l) {
   var s        = l.settings;
@@ -352,32 +474,73 @@ function buildCard(l) {
   // Stats from season data
   var rank = '—', score = '—', wksLeft = '—';
   if (l.seasonData) {
+    // Real Firebase shape is an object keyed by team uid (e.g.
+    // {"uid1": {...}, "uid2": {...}, "ownership": {...}}), not an
+    // array — .length on a plain object is always undefined, which
+    // silently made every week look empty regardless of real data
+    // present. Object.keys(...).length is the correct check, and
+    // "ownership" (a sibling key, not a real team entry) needs to be
+    // filtered out before treating this as a list of teams.
     var weeks = Object.keys(l.seasonData).filter(function(k) {
-      return !isNaN(Number(k)) && l.seasonData[k] && l.seasonData[k].length;
+      return !isNaN(Number(k)) && l.seasonData[k] && Object.keys(l.seasonData[k]).length;
     }).map(Number);
     if (weeks.length) {
-      var latest  = Math.max.apply(null, weeks);
-      var entries = l.seasonData[String(latest)] || [];
-      var mine    = entries.find(function(e) {
-        return e.name && teamName && e.name.toLowerCase() === teamName.toLowerCase();
+      var latest      = Math.max.apply(null, weeks);
+      var weekEntries = l.seasonData[String(latest)] || {};
+      var entries     = Object.keys(weekEntries)
+        .filter(function(k) { return k !== 'ownership' && weekEntries[k] && weekEntries[k].team; })
+        .map(function(k) { return weekEntries[k]; });
+      var mine = entries.find(function(e) {
+        return e.team && teamName && e.team.toLowerCase() === teamName.toLowerCase();
       });
       if (mine) {
-        score = mine.score ? mine.score.toFixed(1) : '—';
+        score = typeof mine.score === 'number' ? mine.score.toFixed(1) : '—';
         var sorted = entries.slice().sort(function(a, b) { return b.score - a.score; });
-        var r = sorted.findIndex(function(e) { return e.name === mine.name; });
+        var r = sorted.findIndex(function(e) { return e.uid === mine.uid; });
         rank = r >= 0 ? '#' + (r + 1) : '—';
       }
       wksLeft = 18 - weeks.length;
     }
   }
 
-  var commBadge = l.isComm ? '<span class="badge badge-comm">👑 Commissioner</span>' : '';
-  var gearBtn   = l.isComm
-    ? '<div class="gear-btn" onclick="openCommSettings(\'' + l.leagueId + '\',event)" title="League settings">'
-      + '<svg viewBox="0 0 24 24"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/>'
-      + '<path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>'
-      + '</div>'
-    : '';
+  var seasonStats = computeSeasonStats(l, teamName);
+  var cardIdSuffix = l.leagueId.replace(/[^a-zA-Z0-9]/g, '');
+  var weekStatsId   = 'wk-stats-' + cardIdSuffix;
+  var seasonStatsId = 'szn-stats-' + cardIdSuffix;
+  var toggleWkId    = 'tgl-wk-' + cardIdSuffix;
+  var toggleSznId   = 'tgl-szn-' + cardIdSuffix;
+
+  var guillotineBadge = '';
+  if (seasonStats.guillotineStatus === 'alive') {
+    guillotineBadge = '<div style="text-align:center;font-family:var(--fd);font-size:12px;font-weight:800;color:#22C55E;padding:8px 0 2px;">💚 STILL ALIVE</div>';
+  } else if (seasonStats.guillotineStatus === 'eliminated') {
+    guillotineBadge = '<div style="text-align:center;font-family:var(--fd);font-size:12px;font-weight:800;color:#EF4444;padding:8px 0 2px;">☠️ ELIMINATED</div>';
+  }
+
+  // Toggle buttons stop click propagation so tapping them switches the
+  // view instead of also triggering the card's own navigation into the
+  // league (the whole card is clickable via its own onclick).
+  var toggleRow = '<div style="display:flex;gap:6px;margin:8px 0 4px;" onclick="event.stopPropagation();">'
+    + '<button id="' + toggleWkId + '" onclick="switchCardView(\'' + cardIdSuffix + '\',\'week\')" style="flex:1;padding:6px;border-radius:8px;border:1px solid var(--bdr);background:var(--pk);color:#fff;font-family:var(--fd);font-size:11px;font-weight:800;cursor:pointer;">WEEK</button>'
+    + '<button id="' + toggleSznId + '" onclick="switchCardView(\'' + cardIdSuffix + '\',\'season\')" style="flex:1;padding:6px;border-radius:8px;border:1px solid var(--bdr);background:transparent;color:var(--ink2);font-family:var(--fd);font-size:11px;font-weight:800;cursor:pointer;">SEASON</button>'
+    + '</div>';
+
+  var weekStatsBlock = '<div id="' + weekStatsId + '">'
+    + '<div class="card-stats">'
+    + '<div class="stat"><div class="stat-label">Rank</div><div class="stat-val rank">' + rank + '</div></div>'
+    + '<div class="stat"><div class="stat-label">Score</div><div class="stat-val score">' + score + '</div></div>'
+    + '<div class="stat"><div class="stat-label">Wks Left</div><div class="stat-val neutral">' + (typeof wksLeft === 'number' ? wksLeft : '—') + '</div></div>'
+    + '</div>'
+    + '</div>';
+
+  var seasonStatsBlock = '<div id="' + seasonStatsId + '" style="display:none;">'
+    + '<div class="card-stats">'
+    + '<div class="stat"><div class="stat-label">Season Rank</div><div class="stat-val rank">' + seasonStats.rank + '</div></div>'
+    + '<div class="stat"><div class="stat-label">Total Pts</div><div class="stat-val score">' + seasonStats.total + '</div></div>'
+    + '<div class="stat"><div class="stat-label">Wks Left</div><div class="stat-val neutral">' + (typeof wksLeft === 'number' ? wksLeft : '—') + '</div></div>'
+    + '</div>'
+    + guillotineBadge
+    + '</div>';
 
   var cardId = 'card-msg-' + l.leagueId;
   var card = '<div class="league-card" onclick="enterLeague(\'' + l.leagueId + '\')">'
@@ -395,11 +558,9 @@ function buildCard(l) {
     + '<div class="card-team-row">'
     + '<span class="card-team-name" style="font-family:var(--fd);font-size:14px;font-weight:700;color:var(--ink2);">' + teamName + '</span>'
     + '</div>'
-    + '<div class="card-stats">'
-    + '<div class="stat"><div class="stat-label">Rank</div><div class="stat-val rank">' + rank + '</div></div>'
-    + '<div class="stat"><div class="stat-label">Score</div><div class="stat-val score">' + score + '</div></div>'
-    + '<div class="stat"><div class="stat-label">Wks Left</div><div class="stat-val neutral">' + (typeof wksLeft === 'number' ? wksLeft : '—') + '</div></div>'
-    + '</div>'
+    + toggleRow
+    + weekStatsBlock
+    + seasonStatsBlock
     + '<div id="' + cardId + '" style="font-size:13px;color:var(--ink2);font-style:italic;padding:10px 0 2px;min-height:0;line-height:1.4;"></div>'
     + '</div>'
     + '</div>';
