@@ -2,6 +2,14 @@ name: Auto Scoring
 
 on:
   schedule:
+    # High-frequency live-scoring windows removed — this workflow is now
+    # triggered externally every 2 minutes by a reliable cron service
+    # (cron-job.org), which supersedes GitHub's own unreliable
+    # high-frequency scheduling. Keeping both would risk overlapping
+    # runs and doubled Tank01 API usage for no benefit.
+    # Tuesday 9am ET (13:00 UTC) — lock final scores. Kept as GitHub's
+    # own schedule trigger since this is a once-a-week, low-frequency
+    # job where the scheduler's unreliability was never a real problem.
     - cron: '0 13 * * 2'
   workflow_dispatch:
     inputs:
@@ -333,16 +341,29 @@ jobs:
               for (const [slotId, player] of Object.entries(lineup.slots)) {
                 if (!player) continue;
                 let stats = playerStats[player.id] || playerStats[(player.name || '').toLowerCase()];
-                if (!stats) {
-                  console.log(`    ❌ NO MATCH: lineup has "${player.name}" (id: ${player.id}) — not found in playerStats`);
+                let result;
+                if (stats) {
+                  result = calcDKPoints(stats, player.pos);
+                } else {
+                  // Not found in TODAY's stats — this player's game
+                  // simply wasn't today (already happened on an earlier
+                  // day this same fantasy week, e.g. a week spanning
+                  // Thu-Mon, or hasn't happened yet). Preserve whatever
+                  // was already computed for them in the previous run
+                  // rather than zeroing out real, already-earned points
+                  // just because today's date-specific lookup doesn't
+                  // happen to include them. Confirmed this was the exact
+                  // cause of last night's already-scored players getting
+                  // wiped out the moment tonight's games started scoring.
+                  const existingPts = (existing && existing.slotPts && typeof existing.slotPts[slotId] === 'number') ? existing.slotPts[slotId] : 0;
+                  const existingBreakdown = (existing && existing.slotBreakdown && existing.slotBreakdown[slotId]) ? existing.slotBreakdown[slotId] : [];
+                  result = { pts: existingPts, breakdown: existingBreakdown };
+                  if (existingPts) {
+                    console.log(`    ↩️  PRESERVED: "${player.name}" not in today's data — kept prior score of ${existingPts}`);
+                  } else {
+                    console.log(`    ❌ NO MATCH: lineup has "${player.name}" (id: ${player.id}) — not found in playerStats, no prior score to preserve`);
+                  }
                 }
-                // Always use our own calculation, not Tank01's own
-                // fantasyPoints value — confirmed earlier (Baker Mayfield,
-                // real stat line) that Tank01's own number doesn't
-                // reliably match our specific scoring weights, so
-                // trusting it first was silently masking real production
-                // whenever it disagreed with our actual scoring rules.
-                const result = stats ? calcDKPoints(stats, player.pos) : { pts: 0, breakdown: [] };
                 slotPts[slotId] = Math.round(result.pts * 100) / 100;
                 slotBreakdown[slotId] = result.breakdown;
                 if (player.pos === 'DEF' && stats) {
@@ -714,7 +735,40 @@ jobs:
 
             console.log(`Found ${activeGames.length} active/final game(s) of ${games.length} total`);
 
-            const allFinal = games.every(g => {
+            // allFinal must reflect the ENTIRE fantasy week, not just
+            // today — a week spanning multiple real-world nights (e.g.
+            // Thu-Mon) shouldn't be declared final just because tonight's
+            // games happen to all be done, with more games and real
+            // points still coming later in the same week. Confirmed this
+            // was happening: allFinal was computed purely from today's
+            // games list, with no awareness of the rest of the week at
+            // all. Uses the cached full-season schedule (every game for
+            // this week, regardless of which day it falls on) to find
+            // the actual last game-day, and only allows allFinal=true
+            // once today IS that last day. Earlier days' games will
+            // already be done and correctly scored by then (via the
+            // score-preservation fix above), so this doesn't need to
+            // separately re-check their status.
+            let isLastGameDayOfWeek = true; // safe default if the cache lookup fails
+            try {
+              const cachedWeek = await firebaseGet(`/nflSchedule/${SEASON}/${seasonType}/weeks/week${week}.json`);
+              if (Array.isArray(cachedWeek) && cachedWeek.length) {
+                const gameDates = cachedWeek
+                  .filter(g => g && g.time)
+                  .map(g => new Intl.DateTimeFormat('en-CA', {
+                    timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit'
+                  }).format(new Date(g.time)).replace(/-/g, ''));
+                if (gameDates.length) {
+                  const lastGameDate = gameDates.reduce((a, b) => (a > b ? a : b));
+                  isLastGameDayOfWeek = etDate >= lastGameDate;
+                  console.log(`  Week ${week} spans through ${lastGameDate} — today (${etDate}) is${isLastGameDayOfWeek ? '' : ' NOT'} the last game day.`);
+                }
+              }
+            } catch (e) {
+              console.log(`  Could not check full-week schedule for allFinal: ${e.message} — defaulting to allowing allFinal today.`);
+            }
+
+            const allFinal = isLastGameDayOfWeek && games.every(g => {
               const s = (g.gameStatus || g.status || '').toLowerCase();
               return s.includes('final') || s.includes('completed');
             });
@@ -1383,16 +1437,16 @@ jobs:
             console.log(`  📰 Recap generated for ${leagueId} week ${week}`);
           }
 
-          function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
-          // GitHub Actions' cron scheduler only supports 1-minute
-          // granularity — there's no way to trigger a workflow every 90
-          // seconds directly. This is what actually achieves that real
-          // 90-second cadence: each 5-minute cron trigger runs main()
-          // repeatedly with a 90-second sleep between calls, for about 4
-          // minutes, before naturally ending — leaving a clean buffer
-          // before the next scheduled trigger fires, so runs don't
-          // overlap. IS_LOCK_RUN (the one-time Tuesday morning lock,
-          // unrelated to live scoring) only ever runs once, not looped.
+          // Internal loop removed — this workflow is now triggered
+          // externally every 2 minutes by a reliable cron service
+          // (cron-job.org), which supersedes GitHub's own unreliable
+          // high-frequency scheduling entirely. Looping internally on
+          // top of that reliable external cadence would cause
+          // overlapping runs (a new trigger firing every 2 minutes while
+          // the previous run is still mid-loop for up to 4 minutes),
+          // each making its own real Tank01 calls — wasted API usage for
+          // no benefit, since the external trigger already provides the
+          // frequency this loop existed to work around.
           main().catch(e => {
             console.error('Scoring job failed:', e);
             process.exit(1);
