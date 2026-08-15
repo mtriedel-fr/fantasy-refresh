@@ -830,21 +830,25 @@ jobs:
                   // gameStatusCode is a REAL, documented Tank01 field
                   // (0=not started, 1=live, 2=final — see
                   // tank01.com/Guides_Game_Status_Code_NFL.html).
-                  // quarter/clock field names below are an educated guess
-                  // based on common sports-API naming conventions —
-                  // UNVERIFIED against a real live response, since no
-                  // games were live when this was written (mid-July,
-                  // before preseason). First real Thursday/Sunday of live
-                  // games should be checked against this — if the "PMR"
-                  // (quarter + clock) display comes back blank/wrong while
-                  // scores are updating fine, this is the spot to fix,
-                  // same pattern as the projections endpoint fix earlier.
+                  // quarter/clock/score field names below are an
+                  // educated guess based on common sports-API naming
+                  // conventions — UNVERIFIED against a real live
+                  // response, since no games were live when this was
+                  // written (mid-July, before preseason). First real
+                  // Thursday/Sunday of live games should be checked
+                  // against this — if the "PMR" (quarter + clock)
+                  // display or the live score comes back blank/wrong
+                  // while fantasy scores are updating fine, this is the
+                  // spot to fix, same pattern as the projections
+                  // endpoint fix earlier.
                   liveGameStatus[gameId] = {
                     statusCode: bs.body.gameStatusCode != null ? Number(bs.body.gameStatusCode) : null,
                     quarter:    bs.body.quarter || bs.body.period || bs.body.gamePeriod || null,
                     clock:      bs.body.gameClock || bs.body.clock || bs.body.timeRemaining || null,
                     home:       game.home || game.homeTeamAbbr || game.homeTeam || '',
-                    away:       game.away || game.awayTeamAbbr || game.awayTeam || ''
+                    away:       game.away || game.awayTeamAbbr || game.awayTeam || '',
+                    homeScore:  bs.body.homePts != null ? Number(bs.body.homePts) : (bs.body.homeScore != null ? Number(bs.body.homeScore) : null),
+                    awayScore:  bs.body.awayPts != null ? Number(bs.body.awayPts) : (bs.body.awayScore != null ? Number(bs.body.awayScore) : null)
                   };
                 }
               } catch(e) {
