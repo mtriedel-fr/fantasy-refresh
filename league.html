@@ -927,6 +927,7 @@ setTimeout(function(){
       <div class="logo-txt">Fantasy <span>Refresh</span></div>
       <div class="logo-sub">Weekly Salary Cap League</div>
     </div>
+    <button onclick="showWelcomeTour()" title="Show the welcome tour again" style="margin-left:8px;width:22px;height:22px;border-radius:50%;border:1px solid var(--bdr);background:transparent;color:var(--ink3);font-family:var(--fd);font-size:12px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">?</button>
   </div>
   <div class="hdr-r">
     <div class="hdr-sub" id="hdr-sub"></div>
@@ -2538,6 +2539,66 @@ function boot(){
       })
       .catch(function(){});
   }
+
+  showWelcomeTourIfNeeded();
+}
+
+// ── WELCOME TOUR ──────────────────────────────────────────────────
+// Two separate, independent flags: WELCOME_TOUR_KEY tracks whether
+// THIS specific page's tour has been dismissed (so each page still
+// shows its own tour once, tailored to what's actually on it) —
+// WELCOME_TOUR_OPTOUT_KEY is shared across every page and, once set,
+// suppresses all of them everywhere, for someone who just doesn't want
+// these at all. Same localStorage pattern already used elsewhere in
+// this app for other persistent state (fr_user_*, fr_league_ctx).
+var WELCOME_TOUR_KEY = 'fr_welcome_tour_seen_league';
+var WELCOME_TOUR_OPTOUT_KEY = 'fr_welcome_tour_optout'; // shared across every page — not page-specific
+
+function showWelcomeTourIfNeeded(){
+  try{
+    if(localStorage.getItem(WELCOME_TOUR_KEY)) return;
+    if(localStorage.getItem(WELCOME_TOUR_OPTOUT_KEY)) return;
+  }catch(e){ return; } // if localStorage is unavailable, don't repeatedly show this every visit
+  showWelcomeTour();
+}
+
+function showWelcomeTour(){
+  var items = [
+    { icon: '👤', title: 'My Team', body: 'View and edit your lineup for the current week — tap the pencil to swap players before they lock.' },
+    { icon: '🏆', title: 'Weekly Standings', body: 'See how everyone ranks this week. Tap any team\u2019s name to expand their live roster and scores.' },
+    { icon: '📅', title: 'Week Selector', body: 'Switch between weeks using the dropdown at the top — check past results or a locked-in upcoming lineup.' },
+    { icon: '📰', title: 'Weekly Review', body: 'A full recap of each week once it\u2019s done — league leader, high/low score, MVP, and more.' }
+  ];
+  var html = '<div id="welcome-tour-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;">'
+    + '<div style="background:var(--bg2);border-radius:16px;max-width:420px;width:100%;max-height:85vh;overflow-y:auto;padding:24px;">'
+    + '<div style="text-align:center;margin-bottom:18px;">'
+    +   '<div style="font-family:var(--fd);font-size:20px;font-weight:900;color:var(--ink);">👋 Welcome to Fantasy Refresh!</div>'
+    +   '<div style="font-family:var(--fd);font-size:13px;color:var(--ink3);margin-top:4px;">Here\'s a quick tour of this page.</div>'
+    + '</div>'
+    + items.map(function(item){
+        return '<div style="display:flex;gap:12px;padding:12px 0;border-top:1px solid var(--bdr);">'
+          + '<div style="font-size:24px;flex-shrink:0;">' + item.icon + '</div>'
+          + '<div><div style="font-family:var(--fd);font-size:14px;font-weight:800;color:var(--ink);">' + item.title + '</div>'
+          + '<div style="font-family:var(--fd);font-size:12.5px;color:var(--ink2);margin-top:2px;line-height:1.4;">' + item.body + '</div></div>'
+          + '</div>';
+      }).join('')
+    + '<button onclick="dismissWelcomeTour()" style="width:100%;margin-top:18px;padding:12px;border-radius:10px;border:none;background:var(--pk);color:#fff;font-family:var(--fd);font-size:14px;font-weight:800;cursor:pointer;">Got it, let\'s go!</button>'
+    + '<button onclick="optOutWelcomeTours()" style="width:100%;margin-top:8px;padding:8px;border-radius:10px;border:none;background:transparent;color:var(--ink3);font-family:var(--fd);font-size:12px;cursor:pointer;text-decoration:underline;">Don\'t show these tips again on any page</button>'
+    + '</div>'
+    + '</div>';
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+function dismissWelcomeTour(){
+  try{ localStorage.setItem(WELCOME_TOUR_KEY, '1'); }catch(e){}
+  var el = document.getElementById('welcome-tour-overlay');
+  if(el) el.remove();
+}
+
+function optOutWelcomeTours(){
+  try{ localStorage.setItem(WELCOME_TOUR_OPTOUT_KEY, '1'); }catch(e){}
+  var el = document.getElementById('welcome-tour-overlay');
+  if(el) el.remove();
 }
 
 loadPlayoffsFromCloud();

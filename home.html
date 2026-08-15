@@ -159,6 +159,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
       </g>
     </svg>
     <div class="hdr-logo-text">Fantasy <span>Refresh</span></div>
+    <button onclick="showWelcomeTour()" title="Show the welcome tour again" style="margin-left:4px;width:22px;height:22px;border-radius:50%;border:1px solid var(--bdr);background:transparent;color:var(--ink3);font-family:var(--fd);font-size:12px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">?</button>
   </div>
   <div class="hdr-right">
     <button class="profile-btn" id="hdr-user" onclick="openProfileDrawer()">
@@ -719,6 +720,62 @@ function loadLeagues() {
     .catch(function() { renderCards(leagueIds, uid); });
 }
 
+// ── WELCOME TOUR ──────────────────────────────────────────────────
+// Same shared pattern as league.html and draft.html: WELCOME_TOUR_KEY
+// tracks whether THIS specific page's tour has been dismissed,
+// WELCOME_TOUR_OPTOUT_KEY is the identical, shared key across every
+// page — if set anywhere, it suppresses all of them everywhere, for
+// someone who just doesn't want these at all.
+var WELCOME_TOUR_KEY = 'fr_welcome_tour_seen_home';
+var WELCOME_TOUR_OPTOUT_KEY = 'fr_welcome_tour_optout'; // shared across every page — not page-specific
+
+function showWelcomeTourIfNeeded(){
+  try{
+    if(localStorage.getItem(WELCOME_TOUR_KEY)) return;
+    if(localStorage.getItem(WELCOME_TOUR_OPTOUT_KEY)) return;
+  }catch(e){ return; }
+  showWelcomeTour();
+}
+
+function showWelcomeTour(){
+  var items = [
+    { icon: '🏆', title: 'Your Leagues', body: 'Every league you\u2019re part of shows here, with your current rank and score. Tap a card to jump into that league.' },
+    { icon: '🔀', title: 'Week / Season Toggle', body: 'Switch between this week\u2019s standing and your cumulative season-long total and rank, right on each card.' },
+    { icon: '💀', title: 'Guillotine Status', body: 'In a guillotine league, switch to Season view to see whether you\u2019re still alive or already eliminated.' },
+    { icon: '⚙️', title: 'League Settings', body: 'If you\u2019re commissioner of a league, the gear icon on its card opens settings for that league.' }
+  ];
+  var html = '<div id="welcome-tour-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;">'
+    + '<div style="background:var(--bg2);border-radius:16px;max-width:420px;width:100%;max-height:85vh;overflow-y:auto;padding:24px;">'
+    + '<div style="text-align:center;margin-bottom:18px;">'
+    +   '<div style="font-family:var(--fd);font-size:20px;font-weight:900;color:var(--ink);">👋 Welcome to Fantasy Refresh!</div>'
+    +   '<div style="font-family:var(--fd);font-size:13px;color:var(--ink3);margin-top:4px;">Here\'s a quick tour of this page.</div>'
+    + '</div>'
+    + items.map(function(item){
+        return '<div style="display:flex;gap:12px;padding:12px 0;border-top:1px solid var(--bdr);">'
+          + '<div style="font-size:24px;flex-shrink:0;">' + item.icon + '</div>'
+          + '<div><div style="font-family:var(--fd);font-size:14px;font-weight:800;color:var(--ink);">' + item.title + '</div>'
+          + '<div style="font-family:var(--fd);font-size:12.5px;color:var(--ink2);margin-top:2px;line-height:1.4;">' + item.body + '</div></div>'
+          + '</div>';
+      }).join('')
+    + '<button onclick="dismissWelcomeTour()" style="width:100%;margin-top:18px;padding:12px;border-radius:10px;border:none;background:var(--pk);color:#fff;font-family:var(--fd);font-size:14px;font-weight:800;cursor:pointer;">Got it, let\'s go!</button>'
+    + '<button onclick="optOutWelcomeTours()" style="width:100%;margin-top:8px;padding:8px;border-radius:10px;border:none;background:transparent;color:var(--ink3);font-family:var(--fd);font-size:12px;cursor:pointer;text-decoration:underline;">Don\'t show these tips again on any page</button>'
+    + '</div>'
+    + '</div>';
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+function dismissWelcomeTour(){
+  try{ localStorage.setItem(WELCOME_TOUR_KEY, '1'); }catch(e){}
+  var el = document.getElementById('welcome-tour-overlay');
+  if(el) el.remove();
+}
+
+function optOutWelcomeTours(){
+  try{ localStorage.setItem(WELCOME_TOUR_OPTOUT_KEY, '1'); }catch(e){}
+  var el = document.getElementById('welcome-tour-overlay');
+  if(el) el.remove();
+}
+
 function renderCards(leagueIds, uid) {
   var wrap = document.getElementById('leagues-wrap');
 
@@ -756,7 +813,7 @@ function renderCards(leagueIds, uid) {
     }
 
     wrap.innerHTML = mine.map(buildCard).join('');
-
+    showWelcomeTourIfNeeded();
 
   })
   .catch(function(err) {
