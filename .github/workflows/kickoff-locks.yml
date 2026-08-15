@@ -184,11 +184,33 @@ jobs:
 
               console.log(`  Game check: ${awayTeam}@${homeTeam} — raw status: "${game.gameStatus || game.status || '(none)'}"`);
 
-              const isLocked = status.includes('in progress') ||
+              // Same field mapping already proven correct in the Worker's
+              // own /schedule endpoint — gameTime_epoch (seconds) or
+              // gameTime (a parseable date string) are Tank01's real
+              // fields for a game's scheduled kickoff.
+              const kickoffMs = game.gameTime_epoch ? game.gameTime_epoch * 1000
+                               : game.gameTime ? new Date(game.gameTime).getTime() : 0;
+              // Locking should never depend entirely on Tank01's own
+              // status string — confirmed tonight that its reporting can
+              // lag several minutes behind a game's real, scheduled
+              // kickoff, leaving players unlocked and swappable well
+              // after their game had actually started. A game whose
+              // known kickoff time has already passed is locked
+              // immediately regardless of what Tank01's status currently
+              // says — this is static, already-known data with zero
+              // dependency on Tank01's own latency at any given moment.
+              const pastKickoff = kickoffMs > 0 && Date.now() >= kickoffMs;
+
+              const isLocked = pastKickoff ||
+                               status.includes('in progress') ||
                                status.includes('inprogress') ||
                                status.includes('final') ||
                                status === 'completed' ||
                                status === 'live';
+
+              if (pastKickoff && !status.includes('progress') && !status.includes('final') && status !== 'live' && status !== 'completed') {
+                console.log(`  ⏰ Locking by scheduled kickoff time (Tank01 status hasn't caught up yet): ${awayTeam}@${homeTeam}`);
+              }
 
               if (isLocked) {
                 const lockTime = Date.now();
