@@ -1446,7 +1446,19 @@ function renderRoster(){
     }
     var slotEl = e.target.closest('[data-slot-id]');
     if(slotEl){
-      selectSlot(slotEl.getAttribute('data-slot-id'));
+      var tappedSlotId = slotEl.getAttribute('data-slot-id');
+      var currentPlayer = lineup[tappedSlotId];
+      // A locked player (game already started) must be fully locked into
+      // their slot — not just protected from the Remove button, which
+      // was the only place this was actually being checked before. The
+      // picker itself was a separate, unguarded route to the same
+      // effect: opening it for this slot and picking someone else would
+      // silently overwrite an already-started, already-scoring player.
+      if(currentPlayer && isPlayerLocked(currentPlayer)){
+        showToast('🔒 ' + currentPlayer.name + '\'s game has started — locked in for this week.', true);
+        return;
+      }
+      selectSlot(tappedSlotId);
     }
   });
 })();
