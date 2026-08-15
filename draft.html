@@ -1089,6 +1089,59 @@ function setGameFilter(gameIdx, btn){
 }
 
 function renderGamePreview(game){
+  // A completed game has nothing left to draft — every player from it
+  // is already locked out of the picker below anyway. Show real
+  // fantasy stats for that game instead of an empty "no players" list.
+  var gameComplete = game.home && liveGameStatus[game.home] && liveGameStatus[game.home].liveStatusCode === 2;
+  if(gameComplete && game.gameId){
+    document.getElementById('picker-list').innerHTML = '<div style="padding:20px;text-align:center;color:var(--ink3);font-family:var(--fd);font-size:13px;">Loading final stats…</div>';
+    FR.fb.get('/gameStats/2026/' + game.gameId).then(function(data){
+      renderCompletedGameStats(data, game);
+    }).catch(function(){
+      document.getElementById('picker-list').innerHTML = '<div style="padding:20px;text-align:center;color:var(--ink3);font-family:var(--fd);font-size:13px;">Stats not available for this game yet.</div>';
+    });
+    return;
+  }
+
+  renderGameTeamToggle(game);
+  renderFlexPosToggle(activeSlot ? SLOT_DEFS.find(function(s){ return s.id === activeSlot; }) : null);
+  renderGamePreviewPickable(game);
+}
+
+function renderCompletedGameStats(data, game){
+  var players = (data && data.players) || [];
+  if(!players.length){
+    document.getElementById('picker-list').innerHTML = '<div style="padding:20px;text-align:center;color:var(--ink3);font-family:var(--fd);font-size:13px;">No stats available for this game yet.</div>';
+    return;
+  }
+  var POS_COLORS_LOCAL = POS_COLORS || {};
+  var html = '<div style="padding:8px 12px;font-family:var(--fd);font-size:11px;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;">'
+    + 'Final — ' + escapeHtmlFR(game.away) + ' @ ' + escapeHtmlFR(game.home) + '</div>';
+  html += players.map(function(p, i){
+    var color = POS_COLORS_LOCAL[p.pos] || 'var(--ink2)';
+    var breakdownId = 'gstat-bd-' + i;
+    var hasBreakdown = p.breakdown && p.breakdown.length > 0;
+    var rows = hasBreakdown ? p.breakdown.map(function(b){
+      var ptsColor = b.points > 0 ? 'var(--or)' : (b.points < 0 ? 'var(--pk)' : 'var(--ink3)');
+      var sign = b.points > 0 ? '+' : '';
+      return '<div style="display:flex;justify-content:space-between;padding:4px 0;font-family:var(--fd);font-size:12px;">'
+        + '<span style="color:var(--ink2);">' + escapeHtmlFR(b.label) + ' (' + b.stat + ')</span>'
+        + '<span style="color:' + ptsColor + ';font-weight:700;">' + sign + b.points.toFixed(2) + '</span>'
+        + '</div>';
+    }).join('') : '';
+    var cardClick = hasBreakdown ? ' onclick="var el=document.getElementById(\'' + breakdownId + '\');el.style.display=el.style.display===\'none\'?\'block\':\'none\';" style="cursor:pointer;"' : '';
+    return '<div class="player-row"' + cardClick + '>'
+      + '<div class="p-info">'
+      +   '<div class="p-name">' + escapeHtmlFR(p.name) + (p.pos ? ' · <span style="color:' + color + ';">' + p.pos + '</span>' : '') + (p.team ? ' · ' + escapeHtmlFR(p.team) : '') + '</div>'
+      + '</div>'
+      + '<div style="font-family:var(--fd);font-size:16px;font-weight:800;color:var(--or);">' + p.pts.toFixed(2) + '</div>'
+      + '</div>'
+      + '<div id="' + breakdownId + '" style="display:none;padding:6px 14px 10px;background:var(--bg3);">' + rows + '</div>';
+  }).join('');
+  document.getElementById('picker-list').innerHTML = html;
+}
+
+function renderGamePreviewPickable(game){
   var POS_ORDER = ['QB','RB','WR','TE','DEF'];
   var POS_LABELS = {QB:'Quarterbacks', RB:'Running Backs', WR:'Wide Receivers', TE:'Tight Ends', DEF:'Defense/ST'};
 
@@ -1099,9 +1152,6 @@ function renderGamePreview(game){
   // same idea as before, just applied to a single unified list now
   // instead of filtering two separate columns.
   var slot = activeSlot ? SLOT_DEFS.find(function(s){ return s.id === activeSlot; }) : null;
-
-  renderGameTeamToggle(game);
-  renderFlexPosToggle(slot);
 
   var eligible = allPlayers.filter(function(p){
     var onAway = normTeam(p.team) === normTeam(game.away);
