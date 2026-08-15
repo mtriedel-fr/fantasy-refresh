@@ -213,7 +213,15 @@ jobs:
               }
 
               if (isLocked) {
-                const lockTime = Date.now();
+                // Use the real, known scheduled kickoff time when that's
+                // what triggered this lock — exactly accurate, rather
+                // than "whenever this run happened to execute and
+                // notice," which could still be off by up to the ~2
+                // minute run interval even with the fix above. Falls
+                // back to the actual detection time when locked via
+                // Tank01's own status instead, since there's no precise
+                // kickoff moment to use in that case.
+                const lockTime = pastKickoff ? kickoffMs : Date.now();
                 if (!locks[homeTeam]) {
                   locks[homeTeam] = { lockedAt: lockTime, gameId, opponent: awayTeam };
                   newLocks++;
