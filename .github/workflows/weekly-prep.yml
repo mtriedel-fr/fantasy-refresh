@@ -239,10 +239,17 @@ jobs:
             }).format(now).split('-').map(Number);
             const [etYear, etMonth, etDay] = etParts;
             if (etMonth === 8 || (etMonth === 9 && etDay <= 8)) {
-              const aug1 = new Date(Date.UTC(etYear, 7, 1));
-              const todayUTC = new Date(Date.UTC(etYear, etMonth - 1, etDay));
-              const daysSinceAug1 = Math.floor((todayUTC - aug1) / (1000 * 60 * 60 * 24));
-              globalCurrentWeek = Math.min(4, Math.max(1, Math.floor(daysSinceAug1 / 7) + 1));
+              // Real, explicit calendar for this season's preseason
+              // weeks, not naive "days since Aug 1 divided by 7" math —
+              // confirmed tonight (auto-scoring.yml, kickoff-locks.yml)
+              // that the naive math drifts out of sync with the real
+              // game windows, since 7-day math doesn't actually line up
+              // evenly against these real dates.
+              const mmdd = etMonth * 100 + etDay;
+              if (mmdd <= 812)      globalCurrentWeek = 1; // through Aug 12 — HOF game, before Week 2 starts
+              else if (mmdd <= 819) globalCurrentWeek = 2; // Aug 13-19 — real games Aug 13-17
+              else if (mmdd <= 826) globalCurrentWeek = 3; // Aug 20-26 — real games Aug 20-23
+              else                  globalCurrentWeek = 4; // Aug 27 onward — real games Aug 27-30
               return globalCurrentWeek;
             }
             try {

@@ -266,13 +266,26 @@ jobs:
             }).format(now).split('-').map(Number);
             const [etYear, etMonth, etDay] = etParts;
             if (etMonth === 8 || (etMonth === 9 && etDay <= 8)) {
-              // Estimate preseason week based on date
-              // Preseason Week 1 typically starts ~Aug 7
-              const aug1 = new Date(Date.UTC(etYear, 7, 1)); // month is 0-indexed, so 7 = August
-              const todayUTC = new Date(Date.UTC(etYear, etMonth - 1, etDay));
-              const daysSinceAug1 = Math.floor((todayUTC - aug1) / (1000 * 60 * 60 * 24));
-              const psWeek = Math.min(4, Math.max(1, Math.floor(daysSinceAug1 / 7) + 1));
-              console.log(`Preseason window (by ET date ${etYear}-${String(etMonth).padStart(2,'0')}-${String(etDay).padStart(2,'0')}) — estimated week ${psWeek}`);
+              // Real, explicit calendar for this season's preseason
+              // weeks — NOT a "days since Aug 1 divided by 7" formula.
+              // Confirmed directly tonight that naive math drifts out of
+              // sync with the actual, real game windows: Aug 15 is
+              // genuinely still within the established Week 2 window
+              // (Aug 13-17), but the old formula had already rolled over
+              // to Week 3 a day early, since 7-day math doesn't actually
+              // line up evenly against these real dates. This caused a
+              // genuine, confusing split — the backend correctly locking
+              // "Week 3" games while the site itself, using a completely
+              // different method (advance only once a week has finished
+              // and stayed final 24h), correctly stayed on Week 2, since
+              // Week 2 hadn't actually finished yet.
+              const mmdd = etMonth * 100 + etDay; // e.g. Aug 15 -> 815
+              let psWeek;
+              if (mmdd <= 812)      psWeek = 1; // through Aug 12 — HOF game, before Week 2 starts
+              else if (mmdd <= 819) psWeek = 2; // Aug 13-19 — real games Aug 13-17
+              else if (mmdd <= 826) psWeek = 3; // Aug 20-26 — real games Aug 20-23
+              else                  psWeek = 4; // Aug 27 onward — real games Aug 27-30
+              console.log(`Preseason window (by ET date ${etYear}-${String(etMonth).padStart(2,'0')}-${String(etDay).padStart(2,'0')}) — calendar week ${psWeek}`);
               return { week: psWeek, seasonType: 'Preseason' };
             }
 
