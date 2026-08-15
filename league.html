@@ -191,6 +191,7 @@ tr:hover td{background:var(--or4);}
 .lineup-card-mid{flex:1;min-width:0;}
 .lineup-card-name{font-family:var(--fd);font-size:17px;font-weight:700;color:var(--ink);display:flex;align-items:center;gap:6px;}
 .lineup-card-game{font-size:12.5px;color:var(--ink3);margin-top:2px;}
+.lineup-card-game.live{color:var(--or);font-weight:700;}
 .lineup-card-pts{flex-shrink:0;text-align:right;font-family:var(--fd);font-size:17px;font-weight:900;color:var(--ink);line-height:1;}
 .lineup-card-pts-lbl{display:block;font-size:10px;font-weight:700;color:var(--ink3);letter-spacing:.5px;margin-top:2px;}
 .lineup-card-pending{font-size:10px;font-weight:700;color:var(--ink3);background:var(--bg2);border:1px solid var(--bdr2);border-radius:5px;padding:1px 6px;text-transform:uppercase;letter-spacing:.3px;}
@@ -2238,10 +2239,42 @@ function fmtKickoff(iso){
 function fetchWeekSchedule(week){
   var ctx = FRAuth.getLeagueCtx();
   var seasonType = (ctx && (ctx.isPreseason || ctx.seasonType === 'Preseason')) ? 'Preseason' : 'Regular';
-  return fetch(TANK01_WORKER + '/schedule?week=' + week + '&season=2026&seasonType=' + seasonType)
-    .then(function(r){ return r.json(); })
-    .then(function(data){ return buildTeamGameMap(data && data.games); })
-    .catch(function(){ return {}; });
+  return Promise.all([
+    fetch(TANK01_WORKER + '/schedule?week=' + week + '&season=2026&seasonType=' + seasonType)
+      .then(function(r){ return r.json(); })
+      .then(function(data){ return buildTeamGameMap(data && data.games); })
+      .catch(function(){ return {}; }),
+    // Live status (score, quarter, clock) — written by auto-scoring.yml
+    // every ~2 minutes during game windows, separate from the static
+    // pre-game schedule above. Missing here entirely was the actual
+    // root cause of a real bug tonight: a player's lock/game-info
+    // display depends on this gameMap having a real entry, and this
+    // page never fetched live status at all before now.
+    FR.fb.get('/liveGameStatus/2026/' + seasonType + '_wk' + week).catch(function(){ return null; })
+  ]).then(function(results){
+    var map = results[0] || {};
+    var live = results[1];
+    if(live && live.games){
+      Object.keys(live.games).forEach(function(gameId){
+        var g = live.games[gameId];
+        if(g.home && map[g.home]){
+          map[g.home].liveStatusCode = g.statusCode;
+          map[g.home].quarter = g.quarter;
+          map[g.home].clock = g.clock;
+          map[g.home].myScore = g.homeScore;
+          map[g.home].oppScore = g.awayScore;
+        }
+        if(g.away && map[g.away]){
+          map[g.away].liveStatusCode = g.statusCode;
+          map[g.away].quarter = g.quarter;
+          map[g.away].clock = g.clock;
+          map[g.away].myScore = g.awayScore;
+          map[g.away].oppScore = g.homeScore;
+        }
+      });
+    }
+    return map;
+  }).catch(function(){ return {}; });
 }
 
 // Standard baseline counts — any slot numbered beyond these is a promoted
@@ -2264,14 +2297,31 @@ function buildLineupPlayerCard(p, pts, hasStarted, gameMap, showNotStartedTag, s
   var game = (gameMap && p.team) ? gameMap[p.team] : null;
   var gameLine = '';
   if(game){
-    var vsAt = game.international ? (game.isHome ? 'vs' : '@') + ' Int\'l' : (game.isHome ? 'vs' : '@');
-    var kickoff = fmtKickoff(game.time);
-    // Dome/retractable icon reflects the STADIUM the game is played at —
-    // the home team's stadium, regardless of which side p.team is on.
-    var hostTeam = game.isHome ? p.team : game.opp;
-    var venueIcon = stadiumIcon(hostTeam);
-    gameLine = '<div class="lineup-card-game">' + (kickoff ? kickoff + ' · ' : '') + vsAt + ' ' + escapeHtmlFR(game.opp)
-      + (venueIcon ? ' ' + venueIcon : '') + '</div>';
+    if(game.liveStatusCode === 1){
+      // Live — show time remaining and score instead of the static
+      // kickoff time, since kickoff has already passed and isn't the
+      // useful piece of information anymore. Score field names are an
+      // educated guess (same honest flag as quarter/clock elsewhere in
+      // this app) — unverified against a real live response.
+      var q = game.quarter ? 'Q' + game.quarter : 'Live';
+      var clk = game.clock ? ' ' + game.clock : '';
+      var scoreLine = (typeof game.myScore === 'number' && typeof game.oppScore === 'number')
+        ? ' · ' + game.myScore + '-' + game.oppScore : '';
+      gameLine = '<div class="lineup-card-game live">' + q + clk + ' vs ' + escapeHtmlFR(game.opp) + scoreLine + '</div>';
+    } else if(game.liveStatusCode === 2){
+      var finalScoreLine = (typeof game.myScore === 'number' && typeof game.oppScore === 'number')
+        ? ' ' + game.myScore + '-' + game.oppScore : '';
+      gameLine = '<div class="lineup-card-game">Final' + finalScoreLine + ' vs ' + escapeHtmlFR(game.opp) + '</div>';
+    } else {
+      var vsAt = game.international ? (game.isHome ? 'vs' : '@') + ' Int\'l' : (game.isHome ? 'vs' : '@');
+      var kickoff = fmtKickoff(game.time);
+      // Dome/retractable icon reflects the STADIUM the game is played at —
+      // the home team's stadium, regardless of which side p.team is on.
+      var hostTeam = game.isHome ? p.team : game.opp;
+      var venueIcon = stadiumIcon(hostTeam);
+      gameLine = '<div class="lineup-card-game">' + (kickoff ? kickoff + ' · ' : '') + vsAt + ' ' + escapeHtmlFR(game.opp)
+        + (venueIcon ? ' ' + venueIcon : '') + '</div>';
+    }
   }
 
   // Team abbreviation on the name line — skipped for DEF, since a defense

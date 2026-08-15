@@ -481,6 +481,7 @@ var activeGameTeamFilter = 'both'; // 'both' | 'away' | 'home' — which side(s)
 var activeFlexPosFilter = 'all'; // 'all' or a specific position — sub-filter for multi-eligible slots (FLEX, SUPERFLEX)
 var currentWeek  = 1;
 var schedule     = [];   // [{home,away,time,teams:[],international}]
+var liveGameStatus = {}; // team abbr -> {liveStatusCode, quarter, clock, myScore, oppScore} — written by auto-scoring.yml, refetched alongside the schedule itself
 var currentUser  = null;
 
 // ── PER-TEAM GAME LOOKUP (opponent, home/away, international) ──────
@@ -492,6 +493,11 @@ function buildDraftTeamGameMap(){
     if(!g.home || !g.away) return;
     map[g.home] = { opp: g.away, time: g.time, isHome: true,  international: !!g.international };
     map[g.away] = { opp: g.home, time: g.time, isHome: false, international: !!g.international };
+  });
+  // Merge in live status (score, quarter, clock) when available —
+  // separate fetch from the static schedule above, see loadSchedule().
+  Object.keys(liveGameStatus).forEach(function(team){
+    if(map[team]) Object.assign(map[team], liveGameStatus[team]);
   });
   return map;
 }
@@ -887,6 +893,22 @@ function loadSchedule(){
       if(!data || !data.games || !data.games.length) throw new Error('No games');
       schedule = data.games;
       buildGamesBar(schedule);
+
+      // Live status (score, quarter, clock) — same data auto-scoring.yml
+      // now writes for league.html to consume, fetched here too since a
+      // locked-in player's game info should show live time/score just
+      // as much on the draft page as anywhere else. Re-renders the
+      // roster once this resolves, since it may already be showing
+      // stale, pre-game info by the time this arrives.
+      FR.fb.get('/liveGameStatus/2026/' + seasonType + '_wk' + apiWeek).then(function(live){
+        if(!live || !live.games) return;
+        Object.keys(live.games).forEach(function(gameId){
+          var g = live.games[gameId];
+          if(g.home) liveGameStatus[g.home] = { liveStatusCode: g.statusCode, quarter: g.quarter, clock: g.clock, myScore: g.homeScore, oppScore: g.awayScore };
+          if(g.away) liveGameStatus[g.away] = { liveStatusCode: g.statusCode, quarter: g.quarter, clock: g.clock, myScore: g.awayScore, oppScore: g.homeScore };
+        });
+        renderRoster();
+      }).catch(function(){});
 
       // In preseason: re-filter player pool to only teams playing this week
       if(PS_MODE && allPlayers.length){
@@ -1388,14 +1410,27 @@ function renderRoster(){
       // folded right into the same line, matching the picker list format.
       var game = p.team ? teamGameMap[p.team] : null;
       var gameLine = '';
+      var gameIsLiveOrFinal = false;
       if(game){
-        var vsAt = game.international ? (game.isHome ? 'vs' : '@') + ' Int\'l' : (game.isHome ? 'vs' : '@');
-        var hostTeam = game.isHome ? p.team : game.opp;
-        var venueIcon = draftStadiumIcon(hostTeam);
-        var kickoff = fmtKickoff(game.time);
-        gameLine = (kickoff ? kickoff + ' · ' : '') + vsAt + ' ' + game.opp + (venueIcon ? ' ' + venueIcon : '');
+        if(game.liveStatusCode === 1){
+          gameIsLiveOrFinal = true;
+          var q = game.quarter ? 'Q' + game.quarter : 'Live';
+          var clk = game.clock ? ' ' + game.clock : '';
+          var scoreLine = (typeof game.myScore === 'number' && typeof game.oppScore === 'number') ? ' · ' + game.myScore + '-' + game.oppScore : '';
+          gameLine = q + clk + ' vs ' + game.opp + scoreLine;
+        } else if(game.liveStatusCode === 2){
+          gameIsLiveOrFinal = true;
+          var finalScoreLine = (typeof game.myScore === 'number' && typeof game.oppScore === 'number') ? ' ' + game.myScore + '-' + game.oppScore : '';
+          gameLine = 'Final' + finalScoreLine + ' vs ' + game.opp;
+        } else {
+          var vsAt = game.international ? (game.isHome ? 'vs' : '@') + ' Int\'l' : (game.isHome ? 'vs' : '@');
+          var hostTeam = game.isHome ? p.team : game.opp;
+          var venueIcon = draftStadiumIcon(hostTeam);
+          var kickoff = fmtKickoff(game.time);
+          gameLine = (kickoff ? kickoff + ' · ' : '') + vsAt + ' ' + game.opp + (venueIcon ? ' ' + venueIcon : '');
+        }
       }
-      if(p.proj != null) gameLine += (gameLine ? ' · ' : '') + p.proj + ' proj';
+      if(p.proj != null && !gameIsLiveOrFinal) gameLine += (gameLine ? ' · ' : '') + p.proj + ' proj';
 
       // Name and the game/date line now sit in the SAME middle column
       // (.slot-mid), so the date lines up directly under the name instead
