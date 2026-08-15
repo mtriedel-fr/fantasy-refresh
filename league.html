@@ -2257,7 +2257,7 @@ function lineupSlotStructuralLabel(slotId, playerPos){
   return playerPos || prefix.toUpperCase();
 }
 
-function buildLineupPlayerCard(p, pts, hasStarted, gameMap, showNotStartedTag, slotId, breakdown, ownership){
+function buildLineupPlayerCard(p, pts, hasStarted, gameMap, showNotStartedTag, slotId, breakdown, ownership, ownerId){
   var slotLabel = slotId ? lineupSlotStructuralLabel(slotId, p.pos) : (p.pos || '');
   var posColor = LINEUP_POS_COLORS[slotLabel] || LINEUP_POS_COLORS[p.pos] || 'var(--ink2)';
   var ptsLabel = (typeof pts === 'number') ? pts.toFixed(2) : '0.00';
@@ -2314,7 +2314,7 @@ function buildLineupPlayerCard(p, pts, hasStarted, gameMap, showNotStartedTag, s
   // recorded any stats yet (ownership itself doesn't depend on scoring).
   var hasOwnership = hasStarted && typeof ownership === 'number';
   var hasDropdownContent = hasBreakdown || hasOwnership;
-  var breakdownId = 'bd-' + (slotId || Math.random().toString(36).slice(2));
+  var breakdownId = 'bd-' + (ownerId || 'x') + '-' + (slotId || Math.random().toString(36).slice(2));
   var breakdownRows = hasBreakdown ? breakdown.map(function(b){
     var ptsColor = b.points > 0 ? 'var(--or)' : (b.points < 0 ? 'var(--pk)' : 'var(--ink3)');
     var sign = b.points > 0 ? '+' : '';
@@ -2374,7 +2374,8 @@ function rosterColumn(lineup, scoreEntry, locks, isMine, gameMap, ownership){
       var p = lineup.slots[slotId];
       if(!p) return '';
       var hasStarted = !!(p.team && locks && locks[p.team]);
-      return buildLineupPlayerCard(p, slotPts[slotId], hasStarted, gameMap, true, slotId, slotBreakdown[slotId], ownership ? ownership[p.id] : undefined);
+      var ownerId = (lineup && lineup.uid) || (scoreEntry && scoreEntry.uid) || '';
+      return buildLineupPlayerCard(p, slotPts[slotId], hasStarted, gameMap, true, slotId, slotBreakdown[slotId], ownership ? ownership[p.id] : undefined, ownerId);
     }).join('');
 
     // Budget remaining — sum actual drafted salaries against the league cap.
@@ -2403,7 +2404,8 @@ function rosterColumn(lineup, scoreEntry, locks, isMine, gameMap, ownership){
     if(!p) return '';
     var hasStarted = !!(p.team && locks && locks[p.team]);
     if(hasStarted){
-      return buildLineupPlayerCard(p, slotPts[slotId], hasStarted, gameMap, false, slotId, slotBreakdown[slotId], ownership ? ownership[p.id] : undefined);
+      var ownerId2 = (lineup && lineup.uid) || (scoreEntry && scoreEntry.uid) || '';
+      return buildLineupPlayerCard(p, slotPts[slotId], hasStarted, gameMap, false, slotId, slotBreakdown[slotId], ownership ? ownership[p.id] : undefined, ownerId2);
     }
     // Masked row — same visual shape as a real player card, but never
     // reveals identity before that player's game has actually started.
