@@ -1930,6 +1930,16 @@ function setLoading(on){
 // reused here instead of duplicated.
 var h2hLastWeekScores = {};
 
+// Same alias table and helper already proven correct in draft.html —
+// Sleeper (source for lineup/player data) and Tank01 (source for live
+// locks) use different abbreviations for Washington specifically, a
+// long-standing inconsistency between sports data providers. Confirmed
+// tonight as the exact cause of a real player never showing as locked
+// despite his game having genuinely started: locks[p.team] was always
+// being checked with zero normalization anywhere in this file.
+var TEAM_ALIASES = { WAS: 'WSH', WSH: 'WSH' };
+function normTeam(abbr){ return TEAM_ALIASES[abbr] || abbr; }
+
 function escapeHtmlFR(s){
   return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
     return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];
@@ -2424,7 +2434,7 @@ function rosterColumn(lineup, scoreEntry, locks, isMine, gameMap, ownership){
     var allRows = sortedSlotIds(lineup.slots).map(function(slotId){
       var p = lineup.slots[slotId];
       if(!p) return '';
-      var hasStarted = !!(p.team && locks && locks[p.team]);
+      var hasStarted = !!(p.team && locks && locks[normTeam(p.team)]);
       var ownerId = (lineup && lineup.uid) || (scoreEntry && scoreEntry.uid) || '';
       return buildLineupPlayerCard(p, slotPts[slotId], hasStarted, gameMap, true, slotId, slotBreakdown[slotId], ownership ? ownership[p.id] : undefined, ownerId);
     }).join('');
@@ -2453,7 +2463,7 @@ function rosterColumn(lineup, scoreEntry, locks, isMine, gameMap, ownership){
   var allRows2 = sortedSlotIds(lineup.slots).map(function(slotId){
     var p = lineup.slots[slotId];
     if(!p) return '';
-    var hasStarted = !!(p.team && locks && locks[p.team]);
+    var hasStarted = !!(p.team && locks && locks[normTeam(p.team)]);
     if(hasStarted){
       var ownerId2 = (lineup && lineup.uid) || (scoreEntry && scoreEntry.uid) || '';
       return buildLineupPlayerCard(p, slotPts[slotId], hasStarted, gameMap, false, slotId, slotBreakdown[slotId], ownership ? ownership[p.id] : undefined, ownerId2);
@@ -6401,7 +6411,7 @@ function renderNumbers(curEntries){
       slotIds.forEach(function(slotId, si){
         var p = realLineup.slots[slotId];
         if(!p || !p.name) return;
-        var hasStarted = !!(p.team && weekLocks[p.team]);
+        var hasStarted = !!(p.team && weekLocks[normTeam(p.team)]);
         if(!slotCounts[si][p.name]) slotCounts[si][p.name] = { count: 0, hasStarted: hasStarted, pts: undefined };
         slotCounts[si][p.name].count++;
         // A player's own score is the same no matter which team's entry
@@ -6441,7 +6451,7 @@ function renderNumbers(curEntries){
       // showing every other team's full, real roster regardless of
       // whether any of those games had even kicked off, same privacy
       // standard already enforced everywhere else a player card shows.
-      var hasStarted = player && player.team && weekLocks[player.team];
+      var hasStarted = player && player.team && weekLocks[normTeam(player.team)];
       var rowBg = i % 2 ? 'var(--bg3)' : 'transparent';
       if(!player || !hasStarted){
         // Minimal, quiet treatment for empty/not-started slots — the
