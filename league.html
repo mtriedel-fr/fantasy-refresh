@@ -1041,7 +1041,10 @@ setTimeout(function(){
   <div class="h2h-section h2h-section-standings">
     <div class="h2h-section-hdr" style="display:flex;align-items:center;justify-content:space-between;">
       <span>🏆 Weekly Standings</span>
-      <button onclick="openRecap()" style="font-family:var(--fd);font-size:11px;font-weight:800;padding:6px 12px;border-radius:20px;border:1.5px solid var(--or);background:rgba(0,229,212,.1);color:var(--or);cursor:pointer;">📰 Weekly Review</button>
+      <div style="display:flex;gap:8px;">
+        <button onclick="openFullBoardStats()" style="font-family:var(--fd);font-size:11px;font-weight:800;padding:6px 12px;border-radius:20px;border:1.5px solid var(--pu);background:rgba(155,109,255,.1);color:var(--pu);cursor:pointer;">🏈 Full Board Stats</button>
+        <button onclick="openRecap()" style="font-family:var(--fd);font-size:11px;font-weight:800;padding:6px 12px;border-radius:20px;border:1.5px solid var(--or);background:rgba(0,229,212,.1);color:var(--or);cursor:pointer;">📰 Weekly Review</button>
+      </div>
     </div>
     <div id="cum-standings-wrap"></div>
     <div id="cum-standings-pager" style="display:flex;gap:6px;justify-content:center;margin-top:12px;flex-wrap:wrap;"></div>
@@ -7044,6 +7047,117 @@ function closeRecap(){
   document.getElementById('recap-overlay').classList.remove('open');
 }
 
+// ── FULL BOARD STATS ──────────────────────────────────────────────
+// Reuses the same per-game detailed stats already built and persisted
+// by auto-scoring.yml for the draft page's completed-game view (real
+// fantasy points + full stat breakdown for every player, not just
+// rostered ones) — just combined across every game in the week instead
+// of one game at a time, so every player who was ever on the draft
+// board this week can be looked up in one place.
+var fbsAllPlayers = []; // cached once loaded, filtered client-side on position tap — no re-fetch per filter
+var fbsActivePos = 'ALL';
+
+function openFullBoardStats(){
+  var w = currentWeek;
+  document.getElementById('fbs-title').textContent = 'Week ' + w + ' — Full Board Stats';
+  document.getElementById('fbs-body').innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--ink3);font-size:13px;">Loading…</div>';
+  document.getElementById('fbs-pos-filter').innerHTML = '';
+  document.getElementById('fbs-overlay').classList.add('open');
+  fbsActivePos = 'ALL';
+
+  var ctx = FRAuth.getLeagueCtx();
+  var season = (ctx && ctx.season) || 2026;
+  var seasonType = (ctx && (ctx.isPreseason || ctx.seasonType === 'Preseason')) ? 'Preseason' : 'Regular';
+
+  // Raw schedule fetched directly here (not via fetchWeekSchedule/
+  // buildTeamGameMap, which transforms this into a team-keyed map and
+  // drops the gameId field entirely) — gameId is exactly what's needed
+  // to look up each game's stats.
+  fetch(TANK01_WORKER + '/schedule?week=' + w + '&season=' + season + '&seasonType=' + seasonType)
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      var games = (data && data.games) || [];
+      var gameIds = games.map(function(g){ return g.gameId; }).filter(Boolean);
+      if(!gameIds.length){
+        document.getElementById('fbs-body').innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--ink3);font-size:13px;">No games found for this week.</div>';
+        return;
+      }
+      return Promise.all(gameIds.map(function(gid){
+        return FR.fb.get('/gameStats/' + season + '/' + gid).catch(function(){ return null; });
+      }));
+    })
+    .then(function(results){
+      if(!results) return; // no games case already handled above
+      var all = [];
+      (results || []).forEach(function(data){
+        if(data && data.players) all = all.concat(data.players);
+      });
+      if(!all.length){
+        document.getElementById('fbs-body').innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--ink3);font-size:13px;">No stats available yet — check back once today\'s games are underway.</div>';
+        return;
+      }
+      all.sort(function(a, b){ return b.pts - a.pts; });
+      fbsAllPlayers = all;
+      renderFbsPosFilter();
+      renderFbsBody();
+    })
+    .catch(function(){
+      document.getElementById('fbs-body').innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--ink3);font-size:13px;">Couldn\'t load this week\'s stats.</div>';
+    });
+}
+
+function closeFullBoardStats(){
+  document.getElementById('fbs-overlay').classList.remove('open');
+}
+
+function renderFbsPosFilter(){
+  var positions = ['ALL'];
+  fbsAllPlayers.forEach(function(p){
+    if(p.pos && positions.indexOf(p.pos) === -1) positions.push(p.pos);
+  });
+  var html = positions.map(function(pos){
+    var active = pos === fbsActivePos;
+    return '<button onclick="setFbsPosFilter(\'' + pos + '\')" style="font-family:var(--fd);font-size:11px;font-weight:800;padding:5px 12px;border-radius:16px;border:1.5px solid ' + (active ? 'var(--pu)' : 'var(--bdr)') + ';background:' + (active ? 'var(--pu)' : 'transparent') + ';color:' + (active ? '#fff' : 'var(--ink3)') + ';cursor:pointer;">' + pos + '</button>';
+  }).join('');
+  document.getElementById('fbs-pos-filter').innerHTML = html;
+}
+
+function setFbsPosFilter(pos){
+  fbsActivePos = pos;
+  renderFbsPosFilter();
+  renderFbsBody();
+}
+
+function renderFbsBody(){
+  var list = fbsActivePos === 'ALL' ? fbsAllPlayers : fbsAllPlayers.filter(function(p){ return p.pos === fbsActivePos; });
+  if(!list.length){
+    document.getElementById('fbs-body').innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--ink3);font-size:13px;">No players at this position yet.</div>';
+    return;
+  }
+  var html = list.map(function(p, i){
+    var breakdownId = 'fbs-bd-' + i;
+    var hasBreakdown = p.breakdown && p.breakdown.length > 0;
+    var rows = hasBreakdown ? p.breakdown.map(function(b){
+      var ptsColor = b.points > 0 ? 'var(--or)' : (b.points < 0 ? 'var(--pk)' : 'var(--ink3)');
+      var sign = b.points > 0 ? '+' : '';
+      return '<div style="display:flex;justify-content:space-between;padding:4px 0;font-family:var(--fd);font-size:12px;">'
+        + '<span style="color:var(--ink2);">' + escapeHtmlFR(b.label) + ' (' + b.stat + ')</span>'
+        + '<span style="color:' + ptsColor + ';font-weight:700;">' + sign + b.points.toFixed(2) + '</span>'
+        + '</div>';
+    }).join('') : '';
+    var cardClick = hasBreakdown ? ' onclick="var el=document.getElementById(\'' + breakdownId + '\');el.style.display=el.style.display===\'none\'?\'block\':\'none\';" style="cursor:pointer;"' : '';
+    // Order requested: player name first, fantasy score right after,
+    // then their recorded stats for the week (tap to expand).
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 20px;border-top:1px solid var(--bdr);"' + cardClick + '>'
+      + '<div><div style="font-family:var(--fd);font-size:14px;font-weight:700;color:var(--ink);">' + escapeHtmlFR(p.name) + '</div>'
+      + '<div style="font-family:var(--fd);font-size:11px;color:var(--ink3);margin-top:1px;">' + escapeHtmlFR(p.pos || '') + (p.team ? ' · ' + escapeHtmlFR(p.team) : '') + '</div></div>'
+      + '<div style="font-family:var(--fd);font-size:17px;font-weight:900;color:var(--or);">' + p.pts.toFixed(2) + '</div>'
+      + '</div>'
+      + '<div id="' + breakdownId + '" style="display:none;padding:6px 20px 12px;background:var(--bg3);">' + rows + '</div>';
+  }).join('');
+  document.getElementById('fbs-body').innerHTML = html;
+}
+
 function renderRecapBody(r){
   var html = '';
 
@@ -9273,6 +9387,17 @@ function removeCommissioner(uid){
       <button class="recap-close-btn" onclick="closeRecap()">✕</button>
     </div>
     <div class="recap-body" id="recap-body"></div>
+  </div>
+</div>
+
+<div class="recap-overlay" id="fbs-overlay" onclick="if(event.target===this)closeFullBoardStats()">
+  <div class="recap-box">
+    <div class="recap-hdr">
+      <div style="font-family:var(--fd);font-size:16px;font-weight:900;color:var(--pu);text-transform:uppercase;letter-spacing:.5px;" id="fbs-title">Full Board Stats</div>
+      <button class="recap-close-btn" onclick="closeFullBoardStats()">✕</button>
+    </div>
+    <div id="fbs-pos-filter" style="display:flex;gap:6px;flex-wrap:wrap;padding:0 20px 12px;"></div>
+    <div class="recap-body" id="fbs-body"></div>
   </div>
 </div>
 </div>
