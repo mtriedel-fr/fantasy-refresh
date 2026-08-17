@@ -1,0 +1,127 @@
+name: One-Time Preseason Data Migration
+
+# ONE-TIME USE ONLY — delete this file after running it once. Copies
+# the real Week 1/2 preseason test data that already exists under the
+# OLD, plain path (/season/2026, /lineups/2026, /locks/2026,
+# /salaries/2026) into the NEW, correctly-namespaced path
+# (/season/2026P, etc.) that the season-collision fix now reads from
+# and writes to going forward.
+#
+# Why this is needed: the fix changes where NEW data gets written, but
+# never moved data that already existed before the fix went live — so
+# the new path was correctly, but unhelpfully, empty until real Week 3
+# games happen and auto-scoring.yml writes fresh data there naturally.
+# This closes that gap immediately instead of waiting.
+#
+# Does NOT delete or modify the old path — leaves it in place as a
+# harmless backup. Only ever touches the one test league.
+
+on:
+  workflow_dispatch:
+    inputs:
+      league_id:
+        description: 'League ID to migrate'
+        required: true
+        default: 'fr_nth60cij'
+      confirm:
+        description: 'Type YES to actually run the migration'
+        required: true
+        default: ''
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Copy old-path preseason data to the new, namespaced path
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+          LEAGUE_ID: ${{ inputs.league_id }}
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+
+          const FB_URL   = process.env.FIREBASE_DB_URL;
+          const FB_TOKEN = process.env.FIREBASE_AUTH_TOKEN;
+          const LEAGUE   = process.env.LEAGUE_ID;
+          const CONFIRM  = process.env.CONFIRM;
+
+          function fbAuth(path) {
+            const sep = path.includes('?') ? '&' : '?';
+            return FB_TOKEN ? `${path}${sep}auth=${FB_TOKEN}` : path;
+          }
+
+          function fetchJson(url) {
+            return new Promise((resolve, reject) => {
+              const u = new URL(url);
+              https.get({ hostname: u.hostname, path: u.pathname + u.search }, res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+
+          function firebaseGet(path) {
+            return fetchJson(FB_URL + path + '.json');
+          }
+
+          function firebasePut(path, payload) {
+            return new Promise((resolve, reject) => {
+              const body = JSON.stringify(payload);
+              const fullPath = fbAuth(FB_URL + path + '.json');
+              const u = new URL(fullPath);
+              const req = https.request({
+                hostname: u.hostname, path: u.pathname + u.search, method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+              }, res => {
+                let d = '';
+                res.on('data', c => d += c);
+                res.on('end', () => {
+                  if (res.statusCode >= 200 && res.statusCode < 300) resolve(d);
+                  else reject(new Error(`PUT rejected (HTTP ${res.statusCode}) at ${path} — ${d.slice(0,200)}`));
+                });
+              });
+              req.on('error', reject);
+              req.write(body); req.end();
+            });
+          }
+
+          const PATHS_TO_MIGRATE = [
+            { old: `/leagues/${LEAGUE}/season/2026`,    new: `/leagues/${LEAGUE}/season/2026P` },
+            { old: `/leagues/${LEAGUE}/lineups/2026`,   new: `/leagues/${LEAGUE}/lineups/2026P` },
+            { old: `/leagues/${LEAGUE}/locks/2026`,     new: `/leagues/${LEAGUE}/locks/2026P` },
+            { old: `/leagues/${LEAGUE}/salaries/2026`,  new: `/leagues/${LEAGUE}/salaries/2026P` }
+          ];
+
+          async function main() {
+            if (CONFIRM !== 'YES') {
+              console.log('⚠️  Confirm input was not "YES" — nothing was touched. Set confirm=YES and re-run to actually migrate.');
+              return;
+            }
+            console.log(`Migrating preseason data for league: ${LEAGUE}\n`);
+
+            for (const { old, new: newPath } of PATHS_TO_MIGRATE) {
+              console.log(`--- ${old} → ${newPath} ---`);
+              const existing = await firebaseGet(old).catch(() => null);
+              if (!existing) {
+                console.log('  (nothing at the old path — skipping)');
+                continue;
+              }
+              const alreadyAtNew = await firebaseGet(newPath).catch(() => null);
+              if (alreadyAtNew) {
+                console.log('  ⚠️  New path already has real data — NOT overwriting. Skipping to avoid clobbering anything already written there since the fix went live.');
+                continue;
+              }
+              await firebasePut(newPath, existing);
+              console.log(`  ✓ Copied. Old path left untouched as a backup.`);
+            }
+            console.log('\nDone. The old, plain paths were NOT modified or deleted.');
+          }
+
+          main().catch(e => {
+            console.error('Migration failed:', e);
+            process.exit(1);
+          });
+          SCRIPT
