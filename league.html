@@ -1941,6 +1941,7 @@ var h2hLastWeekScores = {};
 // despite his game having genuinely started: locks[p.team] was always
 // being checked with zero normalization anywhere in this file.
 var TEAM_ALIASES = { WAS: 'WSH', WSH: 'WSH' };
+
 function normTeam(abbr){ return TEAM_ALIASES[abbr] || abbr; }
 
 function escapeHtmlFR(s){
@@ -2032,7 +2033,7 @@ function renderH2HMatchups(myUid){
   // Raw per-uid score entries (with slotPts) — a different shape than the
   // name-keyed seasonData array used elsewhere, needed here for the roster
   // dropdown's per-player points.
-  FR.fb.get('/leagues/' + leagueId + '/season/' + (ctx.season || 2026) + '/' + currentWeek).then(function(weekScores){
+  FR.fb.get('/leagues/' + leagueId + '/season/' + (FR.seasonKey()) + '/' + currentWeek).then(function(weekScores){
     weekScores = weekScores || {};
     h2hLastWeekScores = weekScores;
 
@@ -2085,11 +2086,11 @@ function toggleH2HRoster(idx, homeUid, awayUid){
   var myUid = (typeof FRAuth !== 'undefined' && FRAuth.getUser && FRAuth.getUser()) ? FRAuth.getUser().uid : null;
 
   Promise.all([
-    FR.fb.get('/leagues/' + leagueId + '/lineups/' + (ctx.season || 2026) + '/week' + currentWeek + '/' + homeUid).catch(function(){ return null; }),
-    FR.fb.get('/leagues/' + leagueId + '/lineups/' + (ctx.season || 2026) + '/week' + currentWeek + '/' + awayUid).catch(function(){ return null; }),
-    FR.fb.get('/leagues/' + leagueId + '/locks/' + (ctx.season || 2026) + '/week' + currentWeek).catch(function(){ return {}; }),
+    FR.fb.get('/leagues/' + leagueId + '/lineups/' + (FR.seasonKey()) + '/week' + currentWeek + '/' + homeUid).catch(function(){ return null; }),
+    FR.fb.get('/leagues/' + leagueId + '/lineups/' + (FR.seasonKey()) + '/week' + currentWeek + '/' + awayUid).catch(function(){ return null; }),
+    FR.fb.get('/leagues/' + leagueId + '/locks/' + (FR.seasonKey()) + '/week' + currentWeek).catch(function(){ return {}; }),
     fetchWeekSchedule(currentWeek),
-    FR.fb.get('/leagues/' + leagueId + '/season/' + (ctx.season || 2026) + '/' + currentWeek + '/ownership').catch(function(){ return null; })
+    FR.fb.get('/leagues/' + leagueId + '/season/' + (FR.seasonKey()) + '/' + currentWeek + '/ownership').catch(function(){ return null; })
   ]).then(function(results){
     var locks = results[2] || {};
     var gameMap = results[3] || {};
@@ -2532,7 +2533,7 @@ function boot(){
   if(currentWeek > 0){
     var ctx = FRAuth.getLeagueCtx();
     var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
-    var season = (ctx && ctx.season) || 2026;
+    var season = FR.seasonKey();
     FR.fb.get('/leagues/' + leagueId + '/season/' + season + '/' + currentWeek + '/finalizedAt')
       .then(function(finalizedAt){
         if(typeof finalizedAt === 'number' && (Date.now() - finalizedAt) > 24 * 60 * 60 * 1000){
@@ -2706,7 +2707,7 @@ function loadH2HMatchups(callback){
   if(h2hMatchupsLoaded){ callback(); return; }
   var ctx = FRAuth.getLeagueCtx();
   var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
-  FR.fb.get('/leagues/' + leagueId + '/matchups/' + (ctx.season || 2026))
+  FR.fb.get('/leagues/' + leagueId + '/matchups/' + (FR.seasonKey()))
     .then(function(data){
       h2hMatchups = data || {};
       h2hMatchupsLoaded = true;
@@ -2825,8 +2826,8 @@ function renderH2HMyLineup(){
   var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
 
   Promise.all([
-    FR.fb.get('/leagues/' + leagueId + '/lineups/' + (ctx.season || 2026) + '/week' + currentWeek + '/' + user.uid),
-    FR.fb.get('/leagues/' + leagueId + '/season/' + (ctx.season || 2026) + '/' + currentWeek),
+    FR.fb.get('/leagues/' + leagueId + '/lineups/' + (FR.seasonKey()) + '/week' + currentWeek + '/' + user.uid),
+    FR.fb.get('/leagues/' + leagueId + '/season/' + (FR.seasonKey()) + '/' + currentWeek),
     FR.fb.get('/leagues/' + leagueId + '/settings')
   ]).then(function(results){
     var lineup = results[0];
@@ -3055,7 +3056,7 @@ function updateMyTeamLabelsForCumulative(){
   if(!user || !user.uid) return;
   var ctx = FRAuth.getLeagueCtx();
   var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
-  var season = (ctx && ctx.season) || 2026;
+  var season = FR.seasonKey();
 
   Promise.all([
     FR.fb.get('/leagues/' + leagueId + '/lineups/' + season + '/week' + currentWeek + '/' + user.uid),
@@ -3136,7 +3137,7 @@ function computeCumStandings(){
   // 0.00 like anyone else. Re-renders standings once this resolves.
   var ctx = FRAuth.getLeagueCtx();
   var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
-  var season = (ctx && ctx.season) || 2026;
+  var season = FR.seasonKey();
   Promise.all([
     FR.fb.get('/leagues/' + leagueId + '/members').catch(function(){ return {}; }),
     // Full fetch, not a shallow query-string variant — FR.fb.get()
@@ -3317,7 +3318,7 @@ function loadMyTeamLineup(drop){
   drop.innerHTML = '<div class="h2h-roster-empty">Loading…</div>';
   var ctx = FRAuth.getLeagueCtx();
   var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
-  var season = (ctx && ctx.season) || 2026;
+  var season = FR.seasonKey();
 
   var seasonType = IS_PRESEASON_LEAGUE ? 'Preseason' : 'Regular';
 
@@ -5142,7 +5143,7 @@ function renderStandings(sorted, prevRank, curMap, wkHighName){
     cell.innerHTML = '<div style="padding:12px;font-family:var(--fd);font-size:12px;color:var(--ink3);">Loading…</div>';
     var ctx = FRAuth.getLeagueCtx();
     var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
-    var season = (ctx && ctx.season) || 2026;
+    var season = FR.seasonKey();
     Promise.all([
       FR.fb.get('/leagues/' + leagueId + '/lineups/' + season + '/week' + currentWeek + '/' + uid).catch(function(){ return null; }),
       FR.fb.get('/leagues/' + leagueId + '/season/' + season + '/' + currentWeek + '/' + uid).catch(function(){ return null; }),
@@ -6335,7 +6336,7 @@ function renderNumbers(curEntries){
   var weekKey = String(currentWeek);
   var ctx = FRAuth.getLeagueCtx();
   var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
-  var season = (ctx && ctx.season) || 2026;
+  var season = FR.seasonKey();
   if(!weekLineupsCache[weekKey]){
     FR.fb.get('/leagues/' + leagueId + '/lineups/' + season + '/week' + currentWeek)
       .then(function(data){
@@ -7023,7 +7024,7 @@ function closeShare(){
 function openRecap(week){
   var ctx      = FRAuth.getLeagueCtx();
   var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
-  var season   = (ctx && ctx.season) || 2026;
+  var season   = FR.seasonKey();
   var w = week || currentWeek;
 
   document.getElementById('recap-title').textContent = 'Week ' + w + ' Review';
@@ -7066,7 +7067,7 @@ function openFullBoardStats(){
   fbsActivePos = 'ALL';
 
   var ctx = FRAuth.getLeagueCtx();
-  var season = (ctx && ctx.season) || 2026;
+  var season = FR.seasonKey();
   var seasonType = (ctx && (ctx.isPreseason || ctx.seasonType === 'Preseason')) ? 'Preseason' : 'Regular';
 
   // Raw schedule fetched directly here (not via fetchWeekSchedule/
@@ -7997,7 +7998,7 @@ function maybeAutoGenerateH2HSchedule(){
     Promise.all([
       FR.fb.get('/leagues/' + leagueId + '/settings'),
       FR.fb.get('/leagues/' + leagueId + '/members'),
-      FR.fb.get('/leagues/' + leagueId + '/matchups/' + (ctx.season || 2026) + '/meta')
+      FR.fb.get('/leagues/' + leagueId + '/matchups/' + (FR.seasonKey()) + '/meta')
     ]).then(function(results){
       var settings = results[0] || {};
       var members  = results[1] || {};
@@ -8019,13 +8020,13 @@ function maybeAutoGenerateH2HSchedule(){
       // moment — claim the right to regenerate by writing a timestamp first,
       // then only proceed if we're still the most recent claim a moment later.
       var claimTime = Date.now();
-      FR.fb.patch('/leagues/' + leagueId + '/matchups/' + (ctx.season || 2026) + '/meta', { regenClaim: claimTime })
+      FR.fb.patch('/leagues/' + leagueId + '/matchups/' + (FR.seasonKey()) + '/meta', { regenClaim: claimTime })
         .then(function(patchResult){
           if(patchResult && patchResult.error){ console.error('Auto-schedule claim write denied:', patchResult.error); return; }
           return new Promise(function(resolve){ setTimeout(resolve, 400); });
         })
         .then(function(){
-          return FR.fb.get('/leagues/' + leagueId + '/matchups/' + (ctx.season || 2026) + '/meta');
+          return FR.fb.get('/leagues/' + leagueId + '/matchups/' + (FR.seasonKey()) + '/meta');
         })
         .then(function(latestMeta){
           if(!latestMeta || latestMeta.regenClaim !== claimTime) return; // someone else won the race
@@ -8048,7 +8049,7 @@ function generateH2HScheduleSilently(leagueId, ctx, settings, members, activeTea
   var playoffStart = settings.playoffStartWeek || 15;
   var regularWeeks = playoffStart - 1;
   var hasDivisions = settings.h2hDivisions > 0;
-  var season = ctx.season || 2026;
+  var season = FR.seasonKey();
 
   // A roster change mid-season (someone joins, someone gets removed) used
   // to trigger a full regenerate that rewrote EVERY week, including ones
@@ -8134,7 +8135,7 @@ function checkH2HScheduleStatus(){
   var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
   var statusEl = document.getElementById('h2h-schedule-status');
   Promise.all([
-    FR.fb.get('/leagues/' + leagueId + '/matchups/' + (ctx.season || 2026)),
+    FR.fb.get('/leagues/' + leagueId + '/matchups/' + (FR.seasonKey())),
     FR.fb.get('/leagues/' + leagueId + '/settings/scheduleLocked')
   ]).then(function(results){
     var data = results[0];
@@ -8395,7 +8396,7 @@ function previewH2HSchedule(){
   var preview = document.getElementById('h2h-schedule-preview');
   preview.innerHTML = '<div style="font-size:12px;color:var(--ink3);">Loading…</div>';
 
-  FR.fb.get('/leagues/' + leagueId + '/matchups/' + (ctx.season || 2026))
+  FR.fb.get('/leagues/' + leagueId + '/matchups/' + (FR.seasonKey()))
     .then(function(data){
       if(!data || !Object.keys(data).length){
         preview.innerHTML = '<div style="font-size:12px;color:var(--ink3);">No schedule yet — generate one above.</div>';
@@ -8442,7 +8443,7 @@ function loadH2HWeekForEdit(week){
   var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
 
   Promise.all([
-    FR.fb.get('/leagues/' + leagueId + '/matchups/' + (ctx.season || 2026) + '/week' + week),
+    FR.fb.get('/leagues/' + leagueId + '/matchups/' + (FR.seasonKey()) + '/week' + week),
     FR.fb.get('/leagues/' + leagueId + '/members')
   ]).then(function(results){
     var matchups = results[0] || [];
@@ -8524,7 +8525,7 @@ function saveH2HWeekEdit(week, count){
         awayName: m.away && members[m.away] ? members[m.away].teamName : 'BYE'
       };
     });
-    return FR.fb.put('/leagues/' + leagueId + '/matchups/' + (ctx.season || 2026) + '/week' + week, final);
+    return FR.fb.put('/leagues/' + leagueId + '/matchups/' + (FR.seasonKey()) + '/week' + week, final);
   }).then(function(){
     // Mark the schedule as manually edited so auto-generation never
     // silently overwrites a commissioner's deliberate change again.
@@ -8542,7 +8543,7 @@ function checkH2HPlayoffStatus(){
   var ctx = FRAuth.getLeagueCtx();
   var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
   var statusEl = document.getElementById('h2h-playoff-status');
-  FR.fb.get('/leagues/' + leagueId + '/playoffs/' + (ctx.season || 2026))
+  FR.fb.get('/leagues/' + leagueId + '/playoffs/' + (FR.seasonKey()))
     .then(function(data){
       if(!statusEl) return;
       if(data && data.seeds && data.seeds.length){
@@ -8826,7 +8827,7 @@ function seedH2HPlayoffs(){
         }
       };
 
-      return FR.fb.put('/leagues/' + leagueId + '/playoffs/' + (ctx.season || 2026), playoffData);
+      return FR.fb.put('/leagues/' + leagueId + '/playoffs/' + (FR.seasonKey()), playoffData);
     }).then(function(){
       statusEl.textContent = '✓ Playoffs seeded successfully.';
       statusEl.style.color = 'var(--or)';
@@ -8849,7 +8850,7 @@ function advanceH2HPlayoffRound(){
   var ctx = FRAuth.getLeagueCtx();
   var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
 
-  FR.fb.get('/leagues/' + leagueId + '/playoffs/' + (ctx.season || 2026)).then(function(data){
+  FR.fb.get('/leagues/' + leagueId + '/playoffs/' + (FR.seasonKey())).then(function(data){
     if(!data || !data.rounds) return;
     var roundKey = 'round' + data.currentRound;
     var round = data.rounds[roundKey];
@@ -8874,7 +8875,7 @@ function advanceH2HPlayoffRound(){
       // Save partial scores but don't advance yet
       var partialUpdate = {};
       partialUpdate['rounds/' + roundKey] = updatedRound;
-      FR.fb.patch('/leagues/' + leagueId + '/playoffs/' + (ctx.season || 2026), partialUpdate);
+      FR.fb.patch('/leagues/' + leagueId + '/playoffs/' + (FR.seasonKey()), partialUpdate);
       return;
     }
 
@@ -8886,7 +8887,7 @@ function advanceH2HPlayoffRound(){
       var finalUpdate = {};
       finalUpdate['rounds/' + roundKey] = updatedRound;
       finalUpdate['champion'] = champSeed ? champSeed.name : null;
-      FR.fb.patch('/leagues/' + leagueId + '/playoffs/' + (ctx.season || 2026), finalUpdate);
+      FR.fb.patch('/leagues/' + leagueId + '/playoffs/' + (FR.seasonKey()), finalUpdate);
       return;
     }
 
@@ -8937,7 +8938,7 @@ function advanceH2HPlayoffRound(){
     update['rounds/' + roundKey] = updatedRound;
     update['rounds/' + nextRoundKey] = nextRound;
     update['currentRound'] = data.currentRound + 1;
-    FR.fb.patch('/leagues/' + leagueId + '/playoffs/' + (ctx.season || 2026), update);
+    FR.fb.patch('/leagues/' + leagueId + '/playoffs/' + (FR.seasonKey()), update);
   }).catch(function(){});
 }
 
@@ -8949,7 +8950,7 @@ function renderH2HPlayoffsTab(){
   if(!el) return;
 
   Promise.all([
-    FR.fb.get('/leagues/' + leagueId + '/playoffs/' + (ctx.season || 2026)),
+    FR.fb.get('/leagues/' + leagueId + '/playoffs/' + (FR.seasonKey())),
     FR.fb.get('/leagues/' + leagueId + '/settings')
   ]).then(function(results){
     var data = results[0];
@@ -9061,7 +9062,7 @@ function previewH2HPlayoffBracket(){
   var preview = document.getElementById('h2h-playoff-preview');
   preview.innerHTML = '<div style="font-size:12px;color:var(--ink3);">Loading…</div>';
 
-  FR.fb.get('/leagues/' + leagueId + '/playoffs/' + (ctx.season || 2026)).then(function(data){
+  FR.fb.get('/leagues/' + leagueId + '/playoffs/' + (FR.seasonKey())).then(function(data){
     if(!data || !data.seeds || !data.seeds.length){
       preview.innerHTML = '<div style="font-size:12px;color:var(--ink3);">Not seeded yet.</div>';
       return;

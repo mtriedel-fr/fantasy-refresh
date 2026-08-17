@@ -29,6 +29,43 @@
     return _ctx;
   }
 
+  // Preseason testing is a URL-driven testing tool, not a real league
+  // state — confirmed directly with the user. There is no such thing as
+  // a league that "is" preseason; a dedicated test league is visited
+  // with ?mode=preseason specifically to validate scoring/locks against
+  // real, live NFL preseason games, then deleted afterward. This must
+  // match the real, existing signal draft.html already uses (its own
+  // PS_MODE variable) — not a guess based on today's date, which would
+  // have wrongly treated a real, production league's ordinary page
+  // loads during the August calendar window as "preseason" even though
+  // it never actually is one. Checked fresh from the URL every call,
+  // never cached/persisted alongside the rest of ctx, since this is
+  // about the current page load, not the league itself.
+  function isPreseasonTestMode() {
+    try {
+      var params = new URLSearchParams(window.location.search);
+      return params.get('mode') === 'preseason' || params.get('testMode') === 'hof';
+    } catch (e) { return false; }
+  }
+
+  // The actual fix for a real, confirmed collision: preseason weeks 1-4
+  // and regular-season weeks 1-4 previously shared the exact same
+  // /season/{year}/{week} path (and equivalents for lineups, locks,
+  // salaries) — a league scored in both would have regular-season week
+  // 1's real data silently overwrite preseason week 1's. This is called
+  // from every path builder below via ctx().season, instead of the raw
+  // stored value — so every single existing path in this file
+  // automatically, correctly lands in a separate, non-colliding
+  // namespace for preseason data, with no need to touch each builder
+  // individually. Confirmed directly tonight (draft.html) that a
+  // parallel, hand-built "preseason" namespace already existed but was
+  // never actually wired up to anything the backend writes to — this
+  // replaces that dead, orphaned convention with one true one.
+  function seasonKey() {
+    var raw = _ctx ? _ctx.season : 2026;
+    return isPreseasonTestMode() ? (raw + 'P') : raw;
+  }
+
   function saveContext(ctx) {
     _ctx = ctx;
     try { localStorage.setItem('fr_league_ctx', JSON.stringify(ctx)); } catch(e) {}
@@ -49,30 +86,30 @@
     commissioner:   function(uid)    { return paths.commissioners() + '/' + uid; },
     members:        function()       { return paths.league() + '/members'; },
     member:         function(uid)    { return paths.members() + '/' + uid; },
-    season:         function()       { return paths.league() + '/season/' + ctx().season; },
+    season:         function()       { return paths.league() + '/season/' + seasonKey(); },
     week:           function(w)      { return paths.season() + '/' + w; },
     weekEntry:      function(w, uid) { return paths.week(w) + '/' + uid; },
     seasonMeta:     function()       { return paths.season() + '/meta'; },
-    lineups:        function()       { return paths.league() + '/lineups/' + ctx().season; },
+    lineups:        function()       { return paths.league() + '/lineups/' + seasonKey(); },
     weekLineups:    function(w)      { return paths.lineups() + '/week' + w; },
     myLineup:       function(w, uid) { return paths.weekLineups(w) + '/' + uid; },
-    salaries:       function()       { return paths.league() + '/salaries/' + ctx().season; },
+    salaries:       function()       { return paths.league() + '/salaries/' + seasonKey(); },
     weekSalaries:   function(w)      { return paths.salaries() + '/week' + w; },
-    locks:          function()       { return paths.league() + '/locks/' + ctx().season; },
+    locks:          function()       { return paths.league() + '/locks/' + seasonKey(); },
     weekLocks:      function(w)      { return paths.locks() + '/week' + w; },
     locksMeta:      function()       { return paths.locks() + '/meta'; },
-    matchups:       function()       { return paths.league() + '/matchups/' + ctx().season; },
+    matchups:       function()       { return paths.league() + '/matchups/' + seasonKey(); },
     weekMatchups:   function(w)      { return paths.matchups() + '/week' + w; },
-    reactions:      function()       { return paths.league() + '/reactions/' + ctx().season; },
-    chat:           function()       { return paths.league() + '/chat/' + ctx().season; },
+    reactions:      function()       { return paths.league() + '/reactions/' + seasonKey(); },
+    chat:           function()       { return paths.league() + '/chat/' + seasonKey(); },
     weekReactions:  function(w)      { return paths.reactions() + '/' + w; },
+    // Deliberately NOT seasonKey()-aware — the real NFL player pool
+    // (names, positions, teams) doesn't differ between preseason
+    // testing and a real season; it's the same players either way, so
+    // splitting this into two copies would be unnecessary.
     playerPool:     function()       { return '/playerPool/' + ctx().season; },
     players:        function()       { return paths.playerPool() + '/players'; },
     user:           function(uid)    { return '/users/' + uid; },
-    preseason:      function()       { return paths.league() + '/season/preseason'; },
-    preSeasonSal:   function(w)      { return paths.league() + '/salaries/preseason/week' + w; },
-    preSeasonLin:   function(w)      { return paths.league() + '/lineups/preseason/week' + w; },
-    preSeasonLocks: function(w)      { return paths.league() + '/locks/preseason/week' + w; },
     url:            function(p)      { return FB_DB_URL + p + '.json'; }
   };
 
@@ -289,6 +326,8 @@
     checkCommissionerStatus: checkCommissionerStatus,
     addCoCommissioner:       addCoCommissioner,
     removeCoCommissioner:    removeCoCommissioner,
+    seasonKey:               seasonKey,
+    isPreseasonTestMode:     isPreseasonTestMode,
     FB_DB_URL:               FB_DB_URL,
     FR_SEASON:               FR_SEASON,
     DEFAULT_LEAGUE_ID:       DEFAULT_LEAGUE_ID

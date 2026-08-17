@@ -784,10 +784,11 @@ function loadSalaries(){
     }).catch(function(){});
     return;
   }
-  // Preseason: try preseason salaries, fall back to flat from pool
-  var salPath = PS_MODE
-    ? FR.paths.url(FR.paths.preSeasonSal(currentWeek))
-    : FR.paths.url(FR.paths.weekSalaries(currentWeek));
+  // weekSalaries() is now correctly season-aware in league-context.js —
+  // resolves to the same namespace weekly-prep.yml actually writes to,
+  // whether this is real preseason testing or a real season, with no
+  // separate branch needed here anymore.
+  var salPath = FR.paths.url(FR.paths.weekSalaries(currentWeek));
 
   fetch(salPath)
     .then(function(r){ return r.json(); })
@@ -2156,7 +2157,7 @@ function saveLineupToFirebase(){
 
   return FR.fb.get('/leagues/' + leagueId + '/members/' + currentUser.uid).then(function(member){
     var teamName = (member && member.teamName) || (ctx && ctx.teamName) || currentUser.team2026 || currentUser.email;
-    return FR.fb.put('/leagues/' + leagueId + '/lineups/' + (ctx.season || FR_SEASON) + '/week' + currentWeek + '/' + currentUser.uid, {
+    return FR.fb.put('/leagues/' + leagueId + '/lineups/' + FR.seasonKey() + '/week' + currentWeek + '/' + currentUser.uid, {
       uid: currentUser.uid, team: teamName,
       week: currentWeek, slots: slots, totalSal: getSpent(), submitted: Date.now()
     });
