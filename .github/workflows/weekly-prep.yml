@@ -338,9 +338,22 @@ jobs:
             const week = await getTargetWeek(leagueId);
             if (week > 18) { console.log(`  ${leagueId}: week ${week} is past the season — skipping`); return; }
 
+            // Local, scoped override — not the global SEASON constant,
+            // since that's also used for season-wide data (the player
+            // pool) that shouldn't be split the same way week-specific
+            // salary data needs to be. Fixes a real, confirmed collision:
+            // preseason week N and regular-season week N previously
+            // shared the exact same /salaries/${SEASON}/week${week} path.
+            const nowForSeasonCheck = new Date();
+            const seasonCheckParts = new Intl.DateTimeFormat('en-CA', {
+              timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit'
+            }).format(nowForSeasonCheck).split('-').map(Number);
+            const isPreseasonWindow = seasonCheckParts[1] === 8 || (seasonCheckParts[1] === 9 && seasonCheckParts[2] <= 8);
+            const salarySeason = isPreseasonWindow ? SEASON + 'P' : SEASON;
+
             // Don't clobber a week the commissioner already locked manually.
             let existingMeta = null;
-            try { existingMeta = await firebaseGet(`/leagues/${leagueId}/salaries/${SEASON}/week${week}/meta.json`); } catch (e) {}
+            try { existingMeta = await firebaseGet(`/leagues/${leagueId}/salaries/${salarySeason}/week${week}/meta.json`); } catch (e) {}
             if (existingMeta && existingMeta.locked) {
               console.log(`  ${leagueId}: week ${week} salaries are locked — skipping`);
               return;
@@ -363,16 +376,25 @@ jobs:
               // flat pricing just because a later regeneration attempt
               // happened to fail — only use flat as a first-time safety
               // net when there's genuinely nothing better in place yet.
+              //
+              // During preseason specifically, flat pricing isn't a
+              // fallback failure at all — it's the expected, unavoidable
+              // outcome. Confirmed directly with Tank01: they do not
+              // provide fantasy projections for preseason games, period.
+              // There's no real projection data to differentiate pricing
+              // with during this window, regardless of how reliably this
+              // workflow itself runs. This should stop being the case
+              // automatically once real regular-season projections exist.
               if (existingMeta && existingMeta.count > 0 && !existingMeta.flat) {
                 console.log(`  ${leagueId}: no usable projections for week ${week} — but real salaries already exist, leaving them in place (not downgrading to flat)`);
                 return;
               }
-              console.log(`  ${leagueId}: no usable projections for week ${week} — using flat fallback`);
+              console.log(`  ${leagueId}: no usable projections for week ${week} (expected during preseason — Tank01 doesn't provide preseason projections) — using flat fallback`);
               result = buildFlatSalaries(poolPlayers);
               usedFlat = true;
             }
 
-            await firebasePut(`/leagues/${leagueId}/salaries/${SEASON}/week${week}.json`, {
+            await firebasePut(`/leagues/${leagueId}/salaries/${salarySeason}/week${week}.json`, {
               players: result.salaries,
               meta: { week, count: result.count, generated: Date.now(), locked: false, cap, automated: true, flat: usedFlat }
             });
