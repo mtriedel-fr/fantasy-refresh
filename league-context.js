@@ -44,8 +44,15 @@
   function isPreseasonTestMode() {
     try {
       var params = new URLSearchParams(window.location.search);
-      return params.get('mode') === 'preseason' || params.get('testMode') === 'hof';
-    } catch (e) { return false; }
+      if (params.get('mode') === 'preseason' || params.get('testMode') === 'hof') return true;
+    } catch (e) { /* fall through to the ctx-based check below */ }
+    // draft.html signals this via the URL parameter above; league.html
+    // and home.html never carry that parameter at all — they determine
+    // this from the league's own real, loaded settings instead. Both
+    // are genuinely valid signals for different pages, not competing
+    // ones, so both are checked here.
+    var c = ctx();
+    return !!(c && (c.isPreseason || c.seasonType === 'Preseason'));
   }
 
   // The actual fix for a real, confirmed collision: preseason weeks 1-4
@@ -261,15 +268,23 @@
         if (!settings) throw new Error('League not found: ' + id);
         var current = loadContext();
         saveContext(Object.assign({}, current, {
-          leagueId:   settings.leagueId   || id,
-          leagueName: settings.name       || "OG King/Queen of the Hill '26",
-          season:     settings.season     || 2026,
-          format:     settings.format     || 'cumulative',
-          guillotine: settings.guillotine || false,
-          cap:        settings.cap        || 60000,
-          maxSalary:  settings.maxSalary  || 11300,
-          minSalary:  settings.minSalary  || 3700,
-          joinCode:   settings.joinCode   || ''
+          leagueId:    settings.leagueId    || id,
+          leagueName:  settings.name        || "OG King/Queen of the Hill '26",
+          season:      settings.season      || 2026,
+          format:      settings.format      || 'cumulative',
+          guillotine:  settings.guillotine  || false,
+          cap:         settings.cap         || 60000,
+          maxSalary:   settings.maxSalary   || 11300,
+          minSalary:   settings.minSalary   || 3700,
+          joinCode:    settings.joinCode    || '',
+          // Confirmed real, correctly-set fields on the actual league
+          // settings (directly verified via Firebase) that were being
+          // silently dropped here — every existing ctx.isPreseason /
+          // ctx.seasonType check elsewhere in the app was always
+          // failing as a result, regardless of what the real league
+          // settings actually said.
+          isPreseason: settings.isPreseason || false,
+          seasonType:  settings.seasonType  || 'Regular'
         }));
         return settings;
       });
