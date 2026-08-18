@@ -251,7 +251,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
     </svg>
     <span>Fantasy<span style="color:var(--pk);">Refresh</span></span>
   </a>
-  <button onclick="showWelcomeTour()" title="Show the welcome tour again" style="width:22px;height:22px;border-radius:50%;border:1px solid var(--bdr);background:transparent;color:var(--ink3);font-family:var(--fd);font-size:12px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">?</button>
+  <button onclick="showMyWelcomeTour()" title="Show the welcome tour again" style="width:22px;height:22px;border-radius:50%;border:1px solid var(--bdr);background:transparent;color:var(--ink3);font-family:var(--fd);font-size:12px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">?</button>
   <div class="hdr-week" id="hdr-week">Loading…</div>
   <div id="test-banner" style="display:none;background:rgba(155,109,255,.15);border:1px solid var(--pu);color:var(--pu);font-family:var(--fd);font-size:10px;font-weight:800;padding:3px 10px;border-radius:10px;text-transform:uppercase;letter-spacing:.5px;">🧪 Test Mode</div>
   <div id="flat-sal-banner" style="display:none;background:rgba(255,150,50,.15);border:1px solid #FF9A3A;color:#FF9A3A;font-family:var(--fd);font-size:10px;font-weight:800;padding:3px 10px;border-radius:10px;text-transform:uppercase;letter-spacing:.5px;">⚠️ Salaries Not Ready — Flat Pricing</div>
@@ -359,7 +359,8 @@ var SLOT_DEFS = [
   {id:'fx1', pos:'FLEX', label:'FLEX', eligible:['WR','RB','TE']},
   {id:'df1', pos:'DEF',  label:'DEF',  eligible:['DEF']}
 ];
-var POS_COLORS = {QB:'var(--or)',RB:'var(--pk)',WR:'var(--pu)',TE:'#FF9A3A',DEF:'#69BE28',FLEX:'var(--ink2)',SUPERFLEX:'#FFD23F'};
+// POS_COLORS now provided by the shared league-context.js global —
+// removed the local duplicate that used to live here.
 
 // Shared "photo or badge" pattern — a real headshot when the player has
 // one, gracefully falling back to the existing colored position badge
@@ -548,54 +549,20 @@ function fmtGameDay(iso){
 // suppresses all of them everywhere, for someone who just doesn't want
 // these at all.
 var WELCOME_TOUR_KEY = 'fr_welcome_tour_seen_draft';
-var WELCOME_TOUR_OPTOUT_KEY = 'fr_welcome_tour_optout'; // shared across every page — not page-specific
+var WELCOME_TOUR_TITLE = '👋 Welcome to the Draft Page!';
+var WELCOME_TOUR_ITEMS = [
+  { icon: '💰', title: 'Salary Cap', body: 'Your remaining budget and average per open slot are shown at the top — they turn orange, then pink, as your budget gets tight.' },
+  { icon: '🧩', title: 'Roster Slots', body: 'Tap any open slot to browse and draft a player for it. Tap a filled slot to swap — unless that player\u2019s game has already started, which locks them in for the week.' },
+  { icon: '🏈', title: 'Browse by Game', body: 'Use the games bar to see players from a specific matchup — once a game\u2019s final, it shows real stats from that game instead.' },
+  { icon: '✅', title: 'Submit Lineup', body: 'Fill every slot, then submit — you can keep adjusting anything that hasn\u2019t locked yet, right up until kickoff.' }
+];
 
-function showWelcomeTourIfNeeded(){
-  try{
-    if(localStorage.getItem(WELCOME_TOUR_KEY)) return;
-    if(localStorage.getItem(WELCOME_TOUR_OPTOUT_KEY)) return;
-  }catch(e){ return; }
-  showWelcomeTour();
+function showMyWelcomeTour(){
+  showWelcomeTour(WELCOME_TOUR_KEY, WELCOME_TOUR_TITLE, WELCOME_TOUR_ITEMS);
 }
 
-function showWelcomeTour(){
-  var items = [
-    { icon: '💰', title: 'Salary Cap', body: 'Your remaining budget and average per open slot are shown at the top — they turn orange, then pink, as your budget gets tight.' },
-    { icon: '🧩', title: 'Roster Slots', body: 'Tap any open slot to browse and draft a player for it. Tap a filled slot to swap — unless that player\u2019s game has already started, which locks them in for the week.' },
-    { icon: '🏈', title: 'Browse by Game', body: 'Use the games bar to see players from a specific matchup — once a game\u2019s final, it shows real stats from that game instead.' },
-    { icon: '✅', title: 'Submit Lineup', body: 'Fill every slot, then submit — you can keep adjusting anything that hasn\u2019t locked yet, right up until kickoff.' }
-  ];
-  var html = '<div id="welcome-tour-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;">'
-    + '<div style="background:var(--bg2);border-radius:16px;max-width:420px;width:100%;max-height:85vh;overflow-y:auto;padding:24px;">'
-    + '<div style="text-align:center;margin-bottom:18px;">'
-    +   '<div style="font-family:var(--fd);font-size:20px;font-weight:900;color:var(--ink);">👋 Welcome to the Draft Page!</div>'
-    +   '<div style="font-family:var(--fd);font-size:13px;color:var(--ink3);margin-top:4px;">Here\'s a quick tour of this page.</div>'
-    + '</div>'
-    + items.map(function(item){
-        return '<div style="display:flex;gap:12px;padding:12px 0;border-top:1px solid var(--bdr);">'
-          + '<div style="font-size:24px;flex-shrink:0;">' + item.icon + '</div>'
-          + '<div><div style="font-family:var(--fd);font-size:14px;font-weight:800;color:var(--ink);">' + item.title + '</div>'
-          + '<div style="font-family:var(--fd);font-size:12.5px;color:var(--ink2);margin-top:2px;line-height:1.4;">' + item.body + '</div></div>'
-          + '</div>';
-      }).join('')
-    + '<button onclick="dismissWelcomeTour()" style="width:100%;margin-top:18px;padding:12px;border-radius:10px;border:none;background:var(--pk);color:#fff;font-family:var(--fd);font-size:14px;font-weight:800;cursor:pointer;">Got it, let\'s go!</button>'
-    + '<button onclick="optOutWelcomeTours()" style="width:100%;margin-top:8px;padding:8px;border-radius:10px;border:none;background:transparent;color:var(--ink3);font-family:var(--fd);font-size:12px;cursor:pointer;text-decoration:underline;">Don\'t show these tips again on any page</button>'
-    + '</div>'
-    + '</div>';
-  document.body.insertAdjacentHTML('beforeend', html);
-}
-
-function dismissWelcomeTour(){
-  try{ localStorage.setItem(WELCOME_TOUR_KEY, '1'); }catch(e){}
-  var el = document.getElementById('welcome-tour-overlay');
-  if(el) el.remove();
-}
-
-function optOutWelcomeTours(){
-  try{ localStorage.setItem(WELCOME_TOUR_OPTOUT_KEY, '1'); }catch(e){}
-  var el = document.getElementById('welcome-tour-overlay');
-  if(el) el.remove();
-}
+// showWelcomeTourIfNeeded/dismissWelcomeTour/optOutWelcomeTours are now
+// the shared, parameterized versions from league-context.js.
 
 document.addEventListener('DOMContentLoaded', function(){
   try{
@@ -628,7 +595,7 @@ document.addEventListener('DOMContentLoaded', function(){
     loadWeekAndData();
     fixMainHeightForScaledDisplays();
     window.addEventListener('resize', fixMainHeightForScaledDisplays);
-    showWelcomeTourIfNeeded();
+    showWelcomeTourIfNeeded(WELCOME_TOUR_KEY, WELCOME_TOUR_TITLE, WELCOME_TOUR_ITEMS);
   }
 
   // Build SLOT_DEFS from the league's actual roster config before anything
@@ -842,8 +809,8 @@ function loadFlatSalariesFromPool(){
 // WSH depending on the source. Normalize before comparing anywhere a team
 // abbreviation gets matched, so a mismatch here can't silently make an
 // entire team's players disappear from the pool.
-var TEAM_ALIASES = { WAS: 'WSH', WSH: 'WSH' };
-function normTeam(abbr){ return TEAM_ALIASES[abbr] || abbr; }
+// normTeam()/TEAM_ALIASES now provided by the shared league-context.js
+// globals — removed the local duplicate that used to live here.
 
 function filterPlayersToSchedule(){
   // Build set of teams playing this week from schedule
@@ -2293,12 +2260,8 @@ function isTeamLocked(team){
   return !!(team && teamLocks[normTeam(team)]);
 }
 
-function showToast(msg,isErr){
-  var t=document.getElementById('toast');
-  t.textContent=msg;
-  t.className='toast'+(isErr?' err':'')+' show';
-  setTimeout(function(){ t.className='toast'+(isErr?' err':''); },2500);
-}
+// showToast() now provided by the shared league-context.js global —
+// removed the local duplicate that used to live here.
 
 // ── PLAYER NEWS ────────────────────────────────────────────────
 
@@ -2641,24 +2604,17 @@ function renderHistoricalWeeks(weeks, season){
 
 // ── THEME ──────────────────────────────────────────────────────
 function toggleTheme(){
-  var html  = document.documentElement;
-  var isDark = html.getAttribute('data-theme') !== 'light';
-  html.setAttribute('data-theme', isDark ? 'light' : 'dark');
-  document.getElementById('theme-btn').textContent = isDark ? '☀️' : '🌙';
-  try{ localStorage.setItem('fr_theme', isDark ? 'light' : 'dark'); }catch(e){}
+  var next = FRAuth.toggleTheme();
+  var btn = document.getElementById('theme-btn');
+  if(btn) btn.textContent = next === 'light' ? '☀️' : '🌙';
 }
 (function(){
-  try{
-    var t = localStorage.getItem('fr_theme');
-    if(t){ document.documentElement.setAttribute('data-theme', t);
-      if(t === 'light'){
-        window.addEventListener('DOMContentLoaded', function(){
-          var btn = document.getElementById('theme-btn');
-          if(btn) btn.textContent = '☀️';
-        });
-      }
-    }
-  }catch(e){}
+  var t = FRAuth.applyTheme();
+  document.documentElement.setAttribute('data-theme', t);
+  window.addEventListener('DOMContentLoaded', function(){
+    var btn = document.getElementById('theme-btn');
+    if(btn) btn.textContent = t === 'light' ? '☀️' : '🌙';
+  });
 })();
 
 // ── PRESEASON + TEST MODE ──────────────────────────────────────

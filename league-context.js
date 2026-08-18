@@ -312,6 +312,93 @@
   }
 
   // ── EXPOSE GLOBAL ───────────────────────────────────────────
+  // ── SHARED TOAST ──────────────────────────────────────────────
+  // Was duplicated identically (aside from one page's timing being
+  // 2500ms instead of 3000ms, now standardized) across all three pages.
+  // Exposed as a true global, not under FR., so every existing call
+  // site (called directly as showToast(...) throughout each page)
+  // keeps working unchanged — each page just needs its own local
+  // duplicate definition removed so this one isn't shadowed.
+  global.showToast = function(msg, isErr){
+    var t = document.getElementById('toast');
+    if(!t) return;
+    t.textContent = msg;
+    t.className = 'toast' + (isErr ? ' err' : '') + ' show';
+    setTimeout(function(){ t.className = 'toast' + (isErr ? ' err' : ''); }, 3000);
+  };
+
+  // ── SHARED TEAM ABBREVIATION NORMALIZATION ──────────────────────
+  // Sleeper (source for lineup/player data) and Tank01 (source for live
+  // locks/schedule) use different abbreviations for Washington
+  // specifically, a long-standing inconsistency between sports data
+  // providers. Was duplicated identically in league.html and
+  // draft.html; exposed as true globals for the same reason as
+  // showToast — called directly (normTeam(...)) throughout each file.
+  global.TEAM_ALIASES = { WAS: 'WSH', WSH: 'WSH' };
+  global.normTeam = function(abbr){ return global.TEAM_ALIASES[abbr] || abbr; };
+
+  // ── SHARED WELCOME TOUR ──────────────────────────────────────────
+  // Was duplicated as four near-identical functions across all three
+  // pages, differing only in title/items/which page's own "seen" key —
+  // the opt-out key was already identical everywhere. Now one shared
+  // implementation each page calls with its own content. tourKey is
+  // passed directly into the onclick handlers (not relied on as
+  // module-level state) so dismiss/opt-out always act on the correct
+  // page's own tour.
+  var WELCOME_TOUR_OPTOUT_KEY = 'fr_welcome_tour_optout'; // shared across every page — not page-specific
+
+  global.showWelcomeTourIfNeeded = function(tourKey, title, items){
+    try{
+      if(localStorage.getItem(tourKey)) return;
+      if(localStorage.getItem(WELCOME_TOUR_OPTOUT_KEY)) return;
+    }catch(e){ return; } // if localStorage is unavailable, don't repeatedly show this every visit
+    global.showWelcomeTour(tourKey, title, items);
+  };
+
+  global.showWelcomeTour = function(tourKey, title, items){
+    var html = '<div id="welcome-tour-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;">'
+      + '<div style="background:var(--bg2);border-radius:16px;max-width:420px;width:100%;max-height:85vh;overflow-y:auto;padding:24px;">'
+      + '<div style="text-align:center;margin-bottom:18px;">'
+      +   '<div style="font-family:var(--fd);font-size:20px;font-weight:900;color:var(--ink);">' + title + '</div>'
+      +   '<div style="font-family:var(--fd);font-size:13px;color:var(--ink3);margin-top:4px;">Here\'s a quick tour of this page.</div>'
+      + '</div>'
+      + items.map(function(item){
+          return '<div style="display:flex;gap:12px;padding:12px 0;border-top:1px solid var(--bdr);">'
+            + '<div style="font-size:24px;flex-shrink:0;">' + item.icon + '</div>'
+            + '<div><div style="font-family:var(--fd);font-size:14px;font-weight:800;color:var(--ink);">' + item.title + '</div>'
+            + '<div style="font-family:var(--fd);font-size:12.5px;color:var(--ink2);margin-top:2px;line-height:1.4;">' + item.body + '</div></div>'
+            + '</div>';
+        }).join('')
+      + '<button onclick="dismissWelcomeTour(\'' + tourKey + '\')" style="width:100%;margin-top:18px;padding:12px;border-radius:10px;border:none;background:var(--pk);color:#fff;font-family:var(--fd);font-size:14px;font-weight:800;cursor:pointer;">Got it, let\'s go!</button>'
+      + '<button onclick="optOutWelcomeTours()" style="width:100%;margin-top:8px;padding:8px;border-radius:10px;border:none;background:transparent;color:var(--ink3);font-family:var(--fd);font-size:12px;cursor:pointer;text-decoration:underline;">Don\'t show these tips again on any page</button>'
+      + '</div>'
+      + '</div>';
+    document.body.insertAdjacentHTML('beforeend', html);
+  };
+
+  global.dismissWelcomeTour = function(tourKey){
+    try{ localStorage.setItem(tourKey, '1'); }catch(e){}
+    var el = document.getElementById('welcome-tour-overlay');
+    if(el) el.remove();
+  };
+
+  global.optOutWelcomeTours = function(){
+    try{ localStorage.setItem(WELCOME_TOUR_OPTOUT_KEY, '1'); }catch(e){}
+    var el = document.getElementById('welcome-tour-overlay');
+    if(el) el.remove();
+  };
+
+  // ── SHARED POSITION COLORS ───────────────────────────────────────
+  // Confirmed identical values between league.html's LINEUP_POS_COLORS
+  // and draft.html's POS_COLORS, just different variable names. The
+  // functions that render player photos/badges using these colors are
+  // deliberately left as separate, page-specific implementations —
+  // they have real differences (different CSS classes tied to each
+  // page's own styling system, different calling conventions), not
+  // arbitrary duplication, so unifying those fully would need riskier
+  // parameterization for marginal benefit.
+  global.POS_COLORS = {QB:'var(--or)', RB:'var(--pk)', WR:'var(--pu)', TE:'#FF9A3A', FLEX:'var(--ink2)', DEF:'#69BE28', SUPERFLEX:'#FFD23F'};
+
   global.FR = {
     ctx:                     loadContext,
     saveContext:             saveContext,

@@ -927,7 +927,7 @@ setTimeout(function(){
       <div class="logo-txt">Fantasy <span>Refresh</span></div>
       <div class="logo-sub">Weekly Salary Cap League</div>
     </div>
-    <button onclick="showWelcomeTour()" title="Show the welcome tour again" style="margin-left:8px;width:22px;height:22px;border-radius:50%;border:1px solid var(--bdr);background:transparent;color:var(--ink3);font-family:var(--fd);font-size:12px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">?</button>
+    <button onclick="showMyWelcomeTour()" title="Show the welcome tour again" style="margin-left:8px;width:22px;height:22px;border-radius:50%;border:1px solid var(--bdr);background:transparent;color:var(--ink3);font-family:var(--fd);font-size:12px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">?</button>
   </div>
   <div class="hdr-r">
     <div class="hdr-sub" id="hdr-sub"></div>
@@ -1542,18 +1542,6 @@ function confirmSignOut(){
 }
 
 // ── THEME ─────────────────────────────────────────────────────────
-function toggleTheme(){
-  var next = FRAuth.toggleTheme();
-  // Update theme-btn in profile drawer
-  var icon = document.getElementById('pd-theme-icon');
-  var label = document.getElementById('pd-theme-label');
-  var toggle = document.getElementById('pd-theme-toggle');
-  var dot = document.getElementById('pd-toggle-dot');
-  if(icon) icon.textContent = next === 'light' ? '☀️' : '🌙';
-  if(label) label.textContent = next === 'light' ? 'Light mode' : 'Dark mode';
-  if(toggle) toggle.style.background = next === 'light' ? 'var(--or)' : 'var(--bdr2)';
-  if(dot){ dot.style.left = next === 'light' ? '22px' : '2px'; }
-}
 (function(){
   var t = FRAuth.applyTheme();
   document.documentElement.setAttribute('data-theme', t);
@@ -1940,9 +1928,8 @@ var h2hLastWeekScores = {};
 // tonight as the exact cause of a real player never showing as locked
 // despite his game having genuinely started: locks[p.team] was always
 // being checked with zero normalization anywhere in this file.
-var TEAM_ALIASES = { WAS: 'WSH', WSH: 'WSH' };
-
-function normTeam(abbr){ return TEAM_ALIASES[abbr] || abbr; }
+// normTeam()/TEAM_ALIASES now provided by the shared league-context.js
+// globals — removed the local duplicate that used to live here.
 
 function escapeHtmlFR(s){
   return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
@@ -2099,7 +2086,11 @@ function toggleH2HRoster(idx, homeUid, awayUid){
   });
 }
 
-var LINEUP_POS_COLORS = {QB:'var(--or)', RB:'var(--pk)', WR:'var(--pu)', TE:'#FF9A3A', FLEX:'var(--ink2)', DEF:'#69BE28', SUPERFLEX:'#FFD23F'};
+// LINEUP_POS_COLORS now aliases the shared global POS_COLORS from
+// league-context.js (confirmed identical values, just a different
+// local name here) - kept as its own name so existing references
+// throughout this file don't need to change.
+var LINEUP_POS_COLORS = POS_COLORS;
 
 // Same "photo or badge" pattern as the draft page's picker/roster panel —
 // a real headshot when the player has one, falling back to the existing
@@ -2554,7 +2545,7 @@ function boot(){
       .catch(function(){});
   }
 
-  showWelcomeTourIfNeeded();
+  showWelcomeTourIfNeeded(WELCOME_TOUR_KEY, WELCOME_TOUR_TITLE, WELCOME_TOUR_ITEMS);
 }
 
 // ── WELCOME TOUR ──────────────────────────────────────────────────
@@ -2566,54 +2557,21 @@ function boot(){
 // these at all. Same localStorage pattern already used elsewhere in
 // this app for other persistent state (fr_user_*, fr_league_ctx).
 var WELCOME_TOUR_KEY = 'fr_welcome_tour_seen_league';
-var WELCOME_TOUR_OPTOUT_KEY = 'fr_welcome_tour_optout'; // shared across every page — not page-specific
+var WELCOME_TOUR_TITLE = '👋 Welcome to Fantasy Refresh!';
+var WELCOME_TOUR_ITEMS = [
+  { icon: '👤', title: 'My Team', body: 'View and edit your lineup for the current week — tap the pencil to swap players before they lock.' },
+  { icon: '🏆', title: 'Weekly Standings', body: 'See how everyone ranks this week. Tap any team\u2019s name to expand their live roster and scores.' },
+  { icon: '📅', title: 'Week Selector', body: 'Switch between weeks using the dropdown at the top — check past results or a locked-in upcoming lineup.' },
+  { icon: '📰', title: 'Weekly Review', body: 'A full recap of each week once it\u2019s done — league leader, high/low score, MVP, and more.' }
+];
 
-function showWelcomeTourIfNeeded(){
-  try{
-    if(localStorage.getItem(WELCOME_TOUR_KEY)) return;
-    if(localStorage.getItem(WELCOME_TOUR_OPTOUT_KEY)) return;
-  }catch(e){ return; } // if localStorage is unavailable, don't repeatedly show this every visit
-  showWelcomeTour();
+function showMyWelcomeTour(){
+  showWelcomeTour(WELCOME_TOUR_KEY, WELCOME_TOUR_TITLE, WELCOME_TOUR_ITEMS);
 }
 
-function showWelcomeTour(){
-  var items = [
-    { icon: '👤', title: 'My Team', body: 'View and edit your lineup for the current week — tap the pencil to swap players before they lock.' },
-    { icon: '🏆', title: 'Weekly Standings', body: 'See how everyone ranks this week. Tap any team\u2019s name to expand their live roster and scores.' },
-    { icon: '📅', title: 'Week Selector', body: 'Switch between weeks using the dropdown at the top — check past results or a locked-in upcoming lineup.' },
-    { icon: '📰', title: 'Weekly Review', body: 'A full recap of each week once it\u2019s done — league leader, high/low score, MVP, and more.' }
-  ];
-  var html = '<div id="welcome-tour-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;">'
-    + '<div style="background:var(--bg2);border-radius:16px;max-width:420px;width:100%;max-height:85vh;overflow-y:auto;padding:24px;">'
-    + '<div style="text-align:center;margin-bottom:18px;">'
-    +   '<div style="font-family:var(--fd);font-size:20px;font-weight:900;color:var(--ink);">👋 Welcome to Fantasy Refresh!</div>'
-    +   '<div style="font-family:var(--fd);font-size:13px;color:var(--ink3);margin-top:4px;">Here\'s a quick tour of this page.</div>'
-    + '</div>'
-    + items.map(function(item){
-        return '<div style="display:flex;gap:12px;padding:12px 0;border-top:1px solid var(--bdr);">'
-          + '<div style="font-size:24px;flex-shrink:0;">' + item.icon + '</div>'
-          + '<div><div style="font-family:var(--fd);font-size:14px;font-weight:800;color:var(--ink);">' + item.title + '</div>'
-          + '<div style="font-family:var(--fd);font-size:12.5px;color:var(--ink2);margin-top:2px;line-height:1.4;">' + item.body + '</div></div>'
-          + '</div>';
-      }).join('')
-    + '<button onclick="dismissWelcomeTour()" style="width:100%;margin-top:18px;padding:12px;border-radius:10px;border:none;background:var(--pk);color:#fff;font-family:var(--fd);font-size:14px;font-weight:800;cursor:pointer;">Got it, let\'s go!</button>'
-    + '<button onclick="optOutWelcomeTours()" style="width:100%;margin-top:8px;padding:8px;border-radius:10px;border:none;background:transparent;color:var(--ink3);font-family:var(--fd);font-size:12px;cursor:pointer;text-decoration:underline;">Don\'t show these tips again on any page</button>'
-    + '</div>'
-    + '</div>';
-  document.body.insertAdjacentHTML('beforeend', html);
-}
-
-function dismissWelcomeTour(){
-  try{ localStorage.setItem(WELCOME_TOUR_KEY, '1'); }catch(e){}
-  var el = document.getElementById('welcome-tour-overlay');
-  if(el) el.remove();
-}
-
-function optOutWelcomeTours(){
-  try{ localStorage.setItem(WELCOME_TOUR_OPTOUT_KEY, '1'); }catch(e){}
-  var el = document.getElementById('welcome-tour-overlay');
-  if(el) el.remove();
-}
+// showWelcomeTourIfNeeded/dismissWelcomeTour/optOutWelcomeTours are now
+// the shared, parameterized versions from league-context.js — called
+// with this page's own content from boot(), below.
 
 loadPlayoffsFromCloud();
 var H2H_LAST_WEEK = null; // set once playoff settings load, for any code that needs the real season-end week instead of the generic WEEKS default
@@ -4626,19 +4584,6 @@ function renderPlayoffs(){
 // copy using a '.error' class that nothing in the CSS matches; the live definition
 // further down uses '.err', which is what the CSS actually styles. Removed here
 // rather than leaving silently-unused dead code.)
-
-function toggleTheme(){
-  var html = document.documentElement;
-  var isDark = html.getAttribute('data-theme') !== 'light';
-  html.setAttribute('data-theme', isDark ? 'light' : 'dark');
-  var btn = document.getElementById('theme-btn');
-  if(btn) btn.textContent = isDark ? '☀️' : '🌙';
-  try{ localStorage.setItem('fr_theme', isDark ? 'light' : 'dark'); }catch(e){}
-}
-(function(){
-  try{ var t=localStorage.getItem('fr_theme'); if(t) document.documentElement.setAttribute('data-theme',t); }catch(e){}
-})();
-
 
 // ── LEAGUE INFO PAGE ──────────────────────────────────────────────
 // ── LEAGUE INFO PAGE ──────────────────────────────────────────────
@@ -6965,12 +6910,8 @@ function updateSeasonStats(){
 // ── UTILS ──────────────────────────────────────────────────────
 function showTab(el, id){ handleNav(id); }
 
-function showToast(msg, isErr){
-  var t = document.getElementById('toast');
-  t.textContent = msg;
-  t.className = 'toast' + (isErr ? ' err' : '') + ' show';
-  setTimeout(function(){ t.className = 'toast' + (isErr ? ' err' : ''); }, 3000);
-}
+// showToast() now provided by the shared league-context.js global —
+// removed the local duplicate that used to live here.
 
 
 
