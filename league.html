@@ -3860,12 +3860,12 @@ function renderSeasonWrap(){
     var entries = seasonData[String(w)] || [];
     var wkSorted = entries.slice().sort(function(a,b){ return b.score-a.score; });
     if(wkSorted.length){
-      weeklyHighs.push({week:w, name:wkSorted[0].name, score:wkSorted[0].score});
-      if(wkSorted.length > 1) weeklyHighs.push({week:w, name:wkSorted[1].name, score:wkSorted[1].score, second:true});
+      weeklyHighs.push({week:w, name:wkSorted[0].team, score:wkSorted[0].score});
+      if(wkSorted.length > 1) weeklyHighs.push({week:w, name:wkSorted[1].team, score:wkSorted[1].score, second:true});
     }
     entries.forEach(function(e){
-      teamTotals[e.name] = (teamTotals[e.name]||0) + e.score;
-      allScores.push({week:w, name:e.name, score:e.score});
+      teamTotals[e.team] = (teamTotals[e.team]||0) + e.score;
+      allScores.push({week:w, name:e.team, score:e.score});
     });
   });
 
@@ -3900,7 +3900,7 @@ function renderSeasonWrap(){
   weeks.forEach(function(w){
     var entries = seasonData[String(w)]||[];
     var avg = entries.reduce(function(s,e){ return s+e.score; },0)/(entries.length||1);
-    entries.forEach(function(e){ if(e.score >= avg) aboveAvgCounts[e.name] = (aboveAvgCounts[e.name]||0)+1; });
+    entries.forEach(function(e){ if(e.score >= avg) aboveAvgCounts[e.team] = (aboveAvgCounts[e.team]||0)+1; });
   });
   var mostConsistent = Object.keys(aboveAvgCounts).sort(function(a,b){ return aboveAvgCounts[b]-aboveAvgCounts[a]; })[0];
 
@@ -3910,27 +3910,43 @@ function renderSeasonWrap(){
     if(wi === 0) return;
     var prev = weeks[wi-1];
     (seasonData[String(w)]||[]).forEach(function(e){
-      var prevEntry = (seasonData[String(prev)]||[]).find(function(p){ return p.name===e.name; });
+      var prevEntry = (seasonData[String(prev)]||[]).find(function(p){ return p.team===e.team; });
       if(prevEntry){
         var diff = e.score - prevEntry.score;
-        if(diff > biggestJumpAmt){ biggestJumpAmt = diff; biggestJump = {name:e.name, week:w, diff:diff}; }
+        if(diff > biggestJumpAmt){ biggestJumpAmt = diff; biggestJump = {name:e.team, week:w, diff:diff}; }
       }
     });
   });
 
-  // Most started players by position (whole season)
+  // Most started players by position (whole season) — real lineup data,
+  // via the same shared cache/fetch helper used elsewhere in this file,
+  // since score entries never actually carried lineup data themselves.
+  // Actively fetches every week this needs (not just whichever weeks
+  // another function happened to already request) — without this, if
+  // nothing else had populated the cache yet, this would silently stay
+  // empty forever, since nothing would ever trigger those fetches.
+  var missingWeeks = weeks.filter(function(w){ return !weekLineupsCache[String(w)]; });
+  if(missingWeeks.length){
+    Promise.all(missingWeeks.map(ensureWeekLineups)).then(function(){
+      renderSeasonWrap();
+    });
+  }
   var posPlayers = {};
   weeks.forEach(function(w){
-    (seasonData[String(w)]||[]).forEach(function(e){
-      if(!e.lineup) return;
-      var players = parseLineup(e.lineup);
+    var wkLineups = weekLineupsCache[String(w)];
+    if(!wkLineups) return; // this week's fetch hasn't resolved yet this pass — the Promise.all above will trigger a re-render once it does
+    Object.keys(wkLineups).forEach(function(uid){
+      var lineup = wkLineups[uid];
+      if(!lineup || !lineup.slots) return;
       var seen = {};
-      players.forEach(function(p){
-        var key = p.pos+'|'+p.player;
+      Object.keys(lineup.slots).forEach(function(slotId){
+        var p = lineup.slots[slotId];
+        if(!p) return;
+        var key = p.pos+'|'+p.name;
         if(seen[key]) return;
         seen[key] = true;
         if(!posPlayers[p.pos]) posPlayers[p.pos] = {};
-        posPlayers[p.pos][p.player] = (posPlayers[p.pos][p.player]||0) + 1;
+        posPlayers[p.pos][p.name] = (posPlayers[p.pos][p.name]||0) + 1;
       });
     });
   });
@@ -3943,8 +3959,8 @@ function renderSeasonWrap(){
   var teamBestWeek = {};
   weeks.forEach(function(w){
     (seasonData[String(w)]||[]).forEach(function(e){
-      if(!teamBestWeek[e.name] || e.score > teamBestWeek[e.name].score){
-        teamBestWeek[e.name] = {week:w, score:e.score};
+      if(!teamBestWeek[e.team] || e.score > teamBestWeek[e.team].score){
+        teamBestWeek[e.team] = {week:w, score:e.score};
       }
     });
   });
@@ -3961,7 +3977,7 @@ function renderSeasonWrap(){
   function applyPlayoffRound(teams, wkEntries){
     if(!wkEntries || !wkEntries.length) return {advanced: teams, eliminated: [], scores: {}};
     var scored = teams.map(function(name){
-      var e = wkEntries.find(function(e){ return teamMatch(e.name, name); });
+      var e = wkEntries.find(function(e){ return teamMatch(e.team, name); });
       return {name: name, score: e ? e.score : 0};
     }).sort(function(a,b){ return b.score - a.score; });
     var cutoff = Math.ceil(scored.length / 2);
@@ -3990,13 +4006,13 @@ function renderSeasonWrap(){
     });
     // Week 17 eliminated ranked by wk17 score after week 18 participants
     var r2elim = r2.eliminated.map(function(name){
-      var e = wk17.find(function(e){ return teamMatch(e.name, name); });
+      var e = wk17.find(function(e){ return teamMatch(e.team, name); });
       return {name: name, playoffRank: r3.scores.length + r2.eliminated.indexOf(name) + 1, finalScore: e ? e.score : 0, rounds: 2};
     }).sort(function(a,b){ return b.finalScore - a.finalScore; });
     r2elim.forEach(function(e, i){ e.playoffRank = r3.scores.length + i + 1; ranked.push(e); });
     // Week 16 eliminated
     var r1elim = r1.eliminated.map(function(name){
-      var e = wk16.find(function(e){ return teamMatch(e.name, name); });
+      var e = wk16.find(function(e){ return teamMatch(e.team, name); });
       return {name: name, finalScore: e ? e.score : 0, rounds: 1};
     }).sort(function(a,b){ return b.finalScore - a.finalScore; });
     r1elim.forEach(function(e, i){ e.playoffRank = r3.scores.length + r2elim.length + i + 1; ranked.push(e); });
@@ -4019,7 +4035,7 @@ function renderSeasonWrap(){
     if(!r) return '—';
     var wk = r.rounds === 3 ? 18 : r.rounds === 2 ? 17 : r.rounds === 1 ? 16 : null;
     if(!wk) return fmtTotal(teamTotals[name]);
-    var e = (seasonData[String(wk)]||[]).find(function(e){ return teamMatch(e.name, name); });
+    var e = (seasonData[String(wk)]||[]).find(function(e){ return teamMatch(e.team, name); });
     return e ? fmtScore(e.score) : fmtTotal(teamTotals[name]);
   }
 
@@ -5013,30 +5029,31 @@ function parseLineup(str){
 
 function getTopPlayers(name, limit){
   var counts = {};
-  Object.keys(seasonData).filter(function(k){ return !isNaN(Number(k)) && seasonData[k] && seasonData[k].length; }).forEach(function(w){
-    var entry = (seasonData[w]||[]).find(function(e){ return teamMatch(e.name, name); });
-    if(!entry || !entry.lineup) return;
-    var players = parseLineup(entry.lineup);
+  var relevantWeeks = Object.keys(seasonData).filter(function(k){ return !isNaN(Number(k)) && seasonData[k] && seasonData[k].length; });
+  var missingWeeks = relevantWeeks.filter(function(w){ return !weekLineupsCache[String(w)]; });
+  if(missingWeeks.length){
+    Promise.all(missingWeeks.map(ensureWeekLineups)).then(function(){
+      renderMySeasonInline();
+    });
+  }
+  relevantWeeks.forEach(function(w){
+    var entry = (seasonData[w]||[]).find(function(e){ return teamMatch(e.team, name); });
+    if(!entry) return;
+    var wkLineups = weekLineupsCache[String(w)];
+    var lineup = wkLineups && wkLineups[entry.uid];
+    if(!lineup || !lineup.slots) return;
     var seen = {};
-    players.forEach(function(p){
-      var key = p.player + '|' + p.pos;
+    Object.keys(lineup.slots).forEach(function(slotId){
+      var p = lineup.slots[slotId];
+      if(!p) return;
+      var key = p.name + '|' + p.pos;
       if(seen[key]) return;
       seen[key] = true;
-      if(!counts[key]) counts[key] = {player:p.player, pos:p.pos, count:0};
+      if(!counts[key]) counts[key] = {player:p.name, pos:p.pos, count:0};
       counts[key].count++;
     });
   });
   return Object.values(counts).sort(function(a,b){ return b.count - a.count; }).slice(0, limit || 3);
-}
-
-function buildTip(lineup){
-  if(!lineup) return '';
-  var players = parseLineup(lineup);
-  if(!players.length) return '';
-  var rows = players.map(function(p){
-    return '<div class="tip-row"><span class="tip-pos">' + p.pos + '</span><span class="tip-player">' + p.player + '</span></div>';
-  }).join('');
-  return '<div class="roster-tip"><div class="tip-title">Week ' + currentWeek + ' Roster</div>' + rows + '</div>';
 }
 
 // ── STANDINGS ──────────────────────────────────────────────────
@@ -5387,8 +5404,8 @@ function renderCompare(){
   // Build per-team stats
   var teamStats = compareTeams.map(function(name, ti){
     var weeklyData = weeks.map(function(w){
-      var e = (seasonData[String(w)]||[]).find(function(e){ return teamMatch(e.name, name); });
-      return e ? {score: e.score, lineup: e.lineup||''} : null;
+      var e = (seasonData[String(w)]||[]).find(function(e){ return teamMatch(e.team, name); });
+      return e ? {score: e.score, uid: e.uid} : null;
     });
     var scores = weeklyData.filter(Boolean).map(function(d){ return d.score; });
     var total = scores.reduce(function(a,b){ return a+b; }, 0);
@@ -5512,8 +5529,8 @@ function setCmpWeek(val){
   }).map(Number).sort(function(a,b){ return a-b; });
   var teamStats = compareTeams.map(function(name, ti){
     var weeklyData = weeks.map(function(w){
-      var e = (seasonData[String(w)]||[]).find(function(e){ return teamMatch(e.name, name); });
-      return e ? {score:e.score, lineup:e.lineup||''} : null;
+      var e = (seasonData[String(w)]||[]).find(function(e){ return teamMatch(e.team, name); });
+      return e ? {score:e.score, uid:e.uid} : null;
     });
     return {name:name, color:COLORS[ti], weeklyData:weeklyData};
   });
@@ -5534,16 +5551,31 @@ function buildRosterComparison(teamStats, weeks){
   var wi = weeks.indexOf(cmpSelectedWeek);
   if(wi < 0) return '<div style="padding:16px 18px;color:var(--ink3);font-family:var(--fd)">No data for this week</div>';
 
+  // Real lineup data for this specific week, fetched if not already
+  // cached — re-renders this same comparison once it resolves.
+  if(!weekLineupsCache[String(cmpSelectedWeek)]){
+    ensureWeekLineups(cmpSelectedWeek).then(function(){ setCmpWeek(cmpSelectedWeek); });
+  }
+  var wkLineups = weekLineupsCache[String(cmpSelectedWeek)] || {};
+
   var slotDefs = [
     {pos:'QB',label:'QB'},{pos:'RB',label:'RB'},{pos:'RB',label:'RB'},
     {pos:'WR',label:'WR'},{pos:'WR',label:'WR'},{pos:'WR',label:'WR'},
     {pos:'TE',label:'TE'},{pos:'FLEX',label:'FLEX'},{pos:'DST',label:'DEF'}
   ];
 
+  // Each roster becomes a flat list of {player, pos} from the real
+  // lineup's slots, matching the shape the rest of this function
+  // already expects below.
   var teamRosters = teamStats.map(function(t){
     var d = t.weeklyData[wi];
-    if(!d || !d.lineup) return null;
-    return parseLineup(d.lineup);
+    if(!d || !d.uid) return null;
+    var lineup = wkLineups[d.uid];
+    if(!lineup || !lineup.slots) return null;
+    return Object.keys(lineup.slots).map(function(slotId){
+      var p = lineup.slots[slotId];
+      return p ? {player: p.name, pos: p.pos} : null;
+    }).filter(Boolean);
   });
 
   // Count shared players and assign each shared player a unique color
@@ -6029,16 +6061,16 @@ function buildDotPlot(curEntries, myEntry){
 
   // All other team dots
   var otherDots = curEntries
-    .filter(function(e){ return e.name !== myEntry.name; })
+    .filter(function(e){ return e.team !== myEntry.team; })
     .map(function(e){
-      return '<div class="dotplot-others" style="left:' + pct(e.score) + '%" title="' + e.name + ': ' + fmtScore(e.score) + '"></div>';
+      return '<div class="dotplot-others" style="left:' + pct(e.score) + '%" title="' + escapeHtmlFR(e.team) + ': ' + fmtScore(e.score) + '"></div>';
     }).join('');
 
   var myPct = pct(myEntry.score);
   var avgPct = pct(avg);
 
   var byScore = curEntries.slice().sort(function(a,b){ return b.score - a.score; });
-  var wkRank = byScore.findIndex(function(e){ return e.name === myEntry.name; }) + 1;
+  var wkRank = byScore.findIndex(function(e){ return e.team === myEntry.team; }) + 1;
 
   return '<div class="dotplot-wrap">'
     + '<div class="dotplot-title">Where you finished this week — #' + wkRank + ' of ' + curEntries.length + '</div>'
@@ -6171,11 +6203,15 @@ function renderMyTeam(sorted, curEntries, prevRank, curMap){
     return;
   }
 
-  // Case-insensitive lookup
-  var entry = curEntries.find(function(e){ return teamMatch(e.name, myTeam); });
-  var rank = sorted.findIndex(function(t){ return teamMatch(t.name, myTeam); });
+  // Case-insensitive lookup — real entries carry .team, not .name. This
+  // was the actual, confirmed bug: this whole dashboard was matching on
+  // a field that never existed, so it showed "No data" every single
+  // time, on every render, silently — nobody happened to open this
+  // specific sub-tab during tonight's testing to notice.
+  var entry = curEntries.find(function(e){ return teamMatch(e.team, myTeam); });
+  var rank = sorted.findIndex(function(t){ return teamMatch(t.team, myTeam); });
   var currRank = rank >= 0 ? rank + 1 : null;
-  var prev = currRank ? (prevRank[sorted[rank].name] || null) : null;
+  var prev = currRank ? (prevRank[sorted[rank].team] || null) : null;
   var move = (currRank && prev) ? prev - currRank : null;
 
   if(!entry){
@@ -6183,36 +6219,39 @@ function renderMyTeam(sorted, curEntries, prevRank, curMap){
     return;
   }
 
-  // League start percentages for this week
-  var startPcts = getLeagueStartPcts(curEntries);
+  // Real lineup data lives separately from the score entry — shared
+  // helper handles the fetch-and-cache, so this doesn't duplicate the
+  // same logic renderNumbers() also needs.
+  var weekKey = String(currentWeek);
+  if(!weekLineupsCache[weekKey]){
+    ensureWeekLineups(currentWeek).then(function(){
+      if(String(currentWeek) === weekKey) renderMyTeam(sorted, curEntries, prevRank, curMap);
+    });
+  }
+  var weekLineups = weekLineupsCache[weekKey] || {};
 
-  // Parse this team's lineup
-  var players = parseLineup(entry.lineup || '');
+  // League start percentages for this week — now from real lineup data.
+  var startPcts = getLeagueStartPcts(weekLineups);
 
-  // Build standard fantasy lineup slots in fixed order
-  var slotDefs = [
-    {pos:'QB',  label:'QB'},
-    {pos:'RB',  label:'RB'},
-    {pos:'RB',  label:'RB'},
-    {pos:'WR',  label:'WR'},
-    {pos:'WR',  label:'WR'},
-    {pos:'WR',  label:'WR'},
-    {pos:'TE',  label:'TE'},
-    {pos:'FLEX',label:'FLEX'},
-    {pos:'DST', label:'DEF'}
-  ];
+  // This team's real roster, from the real lineup data (not a parsed
+  // string field that never existed).
+  var myLineup = weekLineups[entry.uid];
+  var roster = [];
+  if(myLineup && myLineup.slots){
+    sortedSlotIds(myLineup.slots).forEach(function(slotId){
+      var p = myLineup.slots[slotId];
+      if(!p) return;
+      roster.push({ label: lineupSlotStructuralLabel(slotId, p.pos), name: p.name });
+    });
+  }
 
-  // Match parsed players to slots greedily
-  var remaining = players.slice();
-  var lineupSlots = slotDefs.map(function(slot){
-    var idx = remaining.findIndex(function(p){ return p.pos === slot.pos; });
-    var player = idx >= 0 ? remaining.splice(idx, 1)[0] : null;
-    var count = player && startPcts[player.player] ? startPcts[player.player] : 0;
+  var lineupSlots = roster.map(function(r){
+    var count = startPcts[r.name] || 0;
     var pct = count ? Math.round(count / curEntries.length * 100) : 0;
     return '<div class="lineup-slot">'
-      + '<span class="lineup-pos">' + slot.label + '</span>'
-      + '<span class="lineup-player">' + (player ? player.player : '—') + '</span>'
-      + (player ? '<span class="lineup-pct">' + count + ' of ' + curEntries.length + ' (' + pct + '%)</span>' : '')
+      + '<span class="lineup-pos">' + escapeHtmlFR(r.label) + '</span>'
+      + '<span class="lineup-player">' + escapeHtmlFR(r.name) + '</span>'
+      + '<span class="lineup-pct">' + count + ' of ' + curEntries.length + ' (' + pct + '%)</span>'
       + '</div>';
   }).join('');
 
@@ -6228,7 +6267,7 @@ function renderMyTeam(sorted, curEntries, prevRank, curMap){
   el.innerHTML = '<div class="myteam-wrap">'
     + '<div class="myteam-card">'
     + '<div class="myteam-hero">'
-    + '<div><div class="myteam-name">' + entry.name + '</div>'
+    + '<div><div class="myteam-name">' + escapeHtmlFR(entry.team) + '</div>'
     + '<div style="font-family:var(--fd);font-size:11px;color:#1A5A5A;text-transform:uppercase;letter-spacing:1px;margin-top:4px;">Week ' + currentWeek + ' · Your dashboard</div></div>'
     + '<div style="text-align:right"><div class="myteam-score">' + fmtScore(entry.score) + '</div><div class="myteam-score-lbl">Points</div><button class="share-btn" onclick="openShareCard()" style="margin-top:8px;">📤 Share</button></div>'
     + '</div>'
@@ -6238,20 +6277,24 @@ function renderMyTeam(sorted, curEntries, prevRank, curMap){
     + '<div class="myteam-stat"><div class="myteam-stat-lbl">Movement</div><div class="myteam-stat-val ' + moveClass + '">' + moveStr + '</div></div>'
     + '</div>'
     + dotPlot
-    + (players.length ? '<div class="myteam-lineup"><div class="myteam-lineup-title" style="display:flex;align-items:center;justify-content:space-between;"><span>Your lineup · League start % shown</span><a href="javascript:void(0)" onclick="goToDraft()" style="font-family:var(--fd);font-size:11px;font-weight:800;color:var(--or);text-decoration:none;background:rgba(0,229,212,.1);border:1px solid rgba(0,229,212,.25);padding:4px 10px;border-radius:8px;text-transform:uppercase;letter-spacing:.5px;">📋 Draft</a></div><div class="lineup-grid">' + lineupSlots + '</div></div>' : '')
+    + (roster.length ? '<div class="myteam-lineup"><div class="myteam-lineup-title" style="display:flex;align-items:center;justify-content:space-between;"><span>Your lineup · League start % shown</span><a href="javascript:void(0)" onclick="goToDraft()" style="font-family:var(--fd);font-size:11px;font-weight:800;color:var(--or);text-decoration:none;background:rgba(0,229,212,.1);border:1px solid rgba(0,229,212,.25);padding:4px 10px;border-radius:8px;text-transform:uppercase;letter-spacing:.5px;">📋 Draft</a></div><div class="lineup-grid">' + lineupSlots + '</div></div>' : '')
     + '</div></div>';
 }
 
-function getLeagueStartPcts(curEntries){
+// Takes the real, fetched lineups object for this week (keyed by uid,
+// same shape as weekLineupsCache) instead of curEntries - entries never
+// actually carried lineup data themselves, only score/uid.
+function getLeagueStartPcts(weekLineups){
   var counts = {};
-  curEntries.forEach(function(entry){
-    if(!entry.lineup) return;
-    var players = parseLineup(entry.lineup);
+  Object.keys(weekLineups || {}).forEach(function(uid){
+    var lineup = weekLineups[uid];
+    if(!lineup || !lineup.slots) return;
     var seen = {};
-    players.forEach(function(p){
-      if(seen[p.player]) return;
-      seen[p.player] = true;
-      counts[p.player] = (counts[p.player] || 0) + 1;
+    Object.keys(lineup.slots).forEach(function(slotId){
+      var p = lineup.slots[slotId];
+      if(!p || seen[p.name]) return;
+      seen[p.name] = true;
+      counts[p.name] = (counts[p.name] || 0) + 1;
     });
   });
   return counts;
@@ -6307,6 +6350,21 @@ function renderFinish(sorted, curEntries, prevRank){
 }
 
 // ── WEEKLY NUMBERS VIEW ───────────────────────────────────────
+// Shared by every place in this file that needs a week's real lineup
+// data — returns a real Promise, cached in weekLineupsCache, so
+// multiple callers (or a single caller needing several weeks via
+// Promise.all) never trigger duplicate fetches for the same week.
+function ensureWeekLineups(week){
+  var weekKey = String(week);
+  if(weekLineupsCache[weekKey]) return Promise.resolve(weekLineupsCache[weekKey]);
+  var ctx = FRAuth.getLeagueCtx();
+  var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+  var season = FR.seasonKey();
+  return FR.fb.get('/leagues/' + leagueId + '/lineups/' + season + '/week' + week)
+    .then(function(data){ weekLineupsCache[weekKey] = data || {}; return weekLineupsCache[weekKey]; })
+    .catch(function(){ weekLineupsCache[weekKey] = {}; return weekLineupsCache[weekKey]; });
+}
+
 var weekLineupsCache = {}; // week -> {uid: {slots: {...}}, ...} — real lineup data, fetched separately since score entries never actually carry a lineup field (see below)
 var weekLocksCache = {}; // week -> {team: true, ...} — which teams have locked (kicked off), used to gate player identity in Roster/Most Started until their game has actually started
 
@@ -6338,12 +6396,9 @@ function renderNumbers(curEntries){
   var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
   var season = FR.seasonKey();
   if(!weekLineupsCache[weekKey]){
-    FR.fb.get('/leagues/' + leagueId + '/lineups/' + season + '/week' + currentWeek)
-      .then(function(data){
-        weekLineupsCache[weekKey] = data || {};
-        if(String(currentWeek) === weekKey) renderNumbers(curEntries);
-      })
-      .catch(function(){ weekLineupsCache[weekKey] = {}; });
+    ensureWeekLineups(currentWeek).then(function(){
+      if(String(currentWeek) === weekKey) renderNumbers(curEntries);
+    });
   }
   if(!weekLocksCache[weekKey]){
     FR.fb.get('/leagues/' + leagueId + '/locks/' + season + '/week' + currentWeek)
@@ -6379,27 +6434,6 @@ function renderNumbers(curEntries){
   ];
 
   // Build most-started by resolving each slot greedily across all entries
-  function getMostStartedForSlots(entries){
-    var slotCounts = slotDefs.map(function(){ return {}; });
-    entries.forEach(function(entry){
-      if(!entry.lineup) return;
-      var players = parseLineup(entry.lineup);
-      var remaining = players.slice();
-      slotDefs.forEach(function(slot, si){
-        var idx = remaining.findIndex(function(p){ return p.pos === slot.pos; });
-        if(idx < 0) return;
-        var p = remaining.splice(idx,1)[0];
-        slotCounts[si][p.player] = (slotCounts[si][p.player]||0) + 1;
-      });
-    });
-    return slotCounts.map(function(counts){
-      var players = Object.keys(counts);
-      if(!players.length) return null;
-      var top = players.reduce(function(a,b){ return counts[a]>=counts[b]?a:b; });
-      return {player:top, count:counts[top], total:entries.length};
-    });
-  }
-
   // For FLEX slot: find most-started eligible player (WR/RB/TE) NOT already in a prior slot
   function getMostStartedForSlotsWithFlex(entries){
     // Real slot IDs, confirmed from draft.html's own SLOT_DEFS — counting
@@ -6951,48 +6985,63 @@ function openShareCard(){
   }).map(Number).sort(function(a,b){ return a-b; });
   if(!weeks.length){ showToast('No data yet', true); return; }
   var curEntries = seasonData[String(currentWeek)] || [];
-  var myEntry = curEntries.find(function(e){ return teamMatch(e.name, myTeam); });
+  // Real entries store .team, not .name — this was the actual, confirmed
+  // reason this feature has likely never worked at all: teamMatch()
+  // returns false immediately whenever either argument is falsy, and
+  // e.name was always undefined, so myEntry could never be found.
+  var myEntry = curEntries.find(function(e){ return teamMatch(e.team, myTeam); });
   if(!myEntry){ showToast('No data for your team this week', true); return; }
   var sorted = curEntries.slice().sort(function(a,b){ return b.score-a.score; });
-  var wkRank = sorted.findIndex(function(e){ return e.name === myEntry.name; }) + 1;
+  var wkRank = sorted.findIndex(function(e){ return e.team === myEntry.team; }) + 1;
   var totals = {};
-  weeks.forEach(function(w){ (seasonData[String(w)]||[]).forEach(function(e){ totals[e.name]=(totals[e.name]||0)+e.score; }); });
-  var sznRank = Object.keys(totals).sort(function(a,b){ return totals[b]-totals[a]; }).indexOf(myEntry.name) + 1;
-  shareCardData = {name:myEntry.name, score:myEntry.score, wkRank:wkRank, total:curEntries.length, sznRank:sznRank, week:currentWeek, lineup:myEntry.lineup||''};
+  weeks.forEach(function(w){ (seasonData[String(w)]||[]).forEach(function(e){ totals[e.team]=(totals[e.team]||0)+e.score; }); });
+  var sznRank = Object.keys(totals).sort(function(a,b){ return totals[b]-totals[a]; }).indexOf(myEntry.team) + 1;
   var medals = ['🥇','🥈','🥉'];
 
-  // Build roster rows
-  var slotDefs = [{pos:'QB',label:'QB'},{pos:'RB',label:'RB'},{pos:'RB',label:'RB'},
-    {pos:'WR',label:'WR'},{pos:'WR',label:'WR'},{pos:'WR',label:'WR'},
-    {pos:'TE',label:'TE'},{pos:'FLEX',label:'FLEX'},{pos:'DST',label:'DEF'}];
-  var players = parseLineup(myEntry.lineup || '');
-  var remaining = players.slice();
-  var rosterRows = slotDefs.map(function(slot){
-    var idx = remaining.findIndex(function(p){ return p.pos === slot.pos; });
-    var player = idx >= 0 ? remaining.splice(idx,1)[0] : null;
-    return '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid #0D3535;">'
-      + '<span style="font-family:var(--fd);font-size:11px;font-weight:800;color:var(--pk);min-width:36px;text-transform:uppercase;">'+slot.label+'</span>'
-      + '<span style="font-family:var(--fd);font-size:13px;font-weight:600;color:#F0FAFA;flex:1;">'+(player?player.player:'—')+'</span>'
-      + '<span style="font-family:monospace;font-size:12px;color:#3A8888;min-width:28px;text-align:right;">—</span>'
-      + '</div>';
-  }).join('');
-
-  document.getElementById('share-preview').innerHTML =
-    '<div class="share-card-inner">'
-    + '<div class="share-card-league">OG King/Queen of Fantasy \'26</div>'
-    + '<div class="share-card-name">'+myEntry.name+'</div>'
-    + '<div class="share-card-score">'+fmtScore(myEntry.score)+'</div>'
-    + '<div class="share-card-pts">points · week '+currentWeek+'</div>'
-    + '<div class="share-card-stats" style="margin-bottom:12px;">'
-    + '<div><div class="share-card-stat-val">'+(wkRank<=3?medals[wkRank-1]:'#'+wkRank)+'</div><div class="share-card-stat-lbl">Week</div></div>'
-    + '<div><div class="share-card-stat-val">#'+sznRank+'</div><div class="share-card-stat-lbl">Season</div></div>'
-    + '</div>'
-    + (players.length ? '<div style="text-align:left;">'+rosterRows+'</div>' : '')
-    + '<div style="font-size:10px;color:#3A8888;margin-top:8px;">fantasyrefresh.com</div>'
-    + '</div>';
-
+  document.getElementById('share-preview').innerHTML = '<div style="padding:30px;text-align:center;color:var(--ink3);font-family:var(--fd);font-size:13px;">Loading…</div>';
   document.getElementById('share-overlay').style.display = 'flex';
   document.getElementById('share-copy-confirm').textContent = '';
+
+  // Real lineup data lives separately from the score entry — same
+  // path/shape already used everywhere else in this file tonight.
+  var ctx = FRAuth.getLeagueCtx();
+  var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+  FR.fb.get('/leagues/' + leagueId + '/lineups/' + FR.seasonKey() + '/week' + currentWeek + '/' + myEntry.uid).then(function(lineupData){
+    var roster = [];
+    if(lineupData && lineupData.slots){
+      sortedSlotIds(lineupData.slots).forEach(function(slotId){
+        var p = lineupData.slots[slotId];
+        if(!p) return;
+        var pts = (myEntry.slotPts && typeof myEntry.slotPts[slotId] === 'number') ? myEntry.slotPts[slotId] : null;
+        roster.push({ label: lineupSlotStructuralLabel(slotId, p.pos), name: p.name, pts: pts });
+      });
+    }
+    shareCardData = {team:myEntry.team, score:myEntry.score, wkRank:wkRank, total:curEntries.length, sznRank:sznRank, week:currentWeek, roster:roster};
+
+    var rosterRows = roster.map(function(r){
+      return '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid #0D3535;">'
+        + '<span style="font-family:var(--fd);font-size:11px;font-weight:800;color:var(--pk);min-width:36px;text-transform:uppercase;">'+escapeHtmlFR(r.label)+'</span>'
+        + '<span style="font-family:var(--fd);font-size:13px;font-weight:600;color:#F0FAFA;flex:1;">'+escapeHtmlFR(r.name)+'</span>'
+        + '<span style="font-family:monospace;font-size:12px;color:#3A8888;min-width:28px;text-align:right;">'+(r.pts != null ? r.pts.toFixed(1) : '—')+'</span>'
+        + '</div>';
+    }).join('');
+
+    document.getElementById('share-preview').innerHTML =
+      '<div class="share-card-inner">'
+      + '<div class="share-card-league">OG King/Queen of Fantasy \'26</div>'
+      + '<div class="share-card-name">'+escapeHtmlFR(myEntry.team)+'</div>'
+      + '<div class="share-card-score">'+fmtScore(myEntry.score)+'</div>'
+      + '<div class="share-card-pts">points · week '+currentWeek+'</div>'
+      + '<div class="share-card-stats" style="margin-bottom:12px;">'
+      + '<div><div class="share-card-stat-val">'+(wkRank<=3?medals[wkRank-1]:'#'+wkRank)+'</div><div class="share-card-stat-lbl">Week</div></div>'
+      + '<div><div class="share-card-stat-val">#'+sznRank+'</div><div class="share-card-stat-lbl">Season</div></div>'
+      + '</div>'
+      + (roster.length ? '<div style="text-align:left;">'+rosterRows+'</div>' : '')
+      + '<div style="font-size:10px;color:#3A8888;margin-top:8px;">fantasyrefresh.com</div>'
+      + '</div>';
+  }).catch(function(){
+    document.getElementById('share-preview').innerHTML = '<div style="padding:30px;text-align:center;color:var(--ink3);font-family:var(--fd);font-size:13px;">Couldn\'t load your roster.</div>';
+  });
 }
 
 function copyShareText(){
@@ -7000,17 +7049,10 @@ function copyShareText(){
   var d = shareCardData;
   var medals = ['🥇','🥈','🥉'];
   var rankEmoji = d.wkRank<=3 ? medals[d.wkRank-1] : '#'+d.wkRank;
-  var slotDefs = [{pos:'QB',label:'QB'},{pos:'RB',label:'RB'},{pos:'RB',label:'RB'},
-    {pos:'WR',label:'WR'},{pos:'WR',label:'WR'},{pos:'WR',label:'WR'},
-    {pos:'TE',label:'TE'},{pos:'FLEX',label:'FLEX'},{pos:'DST',label:'DEF'}];
-  var players = parseLineup(d.lineup || '');
-  var remaining = players.slice();
-  var rosterText = slotDefs.map(function(slot){
-    var idx = remaining.findIndex(function(p){ return p.pos === slot.pos; });
-    var player = idx >= 0 ? remaining.splice(idx,1)[0] : null;
-    return slot.label.padEnd(6) + (player ? player.player : '—');
+  var rosterText = (d.roster || []).map(function(r){
+    return r.label.padEnd(6) + r.name + (r.pts != null ? ' — ' + r.pts.toFixed(1) : '');
   }).join('\n');
-  var text = '🏈 Fantasy Refresh — Week '+d.week+'\n👤 '+d.name+'\n📊 '+fmtScore(d.score)+' pts · '+rankEmoji+' of '+d.total+' teams'+'\n📈 Season rank: #'+d.sznRank+'\n\n'+rosterText+'\n\n🌐 fantasyrefresh.com';
+  var text = '🏈 Fantasy Refresh — Week '+d.week+'\n👤 '+d.team+'\n📊 '+fmtScore(d.score)+' pts · '+rankEmoji+' of '+d.total+' teams'+'\n📈 Season rank: #'+d.sznRank+'\n\n'+rosterText+'\n\n🌐 fantasyrefresh.com';
   navigator.clipboard.writeText(text).then(function(){
     document.getElementById('share-copy-confirm').textContent = '✅ Copied!';
   }).catch(function(){ document.getElementById('share-copy-confirm').textContent = text; });
