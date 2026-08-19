@@ -3561,65 +3561,79 @@ function renderGuillotine(){
     return;
   }
 
+  // Real, persisted elimination status — computed once on the backend
+  // exactly when a week finishes, the same way scores themselves work.
+  // Replaces this page independently replaying the entire elimination
+  // schedule from scratch every time someone loads it (which also,
+  // confirmed, had its own separate e.name/e.team bug — automatically
+  // fixed as a side effect of using the already-correct backend data).
+  var ctx2 = FRAuth.getLeagueCtx();
+  var leagueId2 = ctx2 ? ctx2.leagueId : 'fr_refresh26';
+  var gsKey = FR.seasonKey();
+  if(!guillotineStatusCache[gsKey]){
+    FR.fb.get('/leagues/' + leagueId2 + '/guillotineStatus/' + gsKey)
+      .then(function(data){
+        guillotineStatusCache[gsKey] = data || {teams:{}};
+        renderGuillotine();
+      })
+      .catch(function(){ guillotineStatusCache[gsKey] = {teams:{}}; renderGuillotine(); });
+    el.innerHTML = '<div style="padding:32px;text-align:center;color:var(--ink3);font-family:var(--fd);font-size:13px;">Loading…</div>';
+    return;
+  }
+  var gsTeams = guillotineStatusCache[gsKey].teams || {};
+
   // Get all teams from week 1
   var week1 = seasonData[String(weeks[0])] || [];
   var totalTeams = week1.length;
   var totalWeeks = WEEKS; // 18
   var schedule = buildElimSchedule(totalTeams, totalWeeks);
 
-  // Run through each imported week, eliminate lowest scorers
-  // Track cumulative eliminated set
-  var eliminated = {}; // name → {week, score}
-  var survivors = null;
-  var weekResults = []; // {week, scores, eliminated, survivors}
-  var stillIn = week1.map(function(e){ return e.name; });
+  var eliminated = {}; // name → {week, score, noShow} — direct from the persisted status
+  var stillIn = [];
+  Object.keys(gsTeams).forEach(function(team){
+    var t = gsTeams[team];
+    if(t.status === 'alive') stillIn.push(team);
+    else if(t.status === 'eliminated') eliminated[team] = {week: t.eliminatedWeek, score: t.score, noShow: !!t.noShow};
+  });
 
+  // Per-week breakdown, reconstructed from the persisted elimination
+  // week per team plus each team's real score already loaded in
+  // seasonData — this part was always a simple, direct lookup, not the
+  // risky replay logic, so it's kept the same shape as before.
+  var weekResults = [];
   var finaleResult = null;
-
   weeks.forEach(function(w){
     var wkData = seasonData[String(w)] || [];
     var sched = schedule.find(function(s){ return s.week === w; });
     var isFinale = sched && sched.finale;
 
-    // Get entries for surviving teams — give no-shows a score of 0
-    var entries = stillIn.map(function(name){
-      var found = wkData.find(function(e){ return teamMatch(e.name, name); });
-      return found ? found : {name: name, score: 0, noShow: true};
+    // Teams still in at the START of this week: everyone except those
+    // eliminated in a strictly earlier week.
+    var inAtStart = Object.keys(gsTeams).filter(function(team){
+      var t = gsTeams[team];
+      return t.status === 'alive' || t.eliminatedWeek >= w;
+    });
+    var entries = inAtStart.map(function(team){
+      var found = wkData.find(function(e){ return teamMatch(e.team, team); });
+      return found ? {name: found.team, score: found.score} : {name: team, score: 0, noShow: true};
     });
 
     if(isFinale){
-      // Week 18: no eliminations — rank by score for 1st/2nd/3rd
       var finaleRanked = entries.slice().sort(function(a,b){ return b.score - a.score; });
       finaleResult = finaleRanked;
-      weekResults.push({
-        week: w,
-        scores: entries,
-        eliminatedThisWeek: [],
-        survivors: stillIn.slice(),
-        elimCount: 0,
-        finale: true,
-        finaleRanked: finaleRanked
-      });
+      weekResults.push({week: w, scores: entries, eliminatedThisWeek: [], survivors: inAtStart.slice(), elimCount: 0, finale: true, finaleRanked: finaleRanked});
       return;
     }
 
-    var elimCount = sched ? sched.eliminate : 0;
-    // Sort by score ascending — lowest get eliminated (no-shows at 0 go first)
-    var sorted = entries.slice().sort(function(a,b){ return a.score - b.score; });
-    var elimThisWeek = sorted.slice(0, elimCount);
-
-    elimThisWeek.forEach(function(e){
-      eliminated[e.name] = {week: w, score: e.score, noShow: !!e.noShow};
-      var idx = stillIn.indexOf(e.name);
-      if(idx >= 0) stillIn.splice(idx, 1);
-    });
+    var elimThisWeek = Object.keys(gsTeams).filter(function(team){ return gsTeams[team].eliminatedWeek === w; })
+      .map(function(team){ return {name: team, score: gsTeams[team].score, noShow: !!gsTeams[team].noShow}; });
 
     weekResults.push({
       week: w,
       scores: entries,
       eliminatedThisWeek: elimThisWeek,
-      survivors: stillIn.slice(),
-      elimCount: elimCount,
+      survivors: inAtStart.filter(function(t){ return gsTeams[t].status === 'alive' || gsTeams[t].eliminatedWeek > w; }),
+      elimCount: sched ? sched.eliminate : 0,
       finale: false
     });
   });
@@ -3629,20 +3643,20 @@ function renderGuillotine(){
   var weeksPlayed = weeks.length;
   var weeksRemaining = totalWeeks - weeksPlayed;
 
-  // Season total scores for survivors
+  // Season total scores for survivors — real scores already loaded in
+  // seasonData, a simple sum, not the risky replay logic.
   var survivorTotals = {};
   currentSurvivors.forEach(function(name){
     var total = 0;
     weeks.forEach(function(w){
-      var e = (seasonData[String(w)]||[]).find(function(e){ return teamMatch(e.name, name); });
+      var e = (seasonData[String(w)]||[]).find(function(e){ return teamMatch(e.team, name); });
       if(e) total += e.score;
     });
     survivorTotals[name] = total;
   });
 
   var isComplete = weeksPlayed >= totalWeeks;
-  // For winners: use week 18 finale result if available
-  var finaleRanking = finaleResult; // null until week 18 imported
+  var finaleRanking = finaleResult;
 
   // ── HERO STATS ──
   var heroHTML = '<div class="guill-hero" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;padding:20px 24px;">'
@@ -6310,6 +6324,7 @@ function ensureWeekLineups(week){
     .catch(function(){ weekLineupsCache[weekKey] = {}; return weekLineupsCache[weekKey]; });
 }
 
+var guillotineStatusCache = {}; // seasonKey -> {teams: {name: {status, eliminatedWeek, score, noShow}}} — real, persisted elimination status, fetched separately since it's computed once on the backend rather than replayed client-side
 var weekLineupsCache = {}; // week -> {uid: {slots: {...}}, ...} — real lineup data, fetched separately since score entries never actually carry a lineup field (see below)
 var weekLocksCache = {}; // week -> {team: true, ...} — which teams have locked (kicked off), used to gate player identity in Roster/Most Started until their game has actually started
 
