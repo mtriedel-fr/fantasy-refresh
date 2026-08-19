@@ -607,7 +607,9 @@ function sendPasswordReset(){
     .catch(function(e){ if(status){ status.style.color='var(--pk)'; status.textContent='✗ Error'; } });
 }
 
-function confirmSignOut(){ FRAuth.signOut(); }
+// confirmSignOut() defined once, above — removed the second, incorrect
+// duplicate that used to live here (it skipped the confirmation dialog
+// entirely, despite its own name, silently overwriting the real one).
 
 // ── CREATE LEAGUE — SOFT LOCK ───────────────────────────────────
 // Only mtriedel@gmail.com can create leagues while in testing.
