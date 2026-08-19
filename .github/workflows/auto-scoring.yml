@@ -71,7 +71,7 @@ jobs:
           const FB_URL      = process.env.FIREBASE_DB_URL;
           const FB_TOKEN    = process.env.FIREBASE_AUTH_TOKEN;
           const T01_KEY     = process.env.TANK01_KEY;
-          const SEASON      = process.env.FR_SEASON || '2026';
+          let SEASON      = process.env.FR_SEASON || '2026';
           const T01_HOST    = 'tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com';
           const IS_LOCK_RUN = process.env.LOCK_SCORES === 'true' ||
                               new Date().getUTCDay() === 2; // Tuesday
@@ -720,6 +720,18 @@ jobs:
           // ── MAIN ───────────────────────────────────────────────
           async function main() {
             const { week, seasonType } = await getCurrentWeekInfo();
+            // Fixes a real, confirmed collision: preseason weeks 1-4 and
+            // regular-season weeks 1-4 previously shared the exact same
+            // /season/${SEASON}/${week} path, since nothing distinguished
+            // them — a league scored in both would have regular-season
+            // week 1's real data silently overwrite preseason week 1's.
+            // Reassigning SEASON here, before any other code in this run
+            // reads it, means every existing path reference throughout
+            // this whole file automatically lands in a separate,
+            // non-colliding namespace for preseason data — no need to
+            // touch the dozens of individual places that build a path
+            // with it.
+            if (seasonType === 'Preseason') SEASON = SEASON + 'P';
             const leagues = await getActiveLeagues();
 
             console.log(`\n=== Auto-Scoring | Week ${week} | ${seasonType} | ${new Date().toISOString()} ===`);
@@ -1375,6 +1387,7 @@ jobs:
 
             let stillIn = week1.map(e => e.team);
             let eliminatedThisTargetWeek = [];
+            const eliminatedWhen = {}; // team -> {week, score, noShow}, for persisting a full status below
 
             weeks.forEach(w => {
               const sched = schedule.find(s => s.week === w);
@@ -1395,6 +1408,7 @@ jobs:
               elimThisWeek.forEach(e => {
                 const idx = stillIn.indexOf(e.team);
                 if (idx >= 0) stillIn.splice(idx, 1);
+                eliminatedWhen[e.team] = { week: w, score: Math.round((e.score || 0) * 100) / 100, noShow: !!e.noShow };
               });
 
               if (w === week) {
@@ -1402,7 +1416,7 @@ jobs:
               }
             });
 
-            return { eliminated: eliminatedThisTargetWeek, remaining: stillIn.length };
+            return { eliminated: eliminatedThisTargetWeek, remaining: stillIn.length, alive: stillIn, eliminatedWhen };
           }
 
           async function generateWeeklyRecap(leagueId, week, seasonType, settings) {
@@ -1425,6 +1439,31 @@ jobs:
                 console.error(`  Could not compute guillotine elimination for ${leagueId}:`, e.message);
                 return null;
               });
+
+              // Persist a real, per-team status — the actual point of
+              // this change. Previously league.html, home.html, and
+              // this recap feature each independently replayed the
+              // entire season from scratch every single time someone
+              // loaded a page, using three separate copies of this same
+              // formula that could quietly drift apart from each other.
+              // Now this is computed once, here, exactly when a week
+              // genuinely finishes — the same moment scores themselves
+              // go final — and every client just reads the answer,
+              // the same way scores/locks/salaries already work.
+              if (guillotine) {
+                const teamStatus = {};
+                (guillotine.alive || []).forEach(team => {
+                  teamStatus[team] = { status: 'alive' };
+                });
+                Object.entries(guillotine.eliminatedWhen || {}).forEach(([team, info]) => {
+                  teamStatus[team] = { status: 'eliminated', eliminatedWeek: info.week, score: info.score, noShow: info.noShow };
+                });
+                await firebasePut(`/leagues/${leagueId}/guillotineStatus/${SEASON}.json`, {
+                  teams: teamStatus,
+                  asOfWeek: week,
+                  updatedAt: Date.now()
+                }).catch(e => console.error(`  Could not persist guillotine status for ${leagueId}:`, e.message));
+              }
             }
 
             const teamScores = Object.values(thisWeekScores).filter(e => e && e.uid);
