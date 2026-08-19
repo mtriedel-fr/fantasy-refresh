@@ -4329,7 +4329,7 @@ function getCumulativeTotals(upToWeek){
   Object.keys(seasonData).forEach(function(w){
     if(Number(w) > upToWeek) return;
     (seasonData[w] || []).forEach(function(e){
-      totals[e.name] = (totals[e.name] || 0) + e.score;
+      totals[e.team] = (totals[e.team] || 0) + e.score;
     });
   });
   return totals;
@@ -4348,7 +4348,7 @@ function splitTiers(sorted){
 
 function getWeeklyScores(week){
   var map = {};
-  (seasonData[String(week)] || []).forEach(function(e){ map[e.name] = e.score; });
+  (seasonData[String(week)] || []).forEach(function(e){ map[e.team] = e.score; });
   return map;
 }
 
@@ -5666,7 +5666,7 @@ function buildCompareRankChart(teamStats, weeks){
 
   var allNames = Object.keys((function(){
     var t={};
-    weeks.forEach(function(w){ (seasonData[String(w)]||[]).forEach(function(e){ t[e.name]=1; }); });
+    weeks.forEach(function(w){ (seasonData[String(w)]||[]).forEach(function(e){ t[e.team]=1; }); });
     return t;
   })());
 
@@ -5693,7 +5693,7 @@ function buildCompareRankChart(teamStats, weeks){
   var lines = teamStats.map(function(t){
     var cumTotals = {};
     var points = weeks.map(function(w,wi){
-      (seasonData[String(w)]||[]).forEach(function(e){ cumTotals[e.name]=(cumTotals[e.name]||0)+e.score; });
+      (seasonData[String(w)]||[]).forEach(function(e){ cumTotals[e.team]=(cumTotals[e.team]||0)+e.score; });
       var sorted = Object.keys(cumTotals).sort(function(a,b){ return cumTotals[b]-cumTotals[a]; });
       var rank = sorted.indexOf(t.name)+1;
       return rank > 0 ? rank : null;
@@ -5896,7 +5896,7 @@ function resetAll(){
 function getAllTeams(){
   var seen = {};
   Object.keys(seasonData).forEach(function(w){
-    (seasonData[w]||[]).forEach(function(e){ seen[e.name] = true; });
+    (seasonData[w]||[]).forEach(function(e){ seen[e.team] = true; });
   });
   return Object.keys(seen).sort();
 }
@@ -5905,7 +5905,7 @@ function getTeamRank(name){
   var totals = {};
   Object.keys(seasonData).forEach(function(w){
     (seasonData[w]||[]).forEach(function(e){
-      totals[e.name] = (totals[e.name]||0) + e.score;
+      totals[e.team] = (totals[e.team]||0) + e.score;
     });
   });
   var sorted = Object.keys(totals).sort(function(a,b){ return totals[b]-totals[a]; });
@@ -6085,7 +6085,7 @@ function renderMySeasonInline(){
   }).map(Number).sort(function(a,b){ return a-b; });
   var allTotals = {};
   weeks.forEach(function(w){
-    (seasonData[String(w)]||[]).forEach(function(e){ allTotals[e.name] = (allTotals[e.name]||0) + e.score; });
+    (seasonData[String(w)]||[]).forEach(function(e){ allTotals[e.team] = (allTotals[e.team]||0) + e.score; });
   });
   var sznRank = Object.keys(allTotals).sort(function(a,b){ return allTotals[b]-allTotals[a]; }).indexOf(resolvedName) + 1;
 
@@ -6785,7 +6785,7 @@ function renderDistribution(data){
 
   var bars = groups.map(function(g, i){
     var h = Math.round((g.length/maxCount)*maxH);
-    var isMe = myTeam && g.some(function(e){ return e.name.toLowerCase() === myTeam.toLowerCase(); });
+    var isMe = myTeam && g.some(function(e){ return e.team.toLowerCase() === myTeam.toLowerCase(); });
     var label = (min + i*bucketSize).toFixed(0);
     return '<div class="dist-bar-wrap" title="' + g.length + ' teams · ' + label + '+ pts">'
       + '<div class="dist-bar' + (isMe?' is-me':'') + '" style="height:' + Math.max(4,h) + 'px"></div>'
@@ -6905,7 +6905,7 @@ function updateSeasonStats(){
   // Season leader
   var totals = {};
   weeks.forEach(function(w){
-    (seasonData[String(w)]||[]).forEach(function(e){ totals[e.name]=(totals[e.name]||0)+e.score; });
+    (seasonData[String(w)]||[]).forEach(function(e){ totals[e.team]=(totals[e.team]||0)+e.score; });
   });
   var sorted = Object.keys(totals).sort(function(a,b){ return totals[b]-totals[a]; });
   var leader = sorted[0];
@@ -6918,7 +6918,7 @@ function updateSeasonStats(){
   weeks.forEach(function(w){
     var entries = seasonData[String(w)]||[];
     var avg = entries.reduce(function(s,e){ return s+e.score; },0)/(entries.length||1);
-    entries.forEach(function(e){ if(e.score >= avg) aboveCounts[e.name]=(aboveCounts[e.name]||0)+1; });
+    entries.forEach(function(e){ if(e.score >= avg) aboveCounts[e.team]=(aboveCounts[e.team]||0)+1; });
   });
   var consistent = Object.keys(aboveCounts).sort(function(a,b){ return aboveCounts[b]-aboveCounts[a]; })[0];
   var el = function(id){ return document.getElementById(id); };
