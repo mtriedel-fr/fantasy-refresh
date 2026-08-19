@@ -2232,14 +2232,8 @@ function stadiumIcon(teamAbbr){
   return '';  // outdoor — no icon needed, it's the default assumption
 }
 
-function fmtKickoff(iso){
-  if(!iso) return '';
-  var d = new Date(iso);
-  if(isNaN(d.getTime())) return '';
-  var day = d.toLocaleDateString('en-US', { weekday: 'short' });
-  var time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-  return day + ' ' + time;
-}
+// fmtKickoff() now provided by the shared league-context.js global —
+// removed the local duplicate that used to live here.
 
 function fetchWeekSchedule(week){
   var ctx = FRAuth.getLeagueCtx();
@@ -7965,8 +7959,9 @@ function loadSalaryStatus(){
 // ── SALARY GENERATION (Tank01 projections) ───────────────────────────────────
 var TANK01_WORKER = 'https://fantasy-refresh-news.mtriedel.workers.dev';
 var SAL_CAP = 60000;
-var SAL_MAX = 11300;
-var SAL_MIN = 4500;
+// SAL_MAX/SAL_MIN now come from the single, documented definition
+// above (see SALARY_METHODOLOGY.md) — removed the redundant, bare
+// redeclaration that used to live here.
 
 // ── HEAD-TO-HEAD SCHEDULE GENERATOR ─────────────────────────────────
 function initH2HVisibility(settings){

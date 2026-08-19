@@ -414,6 +414,20 @@
   // parameterization for marginal benefit.
   global.POS_COLORS = {QB:'var(--or)', RB:'var(--pk)', WR:'var(--pu)', TE:'#FF9A3A', FLEX:'var(--ink2)', DEF:'#69BE28', SUPERFLEX:'#FFD23F'};
 
+  // ── SHARED KICKOFF TIME FORMATTER ────────────────────────────────
+  // Confirmed byte-for-byte identical between league.html and
+  // draft.html. Exposed as a true global for the same reason as
+  // showToast/normTeam — called directly (fmtKickoff(...)) throughout
+  // each file.
+  global.fmtKickoff = function(iso){
+    if(!iso) return '';
+    var d = new Date(iso);
+    if(isNaN(d.getTime())) return '';
+    var day = d.toLocaleDateString('en-US', { weekday: 'short' });
+    var time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    return day + ' ' + time;
+  };
+
   global.FR = {
     ctx:                     loadContext,
     saveContext:             saveContext,
