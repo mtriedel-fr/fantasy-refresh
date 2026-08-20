@@ -50,26 +50,32 @@ jobs:
           // they're priced cheaper relative to raw points scored, because
           // a lineup only needs one QB but several skill-position slots
           // (roster-construction scarcity, not point-scoring ability).
-          const POSITION_MULTIPLIERS = {
-            // Recalibrated against real, confirmed week 1 2026
-            // projection data, not assumed "elite tier" reference
-            // points — those reference points had drifted from what
-            // real players are actually projected for this week,
-            // confirmed directly: the real #1 QB (19.84 proj) is 26.5%
-            // below the 27-point reference the old 380 was built
-            // around, and the real #1 WR similarly 10.8% below — so
-            // even the single best available player at those positions
-            // was pricing well under the intended ceiling, leaving
-            // extra cap room and letting stronger-than-intended rosters
-            // get built. RB/TE/DEF's real #1 players were already
-            // close to their reference points, so those only needed
-            // minor tuning.
-            QB:  475,  // was 380 — real #1 QB was landing ~$7,600 vs a $9,400 target ceiling
-            RB:  515,  // was 525 — real #1 RB was already close to target, minor tune only
-            WR:  575,  // was 505 — real #1 WR (19.63 proj) was landing $10,000 vs an $11,300 target ceiling, and lower-ranked WRs were underpriced relative to real value too
-            TE:  520,  // was 525 — real #1 TE was already almost exactly on target, minor tune only
-            DEF: 465   // was 500 — real #1 DEF was slightly above target, minor tune down
-          };
+          // Target ceiling per position — what the single best real
+          // player at that position this week should cost. The formula
+          // below dynamically computes its own effective multiplier
+          // each run from the real, current week's actual top
+          // projection at each position, so the #1 player always lands
+          // almost exactly on this ceiling — unlike the old, fixed
+          // POSITION_MULTIPLIERS approach, which was calibrated against
+          // an assumed "elite tier" reference that drifted out of sync
+          // with real weekly projections (confirmed directly: the real
+          // #1 QB one week landed 26.5% below the reference the old
+          // multiplier was built around).
+          const TARGET_CEILING = { QB: 9400, RB: 10700, WR: 11300, TE: 7400, DEF: 5000 };
+
+          // Bends the price curve so it's no longer purely linear
+          // against projection — a player at, say, 60% of the real #1
+          // player's projection now costs meaningfully MORE than 60% of
+          // the ceiling, not exactly 60%. Confirmed directly against a
+          // real, reported "too easy to build a stacked roster"
+          // complaint: at exponent=1.0 (pure linear), a real 2-stud
+          // roster landed only $2,100 over the $60,000 cap — barely
+          // forcing any real choices. Started at 0.75 (that same real
+          // roster landed $7,400 over), then tuned up to 0.80 after
+          // live play-testing found 0.75 too restrictive — a gentler
+          // bend, still meaningfully tighter than pure linear. Easy to
+          // tune further from here by feel.
+          const SALARY_EXPONENT = 0.80;
           const SAL_MIN_DEFAULT = 4500; // raised from 3700 — see SALARY_METHODOLOGY.md "Floor recalibration" for why
           const SAL_MAX_DEFAULT = 11300;
           const SAL_ROUND = 100;
@@ -235,46 +241,71 @@ jobs:
           // test league running HOF/PS weeks while the real-season league is on Week 6).
           // Falls back to Tank01's getNFLCurrentWeek only if a league has no meta yet
           // (i.e. its season hasn't started scoring).
-          let globalCurrentWeek = null;
-          async function getGlobalCurrentWeek() {
-            if (globalCurrentWeek) return globalCurrentWeek;
-            // Date computed in real US Eastern time — identical fix just
-            // applied and directly verified in auto-scoring.yml tonight,
-            // for the identical reason: this file's own copy of the same
-            // formula was still doing raw UTC math, vulnerable to the
-            // same midnight-crossover bug (a run happening just after
-            // UTC midnight would compute one day, and one full week
-            // boundary, too far ahead while it was still the prior day
-            // in ET).
-            const now = new Date();
-            const etParts = new Intl.DateTimeFormat('en-CA', {
-              timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit'
-            }).format(now).split('-').map(Number);
-            const [etYear, etMonth, etDay] = etParts;
-            if (etMonth === 8 || (etMonth === 9 && etDay <= 8)) {
+          // Cached per season-type, not globally shared across every
+          // league regardless of type — a regular-season league with no
+          // real meta yet must never inherit the preseason calendar's
+          // current week just because today's date happens to fall in
+          // that window.
+          const globalCurrentWeekCache = {};
+          async function getGlobalCurrentWeek(isPreseason) {
+            const cacheKey = isPreseason ? 'preseason' : 'regular';
+            if (globalCurrentWeekCache[cacheKey]) return globalCurrentWeekCache[cacheKey];
+
+            if (isPreseason) {
+              // Date computed in real US Eastern time — identical fix
+              // just applied and directly verified in auto-scoring.yml
+              // tonight, for the identical reason: this file's own copy
+              // of the same formula was still doing raw UTC math,
+              // vulnerable to the same midnight-crossover bug (a run
+              // happening just after UTC midnight would compute one
+              // day, and one full week boundary, too far ahead while it
+              // was still the prior day in ET).
+              const now = new Date();
+              const etParts = new Intl.DateTimeFormat('en-CA', {
+                timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit'
+              }).format(now).split('-').map(Number);
+              const [, etMonth, etDay] = etParts;
+              const mmdd = etMonth * 100 + etDay;
               // Real, explicit calendar for this season's preseason
               // weeks, not naive "days since Aug 1 divided by 7" math —
               // confirmed tonight (auto-scoring.yml, kickoff-locks.yml)
               // that the naive math drifts out of sync with the real
               // game windows, since 7-day math doesn't actually line up
               // evenly against these real dates.
-              const mmdd = etMonth * 100 + etDay;
-              if (mmdd <= 812)      globalCurrentWeek = 1; // through Aug 12 — HOF game, before Week 2 starts
-              else if (mmdd <= 819) globalCurrentWeek = 2; // Aug 13-19 — real games Aug 13-17
-              else if (mmdd <= 826) globalCurrentWeek = 3; // Aug 20-26 — real games Aug 20-23
-              else                  globalCurrentWeek = 4; // Aug 27 onward — real games Aug 27-30
-              return globalCurrentWeek;
+              let week;
+              if (mmdd <= 812)      week = 1; // through Aug 12 — HOF game, before Week 2 starts
+              else if (mmdd <= 819) week = 2; // Aug 13-19 — real games Aug 13-17
+              else if (mmdd <= 826) week = 3; // Aug 20-26 — real games Aug 20-23
+              else                  week = 4; // Aug 27 onward — real games Aug 27-30
+              globalCurrentWeekCache[cacheKey] = week;
+              return week;
             }
+
+            // Regular season — real Tank01 current-week value. During
+            // this same August window this correctly reports week 1 (or
+            // similar), since the real regular season hasn't started
+            // yet — never the preseason calendar's week number, which
+            // means something entirely different.
             try {
               const d = await t01('/getNFLCurrentWeek');
-              globalCurrentWeek = d.body ? parseInt(d.body.week) : 1;
-            } catch (e) { globalCurrentWeek = 1; }
-            return globalCurrentWeek;
+              globalCurrentWeekCache[cacheKey] = d.body ? parseInt(d.body.week) : 1;
+            } catch (e) { globalCurrentWeekCache[cacheKey] = 1; }
+            return globalCurrentWeekCache[cacheKey];
           }
 
-          async function getTargetWeek(leagueId) {
+          async function getTargetWeek(leagueId, settings) {
+            const isPreseason = !!(settings && settings.isPreseason);
+            // Real, per-league season key — a preseason league's real
+            // meta lives under the "P"-suffixed path, not the plain one.
+            // Previously this always read the plain path regardless of
+            // league type, meaning it could never actually find a
+            // preseason league's real meta either — it was only ever
+            // "accidentally" landing on the right week for preseason
+            // leagues via the fallback below, not this real, intended
+            // per-league lookup.
+            const seasonKey = isPreseason ? SEASON + 'P' : SEASON;
             try {
-              const meta = await firebaseGet(`/leagues/${leagueId}/season/${SEASON}/meta.json`);
+              const meta = await firebaseGet(`/leagues/${leagueId}/season/${seasonKey}/meta.json`);
               // Confirmed via real Firebase structure: the field is
               // "week", not "currentWeek" — the original check for
               // meta.currentWeek could never match anything real, so this
@@ -282,7 +313,7 @@ jobs:
               // always falling through to the global fallback below.
               if (meta && typeof meta.week === 'number') return meta.week + 1;
             } catch (e) { /* no meta yet */ }
-            return await getGlobalCurrentWeek();
+            return await getGlobalCurrentWeek(isPreseason);
           }
 
           // Cache projections per (week) so leagues on the same week share one Tank01 call,
@@ -314,6 +345,17 @@ jobs:
           function buildSalariesFromProjections(projPlayers, poolPlayers, min, max) {
             const nameMap = {};
             Object.values(poolPlayers || {}).forEach(p => { if (p && p.name) nameMap[normalizeNameForMatch(p.name)] = p; });
+
+            // Real, current top projection at each position this week —
+            // computed fresh every run so the formula can never drift
+            // out of sync with reality the way a hardcoded reference
+            // point did before.
+            const maxProjByPos = {};
+            ['QB','RB','WR','TE','DEF'].forEach(pos => {
+              const atPos = projPlayers.filter(p => p.pos === pos && p.proj > 0);
+              maxProjByPos[pos] = atPos.length ? Math.max(...atPos.map(p => p.proj)) : 0;
+            });
+
             const salaries = {};
             let count = 0;
             projPlayers.forEach(p => {
@@ -323,10 +365,15 @@ jobs:
               const pid = poolP ? poolP.id : ('t01_' + p.id);
               const inj = poolP ? (poolP.status || p.status || null) : (p.status || null);
               if (inj === 'O' || inj === 'IR') return;
-              const mult = POSITION_MULTIPLIERS[p.pos] || POSITION_MULTIPLIERS.WR; // fallback, shouldn't hit given the position filter above
-              // Round UP to the next $100 (not nearest) — see SALARY_METHODOLOGY.md
-              // "Round-up + multiplier recalibration" for why.
-              let sal = Math.ceil((p.proj * mult) / SAL_ROUND) * SAL_ROUND;
+              const maxProj = maxProjByPos[p.pos] || p.proj; // fallback: this player IS the max if something odd happened above
+              const ceiling = TARGET_CEILING[p.pos] || TARGET_CEILING.WR; // fallback, shouldn't hit given the position filter above
+              // Effective multiplier recalibrated every run so the real
+              // #1 player at this position lands on the target ceiling,
+              // then the same exponent curve applied to every other
+              // player at the position — see SALARY_METHODOLOGY.md
+              // "Round-up + exponent recalibration" for why.
+              const effectiveMult = ceiling / Math.pow(maxProj, SALARY_EXPONENT);
+              let sal = Math.ceil((Math.pow(p.proj, SALARY_EXPONENT) * effectiveMult) / SAL_ROUND) * SAL_ROUND;
               sal = Math.max(min, Math.min(max, sal));
               salaries[pid] = { id: pid, name: p.name, pos: p.pos, team: p.team, proj: Math.round(p.proj*10)/10, salary: sal, status: inj, tank01PlayerID: poolP ? poolP.tank01PlayerID : null, headshot: poolP ? poolP.headshot : null };
               count++;
@@ -348,7 +395,7 @@ jobs:
           }
 
           async function generateSalariesForLeague(leagueId, settings, poolPlayers) {
-            const week = await getTargetWeek(leagueId);
+            const week = await getTargetWeek(leagueId, settings);
             if (week > 18) { console.log(`  ${leagueId}: week ${week} is past the season — skipping`); return; }
 
             // Local, scoped override — not the global SEASON constant,
