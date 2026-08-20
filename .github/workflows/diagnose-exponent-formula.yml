@@ -1,0 +1,104 @@
+name: One-Time Diagnostic — Verify Exponent Formula Live
+
+# ONE-TIME USE — delete this file after running it once.
+# Verifies the corrected approach: apply the exponent directly to the
+# proven linear formula's own scale (proj^exponent * recalibrated
+# multiplier), rather than a new floor-to-ceiling mapping. Confirms
+# exponent=1.0 reproduces the original results almost exactly, then
+# tests 0.95/0.90/0.85/0.80 against live, current projections.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify against live data
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const WORKER = 'https://fantasy-refresh-news.mtriedel.workers.dev';
+
+          const ROSTER = [
+            { name: 'Baker Mayfield', pos: 'QB' },
+            { name: 'Kenneth Walker', pos: 'RB' },
+            { name: 'Saquon Barkley', pos: 'RB' },
+            { name: 'Christian Watson', pos: 'WR' },
+            { name: 'DK Metcalf', pos: 'WR' },
+            { name: 'Luther Burden', pos: 'WR' },
+            { name: 'Isaiah Likely', pos: 'TE' },
+            { name: 'Bijan Robinson', pos: 'RB' },
+            { name: 'TEN', pos: 'DEF' },
+          ];
+
+          function fetchJson(url) {
+            return new Promise((resolve, reject) => {
+              https.get(url, res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+
+          function normalizeNameForMatch(name) {
+            return (name || '').toLowerCase().replace(/[^a-z]/g, '');
+          }
+
+          function priceLinearOriginal(proj, mult, min, max) {
+            let sal = Math.ceil((proj * mult) / 100) * 100;
+            return Math.max(min, Math.min(max, sal));
+          }
+
+          function priceExponent(proj, maxProjAtPos, ceiling, exponent, min, max) {
+            const adjustedMult = ceiling / Math.pow(maxProjAtPos, exponent);
+            let sal = Math.round((Math.pow(proj, exponent) * adjustedMult) / 100) * 100;
+            return Math.max(min, Math.min(max, sal));
+          }
+
+          async function main() {
+            const proj = await fetchJson(`${WORKER}/projections?week=1&season=2026`);
+            const players = proj.players || [];
+
+            const matched = ROSTER.map(r => {
+              const target = normalizeNameForMatch(r.name);
+              const found = players.find(p => p.pos === r.pos && normalizeNameForMatch(p.name).includes(target));
+              return { ...r, proj: found ? found.proj : null, realName: found ? found.name : '(not found)' };
+            });
+
+            const maxByPos = {};
+            ['QB','RB','WR','TE','DEF'].forEach(pos => {
+              const atPos = players.filter(p => p.pos === pos && p.proj > 0);
+              maxByPos[pos] = atPos.length ? Math.max(...atPos.map(p => p.proj)) : 0;
+            });
+
+            const CURRENT_MULT = { QB: 475, RB: 515, WR: 575, TE: 520, DEF: 465 };
+            const CEIL = { QB: 9400, RB: 10700, WR: 11300, TE: 7400, DEF: 5000 };
+            const MIN = 4500, MAX = 11300;
+
+            console.log('Real max projection per position this week:', JSON.stringify(maxByPos));
+            console.log('');
+
+            [
+              { label: 'ORIGINAL linear (proj x mult) — reference', fn: p => priceLinearOriginal(p.proj, CURRENT_MULT[p.pos], MIN, MAX) },
+              { label: 'exponent=1.0 (should ~match original)', fn: p => priceExponent(p.proj, maxByPos[p.pos], CEIL[p.pos], 1.0, MIN, MAX) },
+              { label: 'exponent=0.95', fn: p => priceExponent(p.proj, maxByPos[p.pos], CEIL[p.pos], 0.95, MIN, MAX) },
+              { label: 'exponent=0.90', fn: p => priceExponent(p.proj, maxByPos[p.pos], CEIL[p.pos], 0.90, MIN, MAX) },
+              { label: 'exponent=0.85', fn: p => priceExponent(p.proj, maxByPos[p.pos], CEIL[p.pos], 0.85, MIN, MAX) },
+              { label: 'exponent=0.80', fn: p => priceExponent(p.proj, maxByPos[p.pos], CEIL[p.pos], 0.80, MIN, MAX) },
+            ].forEach(({ label, fn }) => {
+              console.log(`--- ${label} ---`);
+              let total = 0;
+              matched.forEach(p => {
+                if (p.proj == null) { console.log(`  ${p.realName}: NOT FOUND, skipped`); return; }
+                const price = fn(p);
+                total += price;
+                console.log(`  ${p.realName} (${p.pos}, ${p.proj} proj): $${price.toLocaleString()}`);
+              });
+              console.log(`  TOTAL: $${total.toLocaleString()}  (cap: $60,000 — ${total > 60000 ? 'OVER by $' + (total-60000).toLocaleString() : 'fits, $' + (60000-total).toLocaleString() + ' remaining'})\n`);
+            });
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
