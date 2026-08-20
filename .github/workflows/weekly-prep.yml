@@ -70,12 +70,12 @@ jobs:
           // real, reported "too easy to build a stacked roster"
           // complaint: at exponent=1.0 (pure linear), a real 2-stud
           // roster landed only $2,100 over the $60,000 cap — barely
-          // forcing any real choices. Started at 0.75 (that same real
-          // roster landed $7,400 over), then tuned up to 0.80 after
-          // live play-testing found 0.75 too restrictive — a gentler
-          // bend, still meaningfully tighter than pure linear. Easy to
-          // tune further from here by feel.
-          const SALARY_EXPONENT = 0.80;
+          // forcing any real choices. Tuned by feel through live play:
+          // 0.75 (that same real roster landed $7,400 over) felt too
+          // restrictive, 0.80 still too tough, moved to 0.85 — a
+          // gentler bend, still meaningfully tighter than pure linear.
+          // Easy to tune further from here.
+          const SALARY_EXPONENT = 0.85;
           const SAL_MIN_DEFAULT = 4500; // raised from 3700 — see SALARY_METHODOLOGY.md "Floor recalibration" for why
           const SAL_MAX_DEFAULT = 11300;
           const SAL_ROUND = 100;
