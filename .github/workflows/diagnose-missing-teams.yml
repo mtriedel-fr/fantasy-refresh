@@ -1,0 +1,100 @@
+name: One-Time Diagnostic — Missing Team Players
+
+# ONE-TIME USE — delete this file after running it once.
+# Directly checks, for the 8 reported teams (NE, CIN, DET, IND, PIT,
+# CAR, GB, ARI), whether:
+#   1. Tank01's real /projections response for week 1 includes ANY
+#      players from these teams at all
+#   2. The worker's /schedule response shows these teams' real week 1
+#      games, and what abbreviation it uses for them
+#   3. The real, already-generated /salaries/2026/week1 data includes
+#      players from these teams
+# Prints a clear, direct answer for each team rather than requiring
+# manual comparison of multiple raw JSON responses.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Compare projections, schedule, and salary data for the reported teams
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+
+          const FB_URL  = process.env.FIREBASE_DB_URL;
+          const WORKER  = 'https://fantasy-refresh-news.mtriedel.workers.dev';
+          const TEAMS   = ['NE', 'CIN', 'DET', 'IND', 'PIT', 'CAR', 'GB', 'ARI'];
+
+          function fetchJson(url) {
+            return new Promise((resolve, reject) => {
+              https.get(url, res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+
+          async function main() {
+            console.log('=== 1. Tank01 projections for week 1 ===');
+            const proj = await fetchJson(`${WORKER}/projections?week=1&season=2026`).catch(e => ({ error: e.message }));
+            const projPlayers = proj.players || [];
+            console.log(`Total players in projections response: ${projPlayers.length}`);
+            if (proj.error) console.log(`Projections fetch error: ${proj.error}`);
+            const projTeamsSeen = new Set(projPlayers.map(p => p.team));
+            console.log(`Distinct teams appearing in projections: ${[...projTeamsSeen].sort().join(', ')}`);
+
+            console.log('\n=== 2. Worker schedule for week 1, regular season ===');
+            const sched = await fetchJson(`${WORKER}/schedule?week=1&season=2026&seasonType=Regular`).catch(e => ({ error: e.message }));
+            const games = sched.games || [];
+            console.log(`Total games in schedule response: ${games.length}`);
+            if (sched.error) console.log(`Schedule fetch error: ${sched.error}`);
+
+            console.log('\n=== 3. Real, already-generated salary data ===');
+            const salData = await fetchJson(`${FB_URL}/leagues/fr_refresh26/salaries/2026/week1.json`).catch(e => ({ error: e.message }));
+            const salPlayers = salData && salData.players ? Object.values(salData.players) : [];
+            console.log(`Total players in generated salary data: ${salPlayers.length}`);
+            if (salData && salData.meta) console.log(`Salary meta: count=${salData.meta.count}, flat=${salData.meta.flat}, generated=${new Date(salData.meta.generated).toISOString()}`);
+
+            console.log('\n=== Per-team breakdown ===');
+            TEAMS.forEach(team => {
+              console.log(`\n--- ${team} ---`);
+
+              const inProjections = projPlayers.filter(p => p.team === team);
+              console.log(`  Projections: ${inProjections.length} player(s) found with team === "${team}"`);
+              if (!inProjections.length) {
+                // Check if this team appears under any different string at all
+                const similar = [...projTeamsSeen].filter(t => t && (t.includes(team) || team.includes(t)));
+                if (similar.length) console.log(`  ⚠️  But found similar/different team string(s) in projections: ${similar.join(', ')}`);
+              }
+
+              const gameMatch = games.filter(g =>
+                (g.home && (g.home === team || g.homeTeamAbbr === team || g.homeTeam === team)) ||
+                (g.away && (g.away === team || g.awayTeamAbbr === team || g.awayTeam === team)) ||
+                (g.teams && g.teams.includes(team))
+              );
+              console.log(`  Schedule: ${gameMatch.length} game(s) found matching "${team}"`);
+              if (gameMatch.length) console.log(`  Schedule game raw: ${JSON.stringify(gameMatch[0])}`);
+
+              const inSalaries = salPlayers.filter(p => p.team === team);
+              console.log(`  Generated salaries: ${inSalaries.length} player(s) found with team === "${team}"`);
+            });
+
+            console.log('\n=== Raw sample: first 3 projection entries (to see real field shape) ===');
+            console.log(JSON.stringify(projPlayers.slice(0, 3), null, 2));
+
+            console.log('\n=== Raw sample: first 3 schedule games (to see real field shape) ===');
+            console.log(JSON.stringify(games.slice(0, 3), null, 2));
+          }
+
+          main().catch(e => {
+            console.error('Diagnostic failed:', e);
+            process.exit(1);
+          });
+          SCRIPT
