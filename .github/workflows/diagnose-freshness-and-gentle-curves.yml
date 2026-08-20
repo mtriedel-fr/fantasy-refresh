@@ -1,0 +1,131 @@
+name: One-Time Diagnostic — Confirm Freshness + Test Gentler Curves
+
+# ONE-TIME USE — delete this file after running it once.
+# Part 1: Checks the real, stored /salaries/2026/week1 data directly —
+#   its generated timestamp, and the actual stored price for each of
+#   the 9 real roster players — to confirm whether it reflects the
+#   recalibrated multipliers or is still stale data from before.
+# Part 2: Tests much gentler curve strengths (0.95, 0.85, 0.75) against
+#   this same real roster, since the earlier test (0.6/0.45/0.35)
+#   overshot the cap by 34%+ — too aggressive to be usable.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check freshness, then test gentler curves
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB_URL = process.env.FIREBASE_DB_URL;
+          const WORKER = 'https://fantasy-refresh-news.mtriedel.workers.dev';
+
+          const ROSTER = [
+            { name: 'Baker Mayfield', pos: 'QB' },
+            { name: 'Kenneth Walker', pos: 'RB' },
+            { name: 'Saquon Barkley', pos: 'RB' },
+            { name: 'Christian Watson', pos: 'WR' },
+            { name: 'DK Metcalf', pos: 'WR' },
+            { name: 'Luther Burden', pos: 'WR' },
+            { name: 'Isaiah Likely', pos: 'TE' },
+            { name: 'Bijan Robinson', pos: 'RB' },
+            { name: 'TEN', pos: 'DEF' },
+          ];
+
+          function fetchJson(url) {
+            return new Promise((resolve, reject) => {
+              https.get(url, res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+
+          function normalizeNameForMatch(name) {
+            return (name || '').toLowerCase().replace(/[^a-z]/g, '');
+          }
+
+          function priceLinear(proj, mult, min, max) {
+            let sal = Math.ceil((proj * mult) / 100) * 100;
+            return Math.max(min, Math.min(max, sal));
+          }
+
+          function priceCurve(proj, maxProjAtPos, ceiling, floor, power) {
+            const ratio = maxProjAtPos > 0 ? Math.min(1, proj / maxProjAtPos) : 0;
+            const scaled = Math.pow(ratio, power);
+            const sal = floor + (ceiling - floor) * scaled;
+            return Math.round(sal / 100) * 100;
+          }
+
+          async function main() {
+            console.log('========== PART 1: Real, stored salary data freshness ==========\n');
+            const stored = await fetchJson(`${FB_URL}/leagues/fr_refresh26/salaries/2026/week1.json`).catch(() => null);
+            if (stored && stored.meta) {
+              console.log(`Generated: ${new Date(stored.meta.generated).toISOString()}`);
+              console.log(`Count: ${stored.meta.count}, flat: ${stored.meta.flat}`);
+            } else {
+              console.log('No meta found — salary data may not exist at all.');
+            }
+
+            const storedPlayers = stored && stored.players ? Object.values(stored.players) : [];
+            console.log('\nReal, currently-stored prices for this roster:');
+            let storedTotal = 0;
+            ROSTER.forEach(r => {
+              const target = normalizeNameForMatch(r.name);
+              const found = storedPlayers.find(p => p.pos === r.pos && normalizeNameForMatch(p.name).includes(target));
+              if (found) {
+                storedTotal += found.salary;
+                console.log(`  ${found.name} (${r.pos}): $${found.salary.toLocaleString()}`);
+              } else {
+                console.log(`  ${r.name} (${r.pos}): NOT FOUND in stored data`);
+              }
+            });
+            console.log(`  STORED TOTAL: $${storedTotal.toLocaleString()} (cap: $60,000)`);
+
+            console.log('\n\n========== PART 2: Gentler curve strengths on real, live projections ==========\n');
+            const proj = await fetchJson(`${WORKER}/projections?week=1&season=2026`);
+            const players = proj.players || [];
+
+            const matched = ROSTER.map(r => {
+              const target = normalizeNameForMatch(r.name);
+              const found = players.find(p => p.pos === r.pos && normalizeNameForMatch(p.name).includes(target));
+              return { ...r, proj: found ? found.proj : null, realName: found ? found.name : '(not found)' };
+            });
+
+            const maxByPos = {};
+            ['QB','RB','WR','TE','DEF'].forEach(pos => {
+              const atPos = players.filter(p => p.pos === pos && p.proj > 0);
+              maxByPos[pos] = atPos.length ? Math.max(...atPos.map(p => p.proj)) : 0;
+            });
+
+            const CURRENT_MULT = { QB: 475, RB: 515, WR: 575, TE: 520, DEF: 465 };
+            const CEIL = { QB: 9400, RB: 10700, WR: 11300, TE: 7400, DEF: 5000 };
+            const OLD_MIN = 4500, OLD_MAX = 11300;
+            const NEW_FLOOR = { QB: 5500, RB: 5500, WR: 5500, TE: 5000, DEF: 4200 };
+
+            [
+              { label: 'CURRENT (linear, live projections)', fn: p => priceLinear(p.proj, CURRENT_MULT[p.pos], OLD_MIN, OLD_MAX) },
+              { label: 'Curve power=0.95 (nearly linear)', fn: p => priceCurve(p.proj, maxByPos[p.pos], CEIL[p.pos], NEW_FLOOR[p.pos], 0.95) },
+              { label: 'Curve power=0.85', fn: p => priceCurve(p.proj, maxByPos[p.pos], CEIL[p.pos], NEW_FLOOR[p.pos], 0.85) },
+              { label: 'Curve power=0.75', fn: p => priceCurve(p.proj, maxByPos[p.pos], CEIL[p.pos], NEW_FLOOR[p.pos], 0.75) },
+            ].forEach(({ label, fn }) => {
+              console.log(`--- ${label} ---`);
+              let total = 0;
+              matched.forEach(p => {
+                if (p.proj == null) { console.log(`  ${p.realName}: NOT FOUND, skipped`); return; }
+                const price = fn(p);
+                total += price;
+                console.log(`  ${p.realName} (${p.pos}, ${p.proj} proj): $${price.toLocaleString()}`);
+              });
+              console.log(`  TOTAL: $${total.toLocaleString()}  (cap: $60,000 — ${total > 60000 ? 'OVER by $' + (total-60000).toLocaleString() : 'fits, $' + (60000-total).toLocaleString() + ' remaining'})\n`);
+            });
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
