@@ -344,12 +344,16 @@ jobs:
             // salary data needs to be. Fixes a real, confirmed collision:
             // preseason week N and regular-season week N previously
             // shared the exact same /salaries/${SEASON}/week${week} path.
-            const nowForSeasonCheck = new Date();
-            const seasonCheckParts = new Intl.DateTimeFormat('en-CA', {
-              timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit'
-            }).format(nowForSeasonCheck).split('-').map(Number);
-            const isPreseasonWindow = seasonCheckParts[1] === 8 || (seasonCheckParts[1] === 9 && seasonCheckParts[2] <= 8);
-            const salarySeason = isPreseasonWindow ? SEASON + 'P' : SEASON;
+            //
+            // Checked against this specific league's own, real
+            // isPreseason setting — not a blanket date guess. A
+            // date-only check ("if it's August, assume preseason")
+            // would incorrectly treat every league as preseason during
+            // this window, including real, regular-season leagues whose
+            // week 1 salary generation genuinely happens before the
+            // season's actual kickoff — silently writing their real
+            // salaries to the wrong, preseason-only path.
+            const salarySeason = (settings && settings.isPreseason) ? SEASON + 'P' : SEASON;
 
             // Don't clobber a week the commissioner already locked manually.
             let existingMeta = null;
@@ -472,28 +476,22 @@ jobs:
             const leagues = await getActiveLeagues();
             console.log(`Active leagues: ${leagues.map(l => l.id).join(', ')}`);
 
-            // Same safeguard added to auto-scoring.yml tonight, for the
-            // same root cause: a league should only get salaries/scoring
-            // for the kind of season actually happening right now.
-            // Without this, a non-preseason league could get salaries
-            // generated (and, via auto-scoring.yml, scored) against
-            // preseason games — exactly what happened to fr_refresh26
-            // tonight, before this fix existed.
-            const nowForWindow = new Date();
-            const windowEtParts = new Intl.DateTimeFormat('en-CA', {
-              timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit'
-            }).format(nowForWindow).split('-').map(Number);
-            const windowMonth = windowEtParts[1];
-            const windowDay = windowEtParts[2];
-            const currentlyPreseasonWindow = windowMonth === 8 || (windowMonth === 9 && windowDay <= 8);
-
+            // The date-based "only run during the matching season-type
+            // window" gate that used to live here has been removed. Its
+            // intent (don't generate salaries for the wrong season
+            // type) is now already, correctly handled inside
+            // generateSalariesForLeague() itself, which routes each
+            // league to its own real path based on that league's actual
+            // isPreseason setting — not a calendar-date guess. The old
+            // gate was actively harmful: a real, regular-season
+            // league's own isPreseason (false) never matches "is today
+            // within the preseason calendar window" (true, throughout
+            // August/early September) — so the real league was being
+            // skipped entirely during exactly the window it needs its
+            // real week-1 salaries generated, before the season's
+            // actual kickoff.
             for (const { id, settings } of leagues) {
               try {
-                const leagueIsPreseason = !!(settings && settings.isPreseason);
-                if (leagueIsPreseason !== currentlyPreseasonWindow) {
-                  console.log(`  ⏭️  Skipping ${id} — league is ${leagueIsPreseason ? 'preseason' : 'regular season'}, but it's currently ${currentlyPreseasonWindow ? 'preseason' : 'regular season'} window.`);
-                  continue;
-                }
                 await generateSalariesForLeague(id, settings, pool);
               } catch (e) {
                 console.error(`✗ ${id} failed:`, e.message);

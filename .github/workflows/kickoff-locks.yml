@@ -28,7 +28,7 @@ jobs:
 
           const FB_URL   = process.env.FIREBASE_DB_URL;
           const T01_KEY  = process.env.TANK01_KEY;
-          const SEASON   = process.env.FR_SEASON || '2026';
+          let SEASON   = process.env.FR_SEASON || '2026';
           const T01_HOST = 'tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com';
 
           function fetchJson(url, headers) {
@@ -88,43 +88,35 @@ jobs:
             return fetchJson(FB_URL + path, {});
           }
 
-          async function getCurrentWeek() {
-            // Date-based preseason check runs FIRST — same fix already
-            // applied to auto-scoring.yml and weekly-prep.yml earlier
-            // tonight, for the same reason: Tank01's own getNFLCurrentWeek
-            // only knows about regular-season weeks, and this file's own
-            // copy of this function never got the same fix, meaning it
-            // was still unconditionally trusting a regular-season-only
-            // week number during the genuine preseason window — which is
-            // very likely why locks were being written to the wrong week
-            // path entirely.
-            //
-            // Also fixes two further bugs confirmed directly tonight:
-            // (1) this was still doing raw UTC date math, never given the
-            // ET-timezone fix already applied elsewhere, so a run just
-            // after UTC midnight could compute the wrong day entirely
-            // while it was still the prior day in US Eastern time; (2)
-            // even with the right date, "days since Aug 1 divided by 7"
-            // doesn't actually line up against the real, established game
-            // windows for this season — confirmed today, Aug 15, is
-            // genuinely still within the real Week 2 window (Aug 13-17),
-            // but that naive math had already rolled over to Week 3 a day
-            // early. Replaced with the real, explicit calendar instead.
+          // Only meaningful for genuine preseason leagues — maps
+          // today's real calendar date onto this season's specific,
+          // established preseason game windows. A regular-season league
+          // must never use this: during this same August/early-September
+          // window, the real season hasn't started at all, so this
+          // would incorrectly report something like "week 3" for a
+          // league that actually needs its own real week 1.
+          function getPreseasonCalendarWeek() {
             const now = new Date();
             const etParts = new Intl.DateTimeFormat('en-CA', {
               timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit'
             }).format(now).split('-').map(Number);
             const [etYear, etMonth, etDay] = etParts;
-            if (etMonth === 8 || (etMonth === 9 && etDay <= 8)) {
-              const mmdd = etMonth * 100 + etDay;
-              let psWeek;
-              if (mmdd <= 812)      psWeek = 1; // through Aug 12 — HOF game, before Week 2 starts
-              else if (mmdd <= 819) psWeek = 2; // Aug 13-19 — real games Aug 13-17
-              else if (mmdd <= 826) psWeek = 3; // Aug 20-26 — real games Aug 20-23
-              else                  psWeek = 4; // Aug 27 onward — real games Aug 27-30
-              console.log(`Preseason window (by ET date ${etYear}-${String(etMonth).padStart(2,'0')}-${String(etDay).padStart(2,'0')}) — calendar week ${psWeek}`);
-              return psWeek;
-            }
+            const mmdd = etMonth * 100 + etDay;
+            let psWeek;
+            if (mmdd <= 812)      psWeek = 1; // through Aug 12 — HOF game, before Week 2 starts
+            else if (mmdd <= 819) psWeek = 2; // Aug 13-19 — real games Aug 13-17
+            else if (mmdd <= 826) psWeek = 3; // Aug 20-26 — real games Aug 20-23
+            else                  psWeek = 4; // Aug 27 onward — real games Aug 27-30
+            console.log(`Preseason window (by ET date ${etYear}-${String(etMonth).padStart(2,'0')}-${String(etDay).padStart(2,'0')}) — calendar week ${psWeek}`);
+            return psWeek;
+          }
+
+          // For a genuine regular-season league — Tank01's own real,
+          // current week. During this same window this correctly
+          // reports week 1 (or similar), since the regular season
+          // itself hasn't started yet — never the preseason calendar's
+          // week number, which means something different entirely.
+          async function getRegularSeasonWeek() {
             try {
               const data = await fetchJson(
                 `https://${T01_HOST}/getNFLCurrentWeek`,
@@ -180,9 +172,9 @@ jobs:
             }
           }
 
-          async function lockLeagueWeek(leagueId, week, games) {
+          async function lockLeagueWeek(leagueId, week, games, seasonKey) {
             const existingLocks = await firebaseGet(
-              `/leagues/${leagueId}/locks/${SEASON}/week${week}.json`
+              `/leagues/${leagueId}/locks/${seasonKey}/week${week}.json`
             ).catch(() => ({}));
 
             const locks = existingLocks || {};
@@ -253,22 +245,19 @@ jobs:
             }
 
             if (newLocks > 0) {
-              await firebasePut(`/leagues/${leagueId}/locks/${SEASON}/week${week}.json`, locks);
+              await firebasePut(`/leagues/${leagueId}/locks/${seasonKey}/week${week}.json`, locks);
               console.log(`  ✅ Wrote ${newLocks} new locks for ${leagueId}`);
             } else {
               console.log(`  No new locks for ${leagueId} this run.`);
             }
 
-            await firebasePut(`/leagues/${leagueId}/locks/${SEASON}/meta.json`, {
+            await firebasePut(`/leagues/${leagueId}/locks/${seasonKey}/meta.json`, {
               lastChecked: Date.now(),
               week
             });
           }
 
           async function main() {
-            const week = await getCurrentWeek();
-            console.log(`Checking locks for Week ${week}...`);
-
             // Auto-detect preseason vs regular by date, same logic as
             // auto-scoring.yml — this was hardcoded to seasonType=Regular
             // before, meaning it was checking regular-season Week 1 games
@@ -315,10 +304,23 @@ jobs:
             const leagues = await getActiveLeagues();
             console.log(`Leagues to lock: ${leagues.join(', ')}`);
 
+            let regularSeasonWeek = null; // fetched at most once, shared by every regular-season league this run
+
             for (const leagueId of leagues) {
               console.log(`\n--- ${leagueId} ---`);
               try {
-                await lockLeagueWeek(leagueId, week, games);
+                const settings = await firebaseGet(`/leagues/${leagueId}/settings.json`).catch(() => null);
+                const leagueIsPreseason = !!(settings && settings.isPreseason);
+                const seasonKey = leagueIsPreseason ? SEASON + 'P' : SEASON;
+                let week;
+                if (leagueIsPreseason) {
+                  week = getPreseasonCalendarWeek();
+                } else {
+                  if (regularSeasonWeek === null) regularSeasonWeek = await getRegularSeasonWeek();
+                  week = regularSeasonWeek;
+                }
+                console.log(`  ${leagueId}: ${leagueIsPreseason ? 'preseason' : 'regular season'}, week ${week}, path season "${seasonKey}"`);
+                await lockLeagueWeek(leagueId, week, games, seasonKey);
               } catch(e) {
                 console.error(`Failed locking ${leagueId}:`, e.message);
               }
