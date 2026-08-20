@@ -1,0 +1,115 @@
+name: One-Time Cleanup — Remove All Members Except Commissioner
+
+# ONE-TIME USE — delete this file after running it once.
+# Removes every member of fr_refresh26 EXCEPT the commissioner(s),
+# clearing their /members entry and any lineup data they might have
+# (across every week, since the season hasn't started but there could
+# be leftover test data from before drafting was locked). The league
+# itself, its settings, and its join code are completely untouched —
+# people can rejoin with the same code once re-invited.
+#
+# The commissioner is determined dynamically from this league's own
+# real settings (settings.commissioners + settings.createdBy) — not a
+# hardcoded, assumed UID — so this is correct even if commissioner
+# status ever changes.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type YES to actually remove members'
+        required: true
+        default: ''
+
+jobs:
+  remove-members:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Preview, then remove, all non-commissioner members
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+
+          const FB_URL    = process.env.FIREBASE_DB_URL;
+          const FB_TOKEN   = process.env.FIREBASE_AUTH_TOKEN;
+          const CONFIRM    = process.env.CONFIRM;
+          const LEAGUE_ID  = 'fr_refresh26';
+
+          function fbAuth(path) {
+            const sep = path.includes('?') ? '&' : '?';
+            return FB_TOKEN ? `${path}${sep}auth=${FB_TOKEN}` : path;
+          }
+
+          function fetchJson(url) {
+            return new Promise((resolve, reject) => {
+              https.get(url, res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+
+          function firebaseDelete(path) {
+            return new Promise((resolve, reject) => {
+              const fullPath = fbAuth(FB_URL + path + '.json');
+              const u = new URL(fullPath);
+              const req = https.request({
+                hostname: u.hostname, path: u.pathname + u.search, method: 'DELETE'
+              }, res => {
+                let d = '';
+                res.on('data', c => d += c);
+                res.on('end', () => {
+                  if (res.statusCode >= 200 && res.statusCode < 300) resolve(d);
+                  else reject(new Error(`DELETE rejected (HTTP ${res.statusCode}) — ${d.slice(0,200)}`));
+                });
+              });
+              req.on('error', reject);
+              req.end();
+            });
+          }
+
+          async function main() {
+            const settings = await fetchJson(`${FB_URL}/leagues/${LEAGUE_ID}/settings.json`);
+            const commissionerUids = new Set(Object.keys(settings.commissioners || {}));
+            if (settings.createdBy) commissionerUids.add(settings.createdBy);
+            console.log(`Commissioner UID(s), kept in place: ${[...commissionerUids].join(', ')}`);
+
+            const members = await fetchJson(`${FB_URL}/leagues/${LEAGUE_ID}/members.json`) || {};
+            const toRemove = Object.keys(members).filter(uid => !commissionerUids.has(uid));
+
+            console.log(`\nFound ${Object.keys(members).length} total member(s), ${toRemove.length} to remove:\n`);
+            toRemove.forEach(uid => {
+              const m = members[uid];
+              console.log(`  ${(m && m.teamName) || uid}`);
+            });
+
+            if (!toRemove.length) {
+              console.log('\nNothing to remove — only the commissioner is currently a member.');
+              return;
+            }
+
+            if (CONFIRM !== 'YES') {
+              console.log('\n⚠️  Confirm input was not "YES" — nothing was removed. Set confirm=YES and re-run to actually remove these members.');
+              return;
+            }
+
+            // Clear each removed member's membership and any lineup data
+            // they might have across every real season/week — a genuine
+            // fresh start, not just hiding them from the member list.
+            for (const uid of toRemove) {
+              await firebaseDelete(`/leagues/${LEAGUE_ID}/members/${uid}`);
+              for (let week = 1; week <= 18; week++) {
+                await firebaseDelete(`/leagues/${LEAGUE_ID}/lineups/2026/week${week}/${uid}`).catch(() => {});
+              }
+            }
+
+            console.log(`\n✅ Removed ${toRemove.length} member(s). The league, its settings, and its join code (${settings.joinCode || '—'}) are untouched — people can rejoin with the same code.`);
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
