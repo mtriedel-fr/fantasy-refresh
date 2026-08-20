@@ -819,7 +819,8 @@ function filterPlayersToSchedule(){
 
 var WORKER      = 'https://fantasy-refresh-news.mtriedel.workers.dev';
 var gameOdds    = {};
-var teamLocks   = {};
+// teamLocks declared once, near loadLocks() below, where it belongs —
+// removed the redundant, earlier duplicate that used to live here.
 
 // ── HARDCODED 2026 PRESEASON SCHEDULE ──────────────────────────
 // Fallback used until Tank01 Pro is live (and as backup if API has gaps).
