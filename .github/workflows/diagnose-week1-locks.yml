@@ -1,0 +1,57 @@
+name: One-Time Diagnostic — Check Week 1 Locks
+
+# ONE-TIME USE — delete this file after running it once.
+# Directly checks the real, current /locks/2026/week1 data for
+# fr_refresh26, to confirm or rule out whether specific teams are
+# incorrectly marked as locked months before the real season starts.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check real, current week 1 locks data
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB_URL = process.env.FIREBASE_DB_URL;
+
+          function fetchJson(url) {
+            return new Promise((resolve, reject) => {
+              https.get(url, res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+
+          async function main() {
+            const locks = await fetchJson(`${FB_URL}/leagues/fr_refresh26/locks/2026/week1.json`);
+            console.log('Raw /locks/2026/week1 data:');
+            console.log(JSON.stringify(locks, null, 2));
+
+            const meta = await fetchJson(`${FB_URL}/leagues/fr_refresh26/locks/2026/meta.json`).catch(() => null);
+            console.log('\nRaw /locks/2026/meta data:');
+            console.log(JSON.stringify(meta, null, 2));
+
+            const teams = ['NE', 'CIN', 'DET', 'IND', 'PIT', 'CAR', 'GB', 'ARI'];
+            console.log('\nReported teams — locked status:');
+            teams.forEach(t => {
+              console.log(`  ${t}: ${locks && locks[t] ? 'LOCKED — ' + JSON.stringify(locks[t]) : 'not locked'}`);
+            });
+
+            if (locks) {
+              const allLockedTeams = Object.keys(locks);
+              console.log(`\nAll teams currently marked as locked (${allLockedTeams.length} total): ${allLockedTeams.join(', ')}`);
+            } else {
+              console.log('\nNo locks data at all for this path (null/empty).');
+            }
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
