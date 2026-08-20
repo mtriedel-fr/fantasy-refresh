@@ -1,0 +1,67 @@
+name: One-Time Setup — Set Draft Lock Time (Real League Only)
+
+# ONE-TIME USE — delete this file after running it once.
+# Sets /leagues/fr_refresh26/settings/draftLockedUntil to a real
+# timestamp — 1 day before the confirmed, real Week 1 kickoff (Sept 9,
+# 2026, NE@SEA, 8:20pm ET). This is what both the Firebase security
+# rule and the client-side draft page check against. Deliberately only
+# ever touches fr_refresh26 — the preseason test league never gets this
+# setting at all, so it's completely unaffected.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set the real draft lock timestamp
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+
+          const FB_URL   = process.env.FIREBASE_DB_URL;
+          const FB_TOKEN = process.env.FIREBASE_AUTH_TOKEN;
+          const PATH     = '/leagues/fr_refresh26/settings/draftLockedUntil';
+
+          // Real, confirmed first game kickoff (NE@SEA, Sept 9 2026,
+          // 8:20pm ET / 2026-09-10T00:20:00Z) minus exactly 24 hours.
+          const UNLOCK_TIMESTAMP = 1788913200000;
+
+          function fbAuth(path) {
+            const sep = path.includes('?') ? '&' : '?';
+            return FB_TOKEN ? `${path}${sep}auth=${FB_TOKEN}` : path;
+          }
+
+          function firebasePut(path, payload) {
+            return new Promise((resolve, reject) => {
+              const body = JSON.stringify(payload);
+              const fullPath = fbAuth(FB_URL + path + '.json');
+              const u = new URL(fullPath);
+              const req = https.request({
+                hostname: u.hostname, path: u.pathname + u.search, method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+              }, res => {
+                let d = '';
+                res.on('data', c => d += c);
+                res.on('end', () => {
+                  if (res.statusCode >= 200 && res.statusCode < 300) resolve(d);
+                  else reject(new Error(`PUT rejected (HTTP ${res.statusCode}) — ${d.slice(0,200)}`));
+                });
+              });
+              req.on('error', reject);
+              req.write(body); req.end();
+            });
+          }
+
+          async function main() {
+            await firebasePut(PATH, UNLOCK_TIMESTAMP);
+            console.log(`✅ Set ${PATH} = ${UNLOCK_TIMESTAMP}`);
+            console.log(`   That's ${new Date(UNLOCK_TIMESTAMP).toISOString()} — 1 day before real Week 1 kickoff.`);
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
