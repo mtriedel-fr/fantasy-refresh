@@ -51,11 +51,24 @@ jobs:
           // a lineup only needs one QB but several skill-position slots
           // (roster-construction scarcity, not point-scoring ability).
           const POSITION_MULTIPLIERS = {
-            QB:  380,  // ticked down from 400 — was outpricing RB/WR at the elite tier
-            RB:  525,
-            WR:  505,
-            TE:  525,  // ticked down from 575 — a mid-tier TE was pricing above an equally productive RB/WR; 525 matches RB's own multiplier exactly
-            DEF: 500
+            // Recalibrated against real, confirmed week 1 2026
+            // projection data, not assumed "elite tier" reference
+            // points — those reference points had drifted from what
+            // real players are actually projected for this week,
+            // confirmed directly: the real #1 QB (19.84 proj) is 26.5%
+            // below the 27-point reference the old 380 was built
+            // around, and the real #1 WR similarly 10.8% below — so
+            // even the single best available player at those positions
+            // was pricing well under the intended ceiling, leaving
+            // extra cap room and letting stronger-than-intended rosters
+            // get built. RB/TE/DEF's real #1 players were already
+            // close to their reference points, so those only needed
+            // minor tuning.
+            QB:  475,  // was 380 — real #1 QB was landing ~$7,600 vs a $9,400 target ceiling
+            RB:  515,  // was 525 — real #1 RB was already close to target, minor tune only
+            WR:  575,  // was 505 — real #1 WR (19.63 proj) was landing $10,000 vs an $11,300 target ceiling, and lower-ranked WRs were underpriced relative to real value too
+            TE:  520,  // was 525 — real #1 TE was already almost exactly on target, minor tune only
+            DEF: 465   // was 500 — real #1 DEF was slightly above target, minor tune down
           };
           const SAL_MIN_DEFAULT = 4500; // raised from 3700 — see SALARY_METHODOLOGY.md "Floor recalibration" for why
           const SAL_MAX_DEFAULT = 11300;
