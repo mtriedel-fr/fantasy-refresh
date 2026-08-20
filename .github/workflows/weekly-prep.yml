@@ -97,7 +97,23 @@ jobs:
             return path + (path.includes('?') ? '&' : '?') + 'auth=' + FB_TOKEN;
           }
 
-          function firebaseGet(path) { return fetchJson(FB_URL + path); }
+          function firebaseGet(path) {
+            // Append auth token — reads to paths without their own
+            // explicit public .read rule (like the parent /leagues node
+            // itself, as opposed to a specific league's own data) are
+            // rejected without it. Confirmed directly tonight in
+            // kickoff-locks.yml's identical code: getActiveLeagues()'s
+            // attempt to read the full /leagues node was being silently
+            // denied every run, since that parent node has no .read
+            // rule of its own — only each specific league underneath it
+            // does, and rules don't cascade upward from children to a
+            // parent — falling back to a hardcoded, single-league list
+            // every time as a result.
+            const FB_TOKEN = process.env.FIREBASE_AUTH_TOKEN;
+            const sep = path.includes('?') ? '&' : '?';
+            const authedPath = FB_TOKEN ? `${path}${sep}auth=${FB_TOKEN}` : path;
+            return fetchJson(FB_URL + authedPath);
+          }
 
           function firebasePut(path, payload) {
             return new Promise((resolve, reject) => {

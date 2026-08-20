@@ -85,7 +85,23 @@ jobs:
           }
 
           function firebaseGet(path) {
-            return fetchJson(FB_URL + path, {});
+            // Append auth token — reads to paths without their own
+            // explicit public .read rule (like the parent /leagues node
+            // itself, as opposed to a specific league's own data) are
+            // rejected without it. This was the actual, confirmed root
+            // cause of every run silently falling back to a hardcoded,
+            // single-league list: getActiveLeagues()'s attempt to read
+            // the full /leagues node was always being denied, since
+            // that parent node has no .read rule of its own — only each
+            // specific league underneath it does, and rules don't
+            // cascade upward from children to a parent. Every league
+            // beyond the hardcoded fallback, including the preseason
+            // one, was silently never being processed by this workflow
+            // at all as a result.
+            const FB_TOKEN = process.env.FIREBASE_AUTH_TOKEN;
+            const sep = path.includes('?') ? '&' : '?';
+            const authedPath = FB_TOKEN ? `${path}${sep}auth=${FB_TOKEN}` : path;
+            return fetchJson(FB_URL + authedPath, {});
           }
 
           // Only meaningful for genuine preseason leagues — maps
