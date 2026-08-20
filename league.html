@@ -2249,7 +2249,7 @@ function fetchWeekSchedule(week){
     // root cause of a real bug tonight: a player's lock/game-info
     // display depends on this gameMap having a real entry, and this
     // page never fetched live status at all before now.
-    FR.fb.get('/liveGameStatus/2026/' + seasonType + '_wk' + week).catch(function(){ return null; })
+    FR.fb.get('/liveGameStatus/' + FR.seasonKey() + '/' + seasonType + '_wk' + week).catch(function(){ return null; })
   ]).then(function(results){
     var map = results[0] || {};
     var live = results[1];

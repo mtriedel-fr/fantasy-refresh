@@ -955,7 +955,7 @@ function loadSchedule(){
       // as much on the draft page as anywhere else. Re-renders the
       // roster once this resolves, since it may already be showing
       // stale, pre-game info by the time this arrives.
-      FR.fb.get('/liveGameStatus/2026/' + seasonType + '_wk' + apiWeek).then(function(live){
+      FR.fb.get('/liveGameStatus/' + FR.seasonKey() + '/' + seasonType + '_wk' + apiWeek).then(function(live){
         if(!live || !live.games) return;
         Object.keys(live.games).forEach(function(gameId){
           var g = live.games[gameId];
