@@ -51,11 +51,24 @@ jobs:
           // a lineup only needs one QB but several skill-position slots
           // (roster-construction scarcity, not point-scoring ability).
           const POSITION_MULTIPLIERS = {
-            QB:  380,  // ticked down from 400 — was outpricing RB/WR at the elite tier
-            RB:  525,
-            WR:  505,
-            TE:  525,  // ticked down from 575 — a mid-tier TE was pricing above an equally productive RB/WR; 525 matches RB's own multiplier exactly
-            DEF: 500
+            // Recalibrated against real, confirmed week 1 2026
+            // projection data, not assumed "elite tier" reference
+            // points — those reference points had drifted from what
+            // real players are actually projected for this week,
+            // confirmed directly: the real #1 QB (19.84 proj) is 26.5%
+            // below the 27-point reference the old 380 was built
+            // around, and the real #1 WR similarly 10.8% below — so
+            // even the single best available player at those positions
+            // was pricing well under the intended ceiling, leaving
+            // extra cap room and letting stronger-than-intended rosters
+            // get built. RB/TE/DEF's real #1 players were already
+            // close to their reference points, so those only needed
+            // minor tuning.
+            QB:  475,  // was 380 — real #1 QB was landing ~$7,600 vs a $9,400 target ceiling
+            RB:  515,  // was 525 — real #1 RB was already close to target, minor tune only
+            WR:  575,  // was 505 — real #1 WR (19.63 proj) was landing $10,000 vs an $11,300 target ceiling, and lower-ranked WRs were underpriced relative to real value too
+            TE:  520,  // was 525 — real #1 TE was already almost exactly on target, minor tune only
+            DEF: 465   // was 500 — real #1 DEF was slightly above target, minor tune down
           };
           const SAL_MIN_DEFAULT = 4500; // raised from 3700 — see SALARY_METHODOLOGY.md "Floor recalibration" for why
           const SAL_MAX_DEFAULT = 11300;
@@ -225,18 +238,31 @@ jobs:
           let globalCurrentWeek = null;
           async function getGlobalCurrentWeek() {
             if (globalCurrentWeek) return globalCurrentWeek;
-            // Date-based preseason check runs first — same fix applied to
-            // auto-scoring.yml tonight, for the same reason: Tank01's own
-            // getNFLCurrentWeek only knows about regular-season weeks,
-            // and was being trusted unconditionally with no preseason
-            // awareness at all in this file.
+            // Date computed in real US Eastern time — identical fix just
+            // applied and directly verified in auto-scoring.yml tonight,
+            // for the identical reason: this file's own copy of the same
+            // formula was still doing raw UTC math, vulnerable to the
+            // same midnight-crossover bug (a run happening just after
+            // UTC midnight would compute one day, and one full week
+            // boundary, too far ahead while it was still the prior day
+            // in ET).
             const now = new Date();
-            const month = now.getUTCMonth() + 1;
-            const day = now.getUTCDate();
-            if (month === 8 || (month === 9 && day <= 8)) {
-              const aug1 = new Date(`${now.getUTCFullYear()}-08-01`);
-              const daysSinceAug1 = Math.floor((now - aug1) / (1000 * 60 * 60 * 24));
-              globalCurrentWeek = Math.min(4, Math.max(1, Math.floor(daysSinceAug1 / 7) + 1));
+            const etParts = new Intl.DateTimeFormat('en-CA', {
+              timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit'
+            }).format(now).split('-').map(Number);
+            const [etYear, etMonth, etDay] = etParts;
+            if (etMonth === 8 || (etMonth === 9 && etDay <= 8)) {
+              // Real, explicit calendar for this season's preseason
+              // weeks, not naive "days since Aug 1 divided by 7" math —
+              // confirmed tonight (auto-scoring.yml, kickoff-locks.yml)
+              // that the naive math drifts out of sync with the real
+              // game windows, since 7-day math doesn't actually line up
+              // evenly against these real dates.
+              const mmdd = etMonth * 100 + etDay;
+              if (mmdd <= 812)      globalCurrentWeek = 1; // through Aug 12 — HOF game, before Week 2 starts
+              else if (mmdd <= 819) globalCurrentWeek = 2; // Aug 13-19 — real games Aug 13-17
+              else if (mmdd <= 826) globalCurrentWeek = 3; // Aug 20-26 — real games Aug 20-23
+              else                  globalCurrentWeek = 4; // Aug 27 onward — real games Aug 27-30
               return globalCurrentWeek;
             }
             try {
@@ -325,9 +351,26 @@ jobs:
             const week = await getTargetWeek(leagueId);
             if (week > 18) { console.log(`  ${leagueId}: week ${week} is past the season — skipping`); return; }
 
+            // Local, scoped override — not the global SEASON constant,
+            // since that's also used for season-wide data (the player
+            // pool) that shouldn't be split the same way week-specific
+            // salary data needs to be. Fixes a real, confirmed collision:
+            // preseason week N and regular-season week N previously
+            // shared the exact same /salaries/${SEASON}/week${week} path.
+            //
+            // Checked against this specific league's own, real
+            // isPreseason setting — not a blanket date guess. A
+            // date-only check ("if it's August, assume preseason")
+            // would incorrectly treat every league as preseason during
+            // this window, including real, regular-season leagues whose
+            // week 1 salary generation genuinely happens before the
+            // season's actual kickoff — silently writing their real
+            // salaries to the wrong, preseason-only path.
+            const salarySeason = (settings && settings.isPreseason) ? SEASON + 'P' : SEASON;
+
             // Don't clobber a week the commissioner already locked manually.
             let existingMeta = null;
-            try { existingMeta = await firebaseGet(`/leagues/${leagueId}/salaries/${SEASON}/week${week}/meta.json`); } catch (e) {}
+            try { existingMeta = await firebaseGet(`/leagues/${leagueId}/salaries/${salarySeason}/week${week}/meta.json`); } catch (e) {}
             if (existingMeta && existingMeta.locked) {
               console.log(`  ${leagueId}: week ${week} salaries are locked — skipping`);
               return;
@@ -350,16 +393,25 @@ jobs:
               // flat pricing just because a later regeneration attempt
               // happened to fail — only use flat as a first-time safety
               // net when there's genuinely nothing better in place yet.
+              //
+              // During preseason specifically, flat pricing isn't a
+              // fallback failure at all — it's the expected, unavoidable
+              // outcome. Confirmed directly with Tank01: they do not
+              // provide fantasy projections for preseason games, period.
+              // There's no real projection data to differentiate pricing
+              // with during this window, regardless of how reliably this
+              // workflow itself runs. This should stop being the case
+              // automatically once real regular-season projections exist.
               if (existingMeta && existingMeta.count > 0 && !existingMeta.flat) {
                 console.log(`  ${leagueId}: no usable projections for week ${week} — but real salaries already exist, leaving them in place (not downgrading to flat)`);
                 return;
               }
-              console.log(`  ${leagueId}: no usable projections for week ${week} — using flat fallback`);
+              console.log(`  ${leagueId}: no usable projections for week ${week} (expected during preseason — Tank01 doesn't provide preseason projections) — using flat fallback`);
               result = buildFlatSalaries(poolPlayers);
               usedFlat = true;
             }
 
-            await firebasePut(`/leagues/${leagueId}/salaries/${SEASON}/week${week}.json`, {
+            await firebasePut(`/leagues/${leagueId}/salaries/${salarySeason}/week${week}.json`, {
               players: result.salaries,
               meta: { week, count: result.count, generated: Date.now(), locked: false, cap, automated: true, flat: usedFlat }
             });
@@ -437,25 +489,22 @@ jobs:
             const leagues = await getActiveLeagues();
             console.log(`Active leagues: ${leagues.map(l => l.id).join(', ')}`);
 
-            // Same safeguard added to auto-scoring.yml tonight, for the
-            // same root cause: a league should only get salaries/scoring
-            // for the kind of season actually happening right now.
-            // Without this, a non-preseason league could get salaries
-            // generated (and, via auto-scoring.yml, scored) against
-            // preseason games — exactly what happened to fr_refresh26
-            // tonight, before this fix existed.
-            const nowForWindow = new Date();
-            const windowMonth = nowForWindow.getUTCMonth() + 1;
-            const windowDay = nowForWindow.getUTCDate();
-            const currentlyPreseasonWindow = windowMonth === 8 || (windowMonth === 9 && windowDay <= 8);
-
+            // The date-based "only run during the matching season-type
+            // window" gate that used to live here has been removed. Its
+            // intent (don't generate salaries for the wrong season
+            // type) is now already, correctly handled inside
+            // generateSalariesForLeague() itself, which routes each
+            // league to its own real path based on that league's actual
+            // isPreseason setting — not a calendar-date guess. The old
+            // gate was actively harmful: a real, regular-season
+            // league's own isPreseason (false) never matches "is today
+            // within the preseason calendar window" (true, throughout
+            // August/early September) — so the real league was being
+            // skipped entirely during exactly the window it needs its
+            // real week-1 salaries generated, before the season's
+            // actual kickoff.
             for (const { id, settings } of leagues) {
               try {
-                const leagueIsPreseason = !!(settings && settings.isPreseason);
-                if (leagueIsPreseason !== currentlyPreseasonWindow) {
-                  console.log(`  ⏭️  Skipping ${id} — league is ${leagueIsPreseason ? 'preseason' : 'regular season'}, but it's currently ${currentlyPreseasonWindow ? 'preseason' : 'regular season'} window.`);
-                  continue;
-                }
                 await generateSalariesForLeague(id, settings, pool);
               } catch (e) {
                 console.error(`✗ ${id} failed:`, e.message);
