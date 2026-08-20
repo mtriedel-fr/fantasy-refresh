@@ -590,6 +590,7 @@ document.addEventListener('DOMContentLoaded', function(){
     fixMainHeightForScaledDisplays();
     window.addEventListener('resize', fixMainHeightForScaledDisplays);
     showWelcomeTourIfNeeded(WELCOME_TOUR_KEY, WELCOME_TOUR_TITLE, WELCOME_TOUR_ITEMS);
+    if(isDraftLocked()) showDraftLockPopup();
   }
 
   // Build SLOT_DEFS from the league's actual roster config before anything
@@ -601,6 +602,16 @@ document.addEventListener('DOMContentLoaded', function(){
     FR.fb.get('/leagues/' + leagueId0 + '/settings').then(function(settings){
       if(settings && settings.rosterConfig){
         SLOT_DEFS = buildSlotDefsFromConfig(settings.rosterConfig);
+      }
+      // Real teams can browse and see prices before drafting actually
+      // opens — genuinely locking submissions is handled server-side
+      // (see database.rules.json), this is just what shows the popup
+      // and blocks the UI action so people aren't surprised by a
+      // rejected write. Leagues that never have this setting (like the
+      // preseason test league) are completely unaffected — it stays
+      // null, and every check below treats that as "not locked."
+      if(settings && typeof settings.draftLockedUntil === 'number'){
+        DRAFT_LOCKED_UNTIL = settings.draftLockedUntil;
       }
     }).catch(function(){}).then(startBoot);
   } else {
@@ -818,6 +829,29 @@ function filterPlayersToSchedule(){
 
 
 var WORKER      = 'https://fantasy-refresh-news.mtriedel.workers.dev';
+// Real, per-league setting — null for any league that doesn't have it
+// (like the preseason test league), so every check below naturally,
+// automatically treats those leagues as never locked.
+var DRAFT_LOCKED_UNTIL = null;
+
+function isDraftLocked(){
+  return typeof DRAFT_LOCKED_UNTIL === 'number' && Date.now() < DRAFT_LOCKED_UNTIL;
+}
+
+function showDraftLockPopup(){
+  var msRemaining = DRAFT_LOCKED_UNTIL - Date.now();
+  var daysRemaining = Math.max(0, Math.ceil(msRemaining / (24*60*60*1000)));
+  var dayWord = daysRemaining === 1 ? 'day' : 'days';
+  var html = '<div id="draft-lock-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;">'
+    + '<div style="background:var(--bg2);border-radius:16px;max-width:380px;width:100%;padding:28px 24px;text-align:center;">'
+    + '<div style="font-size:36px;margin-bottom:8px;">🔒</div>'
+    + '<div style="font-family:var(--fd);font-size:19px;font-weight:900;color:var(--ink);">Drafting opens in ' + daysRemaining + ' ' + dayWord + '</div>'
+    + '<div style="font-family:var(--fd);font-size:13px;color:var(--ink3);margin-top:8px;line-height:1.5;">Player prices are still settling as real projections come in — drafting opens 1 day before the season kicks off. Feel free to look around and see where prices land.</div>'
+    + '<button onclick="document.getElementById(\'draft-lock-overlay\').remove()" style="width:100%;margin-top:20px;padding:12px;border-radius:10px;border:none;background:var(--pk);color:#fff;font-family:var(--fd);font-size:14px;font-weight:800;cursor:pointer;">Got it, just browsing</button>'
+    + '</div>'
+    + '</div>';
+  document.body.insertAdjacentHTML('beforeend', html);
+}
 var gameOdds    = {};
 // teamLocks declared once, near loadLocks() below, where it belongs —
 // removed the redundant, earlier duplicate that used to live here.
@@ -1578,6 +1612,7 @@ function friendlySlotLabel(slot){
 }
 
 function selectSlot(slotId){
+  if(isDraftLocked()){ showToast('🔒 Drafting isn\'t open yet — check back closer to kickoff.', true); return; }
   activeSlot = slotId;
   activeFlexPosFilter = 'all'; // reset whenever a different slot is tapped
   var slot  = SLOT_DEFS.find(function(s){ return s.id === slotId; });
@@ -2063,6 +2098,7 @@ function updateSubmitBtn(){
 
 // ── SUBMIT ─────────────────────────────────────────────────────
 function submitLineup(){
+  if(isDraftLocked()){ showToast('🔒 Drafting isn\'t open yet — check back closer to kickoff.', true); return; }
   if(!currentUser){ showToast('Sign in first',true); return; }
   if(Object.values(lineup).filter(Boolean).length===0){ showToast('Add at least one player first',true); return; }
   if(getSpent()>CAP){ showToast('Over cap',true); return; }
