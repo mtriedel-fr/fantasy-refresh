@@ -2182,7 +2182,7 @@ function updateMyTeamLabel(filledCount, totalCount, targetWeek){
   // actually DOES in agreement. A past, already-final week isn't
   // editable, so "Edit Lineup" would be misleading once clicking it
   // opens that week's recap instead of an editor.
-  var myEntry = myTeam ? (seasonData[String(currentWeek)] || []).find(function(e){ return teamMatch(e.team, myTeam); }) : null;
+  var myEntry = myTeam ? (seasonData[String(currentWeek)] || []).find(function(e){ return teamMatch(e.name, myTeam); }) : null;
   var isPastFinal = myEntry && (myEntry.status === 'final' || myEntry.locked);
   var text = isPastFinal ? '📰 Week ' + currentWeek + ' Review'
     : filledCount === 0 ? '📝 Draft Team' + wk
@@ -2505,22 +2505,22 @@ function boot(){
   renderAll();
   checkCommParam();
 
-  // 24 hours after a week has genuinely gone fully final, the default
-  // view advances to the next week — not the instant the last game
-  // ends, so there's real time to see how the week went before getting
-  // pushed toward drafting the next one. The just-finished week stays
-  // fully reviewable by hand via the week dropdown regardless; this only
-  // changes what shows by DEFAULT on a fresh page load. Runs after the
-  // initial render (using the naive "highest week with data" value) so
-  // the page shows something immediately, then corrects and re-renders
-  // only if the 24-hour condition is actually met.
-  if(currentWeek > 0){
+  // Once a week is genuinely, fully finalized, the default view
+  // advances to the next week immediately — not after a 24-hour delay
+  // like before. Teams need to see their blank roster for the upcoming
+  // week right away so they can draft; reviewing a just-finished week
+  // is still fully available by hand via the week dropdown, it's just
+  // no longer what shows by DEFAULT. Runs after the initial render
+  // (using the naive "highest week with data" value) so the page shows
+  // something immediately, then corrects and re-renders only if the
+  // week is actually confirmed final.
+  if(currentWeek > 0 && currentWeek < WEEKS){
     var ctx = FRAuth.getLeagueCtx();
     var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
     var season = FR.seasonKey();
     FR.fb.get('/leagues/' + leagueId + '/season/' + season + '/' + currentWeek + '/finalizedAt')
       .then(function(finalizedAt){
-        if(typeof finalizedAt === 'number' && (Date.now() - finalizedAt) > 24 * 60 * 60 * 1000){
+        if(typeof finalizedAt === 'number'){
           currentWeek = currentWeek + 1;
           renderAll();
           // Same fix as setWeekFromSelect() — renderAll() alone doesn't
@@ -2723,7 +2723,7 @@ function getMyH2HMatchup(week){
 function getTeamScore(week, teamName){
   if(!teamName || teamName === 'BYE') return null;
   var weekData = seasonData[String(week)] || [];
-  var entry = weekData.find(function(e){ return teamMatch(e.team, teamName); });
+  var entry = weekData.find(function(e){ return teamMatch(e.name, teamName); });
   return entry ? entry.score : null;
 }
 
@@ -3075,14 +3075,7 @@ var fullStandingsCache = {}; // week -> full merged list (every real member, not
 
 function computeCumStandings(){
   var entries = seasonData[String(currentWeek)] || [];
-  // Raw seasonData entries carry .team, not .name — normalized here to
-  // also expose .name (without losing any other field) since this
-  // array gets mixed together, below, with "not submitted" placeholder
-  // objects that correctly use .name themselves. Downstream display
-  // code expects .name consistently across the whole array; without
-  // this, real scored teams showed a blank name while unsubmitted
-  // teams correctly showed theirs.
-  var scored = entries.map(function(e){ return Object.assign({}, e, {name: e.team}); }).sort(function(a,b){ return b.score - a.score; });
+  var scored = entries.slice().sort(function(a,b){ return b.score - a.score; });
 
   var weekKey = String(currentWeek);
   if(fullStandingsCache[weekKey]) return fullStandingsCache[weekKey];
@@ -3354,9 +3347,9 @@ function renderAll(){
   var totals = {};
   weeks.forEach(function(w){
     seasonData[w].forEach(function(entry){
-      if(!totals[entry.team]) totals[entry.team] = {total:0, cnt:0};
-      totals[entry.team].total += entry.score;
-      totals[entry.team].cnt++;
+      if(!totals[entry.name]) totals[entry.name] = {total:0, cnt:0};
+      totals[entry.name].total += entry.score;
+      totals[entry.name].cnt++;
     });
   });
 
@@ -3371,7 +3364,7 @@ function renderAll(){
   var prevTotals = {};
   prevWeeks.forEach(function(w){
     seasonData[w].forEach(function(entry){
-      prevTotals[entry.team] = (prevTotals[entry.team] || 0) + entry.score;
+      prevTotals[entry.name] = (prevTotals[entry.name] || 0) + entry.score;
     });
   });
   var prevSorted = Object.keys(prevTotals).sort(function(a,b){ return prevTotals[b] - prevTotals[a]; });
@@ -3381,7 +3374,7 @@ function renderAll(){
   // Current week
   var curEntries = seasonData[curKey] || [];
   var curMap = {};
-  curEntries.forEach(function(e){ curMap[e.team] = e; });
+  curEntries.forEach(function(e){ curMap[e.name] = e; });
   var curScores = curEntries.map(function(e){ return e.score; });
   var maxWk = curScores.length ? Math.max.apply(null, curScores) : 0;
   var wkHighName = curEntries.length ? curEntries.reduce(function(a,b){ return b.score > a.score ? b : a; }).name : null;
@@ -3397,8 +3390,8 @@ function renderAll(){
   var sortedEntries = curEntries.slice().sort(function(a,b){ return b.score - a.score; });
 
   // Your score this week
-  var myEntry = myTeam ? curEntries.find(function(e){ return teamMatch(e.team, myTeam); }) : null;
-  var myWkRank = myEntry ? sortedEntries.findIndex(function(e){ return e.team === myEntry.team; }) + 1 : null;
+  var myEntry = myTeam ? curEntries.find(function(e){ return teamMatch(e.name, myTeam); }) : null;
+  var myWkRank = myEntry ? sortedEntries.findIndex(function(e){ return e.name === myEntry.name; }) + 1 : null;
 
   // Your season movement (rank this week vs last week)
   var mySeasonRankNow = myTeam ? sorted.findIndex(function(t){ return teamMatch(t.name, myTeam); }) + 1 : null;
@@ -3614,8 +3607,8 @@ function renderGuillotine(){
       return t.status === 'alive' || t.eliminatedWeek >= w;
     });
     var entries = inAtStart.map(function(team){
-      var found = wkData.find(function(e){ return teamMatch(e.team, team); });
-      return found ? {name: found.team, score: found.score} : {name: team, score: 0, noShow: true};
+      var found = wkData.find(function(e){ return teamMatch(e.name, team); });
+      return found ? {name: found.name, score: found.score} : {name: team, score: 0, noShow: true};
     });
 
     if(isFinale){
@@ -3649,7 +3642,7 @@ function renderGuillotine(){
   currentSurvivors.forEach(function(name){
     var total = 0;
     weeks.forEach(function(w){
-      var e = (seasonData[String(w)]||[]).find(function(e){ return teamMatch(e.team, name); });
+      var e = (seasonData[String(w)]||[]).find(function(e){ return teamMatch(e.name, name); });
       if(e) total += e.score;
     });
     survivorTotals[name] = total;
@@ -3832,12 +3825,12 @@ function renderSeasonWrap(){
     var entries = seasonData[String(w)] || [];
     var wkSorted = entries.slice().sort(function(a,b){ return b.score-a.score; });
     if(wkSorted.length){
-      weeklyHighs.push({week:w, name:wkSorted[0].team, score:wkSorted[0].score});
-      if(wkSorted.length > 1) weeklyHighs.push({week:w, name:wkSorted[1].team, score:wkSorted[1].score, second:true});
+      weeklyHighs.push({week:w, name:wkSorted[0].name, score:wkSorted[0].score});
+      if(wkSorted.length > 1) weeklyHighs.push({week:w, name:wkSorted[1].name, score:wkSorted[1].score, second:true});
     }
     entries.forEach(function(e){
-      teamTotals[e.team] = (teamTotals[e.team]||0) + e.score;
-      allScores.push({week:w, name:e.team, score:e.score});
+      teamTotals[e.name] = (teamTotals[e.name]||0) + e.score;
+      allScores.push({week:w, name:e.name, score:e.score});
     });
   });
 
@@ -3872,7 +3865,7 @@ function renderSeasonWrap(){
   weeks.forEach(function(w){
     var entries = seasonData[String(w)]||[];
     var avg = entries.reduce(function(s,e){ return s+e.score; },0)/(entries.length||1);
-    entries.forEach(function(e){ if(e.score >= avg) aboveAvgCounts[e.team] = (aboveAvgCounts[e.team]||0)+1; });
+    entries.forEach(function(e){ if(e.score >= avg) aboveAvgCounts[e.name] = (aboveAvgCounts[e.name]||0)+1; });
   });
   var mostConsistent = Object.keys(aboveAvgCounts).sort(function(a,b){ return aboveAvgCounts[b]-aboveAvgCounts[a]; })[0];
 
@@ -3882,10 +3875,10 @@ function renderSeasonWrap(){
     if(wi === 0) return;
     var prev = weeks[wi-1];
     (seasonData[String(w)]||[]).forEach(function(e){
-      var prevEntry = (seasonData[String(prev)]||[]).find(function(p){ return p.team===e.team; });
+      var prevEntry = (seasonData[String(prev)]||[]).find(function(p){ return p.name===e.name; });
       if(prevEntry){
         var diff = e.score - prevEntry.score;
-        if(diff > biggestJumpAmt){ biggestJumpAmt = diff; biggestJump = {name:e.team, week:w, diff:diff}; }
+        if(diff > biggestJumpAmt){ biggestJumpAmt = diff; biggestJump = {name:e.name, week:w, diff:diff}; }
       }
     });
   });
@@ -3931,8 +3924,8 @@ function renderSeasonWrap(){
   var teamBestWeek = {};
   weeks.forEach(function(w){
     (seasonData[String(w)]||[]).forEach(function(e){
-      if(!teamBestWeek[e.team] || e.score > teamBestWeek[e.team].score){
-        teamBestWeek[e.team] = {week:w, score:e.score};
+      if(!teamBestWeek[e.name] || e.score > teamBestWeek[e.name].score){
+        teamBestWeek[e.name] = {week:w, score:e.score};
       }
     });
   });
@@ -3949,7 +3942,7 @@ function renderSeasonWrap(){
   function applyPlayoffRound(teams, wkEntries){
     if(!wkEntries || !wkEntries.length) return {advanced: teams, eliminated: [], scores: {}};
     var scored = teams.map(function(name){
-      var e = wkEntries.find(function(e){ return teamMatch(e.team, name); });
+      var e = wkEntries.find(function(e){ return teamMatch(e.name, name); });
       return {name: name, score: e ? e.score : 0};
     }).sort(function(a,b){ return b.score - a.score; });
     var cutoff = Math.ceil(scored.length / 2);
@@ -3978,13 +3971,13 @@ function renderSeasonWrap(){
     });
     // Week 17 eliminated ranked by wk17 score after week 18 participants
     var r2elim = r2.eliminated.map(function(name){
-      var e = wk17.find(function(e){ return teamMatch(e.team, name); });
+      var e = wk17.find(function(e){ return teamMatch(e.name, name); });
       return {name: name, playoffRank: r3.scores.length + r2.eliminated.indexOf(name) + 1, finalScore: e ? e.score : 0, rounds: 2};
     }).sort(function(a,b){ return b.finalScore - a.finalScore; });
     r2elim.forEach(function(e, i){ e.playoffRank = r3.scores.length + i + 1; ranked.push(e); });
     // Week 16 eliminated
     var r1elim = r1.eliminated.map(function(name){
-      var e = wk16.find(function(e){ return teamMatch(e.team, name); });
+      var e = wk16.find(function(e){ return teamMatch(e.name, name); });
       return {name: name, finalScore: e ? e.score : 0, rounds: 1};
     }).sort(function(a,b){ return b.finalScore - a.finalScore; });
     r1elim.forEach(function(e, i){ e.playoffRank = r3.scores.length + r2elim.length + i + 1; ranked.push(e); });
@@ -4007,7 +4000,7 @@ function renderSeasonWrap(){
     if(!r) return '—';
     var wk = r.rounds === 3 ? 18 : r.rounds === 2 ? 17 : r.rounds === 1 ? 16 : null;
     if(!wk) return fmtTotal(teamTotals[name]);
-    var e = (seasonData[String(wk)]||[]).find(function(e){ return teamMatch(e.team, name); });
+    var e = (seasonData[String(wk)]||[]).find(function(e){ return teamMatch(e.name, name); });
     return e ? fmtScore(e.score) : fmtTotal(teamTotals[name]);
   }
 
@@ -4323,7 +4316,7 @@ function getCumulativeTotals(upToWeek){
   Object.keys(seasonData).forEach(function(w){
     if(Number(w) > upToWeek) return;
     (seasonData[w] || []).forEach(function(e){
-      totals[e.team] = (totals[e.team] || 0) + e.score;
+      totals[e.name] = (totals[e.name] || 0) + e.score;
     });
   });
   return totals;
@@ -4342,7 +4335,7 @@ function splitTiers(sorted){
 
 function getWeeklyScores(week){
   var map = {};
-  (seasonData[String(week)] || []).forEach(function(e){ map[e.team] = e.score; });
+  (seasonData[String(week)] || []).forEach(function(e){ map[e.name] = e.score; });
   return map;
 }
 
@@ -4996,7 +4989,7 @@ function getTopPlayers(name, limit){
     });
   }
   relevantWeeks.forEach(function(w){
-    var entry = (seasonData[w]||[]).find(function(e){ return teamMatch(e.team, name); });
+    var entry = (seasonData[w]||[]).find(function(e){ return teamMatch(e.name, name); });
     if(!entry) return;
     var wkLineups = weekLineupsCache[String(w)];
     var lineup = wkLineups && wkLineups[entry.uid];
@@ -5363,7 +5356,7 @@ function renderCompare(){
   // Build per-team stats
   var teamStats = compareTeams.map(function(name, ti){
     var weeklyData = weeks.map(function(w){
-      var e = (seasonData[String(w)]||[]).find(function(e){ return teamMatch(e.team, name); });
+      var e = (seasonData[String(w)]||[]).find(function(e){ return teamMatch(e.name, name); });
       return e ? {score: e.score, uid: e.uid} : null;
     });
     var scores = weeklyData.filter(Boolean).map(function(d){ return d.score; });
@@ -5372,15 +5365,15 @@ function renderCompare(){
     var best = scores.length ? Math.max.apply(null,scores) : 0;
     var worst = scores.length ? Math.min.apply(null,scores) : 0;
     var allTotals = {};
-    weeks.forEach(function(w){ (seasonData[String(w)]||[]).forEach(function(e){ allTotals[e.team]=(allTotals[e.team]||0)+e.score; }); });
+    weeks.forEach(function(w){ (seasonData[String(w)]||[]).forEach(function(e){ allTotals[e.name]=(allTotals[e.name]||0)+e.score; }); });
     var sznRank = Object.keys(allTotals).sort(function(a,b){ return allTotals[b]-allTotals[a]; }).indexOf(name)+1;
     var h2h = {};
     compareTeams.forEach(function(other){
       if(other === name) return;
       var w2=0, t2=0;
       weeks.forEach(function(w){
-        var me = (seasonData[String(w)]||[]).find(function(e){ return teamMatch(e.team, name); });
-        var opp = (seasonData[String(w)]||[]).find(function(e){ return teamMatch(e.team, other); });
+        var me = (seasonData[String(w)]||[]).find(function(e){ return teamMatch(e.name, name); });
+        var opp = (seasonData[String(w)]||[]).find(function(e){ return teamMatch(e.name, other); });
         if(me && opp){ t2++; if(me.score > opp.score) w2++; }
       });
       h2h[other] = {wins:w2, total:t2};
@@ -5488,7 +5481,7 @@ function setCmpWeek(val){
   }).map(Number).sort(function(a,b){ return a-b; });
   var teamStats = compareTeams.map(function(name, ti){
     var weeklyData = weeks.map(function(w){
-      var e = (seasonData[String(w)]||[]).find(function(e){ return teamMatch(e.team, name); });
+      var e = (seasonData[String(w)]||[]).find(function(e){ return teamMatch(e.name, name); });
       return e ? {score:e.score, uid:e.uid} : null;
     });
     return {name:name, color:COLORS[ti], weeklyData:weeklyData};
@@ -5660,7 +5653,7 @@ function buildCompareRankChart(teamStats, weeks){
 
   var allNames = Object.keys((function(){
     var t={};
-    weeks.forEach(function(w){ (seasonData[String(w)]||[]).forEach(function(e){ t[e.team]=1; }); });
+    weeks.forEach(function(w){ (seasonData[String(w)]||[]).forEach(function(e){ t[e.name]=1; }); });
     return t;
   })());
 
@@ -5687,7 +5680,7 @@ function buildCompareRankChart(teamStats, weeks){
   var lines = teamStats.map(function(t){
     var cumTotals = {};
     var points = weeks.map(function(w,wi){
-      (seasonData[String(w)]||[]).forEach(function(e){ cumTotals[e.team]=(cumTotals[e.team]||0)+e.score; });
+      (seasonData[String(w)]||[]).forEach(function(e){ cumTotals[e.name]=(cumTotals[e.name]||0)+e.score; });
       var sorted = Object.keys(cumTotals).sort(function(a,b){ return cumTotals[b]-cumTotals[a]; });
       var rank = sorted.indexOf(t.name)+1;
       return rank > 0 ? rank : null;
@@ -5890,7 +5883,7 @@ function resetAll(){
 function getAllTeams(){
   var seen = {};
   Object.keys(seasonData).forEach(function(w){
-    (seasonData[w]||[]).forEach(function(e){ seen[e.team] = true; });
+    (seasonData[w]||[]).forEach(function(e){ seen[e.name] = true; });
   });
   return Object.keys(seen).sort();
 }
@@ -5899,7 +5892,7 @@ function getTeamRank(name){
   var totals = {};
   Object.keys(seasonData).forEach(function(w){
     (seasonData[w]||[]).forEach(function(e){
-      totals[e.team] = (totals[e.team]||0) + e.score;
+      totals[e.name] = (totals[e.name]||0) + e.score;
     });
   });
   var sorted = Object.keys(totals).sort(function(a,b){ return totals[b]-totals[a]; });
@@ -5944,16 +5937,16 @@ function getPlayerWeekData(name){
   }).map(Number).sort(function(a,b){ return a-b; });
 
   return weeks.map(function(w){
-    var entry = (seasonData[String(w)]||[]).find(function(e){ return teamMatch(e.team, name); });
+    var entry = (seasonData[String(w)]||[]).find(function(e){ return teamMatch(e.name, name); });
     if(!entry) return null;
     var wkData = seasonData[String(w)] || [];
     var avg = wkData.reduce(function(s,e){ return s+e.score; },0) / (wkData.length||1);
     var sorted = wkData.slice().sort(function(a,b){ return b.score-a.score; });
-    var rank = sorted.findIndex(function(e){ return teamMatch(e.team, name); }) + 1;
+    var rank = sorted.findIndex(function(e){ return teamMatch(e.name, name); }) + 1;
     // Cumulative standing up to this week
     var cumTotals = {};
     weeks.filter(function(ww){ return ww <= w; }).forEach(function(ww){
-      (seasonData[String(ww)]||[]).forEach(function(e){ cumTotals[e.team] = (cumTotals[e.team]||0) + e.score; });
+      (seasonData[String(ww)]||[]).forEach(function(e){ cumTotals[e.name] = (cumTotals[e.name]||0) + e.score; });
     });
     var cumSorted = Object.keys(cumTotals).sort(function(a,b){ return cumTotals[b]-cumTotals[a]; });
     var cumStanding = cumSorted.indexOf(name) + 1;
@@ -6020,16 +6013,16 @@ function buildDotPlot(curEntries, myEntry){
 
   // All other team dots
   var otherDots = curEntries
-    .filter(function(e){ return e.team !== myEntry.team; })
+    .filter(function(e){ return e.name !== myEntry.name; })
     .map(function(e){
-      return '<div class="dotplot-others" style="left:' + pct(e.score) + '%" title="' + escapeHtmlFR(e.team) + ': ' + fmtScore(e.score) + '"></div>';
+      return '<div class="dotplot-others" style="left:' + pct(e.score) + '%" title="' + escapeHtmlFR(e.name) + ': ' + fmtScore(e.score) + '"></div>';
     }).join('');
 
   var myPct = pct(myEntry.score);
   var avgPct = pct(avg);
 
   var byScore = curEntries.slice().sort(function(a,b){ return b.score - a.score; });
-  var wkRank = byScore.findIndex(function(e){ return e.team === myEntry.team; }) + 1;
+  var wkRank = byScore.findIndex(function(e){ return e.name === myEntry.name; }) + 1;
 
   return '<div class="dotplot-wrap">'
     + '<div class="dotplot-title">Where you finished this week — #' + wkRank + ' of ' + curEntries.length + '</div>'
@@ -6079,7 +6072,7 @@ function renderMySeasonInline(){
   }).map(Number).sort(function(a,b){ return a-b; });
   var allTotals = {};
   weeks.forEach(function(w){
-    (seasonData[String(w)]||[]).forEach(function(e){ allTotals[e.team] = (allTotals[e.team]||0) + e.score; });
+    (seasonData[String(w)]||[]).forEach(function(e){ allTotals[e.name] = (allTotals[e.name]||0) + e.score; });
   });
   var sznRank = Object.keys(allTotals).sort(function(a,b){ return allTotals[b]-allTotals[a]; }).indexOf(resolvedName) + 1;
 
@@ -6162,12 +6155,12 @@ function renderMyTeam(sorted, curEntries, prevRank, curMap){
     return;
   }
 
-  // Case-insensitive lookup — real entries carry .team, not .name.
-  // sorted's own entries are a separate, locally-built object that uses
-  // .name as its own field (correctly sourced from the real team name)
-  // — a different, legitimate convention from curEntries below, not the
-  // same bug.
-  var entry = curEntries.find(function(e){ return teamMatch(e.team, myTeam); });
+  // Case-insensitive lookup — normalized seasonData entries carry
+  // .name (not .team; normalizeSeasonData() renames it during
+  // normalization). sorted's own entries also use .name as their own,
+  // separately-and-correctly-sourced field — same convention here, not
+  // a different one.
+  var entry = curEntries.find(function(e){ return teamMatch(e.name, myTeam); });
   var rank = sorted.findIndex(function(t){ return teamMatch(t.name, myTeam); });
   var currRank = rank >= 0 ? rank + 1 : null;
   var prev = currRank ? (prevRank[sorted[rank].name] || null) : null;
@@ -6226,7 +6219,7 @@ function renderMyTeam(sorted, curEntries, prevRank, curMap){
   el.innerHTML = '<div class="myteam-wrap">'
     + '<div class="myteam-card">'
     + '<div class="myteam-hero">'
-    + '<div><div class="myteam-name">' + escapeHtmlFR(entry.team) + '</div>'
+    + '<div><div class="myteam-name">' + escapeHtmlFR(entry.name) + '</div>'
     + '<div style="font-family:var(--fd);font-size:11px;color:#1A5A5A;text-transform:uppercase;letter-spacing:1px;margin-top:4px;">Week ' + currentWeek + ' · Your dashboard</div></div>'
     + '<div style="text-align:right"><div class="myteam-score">' + fmtScore(entry.score) + '</div><div class="myteam-score-lbl">Points</div><button class="share-btn" onclick="openShareCard()" style="margin-top:8px;">📤 Share</button></div>'
     + '</div>'
@@ -6275,17 +6268,14 @@ function renderFinish(sorted, curEntries, prevRank){
 
   var rows = byScore.map(function(e, i){
     var wkRank = i + 1;
-    // Find season rank — e is a raw curEntries entry (.team), sorted's
-    // own entries are a separate, locally-built object (.name) — two
-    // different, legitimate conventions, not the same field.
-    var sznRank = sorted.findIndex(function(t){ return t.name === e.team; }) + 1;
-    var prev = prevRank[e.team];
+    var sznRank = sorted.findIndex(function(t){ return t.name === e.name; }) + 1;
+    var prev = prevRank[e.name];
     var move = (sznRank && prev) ? prev - sznRank : null;
     var moveStr = move === null ? '—' : move > 0 ? '<span style="color:var(--grn)">+' + move + '</span>' : move < 0 ? '<span style="color:var(--red)">' + move + '</span>' : '—';
-    var isMe = myTeam && e.team.toLowerCase() === myTeam.toLowerCase();
+    var isMe = myTeam && e.name.toLowerCase() === myTeam.toLowerCase();
     var pct = Math.round(e.score / maxScore * 100);
-    var reactId = 'react_' + e.team.replace(/[^a-z0-9]/gi,'_').toLowerCase() + '_' + currentWeek;
-    var nameLink = '<a class="t-name-link" href="player.html?team=' + encodeURIComponent(e.team) + '">' + e.team + (isMe ? '<span class="my-team-badge">You</span>' : '') + '</a>';
+    var reactId = 'react_' + e.name.replace(/[^a-z0-9]/gi,'_').toLowerCase() + '_' + currentWeek;
+    var nameLink = '<a class="t-name-link" href="player.html?team=' + encodeURIComponent(e.name) + '">' + e.name + (isMe ? '<span class="my-team-badge">You</span>' : '') + '</a>';
     return '<tr' + (isMe ? ' class="is-me"' : '') + '>'
       + '<td class="finish-rank' + (wkRank <= 3 ? ' top' : '') + '">' + (wkRank <= 3 ? med[wkRank-1] : wkRank) + '</td>'
       + '<td class="finish-name">' + nameLink + '</td>'
@@ -6305,8 +6295,8 @@ function renderFinish(sorted, curEntries, prevRank){
     + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
   // Load reactions
   byScore.forEach(function(e){
-    var reactId = 'react_' + e.team.replace(/[^a-z0-9]/gi,'_').toLowerCase() + '_' + currentWeek;
-    renderReactions(reactId, e.team, currentWeek);
+    var reactId = 'react_' + e.name.replace(/[^a-z0-9]/gi,'_').toLowerCase() + '_' + currentWeek;
+    renderReactions(reactId, e.name, currentWeek);
   });
 }
 
@@ -6668,7 +6658,7 @@ function getStreak(name){
   if(weeks.length < 3) return null;
   var recent = weeks.slice(0,3);
   var results = recent.map(function(w){
-    var entry = (seasonData[String(w)]||[]).find(function(e){ return teamMatch(e.team, name); });
+    var entry = (seasonData[String(w)]||[]).find(function(e){ return teamMatch(e.name, name); });
     if(!entry) return null;
     var avg = (seasonData[String(w)]||[]).reduce(function(s,e){ return s+e.score; },0) / (seasonData[String(w)]||[]).length;
     return entry.score >= avg ? 'hot' : 'cold';
@@ -6779,7 +6769,7 @@ function renderDistribution(data){
 
   var bars = groups.map(function(g, i){
     var h = Math.round((g.length/maxCount)*maxH);
-    var isMe = myTeam && g.some(function(e){ return e.team.toLowerCase() === myTeam.toLowerCase(); });
+    var isMe = myTeam && g.some(function(e){ return e.name.toLowerCase() === myTeam.toLowerCase(); });
     var label = (min + i*bucketSize).toFixed(0);
     return '<div class="dist-bar-wrap" title="' + g.length + ' teams · ' + label + '+ pts">'
       + '<div class="dist-bar' + (isMe?' is-me':'') + '" style="height:' + Math.max(4,h) + 'px"></div>'
@@ -6899,7 +6889,7 @@ function updateSeasonStats(){
   // Season leader
   var totals = {};
   weeks.forEach(function(w){
-    (seasonData[String(w)]||[]).forEach(function(e){ totals[e.team]=(totals[e.team]||0)+e.score; });
+    (seasonData[String(w)]||[]).forEach(function(e){ totals[e.name]=(totals[e.name]||0)+e.score; });
   });
   var sorted = Object.keys(totals).sort(function(a,b){ return totals[b]-totals[a]; });
   var leader = sorted[0];
@@ -6912,7 +6902,7 @@ function updateSeasonStats(){
   weeks.forEach(function(w){
     var entries = seasonData[String(w)]||[];
     var avg = entries.reduce(function(s,e){ return s+e.score; },0)/(entries.length||1);
-    entries.forEach(function(e){ if(e.score >= avg) aboveCounts[e.team]=(aboveCounts[e.team]||0)+1; });
+    entries.forEach(function(e){ if(e.score >= avg) aboveCounts[e.name]=(aboveCounts[e.name]||0)+1; });
   });
   var consistent = Object.keys(aboveCounts).sort(function(a,b){ return aboveCounts[b]-aboveCounts[a]; })[0];
   var el = function(id){ return document.getElementById(id); };
@@ -6943,25 +6933,23 @@ function openShareCard(){
   }).map(Number).sort(function(a,b){ return a-b; });
   if(!weeks.length){ showToast('No data yet', true); return; }
   var curEntries = seasonData[String(currentWeek)] || [];
-  // Real entries store .team, not .name — this was the actual, confirmed
-  // reason this feature has likely never worked at all: teamMatch()
-  // returns false immediately whenever either argument is falsy, and
-  // e.name was always undefined, so myEntry could never be found.
-  var myEntry = curEntries.find(function(e){ return teamMatch(e.team, myTeam); });
+  var myEntry = curEntries.find(function(e){ return teamMatch(e.name, myTeam); });
   if(!myEntry){ showToast('No data for your team this week', true); return; }
   var sorted = curEntries.slice().sort(function(a,b){ return b.score-a.score; });
-  var wkRank = sorted.findIndex(function(e){ return e.team === myEntry.team; }) + 1;
+  var wkRank = sorted.findIndex(function(e){ return e.name === myEntry.name; }) + 1;
   var totals = {};
-  weeks.forEach(function(w){ (seasonData[String(w)]||[]).forEach(function(e){ totals[e.team]=(totals[e.team]||0)+e.score; }); });
-  var sznRank = Object.keys(totals).sort(function(a,b){ return totals[b]-totals[a]; }).indexOf(myEntry.team) + 1;
+  weeks.forEach(function(w){ (seasonData[String(w)]||[]).forEach(function(e){ totals[e.name]=(totals[e.name]||0)+e.score; }); });
+  var sznRank = Object.keys(totals).sort(function(a,b){ return totals[b]-totals[a]; }).indexOf(myEntry.name) + 1;
   var medals = ['🥇','🥈','🥉'];
 
   document.getElementById('share-preview').innerHTML = '<div style="padding:30px;text-align:center;color:var(--ink3);font-family:var(--fd);font-size:13px;">Loading…</div>';
   document.getElementById('share-overlay').style.display = 'flex';
   document.getElementById('share-copy-confirm').textContent = '';
 
-  // Real lineup data lives separately from the score entry — same
-  // path/shape already used everywhere else in this file tonight.
+  // Real lineup data lives separately from the score entry — this
+  // fetch is genuinely, correctly keyed by .team on the lineup
+  // document itself (confirmed via real Firebase data), a completely
+  // different object from the seasonData score entry above.
   var ctx = FRAuth.getLeagueCtx();
   var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
   FR.fb.get('/leagues/' + leagueId + '/lineups/' + FR.seasonKey() + '/week' + currentWeek + '/' + myEntry.uid).then(function(lineupData){
@@ -6974,7 +6962,7 @@ function openShareCard(){
         roster.push({ label: lineupSlotStructuralLabel(slotId, p.pos), name: p.name, pts: pts });
       });
     }
-    shareCardData = {team:myEntry.team, score:myEntry.score, wkRank:wkRank, total:curEntries.length, sznRank:sznRank, week:currentWeek, roster:roster};
+    shareCardData = {team:myEntry.name, score:myEntry.score, wkRank:wkRank, total:curEntries.length, sznRank:sznRank, week:currentWeek, roster:roster};
 
     var rosterRows = roster.map(function(r){
       return '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid #0D3535;">'
@@ -6987,7 +6975,7 @@ function openShareCard(){
     document.getElementById('share-preview').innerHTML =
       '<div class="share-card-inner">'
       + '<div class="share-card-league">OG King/Queen of Fantasy \'26</div>'
-      + '<div class="share-card-name">'+escapeHtmlFR(myEntry.team)+'</div>'
+      + '<div class="share-card-name">'+escapeHtmlFR(myEntry.name)+'</div>'
       + '<div class="share-card-score">'+fmtScore(myEntry.score)+'</div>'
       + '<div class="share-card-pts">points · week '+currentWeek+'</div>'
       + '<div class="share-card-stats" style="margin-bottom:12px;">'
@@ -9671,7 +9659,7 @@ function goToDraft(){
   // is done. Only redirects when this specific team's own entry for the
   // currently-viewed week is genuinely final; a live or upcoming week
   // still goes to the draft page as normal.
-  var myEntry = myTeam ? (seasonData[String(currentWeek)] || []).find(function(e){ return teamMatch(e.team, myTeam); }) : null;
+  var myEntry = myTeam ? (seasonData[String(currentWeek)] || []).find(function(e){ return teamMatch(e.name, myTeam); }) : null;
   if(myEntry && (myEntry.status === 'final' || myEntry.locked)){
     openRecap(currentWeek);
     return;
