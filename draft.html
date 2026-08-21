@@ -97,6 +97,12 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
 /* ── PLAYER PICKER PANEL ── */
 .picker-panel{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--bg);min-height:0;}
 .picker-panel.collapsed{display:none !important;}
+/* Redundant with the roster panel's own cap bar, which is visible at
+   the same time on desktop (both panels sit side by side there) —
+   hidden by default, restored inside the mobile media query below,
+   where the picker becomes a full-screen overlay and this becomes the
+   only cap info on screen. */
+.picker-cap-bar{display:none;}
 .picker-header{padding:12px 20px;border-bottom:1px solid var(--bdr);background:var(--bg2);flex-shrink:0;display:flex;align-items:center;gap:12px;}
 .picker-slot-label{font-family:var(--fd);font-size:16px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;}
 .picker-game-filter{font-family:var(--fd);font-size:12px;color:var(--pk);background:rgba(255,95,160,.1);border:1px solid rgba(255,95,160,.3);padding:3px 10px;border-radius:12px;}
@@ -157,6 +163,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
   .picker-panel{display:none;position:fixed;inset:0;z-index:200;background:var(--bg);}
   .picker-panel.open{display:flex;flex-direction:column;}
   .picker-panel .picker-games-mobile{display:block;}
+  .picker-cap-bar{display:block;}
   .picker-list{flex:1;overflow-y:auto;}
   body{overflow-y:auto;}
 }
@@ -1036,6 +1043,17 @@ function buildGamesBar(games){
     if(seenPairs[key]) return false;
     seenPairs[key] = true;
     return true;
+  });
+  // Final games sink to the end of the bar — their players are already
+  // locked and done, so keeping them out of the easy-to-reach front
+  // position cuts down on accidental taps into a matchup that's no
+  // longer actionable. Everything else keeps its original relative
+  // order; only "is this one final or not" affects the sort.
+  games.sort(function(a, b){
+    var aFinal = ((a.home && liveGameStatus[a.home]) || (a.away && liveGameStatus[a.away]) || {}).liveStatusCode === 2;
+    var bFinal = ((b.home && liveGameStatus[b.home]) || (b.away && liveGameStatus[b.away]) || {}).liveStatusCode === 2;
+    if(aFinal === bFinal) return 0;
+    return aFinal ? 1 : -1;
   });
   var html = '<button class="game-chip all active" data-game="all" onclick="setGameFilter(null,this)">All Games</button>';
   games.forEach(function(g, i){
