@@ -1065,20 +1065,31 @@ function buildGamesBar(games){
     // to the normal day/time sub-line below for any game that hasn't
     // started yet, which is unaffected by any of this.
     var liveInfo = (g.home && liveGameStatus[g.home]) || (g.away && liveGameStatus[g.away]) || null;
+    var chipStyle = '';
+    var labelColor = '';
     if(liveInfo && liveInfo.liveStatusCode === 2){
       // myScore/oppScore already line up correctly with home/away in
       // the common case, since liveInfo is looked up via g.home first.
       var homeScore = (g.home && liveGameStatus[g.home]) ? liveGameStatus[g.home].myScore : liveInfo.oppScore;
       var awayScore = (g.home && liveGameStatus[g.home]) ? liveGameStatus[g.home].oppScore : liveInfo.myScore;
       var finalScoreLine = (typeof homeScore === 'number' && typeof awayScore === 'number') ? ' ' + awayScore + '-' + homeScore : '';
-      sub = '<div style="font-size:9px;margin-top:2px;font-weight:800;color:var(--ink3);">Final'+finalScoreLine+'</div>';
+      // Final — bold, filled pink chip. Dark text on top for contrast,
+      // matching the same treatment already used for colored badges
+      // elsewhere (a colored fill always pairs with a dark shade of the
+      // same color for its text, never plain light text).
+      chipStyle = 'background:#FF1A6E;';
+      labelColor = '#4B1528';
+      sub = '<div style="font-size:9px;margin-top:2px;font-weight:800;color:#4B1528;">Final'+finalScoreLine+'</div>';
     } else if(liveInfo && liveInfo.liveStatusCode === 1){
       var homeScoreL = (g.home && liveGameStatus[g.home]) ? liveGameStatus[g.home].myScore : liveInfo.oppScore;
       var awayScoreL = (g.home && liveGameStatus[g.home]) ? liveGameStatus[g.home].oppScore : liveInfo.myScore;
       var q = liveInfo.quarter ? 'Q'+liveInfo.quarter : 'Live';
       var clk = liveInfo.clock ? ' '+liveInfo.clock : '';
       var liveScoreLine = (typeof homeScoreL === 'number' && typeof awayScoreL === 'number') ? ' · ' + awayScoreL + '-' + homeScoreL : '';
-      sub = '<div style="font-size:9px;margin-top:2px;font-weight:800;color:#FF4D6D;">'+q+clk+liveScoreLine+'</div>';
+      // Live — bold, filled green chip, same treatment as final above.
+      chipStyle = 'background:#5DCAA5;';
+      labelColor = '#04342C';
+      sub = '<div style="font-size:9px;margin-top:2px;font-weight:800;color:#04342C;">'+q+clk+liveScoreLine+'</div>';
     } else if(g.time){
       var d        = new Date(g.time);
       var day      = d.getDay();
@@ -1112,7 +1123,8 @@ function buildGamesBar(games){
           + '</div>'
           + intlBadge + ouBadge + domeBadge;
     }
-    html += '<button class="game-chip" data-game="'+i+'" onclick="setGameFilter('+i+',this)" style="text-align:center;padding:5px 12px;">'+label+sub+'</button>';
+    var labelHtml = labelColor ? '<span style="color:'+labelColor+';">'+label+'</span>' : label;
+    html += '<button class="game-chip" data-game="'+i+'" onclick="setGameFilter('+i+',this)" style="text-align:center;padding:5px 12px;'+chipStyle+'">'+labelHtml+sub+'</button>';
   });
   bar.innerHTML = html;
   if(pickerBar) pickerBar.innerHTML = html;
