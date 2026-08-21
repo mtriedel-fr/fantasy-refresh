@@ -191,7 +191,8 @@ tr:hover td{background:var(--or4);}
 .lineup-card-mid{flex:1;min-width:0;}
 .lineup-card-name{font-family:var(--fd);font-size:17px;font-weight:700;color:var(--ink);display:flex;align-items:center;gap:6px;}
 .lineup-card-game{font-size:12.5px;color:var(--ink3);margin-top:2px;}
-.lineup-card-game.live{color:var(--or);font-weight:700;}
+.lineup-card-game.live{display:inline-block;background:#5DCAA5;color:#04342C;font-weight:800;padding:2px 8px;border-radius:20px;}
+.lineup-card-game.final{display:inline-block;background:#FF1A6E;color:#4B1528;font-weight:800;padding:2px 8px;border-radius:20px;}
 .lineup-card-pts{flex-shrink:0;text-align:right;font-family:var(--fd);font-size:17px;font-weight:900;color:var(--ink);line-height:1;}
 .lineup-card-pts-lbl{display:block;font-size:10px;font-weight:700;color:var(--ink3);letter-spacing:.5px;margin-top:2px;}
 .lineup-card-pending{font-size:10px;font-weight:700;color:var(--ink3);background:var(--bg2);border:1px solid var(--bdr2);border-radius:5px;padding:1px 6px;text-transform:uppercase;letter-spacing:.3px;}
@@ -204,7 +205,8 @@ tr:hover td{background:var(--or4);}
    overflowing on narrow phones. This stays a single row everywhere. */
 .lineup-card-pts-stack{display:flex;flex-direction:column;align-items:center;flex-shrink:0;gap:4px;}
 .lineup-card-status-tag{font-size:10px;font-weight:700;color:var(--ink3);background:var(--bg2);border:1px solid var(--bdr2);border-radius:5px;padding:1px 6px;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap;}
-.lineup-card-status-tag.live{color:var(--pk);background:rgba(255,95,160,.1);border-color:rgba(255,95,160,.3);}
+.lineup-card-status-tag.live{color:#04342C;background:#5DCAA5;border-color:#5DCAA5;font-weight:800;}
+.lineup-card-status-tag.final{color:#4B1528;background:#FF1A6E;border-color:#FF1A6E;font-weight:800;}
 .lineup-card-swap-btn{flex-shrink:0;font-family:var(--fd);font-size:12.5px;font-weight:800;color:var(--or);background:rgba(0,229,212,.1);border:1.5px solid rgba(0,229,212,.3);border-radius:7px;padding:6px 10px;cursor:pointer;text-transform:uppercase;letter-spacing:.3px;margin-left:8px;}
 .lineup-card-swap-btn:hover{background:rgba(0,229,212,.18);}
 .lineup-card-live{color:#3CD06C;font-size:10px;}
@@ -2310,7 +2312,7 @@ function buildLineupPlayerCard(p, pts, hasStarted, gameMap, showNotStartedTag, s
     } else if(game.liveStatusCode === 2){
       var finalScoreLine = (typeof game.myScore === 'number' && typeof game.oppScore === 'number')
         ? ' ' + game.myScore + '-' + game.oppScore : '';
-      gameLine = '<div class="lineup-card-game">Final' + finalScoreLine + ' vs ' + escapeHtmlFR(game.opp) + '</div>';
+      gameLine = '<div class="lineup-card-game final">Final' + finalScoreLine + ' vs ' + escapeHtmlFR(game.opp) + '</div>';
     } else {
       var vsAt = game.international ? (game.isHome ? 'vs' : '@') + ' Int\'l' : (game.isHome ? 'vs' : '@');
       var kickoff = fmtKickoff(game.time);
@@ -2344,6 +2346,7 @@ function buildLineupPlayerCard(p, pts, hasStarted, gameMap, showNotStartedTag, s
   var liveCode = game ? game.liveStatusCode : null;
   if(liveCode === 2){
     statusTag = 'Final';
+    statusClass = ' final';
   } else if(liveCode === 1){
     statusTag = (game.quarter ? 'Q' + game.quarter : 'Live') + (game.clock ? ' ' + game.clock : '');
     statusClass = ' live';
