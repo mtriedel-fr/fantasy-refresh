@@ -879,20 +879,21 @@ jobs:
                   // gameStatusCode is a REAL, documented Tank01 field
                   // (0=not started, 1=live, 2=final — see
                   // tank01.com/Guides_Game_Status_Code_NFL.html).
-                  // quarter/clock/score field names below are an
-                  // educated guess based on common sports-API naming
-                  // conventions — UNVERIFIED against a real live
-                  // response, since no games were live when this was
-                  // written (mid-July, before preseason). First real
-                  // Thursday/Sunday of live games should be checked
-                  // against this — if the "PMR" (quarter + clock)
-                  // display or the live score comes back blank/wrong
-                  // while fantasy scores are updating fine, this is the
-                  // spot to fix, same pattern as the projections
-                  // endpoint fix earlier.
+                  // clock/score field names below were confirmed correct
+                  // directly against a real live game's actual box score
+                  // response (Aug 20, 2026). quarter was the one field
+                  // that was wrong — the real field is currentPeriod,
+                  // not quarter/period/gamePeriod (none of which exist
+                  // in the real response at all). Confirmed value on a
+                  // finished game is the literal string "Final" — worth
+                  // a second look at the real value during a genuinely
+                  // live (not final) game, to confirm it's a clean
+                  // number/short label there too, not a longer phrase
+                  // like "2nd Quarter" that would need different
+                  // handling in how the client displays it.
                   liveGameStatus[gameId] = {
                     statusCode: bs.body.gameStatusCode != null ? Number(bs.body.gameStatusCode) : null,
-                    quarter:    bs.body.quarter || bs.body.period || bs.body.gamePeriod || null,
+                    quarter:    bs.body.currentPeriod || (bs.body.lineScore && bs.body.lineScore.period) || null,
                     clock:      bs.body.gameClock || bs.body.clock || bs.body.timeRemaining || null,
                     home:       game.home || game.homeTeamAbbr || game.homeTeam || '',
                     away:       game.away || game.awayTeamAbbr || game.awayTeam || '',
