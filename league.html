@@ -1044,7 +1044,7 @@ setTimeout(function(){
     <div class="h2h-section-hdr" style="display:flex;align-items:center;justify-content:space-between;">
       <span>🏆 Weekly Standings</span>
       <div style="display:flex;gap:8px;">
-        <button onclick="openFullBoardStats()" style="font-family:var(--fd);font-size:11px;font-weight:800;padding:6px 12px;border-radius:20px;border:1.5px solid var(--pu);background:rgba(155,109,255,.1);color:var(--pu);cursor:pointer;">🏈 Full Board Stats</button>
+        <button onclick="openFullBoardStats()" style="font-family:var(--fd);font-size:11px;font-weight:800;padding:6px 12px;border-radius:20px;border:1.5px solid var(--pu);background:rgba(155,109,255,.1);color:var(--pu);cursor:pointer;">🏈 All Players</button>
         <button onclick="openRecap()" style="font-family:var(--fd);font-size:11px;font-weight:800;padding:6px 12px;border-radius:20px;border:1.5px solid var(--or);background:rgba(0,229,212,.1);color:var(--or);cursor:pointer;">📰 Weekly Review</button>
       </div>
     </div>
@@ -7048,18 +7048,39 @@ function closeRecap(){
 // board this week can be looked up in one place.
 var fbsAllPlayers = []; // cached once loaded, filtered client-side on position tap — no re-fetch per filter
 var fbsActivePos = 'ALL';
+var fbsSortCol = 'pts'; // matches the initial sort already applied when the data loads
+var fbsSortDir = 'desc';
 
 function openFullBoardStats(){
   var w = currentWeek;
-  document.getElementById('fbs-title').textContent = 'Week ' + w + ' — Full Board Stats';
+  document.getElementById('fbs-title').textContent = 'All Players — Week ' + w + ' Stats';
   document.getElementById('fbs-body').innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--ink3);font-size:13px;">Loading…</div>';
   document.getElementById('fbs-pos-filter').innerHTML = '';
   document.getElementById('fbs-overlay').classList.add('open');
   fbsActivePos = 'ALL';
+  fbsSortCol = 'pts';
+  fbsSortDir = 'desc';
 
   var ctx = FRAuth.getLeagueCtx();
+  var leagueId = ctx ? ctx.leagueId : null;
   var season = FR.seasonKey();
   var seasonType = (ctx && (ctx.isPreseason || ctx.seasonType === 'Preseason')) ? 'Preseason' : 'Regular';
+
+  // Ownership and salary data fetched alongside the schedule — salary
+  // data (which has both name and id for every player) is what makes
+  // it possible to cross-reference gameStats entries (name-keyed, no
+  // id at all) against the real ownership data (id-keyed). Every
+  // player who can ever appear here already has a started game by
+  // definition — gameStats itself is only ever written for games
+  // auto-scoring.yml has already found active or final — so there's no
+  // separate "has this game started" check needed for showing
+  // ownership; the data source already guarantees it.
+  var ownershipPromise = leagueId
+    ? FR.fb.get('/leagues/' + leagueId + '/season/' + season + '/' + w + '/ownership').catch(function(){ return null; })
+    : Promise.resolve(null);
+  var salaryPromise = leagueId
+    ? FR.fb.get(FR.paths.weekSalaries(w)).catch(function(){ return null; })
+    : Promise.resolve(null);
 
   // Raw schedule fetched directly here (not via fetchWeekSchedule/
   // buildTeamGameMap, which transforms this into a team-keyed map and
@@ -7074,12 +7095,30 @@ function openFullBoardStats(){
         document.getElementById('fbs-body').innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--ink3);font-size:13px;">No games found for this week.</div>';
         return;
       }
-      return Promise.all(gameIds.map(function(gid){
-        return FR.fb.get('/gameStats/' + season + '/' + gid).catch(function(){ return null; });
-      }));
+      return Promise.all([
+        Promise.all(gameIds.map(function(gid){
+          return FR.fb.get('/gameStats/' + season + '/' + gid).catch(function(){ return null; });
+        })),
+        ownershipPromise,
+        salaryPromise
+      ]);
     })
-    .then(function(results){
-      if(!results) return; // no games case already handled above
+    .then(function(combined){
+      if(!combined) return; // no games case already handled above
+      var results = combined[0], ownership = combined[1] || {}, salaryData = combined[2];
+
+      // Name → id map, built from salary data — the only place both a
+      // real id and a matchable name exist together. Same normalization
+      // approach (lowercase, strip punctuation/suffixes) used
+      // throughout the backend for this exact kind of cross-reference.
+      var nameToId = {};
+      if(salaryData && salaryData.players){
+        Object.keys(salaryData.players).forEach(function(pid){
+          var sp = salaryData.players[pid];
+          if(sp && sp.name) nameToId[normalizeNameForFbs(sp.name)] = sp.id || pid;
+        });
+      }
+
       var all = [];
       (results || []).forEach(function(data){
         if(data && data.players) all = all.concat(data.players);
@@ -7088,6 +7127,10 @@ function openFullBoardStats(){
         document.getElementById('fbs-body').innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--ink3);font-size:13px;">No stats available yet — check back once today\'s games are underway.</div>';
         return;
       }
+      all.forEach(function(p){
+        var id = nameToId[normalizeNameForFbs(p.name)];
+        p.ownership = (id && typeof ownership[id] === 'number') ? ownership[id] : null;
+      });
       all.sort(function(a, b){ return b.pts - a.pts; });
       fbsAllPlayers = all;
       renderFbsPosFilter();
@@ -7096,6 +7139,17 @@ function openFullBoardStats(){
     .catch(function(){
       document.getElementById('fbs-body').innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--ink3);font-size:13px;">Couldn\'t load this week\'s stats.</div>';
     });
+}
+
+// Same normalization approach used throughout the backend (lowercase,
+// strip punctuation and Jr/Sr/II/III/IV suffixes) for matching a
+// gameStats entry's plain name against a salary entry's name.
+function normalizeNameForFbs(name){
+  return (name || '')
+    .toLowerCase()
+    .replace(/[.,']/g, '')
+    .replace(/\s+(jr|sr|ii|iii|iv|v)$/i, '')
+    .trim();
 }
 
 function closeFullBoardStats(){
@@ -7120,13 +7174,60 @@ function setFbsPosFilter(pos){
   renderFbsBody();
 }
 
+function setFbsSort(col){
+  if(fbsSortCol === col){
+    fbsSortDir = fbsSortDir === 'desc' ? 'asc' : 'desc';
+  } else {
+    fbsSortCol = col;
+    // Numeric columns default to highest-first (most useful ordering on
+    // first click); text columns default to A-first.
+    fbsSortDir = (col === 'pts' || col === 'ownership') ? 'desc' : 'asc';
+  }
+  renderFbsBody();
+}
+
 function renderFbsBody(){
   var list = fbsActivePos === 'ALL' ? fbsAllPlayers : fbsAllPlayers.filter(function(p){ return p.pos === fbsActivePos; });
   if(!list.length){
     document.getElementById('fbs-body').innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--ink3);font-size:13px;">No players at this position yet.</div>';
     return;
   }
-  var html = list.map(function(p, i){
+
+  list = list.slice(); // sort a copy — never mutate the cached fbsAllPlayers order itself
+  var col = fbsSortCol, dir = fbsSortDir;
+  list.sort(function(a, b){
+    var av, bv;
+    if(col === 'pts'){ av = a.pts || 0; bv = b.pts || 0; }
+    else if(col === 'ownership'){
+      // No match found sorts to the end regardless of direction — "no
+      // data" isn't a real value to rank against 0%, it's the absence
+      // of one.
+      var aHas = typeof a.ownership === 'number', bHas = typeof b.ownership === 'number';
+      if(aHas !== bHas) return aHas ? -1 : 1;
+      av = a.ownership || 0; bv = b.ownership || 0;
+    }
+    else { av = (a[col] || '').toString().toLowerCase(); bv = (b[col] || '').toString().toLowerCase(); }
+    if(av < bv) return dir === 'asc' ? -1 : 1;
+    if(av > bv) return dir === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  function headerCell(label, key, align){
+    var active = fbsSortCol === key;
+    var arrow = active ? (fbsSortDir === 'asc' ? ' ▲' : ' ▼') : '';
+    return '<th onclick="setFbsSort(\'' + key + '\')" style="text-align:' + align + ';padding:8px 12px;font-family:var(--fd);font-size:10px;font-weight:800;color:' + (active ? 'var(--pu)' : 'var(--ink3)') + ';text-transform:uppercase;letter-spacing:.4px;cursor:pointer;white-space:nowrap;user-select:none;">' + label + arrow + '</th>';
+  }
+
+  var html = '<table style="width:100%;border-collapse:collapse;">'
+    + '<thead><tr style="border-bottom:1px solid var(--bdr);position:sticky;top:0;background:var(--bg);">'
+    +   headerCell('Player', 'name', 'left')
+    +   headerCell('Pos', 'pos', 'center')
+    +   headerCell('Team', 'team', 'center')
+    +   headerCell('Pts', 'pts', 'right')
+    +   headerCell('Own%', 'ownership', 'right')
+    + '</tr></thead><tbody>';
+
+  html += list.map(function(p, i){
     var breakdownId = 'fbs-bd-' + i;
     var hasBreakdown = p.breakdown && p.breakdown.length > 0;
     var rows = hasBreakdown ? p.breakdown.map(function(b){
@@ -7137,16 +7238,19 @@ function renderFbsBody(){
         + '<span style="color:' + ptsColor + ';font-weight:700;">' + sign + b.points.toFixed(2) + '</span>'
         + '</div>';
     }).join('') : '';
-    var cardClick = hasBreakdown ? ' onclick="var el=document.getElementById(\'' + breakdownId + '\');el.style.display=el.style.display===\'none\'?\'block\':\'none\';" style="cursor:pointer;"' : '';
-    // Order requested: player name first, fantasy score right after,
-    // then their recorded stats for the week (tap to expand).
-    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 20px;border-top:1px solid var(--bdr);"' + cardClick + '>'
-      + '<div><div style="font-family:var(--fd);font-size:14px;font-weight:700;color:var(--ink);">' + escapeHtmlFR(p.name) + '</div>'
-      + '<div style="font-family:var(--fd);font-size:11px;color:var(--ink3);margin-top:1px;">' + escapeHtmlFR(p.pos || '') + (p.team ? ' · ' + escapeHtmlFR(p.team) : '') + '</div></div>'
-      + '<div style="font-family:var(--fd);font-size:17px;font-weight:900;color:var(--or);">' + p.pts.toFixed(2) + '</div>'
-      + '</div>'
-      + '<div id="' + breakdownId + '" style="display:none;padding:6px 20px 12px;background:var(--bg3);">' + rows + '</div>';
+    var rowClick = hasBreakdown ? ' onclick="var el=document.getElementById(\'' + breakdownId + '\');el.style.display=el.style.display===\'none\'?\'block\':\'none\';" style="cursor:pointer;"' : '';
+    var ownText = (typeof p.ownership === 'number') ? p.ownership.toFixed(1) + '%' : '—';
+    return '<tr' + rowClick + ' style="border-top:1px solid var(--bdr);">'
+      + '<td style="padding:10px 12px;font-family:var(--fd);font-size:14px;font-weight:700;color:var(--ink);">' + escapeHtmlFR(p.name) + '</td>'
+      + '<td style="padding:10px 12px;text-align:center;font-family:var(--fd);font-size:12px;color:var(--ink3);">' + escapeHtmlFR(p.pos || '') + '</td>'
+      + '<td style="padding:10px 12px;text-align:center;font-family:var(--fd);font-size:12px;color:var(--ink3);">' + escapeHtmlFR(p.team || '') + '</td>'
+      + '<td style="padding:10px 12px;text-align:right;font-family:var(--fd);font-size:15px;font-weight:900;color:var(--or);">' + p.pts.toFixed(2) + '</td>'
+      + '<td style="padding:10px 12px;text-align:right;font-family:var(--fd);font-size:13px;font-weight:700;color:var(--ink2);">' + ownText + '</td>'
+      + '</tr>'
+      + '<tr><td colspan="5" style="padding:0;"><div id="' + breakdownId + '" style="display:none;padding:6px 20px 12px;background:var(--bg3);">' + rows + '</div></td></tr>';
   }).join('');
+
+  html += '</tbody></table>';
   document.getElementById('fbs-body').innerHTML = html;
 }
 
