@@ -1,0 +1,79 @@
+name: One-Time Diagnostic — Real Box Score Field Names + Game Status
+
+# ONE-TIME USE — delete this file after running it once.
+# Pulls the real, raw Tank01 box score response for today's actual
+# games directly, to definitively identify the real quarter/period
+# field name (never verified until now — no live games existed when
+# that code was originally written) and to check both games' real,
+# current status directly, rather than guessing at what "didn't fully
+# complete" might mean.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pull real box scores and game statuses
+        env:
+          TANK01_KEY: ${{ secrets.TANK01_KEY }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const T01_KEY = process.env.TANK01_KEY;
+          const T01_HOST = 'tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com';
+
+          function t01(path) {
+            return new Promise((resolve, reject) => {
+              https.get({
+                hostname: T01_HOST, path, headers: {
+                  'X-RapidAPI-Key': T01_KEY, 'X-RapidAPI-Host': T01_HOST
+                }
+              }, res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+
+          async function main() {
+            const now = new Date();
+            const etDate = new Intl.DateTimeFormat('en-CA', {
+              timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit'
+            }).format(now).replace(/-/g, '');
+            console.log(`Today (ET): ${etDate}`);
+
+            const scores = await t01(`/getNFLScoresOnly?gameDate=${etDate}`);
+            const games = scores.body ? Object.values(scores.body) : [];
+            console.log(`\nFound ${games.length} game(s) today.\n`);
+
+            for (const game of games) {
+              const gameId = game.gameID || game.gameId || '';
+              console.log(`=== ${gameId} ===`);
+              console.log('Top-level scores fields:', JSON.stringify(game, null, 2));
+
+              try {
+                const bs = await t01(`/getNFLBoxScore?gameID=${gameId}&fantasyPoints=true&PPRScoring=true`);
+                if (bs.body) {
+                  // Print every top-level key and a shallow value so we
+                  // can see the real field names directly, not just the
+                  // ones we're currently guessing at.
+                  console.log('\nBox score top-level keys:', Object.keys(bs.body));
+                  const shallow = {};
+                  Object.keys(bs.body).forEach(k => {
+                    const v = bs.body[k];
+                    shallow[k] = (typeof v === 'object' && v !== null) ? `[object, ${Array.isArray(v) ? 'array' : Object.keys(v).length + ' keys'}]` : v;
+                  });
+                  console.log('Box score shallow values:', JSON.stringify(shallow, null, 2));
+                }
+              } catch (e) {
+                console.log('Box score fetch failed:', e.message);
+              }
+              console.log('\n');
+            }
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
