@@ -72,6 +72,16 @@ jobs:
           const FB_TOKEN    = process.env.FIREBASE_AUTH_TOKEN;
           const T01_KEY     = process.env.TANK01_KEY;
           let SEASON      = process.env.FR_SEASON || '2026';
+          // Stable, never-reassigned — a league's own settings.season
+          // represents which calendar year it belongs to (always the
+          // plain year, regardless of preseason/regular status), a
+          // genuinely different concept from SEASON itself, which gets
+          // dynamically reassigned to the "P"-suffixed variant below to
+          // pick the right Firebase path. Comparing settings.season
+          // against the reassigned SEASON meant every league failed
+          // this check on every single preseason run, since 2026 (a
+          // league's real, correct value) can never equal 2026P.
+          const BASE_SEASON = SEASON;
           const T01_HOST    = 'tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com';
           const IS_LOCK_RUN = process.env.LOCK_SCORES === 'true' ||
                               new Date().getUTCDay() === 2; // Tuesday
@@ -352,8 +362,8 @@ jobs:
                     console.log(`  ⊘ ${id}: skipped — settings.active is explicitly false`);
                     continue;
                   }
-                  if (settings && settings.season != null && String(settings.season) !== String(SEASON)) {
-                    console.log(`  ⊘ ${id}: skipped — settings.season (${settings.season}) doesn't match current season (${SEASON})`);
+                  if (settings && settings.season != null && String(settings.season) !== String(BASE_SEASON)) {
+                    console.log(`  ⊘ ${id}: skipped — settings.season (${settings.season}) doesn't match current season (${BASE_SEASON})`);
                     continue;
                   }
                   active.push(id);

@@ -29,6 +29,15 @@ jobs:
           const FB_URL   = process.env.FIREBASE_DB_URL;
           const T01_KEY  = process.env.TANK01_KEY;
           let SEASON   = process.env.FR_SEASON || '2026';
+          // Stable, never-reassigned — see the identical fix and full
+          // explanation in auto-scoring.yml tonight. SEASON itself is
+          // never reassigned anymore in this particular file (removed
+          // earlier tonight), so this is currently safe either way, but
+          // relying on that as an implicit guarantee is fragile —
+          // comparing against a name that explicitly promises "the
+          // plain year, always" is correct on its own terms regardless
+          // of what any other code in this file happens to do.
+          const BASE_SEASON = SEASON;
           const T01_HOST = 'tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com';
 
           function fetchJson(url, headers) {
@@ -169,8 +178,8 @@ jobs:
                     console.log(`  ⊘ ${id}: skipped — settings.active is explicitly false`);
                     continue;
                   }
-                  if (settings && settings.season != null && String(settings.season) !== String(SEASON)) {
-                    console.log(`  ⊘ ${id}: skipped — settings.season (${settings.season}) doesn't match current season (${SEASON})`);
+                  if (settings && settings.season != null && String(settings.season) !== String(BASE_SEASON)) {
+                    console.log(`  ⊘ ${id}: skipped — settings.season (${settings.season}) doesn't match current season (${BASE_SEASON})`);
                     continue;
                   }
                   active.push(id);
