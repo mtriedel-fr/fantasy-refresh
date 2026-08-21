@@ -1,0 +1,70 @@
+name: One-Time Diagnostic — Real Box Score Fields (Aug 20 games specifically)
+
+# ONE-TIME USE — delete this file after running it once.
+# Pulls the real, raw Tank01 box score for the specific games shown in
+# the screenshot (LV@HOU and SF@LAC, Aug 20) — not "today", which was
+# the mistake in the earlier version of this diagnostic. Identifies the
+# real quarter/period field name and directly checks both games' real,
+# current status, including whether SF@LAC has actually reached Final.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pull real box scores for the specific Aug 20 games
+        env:
+          TANK01_KEY: ${{ secrets.TANK01_KEY }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const T01_KEY = process.env.TANK01_KEY;
+          const T01_HOST = 'tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com';
+          const GAME_IDS = ['20260820_LV@HOU', '20260820_SF@LAC'];
+
+          function t01(path) {
+            return new Promise((resolve, reject) => {
+              https.get({
+                hostname: T01_HOST, path, headers: {
+                  'X-RapidAPI-Key': T01_KEY, 'X-RapidAPI-Host': T01_HOST
+                }
+              }, res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+
+          async function main() {
+            const scores = await t01(`/getNFLScoresOnly?gameDate=20260820`);
+            const games = scores.body ? Object.values(scores.body) : [];
+            console.log(`Found ${games.length} game(s) for Aug 20.\n`);
+
+            for (const gameId of GAME_IDS) {
+              const topLevel = games.find(g => (g.gameID || g.gameId) === gameId);
+              console.log(`=== ${gameId} ===`);
+              console.log('Top-level scores fields:', JSON.stringify(topLevel, null, 2));
+
+              try {
+                const bs = await t01(`/getNFLBoxScore?gameID=${gameId}&fantasyPoints=true&PPRScoring=true`);
+                if (bs.body) {
+                  console.log('\nBox score top-level keys:', Object.keys(bs.body));
+                  const shallow = {};
+                  Object.keys(bs.body).forEach(k => {
+                    const v = bs.body[k];
+                    shallow[k] = (typeof v === 'object' && v !== null) ? `[object, ${Array.isArray(v) ? 'array' : Object.keys(v).length + ' keys'}]` : v;
+                  });
+                  console.log('Box score shallow values:', JSON.stringify(shallow, null, 2));
+                }
+              } catch (e) {
+                console.log('Box score fetch failed:', e.message);
+              }
+              console.log('\n');
+            }
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
