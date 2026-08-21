@@ -29,10 +29,6 @@ on:
         required: false
         default: ''
       game_date:
-        description: 'Re-score a specific past date (YYYYMMDD, e.g. 20260820) instead of today — for catching up a game that was missed live. Leave blank for normal, today-based runs.'
-        required: false
-        default: ''
-      game_date:
         description: 'Re-score a specific past date instead of today (format YYYYMMDD, e.g. 20260814) — use this to recover a day that was scored incorrectly due to a since-fixed bug, then let normal runs resume covering today going forward.'
         required: false
         default: ''
