@@ -507,19 +507,34 @@ jobs:
               { type: 'Postseason', weeks: [1, 2, 3, 4] } // same reasoning as preseason — short enough not to bother filtering
             ];
             for (const { type, weeks } of seasonTypes) {
+              // Real, per-type season key — this file processes every
+              // season type together in one run (unlike auto-scoring.yml,
+              // which only ever handles one type per run and reassigns
+              // the global SEASON constant specifically for it), so
+              // there was never a point where SEASON itself actually
+              // reflected "Preseason". Confirmed as a real, live bug:
+              // every write here was silently landing at the wrong,
+              // plain-year path (/nflSchedule/2026/Preseason) regardless
+              // of type, while every real reader (openFullBoardStats,
+              // worker.js's own cache lookup) correctly queries the
+              // "P"-suffixed path for a genuine preseason league — the
+              // two never met, so the cache always looked empty to any
+              // preseason-league consumer no matter how many times this
+              // ran.
+              const seasonKey = type === 'Preseason' ? SEASON + 'P' : SEASON;
               // Start from whatever's already cached — past weeks we're
               // deliberately not re-fetching this run still need to stay
               // in place, not get wiped out by this write.
               let byWeek = {};
               try {
-                const existing = await firebaseGet(`/nflSchedule/${SEASON}/${type}.json`);
+                const existing = await firebaseGet(`/nflSchedule/${seasonKey}/${type}.json`);
                 if (existing && existing.weeks) byWeek = existing.weeks;
               } catch(e) { /* nothing cached yet */ }
 
               let fetchedCount = 0;
               for (const week of weeks) {
                 try {
-                  const res = await fetch(`${WORKER}/schedule?week=${week}&season=${SEASON}&seasonType=${type}&bypassCache=true`);
+                  const res = await fetch(`${WORKER}/schedule?week=${week}&season=${seasonKey}&seasonType=${type}&bypassCache=true`);
                   if (!res.ok) continue;
                   const data = await res.json();
                   if (data && Array.isArray(data.games) && data.games.length) {
@@ -531,7 +546,7 @@ jobs:
                 }
               }
               if (fetchedCount > 0) {
-                await firebasePut(`/nflSchedule/${SEASON}/${type}.json`, { weeks: byWeek, updatedAt: Date.now() });
+                await firebasePut(`/nflSchedule/${seasonKey}/${type}.json`, { weeks: byWeek, updatedAt: Date.now() });
                 console.log(`✓ Cached ${type} schedule: refreshed ${fetchedCount} upcoming week(s), ${Object.keys(byWeek).length} total in cache`);
               } else {
                 console.log(`  ${type} schedule: nothing new to refresh (current week: ${currentWeek})`);

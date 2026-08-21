@@ -1,0 +1,50 @@
+name: One-Time Diagnostic — Check nflSchedule Cache Path
+
+# ONE-TIME USE — delete this file after running it once.
+# Confirms whether the preseason schedule cache is genuinely sitting at
+# the wrong, plain '2026' path instead of the expected '2026P' path
+# that openFullBoardStats() (and getCachedScheduleWeek in worker.js)
+# actually query.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check both possible cache paths
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB_URL = process.env.FIREBASE_DB_URL;
+
+          function fetchJson(url) {
+            return new Promise((resolve, reject) => {
+              https.get(url, res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+
+          async function check(label, path) {
+            const data = await fetchJson(FB_URL + path + '.json').catch(() => null);
+            if (data && data.weeks) {
+              console.log(`${label} (${path}): FOUND — weeks: ${Object.keys(data.weeks).join(', ')}, updatedAt: ${new Date(data.updatedAt).toISOString()}`);
+              if (data.weeks.week3) console.log(`  week3 has ${data.weeks.week3.length} game(s)`);
+            } else {
+              console.log(`${label} (${path}): NOT FOUND`);
+            }
+          }
+
+          async function main() {
+            await check('Expected (2026P)', '/nflSchedule/2026P/Preseason');
+            await check('Suspected actual (plain 2026)', '/nflSchedule/2026/Preseason');
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
