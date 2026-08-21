@@ -505,9 +505,28 @@ jobs:
               }
             }
 
-            // Update week meta
+            // Update week meta — week itself only ever advances here
+            // once this week is genuinely, fully finalized (allFinal).
+            // Confirmed directly as a real, live bug: writing the
+            // current week unconditionally on every run meant the
+            // moment ANY game got scored — even a single catch-up game,
+            // even mid-week with most of the week's real games still
+            // unplayed — every downstream reader (weekly-prep.yml,
+            // home.html, league.html, all of which treat meta.week + 1
+            // as "the current, upcoming week") would immediately jump
+            // ahead a full week early. lastScored/allFinal/gamesActive
+            // still update every run regardless, as real-time status —
+            // only the week number itself needs to wait for the real
+            // finish line.
+            const existingMeta = await firebaseGet(`/leagues/${leagueId}/season/${SEASON}/meta.json`).catch(() => null);
+            // week - 1 (not week) for the "never written before" case —
+            // every downstream reader adds +1 to get "the current week
+            // to show", so an initial value has to be one behind the
+            // real, actual current week for that math to land correctly
+            // on a league's very first-ever run.
+            const metaWeekToWrite = allFinal ? week : ((existingMeta && typeof existingMeta.week === 'number') ? existingMeta.week : week - 1);
             await firebasePut(`/leagues/${leagueId}/season/${SEASON}/meta.json`, {
-              week, lastScored: Date.now(), allFinal,
+              week: metaWeekToWrite, lastScored: Date.now(), allFinal,
               gamesActive: activeGames.length
             });
 
