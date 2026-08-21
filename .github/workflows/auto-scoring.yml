@@ -29,6 +29,10 @@ on:
         required: false
         default: ''
       game_date:
+        description: 'Re-score a specific past date (YYYYMMDD, e.g. 20260820) instead of today — for catching up a game that was missed live. Leave blank for normal, today-based runs.'
+        required: false
+        default: ''
+      game_date:
         description: 'Re-score a specific past date instead of today (format YYYYMMDD, e.g. 20260814) — use this to recover a day that was scored incorrectly due to a since-fixed bug, then let normal runs resume covering today going forward.'
         required: false
         default: ''
@@ -802,6 +806,40 @@ jobs:
               console.log(`Found ${games.length} game(s) for ${etDate} via getNFLScoresOnly`);
             } catch(e) {
               console.log(`  gameDate=${etDate} attempt failed: ${e.message}`);
+            }
+
+            // Also check yesterday for any game that hasn't reached
+            // Final yet — confirmed directly tonight as a real, live
+            // bug: a game starting late enough to run past midnight ET
+            // (any West Coast game, Sunday/Monday Night Football, or
+            // anything going to overtime) was getting silently dropped
+            // from tracking forever the instant the calendar date
+            // rolled over, since this script only ever checked a single
+            // date per run. SF@LAC (real kickoff 10pm ET) was still
+            // genuinely live at 11:58pm ET, then simply never got
+            // checked again — stuck showing a live snapshot from just
+            // before midnight even after the real game had long since
+            // finished. Only pulls in yesterday's NON-final games
+            // specifically, so already-completed games from the prior
+            // day aren't unnecessarily reprocessed every run.
+            if (!process.env.MANUAL_GAME_DATE) {
+              const yesterdayDate = new Date(nowDate.getTime() - 24*60*60*1000);
+              const autoEtYesterday = new Intl.DateTimeFormat('en-CA', {
+                timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit'
+              }).format(yesterdayDate).replace(/-/g, '');
+              try {
+                const yData = await t01(`/getNFLScoresOnly?gameDate=${autoEtYesterday}`);
+                const yGames = Object.values(yData.body || {}).filter(g => {
+                  const s = (g.gameStatus || g.status || '').toLowerCase();
+                  return !s.includes('final') && !s.includes('completed');
+                });
+                if (yGames.length) {
+                  console.log(`Found ${yGames.length} still-in-progress game(s) from yesterday (${autoEtYesterday}) — carrying forward so they don't get dropped mid-game`);
+                  games = games.concat(yGames);
+                }
+              } catch(e) {
+                console.log(`  yesterday (${autoEtYesterday}) check failed: ${e.message}`);
+              }
             }
 
             if (!games.length) {
