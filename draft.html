@@ -1041,7 +1041,27 @@ function buildGamesBar(games){
   games.forEach(function(g, i){
     var label = (g.away||'?') + ' @ ' + (g.home||'?');
     var sub   = '';
-    if(g.time){
+    // Live/final status — keyed by either team, since both sides of the
+    // same game carry the same underlying status (myScore/oppScore are
+    // just flipped depending on which team you look up). Falls through
+    // to the normal day/time sub-line below for any game that hasn't
+    // started yet, which is unaffected by any of this.
+    var liveInfo = (g.home && liveGameStatus[g.home]) || (g.away && liveGameStatus[g.away]) || null;
+    if(liveInfo && liveInfo.liveStatusCode === 2){
+      // myScore/oppScore already line up correctly with home/away in
+      // the common case, since liveInfo is looked up via g.home first.
+      var homeScore = (g.home && liveGameStatus[g.home]) ? liveGameStatus[g.home].myScore : liveInfo.oppScore;
+      var awayScore = (g.home && liveGameStatus[g.home]) ? liveGameStatus[g.home].oppScore : liveInfo.myScore;
+      var finalScoreLine = (typeof homeScore === 'number' && typeof awayScore === 'number') ? ' ' + awayScore + '-' + homeScore : '';
+      sub = '<div style="font-size:9px;margin-top:2px;font-weight:800;color:var(--ink3);">Final'+finalScoreLine+'</div>';
+    } else if(liveInfo && liveInfo.liveStatusCode === 1){
+      var homeScoreL = (g.home && liveGameStatus[g.home]) ? liveGameStatus[g.home].myScore : liveInfo.oppScore;
+      var awayScoreL = (g.home && liveGameStatus[g.home]) ? liveGameStatus[g.home].oppScore : liveInfo.myScore;
+      var q = liveInfo.quarter ? 'Q'+liveInfo.quarter : 'Live';
+      var clk = liveInfo.clock ? ' '+liveInfo.clock : '';
+      var liveScoreLine = (typeof homeScoreL === 'number' && typeof awayScoreL === 'number') ? ' · ' + awayScoreL + '-' + homeScoreL : '';
+      sub = '<div style="font-size:9px;margin-top:2px;font-weight:800;color:#FF4D6D;">'+q+clk+liveScoreLine+'</div>';
+    } else if(g.time){
       var d        = new Date(g.time);
       var day      = d.getDay();
       var hr       = d.getHours();
