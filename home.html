@@ -444,7 +444,16 @@ function buildCard(l) {
       return !isNaN(Number(k)) && l.seasonData[k] && Object.keys(l.seasonData[k]).length;
     }).map(Number);
     if (weeks.length) {
-      var latest      = Math.max.apply(null, weeks);
+      // Real, persisted "last week that genuinely finished" value —
+      // same source league.html already uses to correctly advance to
+      // the current, upcoming week the moment a prior one is done,
+      // rather than staying on stale, last-known numbers for the
+      // entire gap between one week finishing and the next one's real
+      // games actually starting. Falls back to the old "highest week
+      // with any data at all" approach only if no meta exists yet.
+      var latest = (l.seasonMeta && typeof l.seasonMeta.week === 'number')
+        ? l.seasonMeta.week + 1
+        : Math.max.apply(null, weeks);
       var weekEntries = l.seasonData[String(latest)] || {};
       var entries     = Object.keys(weekEntries)
         .filter(function(k) { return k !== 'ownership' && weekEntries[k] && weekEntries[k].team; })
@@ -706,30 +715,52 @@ function renderCards(leagueIds, uid) {
   var wrap = document.getElementById('leagues-wrap');
 
   Promise.all(leagueIds.map(function(leagueId) {
-    return Promise.all([
-      fetch(FB_DB_URL + '/leagues/' + leagueId + '/settings.json').then(function(r) { return r.json(); }),
-      fetch(FB_DB_URL + '/leagues/' + leagueId + '/members/' + uid + '.json').then(function(r) { return r.json(); }),
-      fetch(FB_DB_URL + '/leagues/' + leagueId + '/settings/commissioners/' + uid + '.json').then(function(r) { return r.json(); }),
-      fetch(FB_DB_URL + '/leagues/' + leagueId + '/season/' + FR.seasonKey() + '.json').then(function(r) { return r.json(); }).catch(function() { return null; }),
-      // Real, persisted guillotine status — computed once on the
-      // backend exactly when a week finishes, the same way scores
-      // themselves work. Replaces this page independently replaying
-      // the entire season from scratch every time someone loads it.
-      // Cheap to fetch unconditionally even for non-guillotine leagues,
-      // where it just resolves to nothing.
-      fetch(FB_DB_URL + '/leagues/' + leagueId + '/guillotineStatus/' + FR.seasonKey() + '.json').then(function(r) { return r.json(); }).catch(function() { return null; })
-    ]).then(function(res) {
-      var settings = res[0];
-      var isCreator = !!(settings && settings.createdBy === uid);
-      return {
-        leagueId:   leagueId,
-        settings:   settings,
-        member:     res[1],
-        isComm:     res[2] === true || isCreator,
-        seasonData: res[3],
-        guillotineStatus: res[4]
-      };
-    }).catch(function() { return null; });
+    // Settings fetched first, on their own — everything below depends
+    // on knowing THIS specific league's own real isPreseason setting,
+    // which can't be assumed from FR.seasonKey() (that reflects
+    // whichever single league the user's overall, currently-active
+    // context happens to be pointing at, not necessarily this one).
+    // Multiple leagues with different season types shown on the same
+    // page means each one's own real setting has to be checked
+    // independently, not borrowed from a shared, single value.
+    return fetch(FB_DB_URL + '/leagues/' + leagueId + '/settings.json').then(function(r) { return r.json(); })
+      .then(function(settings) {
+        var seasonKey = (settings && settings.isPreseason) ? '2026P' : '2026';
+        return Promise.all([
+          Promise.resolve(settings),
+          fetch(FB_DB_URL + '/leagues/' + leagueId + '/members/' + uid + '.json').then(function(r) { return r.json(); }),
+          fetch(FB_DB_URL + '/leagues/' + leagueId + '/settings/commissioners/' + uid + '.json').then(function(r) { return r.json(); }),
+          fetch(FB_DB_URL + '/leagues/' + leagueId + '/season/' + seasonKey + '.json').then(function(r) { return r.json(); }).catch(function() { return null; }),
+          // Real, persisted guillotine status — computed once on the
+          // backend exactly when a week finishes, the same way scores
+          // themselves work. Replaces this page independently replaying
+          // the entire season from scratch every time someone loads it.
+          // Cheap to fetch unconditionally even for non-guillotine leagues,
+          // where it just resolves to nothing.
+          fetch(FB_DB_URL + '/leagues/' + leagueId + '/guillotineStatus/' + seasonKey + '.json').then(function(r) { return r.json(); }).catch(function() { return null; }),
+          // Real, persisted "last week that genuinely finished" value —
+          // same source league.html already uses to correctly advance
+          // its own default week the moment a week is done, rather than
+          // this page's own, separate logic just showing whichever week
+          // happens to have the most recent real data (which stays on
+          // last week's numbers for the entire gap between one week
+          // finishing and the next one's games actually starting).
+          fetch(FB_DB_URL + '/leagues/' + leagueId + '/season/' + seasonKey + '/meta.json').then(function(r) { return r.json(); }).catch(function() { return null; })
+        ]);
+      })
+      .then(function(res) {
+        var settings = res[0];
+        var isCreator = !!(settings && settings.createdBy === uid);
+        return {
+          leagueId:   leagueId,
+          settings:   settings,
+          member:     res[1],
+          isComm:     res[2] === true || isCreator,
+          seasonData: res[3],
+          guillotineStatus: res[4],
+          seasonMeta: res[5]
+        };
+      }).catch(function() { return null; });
   }))
   .then(function(all) {
     // Only show leagues where this user is a member
