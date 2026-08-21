@@ -1,0 +1,51 @@
+name: One-Time Diagnostic — Re-check Meta State Right Now
+
+# ONE-TIME USE — delete this file after running it once.
+# Re-checks the real, current meta value with a fresh timestamp
+# comparison, to determine whether the correction never actually took,
+# was overwritten by a subsequent run since, or whether "Week 4" is
+# coming from somewhere other than this value entirely.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check real, current meta state
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB_URL = process.env.FIREBASE_DB_URL;
+
+          function fetchJson(url) {
+            return new Promise((resolve, reject) => {
+              https.get(url, res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+
+          async function main() {
+            const meta = await fetchJson(FB_URL + '/leagues/fr_nth60cij/season/2026P/meta.json').catch(() => null);
+            console.log('Current /leagues/fr_nth60cij/season/2026P/meta:');
+            console.log(JSON.stringify(meta, null, 2));
+            if (meta && meta.lastScored) {
+              const ageMin = Math.round((Date.now() - meta.lastScored) / 60000);
+              console.log(`\nlastScored was ${ageMin} minute(s) ago (${new Date(meta.lastScored).toISOString()})`);
+            }
+
+            // Also check the plain, non-preseason path — in case
+            // something is reading/writing there instead for this league.
+            const wrongPath = await fetchJson(FB_URL + '/leagues/fr_nth60cij/season/2026/meta.json').catch(() => null);
+            console.log('\nFor comparison, /leagues/fr_nth60cij/season/2026/meta (wrong/non-preseason path):');
+            console.log(JSON.stringify(wrongPath, null, 2));
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
