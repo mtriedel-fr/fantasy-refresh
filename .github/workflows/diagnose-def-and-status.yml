@@ -1,0 +1,95 @@
+name: One-Time Diagnostic — Defense Stats + Game Status Check
+
+# ONE-TIME USE — delete this file after running it once.
+# Part 1: real, raw box score structure for a defense, to find where
+# sack/int/fumble/TD stats actually live (top-level vs nested under
+# Defense, matching how offensive stats were already confirmed nested).
+# Part 2: real, current liveGameStatus for this week + each reported
+# game's real, live Tank01 status directly.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check defense stats structure and game statuses
+        env:
+          TANK01_KEY: ${{ secrets.TANK01_KEY }}
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const T01_KEY = process.env.TANK01_KEY;
+          const T01_HOST = 'tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com';
+          const FB_URL = process.env.FIREBASE_DB_URL;
+
+          function t01(path) {
+            return new Promise((resolve, reject) => {
+              https.get({
+                hostname: T01_HOST, path, headers: {
+                  'X-RapidAPI-Key': T01_KEY, 'X-RapidAPI-Host': T01_HOST
+                }
+              }, res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+
+          function fetchJson(url) {
+            return new Promise((resolve, reject) => {
+              https.get(url, res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+
+          async function main() {
+            console.log('========== PART 1: Real defense stats structure ==========\n');
+            const bs = await t01(`/getNFLBoxScore?gameID=20260820_LV@HOU&fantasyPoints=true&PPRScoring=true`);
+            const playerStats = (bs.body && bs.body.playerStats) || {};
+            // Find a defense entry — keyed by team abbreviation directly
+            // (HOU or LV), per how auto-scoring.yml looks it up
+            // (playerStats[d.teamAbv]).
+            ['HOU', 'LV'].forEach(team => {
+              if (playerStats[team]) {
+                console.log(`=== playerStats["${team}"] (full, raw) ===`);
+                console.log(JSON.stringify(playerStats[team], null, 2));
+              } else {
+                console.log(`playerStats["${team}"]: not found under this key`);
+              }
+            });
+            // Also check the separate top-level DST field, in case
+            // defense stats live there instead of inside playerStats.
+            if (bs.body && bs.body.DST) {
+              console.log('\n=== Top-level DST field (full, raw) ===');
+              console.log(JSON.stringify(bs.body.DST, null, 2));
+            }
+
+            console.log('\n\n========== PART 2: Real, current liveGameStatus ==========\n');
+            const live = await fetchJson(`${FB_URL}/liveGameStatus/2026P/Preseason_wk3.json`).catch(() => null);
+            console.log(JSON.stringify(live, null, 2));
+
+            console.log('\n\n========== PART 3: Real, live Tank01 status for each reported game ==========\n');
+            const gameIds = ['20260820_GB@DEN', '20260819_GB@DEN', '20260821_GB@DEN'];
+            for (const gid of gameIds) {
+              try {
+                const g = await t01(`/getNFLBoxScore?gameID=${gid}&fantasyPoints=true&PPRScoring=true`);
+                if (g.body && g.body.gameStatus) {
+                  console.log(`${gid}: gameStatus="${g.body.gameStatus}", gameStatusCode="${g.body.gameStatusCode}", currentPeriod="${g.body.currentPeriod}", gameClock="${g.body.gameClock}"`);
+                } else {
+                  console.log(`${gid}: ${JSON.stringify(g.body || g)}`);
+                }
+              } catch(e) {
+                console.log(`${gid}: fetch failed - ${e.message}`);
+              }
+            }
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT

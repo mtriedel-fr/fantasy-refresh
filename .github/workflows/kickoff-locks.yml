@@ -39,6 +39,12 @@ jobs:
           // of what any other code in this file happens to do.
           const BASE_SEASON = SEASON;
           const T01_HOST = 'tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com';
+          // Real, confirmed first kickoff of the actual regular season
+          // (NE@SEA, Sept 9 2026, 8:20pm ET / 2026-09-10T00:20:00Z) —
+          // same value already confirmed and used for the draft-lock
+          // feature earlier tonight. Any game before this timestamp
+          // cannot possibly be a genuine regular-season game.
+          const REAL_SEASON_KICKOFF_MS = 1788913200000;
 
           function fetchJson(url, headers) {
             return new Promise((resolve, reject) => {
@@ -345,7 +351,32 @@ jobs:
                   week = regularSeasonWeek;
                 }
                 console.log(`  ${leagueId}: ${leagueIsPreseason ? 'preseason' : 'regular season'}, week ${week}, path season "${seasonKey}"`);
-                await lockLeagueWeek(leagueId, week, games, seasonKey);
+                // A regular-season league must never lock a team based
+                // on a preseason game — confirmed as a real, live bug:
+                // today's real games (fetched once, globally, above)
+                // are whatever's actually being played right now, which
+                // during this entire window is exclusively preseason,
+                // and that same shared array was being passed to every
+                // league's lockLeagueWeek() call regardless of type.
+                // The earlier fix corrected which PATH locks land at
+                // (so a preseason league's locks stop overwriting a
+                // regular-season league's), but never filtered the
+                // actual games being locked against — a preseason
+                // team's game was still being treated as evidence that
+                // team is locked for the real season's Week 1, months
+                // before that's actually true. REAL_SEASON_KICKOFF_MS
+                // is the confirmed, real first kickoff of the actual
+                // regular season — any game before that timestamp
+                // cannot possibly be a genuine regular-season game,
+                // regardless of what Tank01's own season-type reporting
+                // says.
+                const gamesForThisLeague = leagueIsPreseason
+                  ? games
+                  : games.filter(g => {
+                      const t = g.gameTime_epoch ? g.gameTime_epoch * 1000 : (g.gameTime ? new Date(g.gameTime).getTime() : 0);
+                      return t >= REAL_SEASON_KICKOFF_MS;
+                    });
+                await lockLeagueWeek(leagueId, week, gamesForThisLeague, seasonKey);
               } catch(e) {
                 console.error(`Failed locking ${leagueId}:`, e.message);
               }
