@@ -862,6 +862,53 @@ jobs:
               return;
             }
 
+            // Genuinely date-independent recovery — checks our OWN
+            // currently-stored liveGameStatus directly, rather than any
+            // calendar date window. Confirmed as a real, live bug: the
+            // "check yesterday too" fix above only carries a game
+            // forward if a fresh date-based check still finds it
+            // non-final at that exact moment. A game that finished
+            // sometime between two runs would already read as complete
+            // by the time it's rechecked, so nothing would ever notice
+            // it needed its final status actually written into our own
+            // storage — it just stays frozen at whatever it looked like
+            // the last time anyone checked, potentially forever. Using
+            // each game's own known ID instead of a date removes the
+            // calendar dependency behind both this and the earlier bug
+            // entirely — it recovers any stuck game, whenever it
+            // actually happened, not just ones still live on a specific
+            // day.
+            try {
+              const storedStatus = await firebaseGet(`/liveGameStatus/${SEASON}/${seasonType}_wk${week}.json`).catch(() => null);
+              const storedGames = (storedStatus && storedStatus.games) || {};
+              const stuckIds = Object.keys(storedGames).filter(gid => storedGames[gid].statusCode !== 2);
+              if (stuckIds.length) {
+                console.log(`Checking ${stuckIds.length} game(s) our own records still show as non-final, by their own ID directly...`);
+                for (const gid of stuckIds) {
+                  // Already covered by today/yesterday above — no need
+                  // to duplicate the check or the API call.
+                  if (games.some(g => (g.gameID || g.gameId) === gid)) continue;
+                  try {
+                    const real = await t01(`/getNFLBoxScore?gameID=${gid}&fantasyPoints=true&PPRScoring=true`);
+                    if (real.body && real.body.gameStatus) {
+                      const s = real.body.gameStatus.toLowerCase();
+                      if (s.includes('final') || s.includes('completed') || s.includes('progress')) {
+                        console.log(`  ${gid}: our records show non-final, but real status is "${real.body.gameStatus}" — recovering`);
+                        games.push({
+                          gameID: gid, gameStatus: real.body.gameStatus,
+                          home: storedGames[gid].home, away: storedGames[gid].away
+                        });
+                      }
+                    }
+                  } catch(e) {
+                    console.log(`  ${gid}: recheck failed - ${e.message}`);
+                  }
+                }
+              }
+            } catch(e) {
+              console.log(`  Stuck-game recovery check failed: ${e.message}`);
+            }
+
             // Filter to active/final games
             const activeGames = games.filter(g => {
               const s = (g.gameStatus || g.status || '').toLowerCase();
