@@ -7157,10 +7157,7 @@ function closeFullBoardStats(){
 }
 
 function renderFbsPosFilter(){
-  var positions = ['ALL'];
-  fbsAllPlayers.forEach(function(p){
-    if(p.pos && positions.indexOf(p.pos) === -1) positions.push(p.pos);
-  });
+  var positions = ['ALL', 'QB', 'RB', 'WR', 'TE', 'DEF'];
   var html = positions.map(function(pos){
     var active = pos === fbsActivePos;
     return '<button onclick="setFbsPosFilter(\'' + pos + '\')" style="font-family:var(--fd);font-size:11px;font-weight:800;padding:5px 12px;border-radius:16px;border:1.5px solid ' + (active ? 'var(--pu)' : 'var(--bdr)') + ';background:' + (active ? 'var(--pu)' : 'transparent') + ';color:' + (active ? '#fff' : 'var(--ink3)') + ';cursor:pointer;">' + pos + '</button>';
@@ -7189,7 +7186,7 @@ function setFbsSort(col){
 function renderFbsBody(){
   var list = fbsActivePos === 'ALL' ? fbsAllPlayers : fbsAllPlayers.filter(function(p){ return p.pos === fbsActivePos; });
   if(!list.length){
-    document.getElementById('fbs-body').innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--ink3);font-size:13px;">No players at this position yet.</div>';
+    document.getElementById('fbs-body').innerHTML = '<div style="text-align:center;padding:40px 0;color:#7AACAC;font-size:13px;">No players at this position yet.</div>';
     return;
   }
 
@@ -7212,14 +7209,25 @@ function renderFbsBody(){
     return 0;
   });
 
+  // Hardcoded, theme-independent colors — this modal (.recap-box) has
+  // its own fixed dark background (#080E0E) regardless of the app's
+  // light/dark theme setting. The var(--ink)/--ink3 theme variables
+  // flip to dark values in light mode (meant for a light background
+  // elsewhere in the app), which against this always-dark modal meant
+  // dark-on-dark, nearly invisible text — a pre-existing mismatch in
+  // this modal that simply wasn't visible before, since this table
+  // only ever showed an empty-state message until real data started
+  // flowing through it. #E8F8F8 matches the same light color already
+  // proven elsewhere in this file (the header logo) against this same
+  // kind of fixed-dark surface.
   function headerCell(label, key, align){
     var active = fbsSortCol === key;
     var arrow = active ? (fbsSortDir === 'asc' ? ' ▲' : ' ▼') : '';
-    return '<th onclick="setFbsSort(\'' + key + '\')" style="text-align:' + align + ';padding:8px 12px;font-family:var(--fd);font-size:10px;font-weight:800;color:' + (active ? 'var(--pu)' : 'var(--ink3)') + ';text-transform:uppercase;letter-spacing:.4px;cursor:pointer;white-space:nowrap;user-select:none;">' + label + arrow + '</th>';
+    return '<th onclick="setFbsSort(\'' + key + '\')" style="text-align:' + align + ';padding:8px 12px;font-family:var(--fd);font-size:10px;font-weight:800;color:' + (active ? 'var(--pu)' : '#7AACAC') + ';text-transform:uppercase;letter-spacing:.4px;cursor:pointer;white-space:nowrap;user-select:none;">' + label + arrow + '</th>';
   }
 
   var html = '<table style="width:100%;border-collapse:collapse;">'
-    + '<thead><tr style="border-bottom:1px solid var(--bdr);position:sticky;top:0;background:var(--bg);">'
+    + '<thead><tr style="border-bottom:1px solid #1A3A3A;position:sticky;top:0;background:#080E0E;">'
     +   headerCell('Player', 'name', 'left')
     +   headerCell('Pos', 'pos', 'center')
     +   headerCell('Team', 'team', 'center')
@@ -7231,23 +7239,23 @@ function renderFbsBody(){
     var breakdownId = 'fbs-bd-' + i;
     var hasBreakdown = p.breakdown && p.breakdown.length > 0;
     var rows = hasBreakdown ? p.breakdown.map(function(b){
-      var ptsColor = b.points > 0 ? 'var(--or)' : (b.points < 0 ? 'var(--pk)' : 'var(--ink3)');
+      var ptsColor = b.points > 0 ? 'var(--or)' : (b.points < 0 ? 'var(--pk)' : '#7AACAC');
       var sign = b.points > 0 ? '+' : '';
       return '<div style="display:flex;justify-content:space-between;padding:4px 0;font-family:var(--fd);font-size:12px;">'
-        + '<span style="color:var(--ink2);">' + escapeHtmlFR(b.label) + ' (' + b.stat + ')</span>'
+        + '<span style="color:#B8DCDC;">' + escapeHtmlFR(b.label) + ' (' + b.stat + ')</span>'
         + '<span style="color:' + ptsColor + ';font-weight:700;">' + sign + b.points.toFixed(2) + '</span>'
         + '</div>';
     }).join('') : '';
     var rowClick = hasBreakdown ? ' onclick="var el=document.getElementById(\'' + breakdownId + '\');el.style.display=el.style.display===\'none\'?\'block\':\'none\';" style="cursor:pointer;"' : '';
     var ownText = (typeof p.ownership === 'number') ? p.ownership.toFixed(1) + '%' : '—';
-    return '<tr' + rowClick + ' style="border-top:1px solid var(--bdr);">'
-      + '<td style="padding:10px 12px;font-family:var(--fd);font-size:14px;font-weight:700;color:var(--ink);">' + escapeHtmlFR(p.name) + '</td>'
-      + '<td style="padding:10px 12px;text-align:center;font-family:var(--fd);font-size:12px;color:var(--ink3);">' + escapeHtmlFR(p.pos || '') + '</td>'
-      + '<td style="padding:10px 12px;text-align:center;font-family:var(--fd);font-size:12px;color:var(--ink3);">' + escapeHtmlFR(p.team || '') + '</td>'
+    return '<tr' + rowClick + ' style="border-top:1px solid #1A3A3A;">'
+      + '<td style="padding:10px 12px;font-family:var(--fd);font-size:14px;font-weight:700;color:#E8F8F8;">' + escapeHtmlFR(p.name) + '</td>'
+      + '<td style="padding:10px 12px;text-align:center;font-family:var(--fd);font-size:12px;color:#7AACAC;">' + escapeHtmlFR(p.pos || '') + '</td>'
+      + '<td style="padding:10px 12px;text-align:center;font-family:var(--fd);font-size:12px;color:#7AACAC;">' + escapeHtmlFR(p.team || '') + '</td>'
       + '<td style="padding:10px 12px;text-align:right;font-family:var(--fd);font-size:15px;font-weight:900;color:var(--or);">' + p.pts.toFixed(2) + '</td>'
-      + '<td style="padding:10px 12px;text-align:right;font-family:var(--fd);font-size:13px;font-weight:700;color:var(--ink2);">' + ownText + '</td>'
+      + '<td style="padding:10px 12px;text-align:right;font-family:var(--fd);font-size:13px;font-weight:700;color:#B8DCDC;">' + ownText + '</td>'
       + '</tr>'
-      + '<tr><td colspan="5" style="padding:0;"><div id="' + breakdownId + '" style="display:none;padding:6px 20px 12px;background:var(--bg3);">' + rows + '</div></td></tr>';
+      + '<tr><td colspan="5" style="padding:0;"><div id="' + breakdownId + '" style="display:none;padding:6px 20px 12px;background:#0D1616;">' + rows + '</div></td></tr>';
   }).join('');
 
   html += '</tbody></table>';
