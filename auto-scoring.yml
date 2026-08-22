@@ -28,6 +28,10 @@ on:
         description: 'Specific league ID to score (leave blank for all active leagues)'
         required: false
         default: ''
+      game_date:
+        description: 'Re-score a specific past date instead of today (format YYYYMMDD, e.g. 20260814) — use this to recover a day that was scored incorrectly due to a since-fixed bug, then let normal runs resume covering today going forward.'
+        required: false
+        default: ''
 
 jobs:
   score-lineups:
@@ -43,14 +47,41 @@ jobs:
           MANUAL_SEASON_TYPE: ${{ inputs.season_type }}
           LOCK_SCORES: ${{ inputs.lock_scores }}
           MANUAL_LEAGUE: ${{ inputs.league_id }}
+          MANUAL_GAME_DATE: ${{ inputs.game_date }}
         run: |
           node << 'SCRIPT'
           const https = require('https');
 
+          // Strips a trailing name suffix (Jr, Sr, II, III, IV, V —
+          // with or without a period) for matching purposes only.
+          // Confirmed as a real, recurring failure mode tonight: Ted
+          // Hurst III's lineup entry stores the plain "Ted Hurst",
+          // while Tank01's own data likely carries the full suffixed
+          // name, so an exact-string match silently failed even though
+          // both clearly refer to the same real player. This is a
+          // general risk for any player with a suffix, not a one-off
+          // fix specific to this one name. Placed at true top-level
+          // scope (not nested inside main() or scoreLeague()) so both
+          // functions can actually call it — they're siblings, not
+          // nested within each other.
+          function stripNameSuffix(name) {
+            return (name || '').replace(/\s+(jr|sr|ii|iii|iv|v)\.?$/i, '').trim();
+          }
+
           const FB_URL      = process.env.FIREBASE_DB_URL;
           const FB_TOKEN    = process.env.FIREBASE_AUTH_TOKEN;
           const T01_KEY     = process.env.TANK01_KEY;
-          const SEASON      = process.env.FR_SEASON || '2026';
+          let SEASON      = process.env.FR_SEASON || '2026';
+          // Stable, never-reassigned — a league's own settings.season
+          // represents which calendar year it belongs to (always the
+          // plain year, regardless of preseason/regular status), a
+          // genuinely different concept from SEASON itself, which gets
+          // dynamically reassigned to the "P"-suffixed variant below to
+          // pick the right Firebase path. Comparing settings.season
+          // against the reassigned SEASON meant every league failed
+          // this check on every single preseason run, since 2026 (a
+          // league's real, correct value) can never equal 2026P.
+          const BASE_SEASON = SEASON;
           const T01_HOST    = 'tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com';
           const IS_LOCK_RUN = process.env.LOCK_SCORES === 'true' ||
                               new Date().getUTCDay() === 2; // Tuesday
@@ -104,16 +135,24 @@ jobs:
               const rawPa = p.ptsAllowed != null ? p.ptsAllowed : p.pointsAllowed;
               const pa = rawPa != null ? parseFloat(rawPa) : null;
               if (pa !== null) {
-                let paBonus = 0;
-                if      (pa === 0)  paBonus = 10;
-                else if (pa <= 6)   paBonus = 7;
-                else if (pa <= 13)  paBonus = 4;
-                else if (pa <= 20)  paBonus = 1;
-                else if (pa <= 27)  paBonus = 0;
-                else if (pa <= 34)  paBonus = -1;
-                else                paBonus = -4;
+                let paBonus = 0, tierRange = '';
+                if      (pa === 0)  { paBonus = 10; tierRange = '0'; }
+                else if (pa <= 6)   { paBonus = 7;  tierRange = '1-6'; }
+                else if (pa <= 13)  { paBonus = 4;  tierRange = '7-13'; }
+                else if (pa <= 20)  { paBonus = 1;  tierRange = '14-20'; }
+                else if (pa <= 27)  { paBonus = 0;  tierRange = '21-27'; }
+                else if (pa <= 34)  { paBonus = -1; tierRange = '28-34'; }
+                else                { paBonus = -4; tierRange = '35+'; }
                 pts += paBonus;
-                breakdown.push({ label: `Points Allowed (${pa})`, stat: pa, points: paBonus });
+                // Real tier range the value actually falls into, matching
+                // the exact thresholds just above — not an approximation.
+                // Fixes a confirmed, real display bug too: the raw value
+                // used to be embedded directly in the label AND passed
+                // separately as stat, so the UI (which always appends
+                // "(stat)" after the label) showed it twice — "Points
+                // Allowed (17)(17)". Shown once now, same as every other
+                // breakdown row.
+                breakdown.push({ label: 'Points Allowed', stat: `${pa} pts allowed, ${tierRange} tier`, points: paBonus });
               }
             }
             return { pts: Math.round(pts * 100) / 100, breakdown };
@@ -188,7 +227,21 @@ jobs:
           }
 
           function firebaseGet(path) {
-            return fetchJson(FB_URL + path, {});
+            // Append auth token — reads to paths without their own
+            // explicit public .read rule (like the parent /leagues node
+            // itself, as opposed to a specific league's own data) are
+            // rejected without it. Confirmed directly tonight in
+            // kickoff-locks.yml's identical code: getActiveLeagues()'s
+            // attempt to read the full /leagues node was being silently
+            // denied every run, since that parent node has no .read
+            // rule of its own — only each specific league underneath it
+            // does, and rules don't cascade upward from children to a
+            // parent — falling back to a hardcoded, single-league list
+            // every time as a result.
+            const FB_TOKEN = process.env.FIREBASE_AUTH_TOKEN;
+            const sep = path.includes('?') ? '&' : '?';
+            const authedPath = FB_TOKEN ? `${path}${sep}auth=${FB_TOKEN}` : path;
+            return fetchJson(FB_URL + authedPath, {});
           }
 
           function t01(path) {
@@ -229,16 +282,42 @@ jobs:
             // recognized as being in preseason mode. Calendar date is
             // known with certainty; Tank01's own answer isn't trustworthy
             // for "what week is it" during this specific window.
+            // Date computed in real US Eastern time throughout — same
+            // fix already proven correct for the game-finding logic and
+            // kickoff-locks.yml tonight. This function's own date math
+            // was never updated to match, and was still vulnerable to
+            // the identical UTC-midnight-crossover bug: confirmed
+            // directly tonight that a run's own log timestamp was
+            // already Aug 15 in UTC while still Aug 14 in ET, pushing
+            // the estimated week one day (and one full week boundary)
+            // too far ahead — which meant scoring looked for lineups
+            // under the wrong week entirely and silently found none.
             const now = new Date();
-            const month = now.getUTCMonth() + 1; // 1-based
-            const day = now.getUTCDate();
-            if (month === 8 || (month === 9 && day <= 8)) {
-              // Estimate preseason week based on date
-              // Preseason Week 1 typically starts ~Aug 7
-              const aug1 = new Date(`${now.getUTCFullYear()}-08-01`);
-              const daysSinceAug1 = Math.floor((now - aug1) / (1000 * 60 * 60 * 24));
-              const psWeek = Math.min(4, Math.max(1, Math.floor(daysSinceAug1 / 7) + 1));
-              console.log(`Preseason window (by date) — estimated week ${psWeek}`);
+            const etParts = new Intl.DateTimeFormat('en-CA', {
+              timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit'
+            }).format(now).split('-').map(Number);
+            const [etYear, etMonth, etDay] = etParts;
+            if (etMonth === 8 || (etMonth === 9 && etDay <= 8)) {
+              // Real, explicit calendar for this season's preseason
+              // weeks — NOT a "days since Aug 1 divided by 7" formula.
+              // Confirmed directly tonight that naive math drifts out of
+              // sync with the actual, real game windows: Aug 15 is
+              // genuinely still within the established Week 2 window
+              // (Aug 13-17), but the old formula had already rolled over
+              // to Week 3 a day early, since 7-day math doesn't actually
+              // line up evenly against these real dates. This caused a
+              // genuine, confusing split — the backend correctly locking
+              // "Week 3" games while the site itself, using a completely
+              // different method (advance only once a week has finished
+              // and stayed final 24h), correctly stayed on Week 2, since
+              // Week 2 hadn't actually finished yet.
+              const mmdd = etMonth * 100 + etDay; // e.g. Aug 15 -> 815
+              let psWeek;
+              if (mmdd <= 812)      psWeek = 1; // through Aug 12 — HOF game, before Week 2 starts
+              else if (mmdd <= 819) psWeek = 2; // Aug 13-19 — real games Aug 13-17
+              else if (mmdd <= 826) psWeek = 3; // Aug 20-26 — real games Aug 20-23
+              else                  psWeek = 4; // Aug 27 onward — real games Aug 27-30
+              console.log(`Preseason window (by ET date ${etYear}-${String(etMonth).padStart(2,'0')}-${String(etDay).padStart(2,'0')}) — calendar week ${psWeek}`);
               return { week: psWeek, seasonType: 'Preseason' };
             }
 
@@ -291,8 +370,8 @@ jobs:
                     console.log(`  ⊘ ${id}: skipped — settings.active is explicitly false`);
                     continue;
                   }
-                  if (settings && settings.season != null && String(settings.season) !== String(SEASON)) {
-                    console.log(`  ⊘ ${id}: skipped — settings.season (${settings.season}) doesn't match current season (${SEASON})`);
+                  if (settings && settings.season != null && String(settings.season) !== String(BASE_SEASON)) {
+                    console.log(`  ⊘ ${id}: skipped — settings.season (${settings.season}) doesn't match current season (${BASE_SEASON})`);
                     continue;
                   }
                   active.push(id);
@@ -340,17 +419,30 @@ jobs:
 
               for (const [slotId, player] of Object.entries(lineup.slots)) {
                 if (!player) continue;
-                let stats = playerStats[player.id] || playerStats[(player.name || '').toLowerCase()];
-                if (!stats) {
-                  console.log(`    ❌ NO MATCH: lineup has "${player.name}" (id: ${player.id}) — not found in playerStats`);
+                let stats = playerStats[player.id] || playerStats[(player.name || '').toLowerCase()] || playerStats[stripNameSuffix((player.name || '').toLowerCase())];
+                let result;
+                if (stats) {
+                  result = calcDKPoints(stats, player.pos);
+                } else {
+                  // Not found in TODAY's stats — this player's game
+                  // simply wasn't today (already happened on an earlier
+                  // day this same fantasy week, e.g. a week spanning
+                  // Thu-Mon, or hasn't happened yet). Preserve whatever
+                  // was already computed for them in the previous run
+                  // rather than zeroing out real, already-earned points
+                  // just because today's date-specific lookup doesn't
+                  // happen to include them. Confirmed this was the exact
+                  // cause of last night's already-scored players getting
+                  // wiped out the moment tonight's games started scoring.
+                  const existingPts = (existing && existing.slotPts && typeof existing.slotPts[slotId] === 'number') ? existing.slotPts[slotId] : 0;
+                  const existingBreakdown = (existing && existing.slotBreakdown && existing.slotBreakdown[slotId]) ? existing.slotBreakdown[slotId] : [];
+                  result = { pts: existingPts, breakdown: existingBreakdown };
+                  if (existingPts) {
+                    console.log(`    ↩️  PRESERVED: "${player.name}" not in today's data — kept prior score of ${existingPts}`);
+                  } else {
+                    console.log(`    ❌ NO MATCH: lineup has "${player.name}" (id: ${player.id}) — not found in playerStats, no prior score to preserve`);
+                  }
                 }
-                // Always use our own calculation, not Tank01's own
-                // fantasyPoints value — confirmed earlier (Baker Mayfield,
-                // real stat line) that Tank01's own number doesn't
-                // reliably match our specific scoring weights, so
-                // trusting it first was silently masking real production
-                // whenever it disagreed with our actual scoring rules.
-                const result = stats ? calcDKPoints(stats, player.pos) : { pts: 0, breakdown: [] };
                 slotPts[slotId] = Math.round(result.pts * 100) / 100;
                 slotBreakdown[slotId] = result.breakdown;
                 if (player.pos === 'DEF' && stats) {
@@ -421,9 +513,28 @@ jobs:
               }
             }
 
-            // Update week meta
+            // Update week meta — week itself only ever advances here
+            // once this week is genuinely, fully finalized (allFinal).
+            // Confirmed directly as a real, live bug: writing the
+            // current week unconditionally on every run meant the
+            // moment ANY game got scored — even a single catch-up game,
+            // even mid-week with most of the week's real games still
+            // unplayed — every downstream reader (weekly-prep.yml,
+            // home.html, league.html, all of which treat meta.week + 1
+            // as "the current, upcoming week") would immediately jump
+            // ahead a full week early. lastScored/allFinal/gamesActive
+            // still update every run regardless, as real-time status —
+            // only the week number itself needs to wait for the real
+            // finish line.
+            const existingMeta = await firebaseGet(`/leagues/${leagueId}/season/${SEASON}/meta.json`).catch(() => null);
+            // week - 1 (not week) for the "never written before" case —
+            // every downstream reader adds +1 to get "the current week
+            // to show", so an initial value has to be one behind the
+            // real, actual current week for that math to land correctly
+            // on a league's very first-ever run.
+            const metaWeekToWrite = allFinal ? week : ((existingMeta && typeof existingMeta.week === 'number') ? existingMeta.week : week - 1);
             await firebasePut(`/leagues/${leagueId}/season/${SEASON}/meta.json`, {
-              week, lastScored: Date.now(), allFinal,
+              week: metaWeekToWrite, lastScored: Date.now(), allFinal,
               gamesActive: activeGames.length
             });
 
@@ -660,6 +771,18 @@ jobs:
           // ── MAIN ───────────────────────────────────────────────
           async function main() {
             const { week, seasonType } = await getCurrentWeekInfo();
+            // Fixes a real, confirmed collision: preseason weeks 1-4 and
+            // regular-season weeks 1-4 previously shared the exact same
+            // /season/${SEASON}/${week} path, since nothing distinguished
+            // them — a league scored in both would have regular-season
+            // week 1's real data silently overwrite preseason week 1's.
+            // Reassigning SEASON here, before any other code in this run
+            // reads it, means every existing path reference throughout
+            // this whole file automatically lands in a separate,
+            // non-colliding namespace for preseason data — no need to
+            // touch the dozens of individual places that build a path
+            // with it.
+            if (seasonType === 'Preseason') SEASON = SEASON + 'P';
             const leagues = await getActiveLeagues();
 
             console.log(`\n=== Auto-Scoring | Week ${week} | ${seasonType} | ${new Date().toISOString()} ===`);
@@ -690,10 +813,15 @@ jobs:
             // the fallback to yesterday never triggers — it just
             // confidently locks onto the wrong day entirely.
             const nowDate = new Date();
-            const etDate = new Intl.DateTimeFormat('en-CA', {
+            const autoEtDate = new Intl.DateTimeFormat('en-CA', {
               timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit'
             }).format(nowDate).replace(/-/g, '');
-            console.log(`Today in US Eastern time: ${etDate}`);
+            // Manual override — re-score a specific past date on demand,
+            // for recovering a day that scored incorrectly due to a
+            // since-fixed bug. Normal runs (no override) always use
+            // today's real date, computed above.
+            const etDate = process.env.MANUAL_GAME_DATE || autoEtDate;
+            console.log(etDate === autoEtDate ? `Today in US Eastern time: ${etDate}` : `⚠️  Manual override — re-scoring date ${etDate} instead of today (${autoEtDate})`);
             let games = [];
             try {
               const gamesData = await t01(`/getNFLScoresOnly?gameDate=${etDate}`);
@@ -703,9 +831,90 @@ jobs:
               console.log(`  gameDate=${etDate} attempt failed: ${e.message}`);
             }
 
+            // Also check yesterday for any game that hasn't reached
+            // Final yet — confirmed directly tonight as a real, live
+            // bug: a game starting late enough to run past midnight ET
+            // (any West Coast game, Sunday/Monday Night Football, or
+            // anything going to overtime) was getting silently dropped
+            // from tracking forever the instant the calendar date
+            // rolled over, since this script only ever checked a single
+            // date per run. SF@LAC (real kickoff 10pm ET) was still
+            // genuinely live at 11:58pm ET, then simply never got
+            // checked again — stuck showing a live snapshot from just
+            // before midnight even after the real game had long since
+            // finished. Only pulls in yesterday's NON-final games
+            // specifically, so already-completed games from the prior
+            // day aren't unnecessarily reprocessed every run.
+            if (!process.env.MANUAL_GAME_DATE) {
+              const yesterdayDate = new Date(nowDate.getTime() - 24*60*60*1000);
+              const autoEtYesterday = new Intl.DateTimeFormat('en-CA', {
+                timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit'
+              }).format(yesterdayDate).replace(/-/g, '');
+              try {
+                const yData = await t01(`/getNFLScoresOnly?gameDate=${autoEtYesterday}`);
+                const yGames = Object.values(yData.body || {}).filter(g => {
+                  const s = (g.gameStatus || g.status || '').toLowerCase();
+                  return !s.includes('final') && !s.includes('completed');
+                });
+                if (yGames.length) {
+                  console.log(`Found ${yGames.length} still-in-progress game(s) from yesterday (${autoEtYesterday}) — carrying forward so they don't get dropped mid-game`);
+                  games = games.concat(yGames);
+                }
+              } catch(e) {
+                console.log(`  yesterday (${autoEtYesterday}) check failed: ${e.message}`);
+              }
+            }
+
             if (!games.length) {
               console.log(`No ${seasonType} games found for week ${week} — nothing to score.`);
               return;
+            }
+
+            // Genuinely date-independent recovery — checks our OWN
+            // currently-stored liveGameStatus directly, rather than any
+            // calendar date window. Confirmed as a real, live bug: the
+            // "check yesterday too" fix above only carries a game
+            // forward if a fresh date-based check still finds it
+            // non-final at that exact moment. A game that finished
+            // sometime between two runs would already read as complete
+            // by the time it's rechecked, so nothing would ever notice
+            // it needed its final status actually written into our own
+            // storage — it just stays frozen at whatever it looked like
+            // the last time anyone checked, potentially forever. Using
+            // each game's own known ID instead of a date removes the
+            // calendar dependency behind both this and the earlier bug
+            // entirely — it recovers any stuck game, whenever it
+            // actually happened, not just ones still live on a specific
+            // day.
+            try {
+              const storedStatus = await firebaseGet(`/liveGameStatus/${SEASON}/${seasonType}_wk${week}.json`).catch(() => null);
+              const storedGames = (storedStatus && storedStatus.games) || {};
+              const stuckIds = Object.keys(storedGames).filter(gid => storedGames[gid].statusCode !== 2);
+              if (stuckIds.length) {
+                console.log(`Checking ${stuckIds.length} game(s) our own records still show as non-final, by their own ID directly...`);
+                for (const gid of stuckIds) {
+                  // Already covered by today/yesterday above — no need
+                  // to duplicate the check or the API call.
+                  if (games.some(g => (g.gameID || g.gameId) === gid)) continue;
+                  try {
+                    const real = await t01(`/getNFLBoxScore?gameID=${gid}&fantasyPoints=true&PPRScoring=true`);
+                    if (real.body && real.body.gameStatus) {
+                      const s = real.body.gameStatus.toLowerCase();
+                      if (s.includes('final') || s.includes('completed') || s.includes('progress')) {
+                        console.log(`  ${gid}: our records show non-final, but real status is "${real.body.gameStatus}" — recovering`);
+                        games.push({
+                          gameID: gid, gameStatus: real.body.gameStatus,
+                          home: storedGames[gid].home, away: storedGames[gid].away
+                        });
+                      }
+                    }
+                  } catch(e) {
+                    console.log(`  ${gid}: recheck failed - ${e.message}`);
+                  }
+                }
+              }
+            } catch(e) {
+              console.log(`  Stuck-game recovery check failed: ${e.message}`);
             }
 
             // Filter to active/final games
@@ -722,7 +931,64 @@ jobs:
 
             console.log(`Found ${activeGames.length} active/final game(s) of ${games.length} total`);
 
-            const allFinal = games.every(g => {
+            // allFinal must reflect the ENTIRE fantasy week, not just
+            // today — a week spanning multiple real-world nights (e.g.
+            // Thu-Mon) shouldn't be declared final just because tonight's
+            // games happen to all be done, with more games and real
+            // points still coming later in the same week. Confirmed this
+            // was happening: allFinal was computed purely from today's
+            // games list, with no awareness of the rest of the week at
+            // all. Uses the cached full-season schedule (every game for
+            // this week, regardless of which day it falls on) to find
+            // the actual last game-day, and only allows allFinal=true
+            // once today IS that last day. Earlier days' games will
+            // already be done and correctly scored by then (via the
+            // score-preservation fix above), so this doesn't need to
+            // separately re-check their status.
+            //
+            // Confirmed directly tonight: the path this used to check
+            // (.../weeks/week{N}.json, as a separate path segment) never
+            // matched anything real — the actual cached schedule lives
+            // at the flat /nflSchedule/{season}/{seasonType} path, with
+            // "weeks" and "week{N}" as nested object KEYS inside that
+            // single document, not separate path segments (same
+            // structure worker.js's own getCachedScheduleWeek already
+            // correctly reads). This meant the lookup below always
+            // failed, every single run, silently falling through to
+            // whatever the default was — which was "true" (assume today
+            // IS the last day), the opposite of safe. That's the actual,
+            // confirmed root cause of a real preseason week getting
+            // marked fully final while it still had unplayed games
+            // days away. Default flipped to false too, as a second,
+            // independent safety net — if this can't be verified for
+            // any reason (even a transient one), staying on the current
+            // week too long is a far smaller problem than advancing
+            // early.
+            let isLastGameDayOfWeek = false; // unsafe default was true — see comment above
+            try {
+              const cachedSeason = await firebaseGet(`/nflSchedule/${SEASON}/${seasonType}.json`);
+              const cachedWeek = cachedSeason && cachedSeason.weeks && cachedSeason.weeks[`week${week}`];
+              if (Array.isArray(cachedWeek) && cachedWeek.length) {
+                const gameDates = cachedWeek
+                  .filter(g => g && g.time)
+                  .map(g => new Intl.DateTimeFormat('en-CA', {
+                    timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit'
+                  }).format(new Date(g.time)).replace(/-/g, ''));
+                if (gameDates.length) {
+                  const lastGameDate = gameDates.reduce((a, b) => (a > b ? a : b));
+                  isLastGameDayOfWeek = etDate >= lastGameDate;
+                  console.log(`  Week ${week} spans through ${lastGameDate} — today (${etDate}) is${isLastGameDayOfWeek ? '' : ' NOT'} the last game day.`);
+                } else {
+                  console.log(`  Cached week ${week} had no games with real time values — defaulting to NOT allowing allFinal today.`);
+                }
+              } else {
+                console.log(`  No cached schedule found for week ${week} — defaulting to NOT allowing allFinal today.`);
+              }
+            } catch (e) {
+              console.log(`  Could not check full-week schedule for allFinal: ${e.message} — defaulting to NOT allowing allFinal today.`);
+            }
+
+            const allFinal = isLastGameDayOfWeek && games.every(g => {
               const s = (g.gameStatus || g.status || '').toLowerCase();
               return s.includes('final') || s.includes('completed');
             });
@@ -745,21 +1011,26 @@ jobs:
                   // gameStatusCode is a REAL, documented Tank01 field
                   // (0=not started, 1=live, 2=final — see
                   // tank01.com/Guides_Game_Status_Code_NFL.html).
-                  // quarter/clock field names below are an educated guess
-                  // based on common sports-API naming conventions —
-                  // UNVERIFIED against a real live response, since no
-                  // games were live when this was written (mid-July,
-                  // before preseason). First real Thursday/Sunday of live
-                  // games should be checked against this — if the "PMR"
-                  // (quarter + clock) display comes back blank/wrong while
-                  // scores are updating fine, this is the spot to fix,
-                  // same pattern as the projections endpoint fix earlier.
+                  // clock/score field names below were confirmed correct
+                  // directly against a real live game's actual box score
+                  // response (Aug 20, 2026). quarter was the one field
+                  // that was wrong — the real field is currentPeriod,
+                  // not quarter/period/gamePeriod (none of which exist
+                  // in the real response at all). Confirmed value on a
+                  // finished game is the literal string "Final" — worth
+                  // a second look at the real value during a genuinely
+                  // live (not final) game, to confirm it's a clean
+                  // number/short label there too, not a longer phrase
+                  // like "2nd Quarter" that would need different
+                  // handling in how the client displays it.
                   liveGameStatus[gameId] = {
                     statusCode: bs.body.gameStatusCode != null ? Number(bs.body.gameStatusCode) : null,
-                    quarter:    bs.body.quarter || bs.body.period || bs.body.gamePeriod || null,
+                    quarter:    bs.body.currentPeriod || (bs.body.lineScore && bs.body.lineScore.period) || null,
                     clock:      bs.body.gameClock || bs.body.clock || bs.body.timeRemaining || null,
                     home:       game.home || game.homeTeamAbbr || game.homeTeam || '',
-                    away:       game.away || game.awayTeamAbbr || game.awayTeam || ''
+                    away:       game.away || game.awayTeamAbbr || game.awayTeam || '',
+                    homeScore:  bs.body.homePts != null ? Number(bs.body.homePts) : (bs.body.homeScore != null ? Number(bs.body.homeScore) : null),
+                    awayScore:  bs.body.awayPts != null ? Number(bs.body.awayPts) : (bs.body.awayScore != null ? Number(bs.body.awayScore) : null)
                   };
                 }
               } catch(e) {
@@ -769,13 +1040,24 @@ jobs:
 
             // Write live status globally (not per-league — the same for
             // everyone watching this week regardless of which league).
-            // Overwritten every run (every ~2 min during game windows),
-            // so it's always close to real-time without needing a
-            // separate live-polling system on the client.
+            // Merged with whatever's already stored, not a full
+            // replace — confirmed as a real, live bug: liveGameStatus
+            // starts fresh and empty every run, so a direct replace
+            // meant any game from earlier in the same week that wasn't
+            // part of THIS specific run's today/yesterday/stuck-
+            // recovery checks got silently wiped from storage on every
+            // single write. A fantasy week spans Thursday through
+            // Monday; days later, Thursday's and Friday's games are no
+            // longer "today," "yesterday," or "stuck" (they're
+            // correctly Final) — so they'd vanish from what's stored
+            // entirely, even though they're still very much part of
+            // this week and still need to display correctly.
             if (Object.keys(liveGameStatus).length) {
               try {
+                const existingStatus = await firebaseGet(`/liveGameStatus/${SEASON}/${seasonType}_wk${week}.json`).catch(() => null);
+                const mergedGames = { ...(existingStatus && existingStatus.games), ...liveGameStatus };
                 await firebasePut(`/liveGameStatus/${SEASON}/${seasonType}_wk${week}.json`, {
-                  games: liveGameStatus,
+                  games: mergedGames,
                   updatedAt: Date.now()
                 });
               } catch(e) {
@@ -785,7 +1067,23 @@ jobs:
 
             // Build player stats lookup
             const playerStats = {};
-            Object.values(boxScores).forEach(bs => {
+            const gameDetailedStats = {}; // gameId -> [{name, team, pos, pts, breakdown}, ...] — every player in that game, not just rostered ones
+            // Real position for each player, sourced from the actual
+            // player pool (Sleeper's own data) — confirmed directly
+            // tonight that Tank01's box score has no position field at
+            // all, for any player, only which stat category sub-objects
+            // (Rushing/Receiving/Defense/Kicking) they happened to
+            // accumulate stats in that game. That's unreliable to infer
+            // position from — an RB with an incidental special-teams
+            // tackle picks up a Defense sub-object too, structurally
+            // identical to what a real defensive player's entry looks
+            // like. This same real lookup was already built and
+            // correctly used in archiveWeekStats() below, just never
+            // connected to this real-time write, which is what All
+            // Players Stats actually reads from.
+            const realPosLookup = await getPlayerPosLookup();
+            Object.entries(boxScores).forEach(([gameId, bs]) => {
+              const thisGameStats = [];
               Object.entries(bs.playerStats || {}).forEach(([pid, stats]) => {
                 playerStats[pid] = stats;
                 // Tank01 ships a sleeperBotID field on player records in their other
@@ -797,7 +1095,28 @@ jobs:
                 // instead of always silently falling through to name-matching.
                 if (stats.sleeperBotID) playerStats[stats.sleeperBotID] = stats;
                 const name = (stats.longName || stats.playerName || '').toLowerCase();
-                if (name) playerStats[name] = stats;
+                if (name) {
+                  playerStats[name] = stats;
+                  const stripped = stripNameSuffix(name);
+                  if (stripped && stripped !== name && !playerStats[stripped]) playerStats[stripped] = stats;
+                }
+                // Detailed stats for EVERY player in this game, not just
+                // rostered ones — for the "click into a completed game"
+                // stats view. calcDKPoints()'s position argument only
+                // ever changes DEF-specific scoring (see that function),
+                // so offensive players score correctly here regardless
+                // of whether their exact position is confirmed.
+                const result = calcDKPoints(stats, null);
+                if (result.pts !== 0 || result.breakdown.length) {
+                  const realPos = name ? realPosLookup[name] : null;
+                  thisGameStats.push({
+                    name: stats.longName || stats.playerName || 'Unknown',
+                    team: stats.team || stats.teamAbv || '',
+                    pos: realPos || stats.pos || stats.position || stats.playerPosition || 'FLEX',
+                    pts: result.pts,
+                    breakdown: result.breakdown
+                  });
+                }
               });
               // Team defense (DST) lives in a completely separate object
               // from playerStats — confirmed via real testing earlier
@@ -844,7 +1163,30 @@ jobs:
                   console.log(`  🛡️  ${d.teamAbv} points-allowed adjusted: ${rawPtsAllowed} raw → ${adjustedPtsAllowed} (excluding ${oppDefTDs} opponent def/ST TD)`);
                 }
                 console.log(`  ✓ Mapped defense: ${d.teamAbv}`);
+                // Defense uses the real 'DEF' position, unlike offensive
+                // players above — this is the one case where the
+                // position argument to calcDKPoints() actually changes
+                // the scoring math (points-allowed tiers, sacks, etc.),
+                // and it's known with certainty here (not a guess).
+                const defResult = calcDKPoints(playerStats[d.teamAbv], 'DEF');
+                thisGameStats.push({
+                  name: d.teamAbv, team: d.teamAbv, pos: 'DEF',
+                  pts: defResult.pts, breakdown: defResult.breakdown
+                });
               });
+
+              // Persisted per-game (not merged across all of today's
+              // games) so the draft page can fetch "everyone who played
+              // in this specific game" when a completed game is
+              // selected — real fantasy points and stat breakdown for
+              // every player, not just whoever happens to be rostered.
+              if (thisGameStats.length) {
+                thisGameStats.sort((a, b) => b.pts - a.pts);
+                firebasePut(`/gameStats/${SEASON}/${gameId}.json`, {
+                  players: thisGameStats,
+                  updatedAt: Date.now()
+                }).catch(e => console.error(`Failed to write game stats for ${gameId}:`, e.message));
+              }
             });
             const realNames = Object.values(playerStats).map(s => s.longName || s.playerName).filter(Boolean);
             console.log(`  Sample of real names in this game's box score: ${[...new Set(realNames)].slice(0, 10).join(', ')}`);
@@ -917,7 +1259,14 @@ jobs:
             if (playerPosLookup) return playerPosLookup;
             playerPosLookup = {};
             try {
-              const pool = await firebaseGet(`/playerPool/${SEASON}/players.json`);
+              // BASE_SEASON (plain year), not SEASON — the player pool
+              // is season-type-independent and only ever written to the
+              // plain-year path (weekly-prep.yml, which writes it,
+              // never reassigns its own SEASON constant). SEASON here
+              // can be "2026P" during a preseason run, which would
+              // silently make this lookup always fail to find the real
+              // pool during exactly the runs that most need it.
+              const pool = await firebaseGet(`/playerPool/${BASE_SEASON}/players.json`);
               Object.values(pool || {}).forEach(p => {
                 if (p && p.name) playerPosLookup[p.name.toLowerCase()] = p.pos || '';
               });
@@ -1224,6 +1573,7 @@ jobs:
 
             let stillIn = week1.map(e => e.team);
             let eliminatedThisTargetWeek = [];
+            const eliminatedWhen = {}; // team -> {week, score, noShow}, for persisting a full status below
 
             weeks.forEach(w => {
               const sched = schedule.find(s => s.week === w);
@@ -1244,6 +1594,7 @@ jobs:
               elimThisWeek.forEach(e => {
                 const idx = stillIn.indexOf(e.team);
                 if (idx >= 0) stillIn.splice(idx, 1);
+                eliminatedWhen[e.team] = { week: w, score: Math.round((e.score || 0) * 100) / 100, noShow: !!e.noShow };
               });
 
               if (w === week) {
@@ -1251,7 +1602,7 @@ jobs:
               }
             });
 
-            return { eliminated: eliminatedThisTargetWeek, remaining: stillIn.length };
+            return { eliminated: eliminatedThisTargetWeek, remaining: stillIn.length, alive: stillIn, eliminatedWhen };
           }
 
           async function generateWeeklyRecap(leagueId, week, seasonType, settings) {
@@ -1274,6 +1625,31 @@ jobs:
                 console.error(`  Could not compute guillotine elimination for ${leagueId}:`, e.message);
                 return null;
               });
+
+              // Persist a real, per-team status — the actual point of
+              // this change. Previously league.html, home.html, and
+              // this recap feature each independently replayed the
+              // entire season from scratch every single time someone
+              // loaded a page, using three separate copies of this same
+              // formula that could quietly drift apart from each other.
+              // Now this is computed once, here, exactly when a week
+              // genuinely finishes — the same moment scores themselves
+              // go final — and every client just reads the answer,
+              // the same way scores/locks/salaries already work.
+              if (guillotine) {
+                const teamStatus = {};
+                (guillotine.alive || []).forEach(team => {
+                  teamStatus[team] = { status: 'alive' };
+                });
+                Object.entries(guillotine.eliminatedWhen || {}).forEach(([team, info]) => {
+                  teamStatus[team] = { status: 'eliminated', eliminatedWeek: info.week, score: info.score, noShow: info.noShow };
+                });
+                await firebasePut(`/leagues/${leagueId}/guillotineStatus/${SEASON}.json`, {
+                  teams: teamStatus,
+                  asOfWeek: week,
+                  updatedAt: Date.now()
+                }).catch(e => console.error(`  Could not persist guillotine status for ${leagueId}:`, e.message));
+              }
             }
 
             const teamScores = Object.values(thisWeekScores).filter(e => e && e.uid);
