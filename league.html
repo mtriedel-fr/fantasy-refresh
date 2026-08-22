@@ -2486,6 +2486,7 @@ function boot(){
     return !isNaN(Number(k)) && seasonData[k] && seasonData[k].length > 0;
   }).map(Number);
   if(loadedWks.length) currentWeek = Math.max.apply(null, loadedWks);
+  console.log('🔎 boot(): loadedWks=' + JSON.stringify(loadedWks) + ' → currentWeek=' + currentWeek);
   // Previously forced tab-yourweek (This Week — a full-screen overlay tab)
   // to be the default visible content here, unconditionally, every time
   // boot() ran. That's what was actually causing the full-screen takeover
@@ -5116,6 +5117,7 @@ function renderStandings(sorted, prevRank, curMap, wkHighName){
     var ctx = FRAuth.getLeagueCtx();
     var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
     var season = FR.seasonKey();
+    console.log('🔎 toggleStandingsRoster: teamName=' + teamName + ' uid=' + uid + ' currentWeek=' + currentWeek + ' season=' + season + ' leagueId=' + leagueId);
     Promise.all([
       FR.fb.get('/leagues/' + leagueId + '/lineups/' + season + '/week' + currentWeek + '/' + uid).catch(function(){ return null; }),
       FR.fb.get('/leagues/' + leagueId + '/season/' + season + '/' + currentWeek + '/' + uid).catch(function(){ return null; }),
@@ -5123,6 +5125,7 @@ function renderStandings(sorted, prevRank, curMap, wkHighName){
       fetchWeekSchedule(currentWeek).catch(function(){ return {}; })
     ]).then(function(results){
       var lineup = results[0], scoreEntry = results[1], locks = results[2] || {}, gameMap = results[3] || {};
+      console.log('🔎 toggleStandingsRoster RESULT for ' + teamName + ' (week ' + currentWeek + '): lineup=' + JSON.stringify(lineup) + ' scoreEntry.week=' + (scoreEntry && scoreEntry.week));
       cell.innerHTML = rosterColumn(lineup, scoreEntry, locks, false, gameMap);
       cell.dataset.loaded = '1';
     }).catch(function(){
