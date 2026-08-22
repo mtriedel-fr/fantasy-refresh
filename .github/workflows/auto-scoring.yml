@@ -1057,6 +1057,20 @@ jobs:
             // Build player stats lookup
             const playerStats = {};
             const gameDetailedStats = {}; // gameId -> [{name, team, pos, pts, breakdown}, ...] — every player in that game, not just rostered ones
+            // Real position for each player, sourced from the actual
+            // player pool (Sleeper's own data) — confirmed directly
+            // tonight that Tank01's box score has no position field at
+            // all, for any player, only which stat category sub-objects
+            // (Rushing/Receiving/Defense/Kicking) they happened to
+            // accumulate stats in that game. That's unreliable to infer
+            // position from — an RB with an incidental special-teams
+            // tackle picks up a Defense sub-object too, structurally
+            // identical to what a real defensive player's entry looks
+            // like. This same real lookup was already built and
+            // correctly used in archiveWeekStats() below, just never
+            // connected to this real-time write, which is what All
+            // Players Stats actually reads from.
+            const realPosLookup = await getPlayerPosLookup();
             Object.entries(boxScores).forEach(([gameId, bs]) => {
               const thisGameStats = [];
               Object.entries(bs.playerStats || {}).forEach(([pid, stats]) => {
@@ -1080,17 +1094,14 @@ jobs:
                 // stats view. calcDKPoints()'s position argument only
                 // ever changes DEF-specific scoring (see that function),
                 // so offensive players score correctly here regardless
-                // of whether their exact position is confirmed — 'pos'
-                // below is display-only, tried from a few plausible
-                // field names since Tank01 doesn't document this
-                // response shape, with 'FLEX' as an honest fallback
-                // label rather than guessing wrong.
+                // of whether their exact position is confirmed.
                 const result = calcDKPoints(stats, null);
                 if (result.pts !== 0 || result.breakdown.length) {
+                  const realPos = name ? realPosLookup[name] : null;
                   thisGameStats.push({
                     name: stats.longName || stats.playerName || 'Unknown',
                     team: stats.team || stats.teamAbv || '',
-                    pos: stats.pos || stats.position || stats.playerPosition || 'FLEX',
+                    pos: realPos || stats.pos || stats.position || stats.playerPosition || 'FLEX',
                     pts: result.pts,
                     breakdown: result.breakdown
                   });
@@ -1237,7 +1248,14 @@ jobs:
             if (playerPosLookup) return playerPosLookup;
             playerPosLookup = {};
             try {
-              const pool = await firebaseGet(`/playerPool/${SEASON}/players.json`);
+              // BASE_SEASON (plain year), not SEASON — the player pool
+              // is season-type-independent and only ever written to the
+              // plain-year path (weekly-prep.yml, which writes it,
+              // never reassigns its own SEASON constant). SEASON here
+              // can be "2026P" during a preseason run, which would
+              // silently make this lookup always fail to find the real
+              // pool during exactly the runs that most need it.
+              const pool = await firebaseGet(`/playerPool/${BASE_SEASON}/players.json`);
               Object.values(pool || {}).forEach(p => {
                 if (p && p.name) playerPosLookup[p.name.toLowerCase()] = p.pos || '';
               });
