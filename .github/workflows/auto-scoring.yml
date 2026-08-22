@@ -135,16 +135,24 @@ jobs:
               const rawPa = p.ptsAllowed != null ? p.ptsAllowed : p.pointsAllowed;
               const pa = rawPa != null ? parseFloat(rawPa) : null;
               if (pa !== null) {
-                let paBonus = 0;
-                if      (pa === 0)  paBonus = 10;
-                else if (pa <= 6)   paBonus = 7;
-                else if (pa <= 13)  paBonus = 4;
-                else if (pa <= 20)  paBonus = 1;
-                else if (pa <= 27)  paBonus = 0;
-                else if (pa <= 34)  paBonus = -1;
-                else                paBonus = -4;
+                let paBonus = 0, tierRange = '';
+                if      (pa === 0)  { paBonus = 10; tierRange = '0'; }
+                else if (pa <= 6)   { paBonus = 7;  tierRange = '1-6'; }
+                else if (pa <= 13)  { paBonus = 4;  tierRange = '7-13'; }
+                else if (pa <= 20)  { paBonus = 1;  tierRange = '14-20'; }
+                else if (pa <= 27)  { paBonus = 0;  tierRange = '21-27'; }
+                else if (pa <= 34)  { paBonus = -1; tierRange = '28-34'; }
+                else                { paBonus = -4; tierRange = '35+'; }
                 pts += paBonus;
-                breakdown.push({ label: `Points Allowed (${pa})`, stat: pa, points: paBonus });
+                // Real tier range the value actually falls into, matching
+                // the exact thresholds just above — not an approximation.
+                // Fixes a confirmed, real display bug too: the raw value
+                // used to be embedded directly in the label AND passed
+                // separately as stat, so the UI (which always appends
+                // "(stat)" after the label) showed it twice — "Points
+                // Allowed (17)(17)". Shown once now, same as every other
+                // breakdown row.
+                breakdown.push({ label: 'Points Allowed', stat: `${pa} pts allowed, ${tierRange} tier`, points: paBonus });
               }
             }
             return { pts: Math.round(pts * 100) / 100, breakdown };
