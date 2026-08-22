@@ -1,0 +1,59 @@
+name: One-Time Diagnostic — Compare Schedule vs LiveGameStatus Team Names
+
+# ONE-TIME USE — delete this file after running it once.
+# Compares the real, live /schedule endpoint's team abbreviations
+# against the real, stored liveGameStatus data's team keys for the same
+# week - to confirm whether these two independently-correct sources
+# use different team abbreviation conventions, which would explain the
+# color/sort regression without either individual source being wrong.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Compare team abbreviations between the two sources
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB_URL = process.env.FIREBASE_DB_URL;
+          const WORKER = 'https://fantasy-refresh-news.mtriedel.workers.dev';
+
+          function fetchJson(url) {
+            return new Promise((resolve, reject) => {
+              https.get(url, res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+
+          async function main() {
+            const sched = await fetchJson(`${WORKER}/schedule?week=3&season=2026P&seasonType=Preseason`);
+            const games = (sched && sched.games) || [];
+            console.log(`Real /schedule response: ${games.length} game(s)`);
+            games.forEach(g => console.log(`  gameId="${g.gameId}" home="${g.home}" away="${g.away}"`));
+
+            const live = await fetchJson(`${FB_URL}/liveGameStatus/2026P/Preseason_wk3.json`).catch(() => null);
+            const liveGames = live && live.games ? live.games : {};
+            console.log(`\nReal liveGameStatus: ${Object.keys(liveGames).length} game(s)`);
+            Object.keys(liveGames).forEach(gid => {
+              const g = liveGames[gid];
+              console.log(`  gameId="${gid}" home="${g.home}" away="${g.away}" statusCode=${g.statusCode}`);
+            });
+
+            console.log('\n=== Direct match check ===');
+            games.forEach(g => {
+              const homeMatch = Object.values(liveGames).some(lg => lg.home === g.home || lg.away === g.home);
+              const awayMatch = Object.values(liveGames).some(lg => lg.home === g.away || lg.away === g.away);
+              console.log(`  ${g.away}@${g.home}: home "${g.home}" ${homeMatch ? 'MATCHES' : 'NO MATCH'} in liveGameStatus, away "${g.away}" ${awayMatch ? 'MATCHES' : 'NO MATCH'}`);
+            });
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
