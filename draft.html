@@ -949,7 +949,7 @@ function loadSchedule(){
   // ported to this file, meaning every preseason week request here was
   // asking for the WRONG week's schedule (one behind what was intended).
   var apiWeek = currentWeek;
-  fetch(WORKER + '/schedule?week='+apiWeek+'&season=2026&seasonType='+seasonType)
+  fetch(WORKER + '/schedule?week='+apiWeek+'&season='+FR.seasonKey()+'&seasonType='+seasonType)
     .then(function(r){ return r.json(); })
     .then(function(data){
       if(!data || !data.games || !data.games.length) throw new Error('No games');

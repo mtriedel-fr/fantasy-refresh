@@ -2241,7 +2241,7 @@ function fetchWeekSchedule(week){
   var ctx = FRAuth.getLeagueCtx();
   var seasonType = (ctx && (ctx.isPreseason || ctx.seasonType === 'Preseason')) ? 'Preseason' : 'Regular';
   return Promise.all([
-    fetch(TANK01_WORKER + '/schedule?week=' + week + '&season=2026&seasonType=' + seasonType)
+    fetch(TANK01_WORKER + '/schedule?week=' + week + '&season=' + FR.seasonKey() + '&seasonType=' + seasonType)
       .then(function(r){ return r.json(); })
       .then(function(data){ return buildTeamGameMap(data && data.games); })
       .catch(function(){ return {}; }),
