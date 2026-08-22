@@ -1,0 +1,56 @@
+name: One-Time Diagnostic — Check Real Season Score Data
+
+# ONE-TIME USE — delete this file after running it once.
+# Checks the real, raw /season data that currentWeek's initial, naive
+# calculation (highest week with real score entries) reads from
+# directly - to confirm whether week 3 genuinely has real entries right
+# now, or whether it's somehow still empty despite games being scored.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check real season score data
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB_URL = process.env.FIREBASE_DB_URL;
+          const LEAGUE_ID = 'fr_nth60cij';
+
+          function fetchJson(url) {
+            return new Promise((resolve, reject) => {
+              https.get(url, res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+
+          async function main() {
+            const season = await fetchJson(`${FB_URL}/leagues/${LEAGUE_ID}/season/2026P.json`).catch(() => null);
+            if (!season) { console.log('No /season/2026P data at all.'); return; }
+
+            console.log('Top-level keys under /season/2026P:', Object.keys(season));
+            for (const key of Object.keys(season)) {
+              if (isNaN(Number(key))) continue; // skip non-week keys like "ownership" if present at this level
+              const weekData = season[key];
+              const entryCount = weekData ? Object.keys(weekData).filter(k => k !== 'ownership').length : 0;
+              console.log(`  Week ${key}: ${entryCount} team entr(ies)`);
+              if (entryCount > 0) {
+                const sample = Object.values(weekData).find(v => v && typeof v === 'object' && v.score !== undefined);
+                if (sample) console.log(`    sample entry: ${JSON.stringify(sample)}`);
+              }
+            }
+
+            const meta = await fetchJson(`${FB_URL}/leagues/${LEAGUE_ID}/season/2026P/meta.json`).catch(() => null);
+            console.log('\nmeta:', JSON.stringify(meta));
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
