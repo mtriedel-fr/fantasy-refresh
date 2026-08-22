@@ -776,7 +776,6 @@ function loadSalaries(){
         var flatBanner = document.getElementById('flat-sal-banner');
         if(flatBanner) flatBanner.style.display = 'none';
         allPlayers = Object.values(data.players).filter(function(p){ return p && p.name && p.pos; });
-        if(!schedule.length) buildGamesBarFromPlayers();
         renderPicker();
         repriceLineup();   // saved lineup may have loaded first with stale snapshot prices
         return;
@@ -808,8 +807,6 @@ function loadFlatSalariesFromPool(){
       // In preseason mode — filter to only teams playing this week
       if(PS_MODE && schedule.length){
         filterPlayersToSchedule();
-      } else if(!schedule.length){
-        buildGamesBarFromPlayers();
       }
       renderPicker();
     })
@@ -969,6 +966,7 @@ function loadSchedule(){
           if(g.home) liveGameStatus[g.home] = { liveStatusCode: g.statusCode, quarter: g.quarter, clock: g.clock, myScore: g.homeScore, oppScore: g.awayScore };
           if(g.away) liveGameStatus[g.away] = { liveStatusCode: g.statusCode, quarter: g.quarter, clock: g.clock, myScore: g.awayScore, oppScore: g.homeScore };
         });
+        buildGamesBar(schedule);
         renderRoster();
       }).catch(function(){});
 
