@@ -523,6 +523,17 @@ var STADIUM_TYPE = {
   PIT:'outdoor', SEA:'outdoor', SF:'outdoor', TB:'outdoor', TEN:'outdoor',
   WSH:'outdoor'
 };
+// Tank01's real currentPeriod field is sometimes a genuine quarter
+// number ("1", "2", "3", "4") and sometimes a non-numeric status string
+// ("Halftime", "Delayed") — confirmed directly from a real game. Only
+// the numeric case should ever get a "Q" prefix; a status string
+// already describes itself clearly and reads oddly with "Q" glued onto
+// the front of it ("QHalftime", "QDelayed").
+function formatQuarterLabel(quarter){
+  if(quarter == null || quarter === '') return 'Live';
+  return /^\d+$/.test(String(quarter)) ? 'Q' + quarter : String(quarter);
+}
+
 function draftStadiumIcon(teamAbbr){
   var type = STADIUM_TYPE[teamAbbr];
   // Retractable merged into dome — see league.html's stadiumIcon() for why
@@ -1081,7 +1092,7 @@ function buildGamesBar(games){
     } else if(liveInfo && liveInfo.liveStatusCode === 1){
       var homeScoreL = (g.home && liveGameStatus[g.home]) ? liveGameStatus[g.home].myScore : liveInfo.oppScore;
       var awayScoreL = (g.home && liveGameStatus[g.home]) ? liveGameStatus[g.home].oppScore : liveInfo.myScore;
-      var q = liveInfo.quarter ? 'Q'+liveInfo.quarter : 'Live';
+      var q = formatQuarterLabel(liveInfo.quarter);
       var clk = liveInfo.clock ? ' '+liveInfo.clock : '';
       var liveScoreLine = (typeof homeScoreL === 'number' && typeof awayScoreL === 'number') ? ' · ' + awayScoreL + '-' + homeScoreL : '';
       // Live — bold, filled green chip, same treatment as final above.
@@ -1567,7 +1578,7 @@ function renderRoster(){
       if(game){
         if(game.liveStatusCode === 1){
           gameIsLiveOrFinal = true;
-          var q = game.quarter ? 'Q' + game.quarter : 'Live';
+          var q = formatQuarterLabel(game.quarter);
           var clk = game.clock ? ' ' + game.clock : '';
           var scoreLine = (typeof game.myScore === 'number' && typeof game.oppScore === 'number') ? ' · ' + game.myScore + '-' + game.oppScore : '';
           gameLine = q + clk + ' vs ' + game.opp + scoreLine;

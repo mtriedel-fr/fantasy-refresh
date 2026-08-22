@@ -1938,6 +1938,17 @@ function escapeHtmlFR(s){
   });
 }
 
+// Tank01's real currentPeriod field is sometimes a genuine quarter
+// number ("1", "2", "3", "4") and sometimes a non-numeric status string
+// ("Halftime", "Delayed") — confirmed directly from a real game. Only
+// the numeric case should ever get a "Q" prefix; a status string
+// already describes itself clearly and reads oddly with "Q" glued onto
+// the front of it ("QHalftime", "QDelayed").
+function formatQuarterLabel(quarter){
+  if(quarter == null || quarter === '') return 'Live';
+  return /^\d+$/.test(String(quarter)) ? 'Q' + quarter : String(quarter);
+}
+
 function applyArchiveVisibility(){
   // The 2025 archive only has data for the original league, and once it's
   // gone, 2026 is the only option left in this dropdown for every other
@@ -2304,7 +2315,7 @@ function buildLineupPlayerCard(p, pts, hasStarted, gameMap, showNotStartedTag, s
       // useful piece of information anymore. Score field names are an
       // educated guess (same honest flag as quarter/clock elsewhere in
       // this app) — unverified against a real live response.
-      var q = game.quarter ? 'Q' + game.quarter : 'Live';
+      var q = formatQuarterLabel(game.quarter);
       var clk = game.clock ? ' ' + game.clock : '';
       var scoreLine = (typeof game.myScore === 'number' && typeof game.oppScore === 'number')
         ? ' · ' + game.myScore + '-' + game.oppScore : '';
@@ -2348,7 +2359,7 @@ function buildLineupPlayerCard(p, pts, hasStarted, gameMap, showNotStartedTag, s
     statusTag = 'Final';
     statusClass = ' final';
   } else if(liveCode === 1){
-    statusTag = (game.quarter ? 'Q' + game.quarter : 'Live') + (game.clock ? ' ' + game.clock : '');
+    statusTag = formatQuarterLabel(game.quarter) + (game.clock ? ' ' + game.clock : '');
     statusClass = ' live';
   } else if(hasStarted){
     statusTag = '🔒';
