@@ -1040,13 +1040,24 @@ jobs:
 
             // Write live status globally (not per-league — the same for
             // everyone watching this week regardless of which league).
-            // Overwritten every run (every ~2 min during game windows),
-            // so it's always close to real-time without needing a
-            // separate live-polling system on the client.
+            // Merged with whatever's already stored, not a full
+            // replace — confirmed as a real, live bug: liveGameStatus
+            // starts fresh and empty every run, so a direct replace
+            // meant any game from earlier in the same week that wasn't
+            // part of THIS specific run's today/yesterday/stuck-
+            // recovery checks got silently wiped from storage on every
+            // single write. A fantasy week spans Thursday through
+            // Monday; days later, Thursday's and Friday's games are no
+            // longer "today," "yesterday," or "stuck" (they're
+            // correctly Final) — so they'd vanish from what's stored
+            // entirely, even though they're still very much part of
+            // this week and still need to display correctly.
             if (Object.keys(liveGameStatus).length) {
               try {
+                const existingStatus = await firebaseGet(`/liveGameStatus/${SEASON}/${seasonType}_wk${week}.json`).catch(() => null);
+                const mergedGames = { ...(existingStatus && existingStatus.games), ...liveGameStatus };
                 await firebasePut(`/liveGameStatus/${SEASON}/${seasonType}_wk${week}.json`, {
-                  games: liveGameStatus,
+                  games: mergedGames,
                   updatedAt: Date.now()
                 });
               } catch(e) {

@@ -1,0 +1,134 @@
+name: One-Time Fix — Rebuild Full liveGameStatus
+
+# ONE-TIME USE — delete this file after running it once.
+# The code fix stops liveGameStatus from losing games going forward,
+# but doesn't restore what's already been silently dropped by the
+# confirmed full-replace bug. This rebuilds it completely: uses
+# /gameStats/2026P (which survived, since it's written differently) as
+# the source of every real game ID this preseason, fetches each game's
+# real, current status directly from Tank01, and writes a single,
+# complete, correct liveGameStatus covering every game - not just
+# whichever ones happened to survive the last few overwrites.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type YES to actually write the rebuilt data'
+        required: true
+        default: ''
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Rebuild liveGameStatus from real, current data
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+          TANK01_KEY: ${{ secrets.TANK01_KEY }}
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB_URL   = process.env.FIREBASE_DB_URL;
+          const FB_TOKEN = process.env.FIREBASE_AUTH_TOKEN;
+          const T01_KEY  = process.env.TANK01_KEY;
+          const T01_HOST = 'tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com';
+          const CONFIRM  = process.env.CONFIRM;
+
+          function fbAuth(path) {
+            const sep = path.includes('?') ? '&' : '?';
+            return FB_TOKEN ? `${path}${sep}auth=${FB_TOKEN}` : path;
+          }
+          function fetchJson(url) {
+            return new Promise((resolve, reject) => {
+              https.get(url, res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+          function t01(path) {
+            return new Promise((resolve, reject) => {
+              https.get({
+                hostname: T01_HOST, path, headers: {
+                  'X-RapidAPI-Key': T01_KEY, 'X-RapidAPI-Host': T01_HOST
+                }
+              }, res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+          function firebasePut(path, payload) {
+            return new Promise((resolve, reject) => {
+              const body = JSON.stringify(payload);
+              const fullPath = fbAuth(FB_URL + path + '.json');
+              const u = new URL(fullPath);
+              const req = https.request({
+                hostname: u.hostname, path: u.pathname + u.search, method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+              }, res => {
+                let d = '';
+                res.on('data', c => d += c);
+                res.on('end', () => {
+                  if (res.statusCode >= 200 && res.statusCode < 300) resolve(d);
+                  else reject(new Error(`PUT rejected (HTTP ${res.statusCode}) — ${d.slice(0,200)}`));
+                });
+              });
+              req.on('error', reject);
+              req.write(body); req.end();
+            });
+          }
+
+          async function main() {
+            const allGameStats = await fetchJson(`${FB_URL}/gameStats/2026P.json`).catch(() => null);
+            const gameIds = allGameStats ? Object.keys(allGameStats) : [];
+            console.log(`Found ${gameIds.length} real game(s) this preseason: ${gameIds.join(', ')}\n`);
+
+            if (!gameIds.length) {
+              console.log('No games found — nothing to rebuild.');
+              return;
+            }
+
+            const games = {};
+            for (const gid of gameIds) {
+              // Derive home/away directly from the game ID's own
+              // established format ("YYYYMMDD_AWAY@HOME") rather than
+              // needing a separate lookup.
+              const match = gid.match(/^\d{8}_([A-Z]+)@([A-Z]+)$/);
+              if (!match) { console.log(`  ${gid}: doesn't match expected ID format — skipping`); continue; }
+              const [, away, home] = match;
+
+              try {
+                const real = await t01(`/getNFLBoxScore?gameID=${gid}&fantasyPoints=true&PPRScoring=true`);
+                if (!real.body || !real.body.gameStatus) { console.log(`  ${gid}: no real status returned — skipping`); continue; }
+                games[gid] = {
+                  away, home,
+                  awayScore: parseInt(real.body.awayPts) || 0,
+                  homeScore: parseInt(real.body.homePts) || 0,
+                  statusCode: real.body.gameStatusCode != null ? Number(real.body.gameStatusCode) : null,
+                  quarter: real.body.currentPeriod || null,
+                  clock: real.body.gameClock || null
+                };
+                console.log(`  ${gid}: ${away}@${home} — ${real.body.gameStatus} (${games[gid].awayScore}-${games[gid].homeScore})`);
+              } catch(e) {
+                console.log(`  ${gid}: fetch failed - ${e.message}`);
+              }
+            }
+
+            console.log(`\nRebuilt ${Object.keys(games).length} game(s) total.`);
+            if (CONFIRM !== 'YES') {
+              console.log('⚠️  Confirm was not "YES" — nothing was written. Re-run with confirm=YES to apply.');
+              return;
+            }
+
+            await firebasePut('/liveGameStatus/2026P/Preseason_wk3', { games, updatedAt: Date.now() });
+            console.log('✅ Rebuilt and wrote complete liveGameStatus.');
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
