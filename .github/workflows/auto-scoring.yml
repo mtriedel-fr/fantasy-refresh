@@ -865,9 +865,23 @@ jobs:
               }
             }
 
-            if (!games.length) {
-              console.log(`No ${seasonType} games found for week ${week} — nothing to score.`);
-              return;
+            // Confirmed as the real, live root cause of a genuine bug:
+            // this used to return here immediately whenever there was
+            // nothing new to score TODAY specifically - which exits
+            // before ever reaching the week-finalization check below,
+            // even when every real game in the week is already
+            // genuinely done. A fantasy week has real gap days (the
+            // day after the last game, before the next week's games
+            // start) where this is completely normal and NOT an error
+            // - but the script was treating it as "nothing to do at
+            // all," silently skipping the one check that actually
+            // matters on exactly those days: whether the week as a
+            // whole should now be marked finalized and advanced. Kept
+            // as a flag instead of an early return, so the
+            // finalization check below still runs regardless.
+            const nothingNewToScoreToday = !games.length;
+            if (nothingNewToScoreToday) {
+              console.log(`No new ${seasonType} games found for week ${week} today — still checking whether the week overall is finished before exiting.`);
             }
 
             // Genuinely date-independent recovery — checks our OWN
@@ -885,7 +899,9 @@ jobs:
             // calendar dependency behind both this and the earlier bug
             // entirely — it recovers any stuck game, whenever it
             // actually happened, not just ones still live on a specific
-            // day.
+            // day. Runs regardless of whether there are new games today
+            // — its whole purpose is catching games independent of
+            // today's own list.
             try {
               const storedStatus = await firebaseGet(`/liveGameStatus/${SEASON}/${seasonType}_wk${week}.json`).catch(() => null);
               const storedGames = (storedStatus && storedStatus.games) || {};
@@ -924,12 +940,11 @@ jobs:
                      s.includes('completed') || s === 'live';
             });
 
-            if (!activeGames.length) {
-              console.log('No active games right now — nothing to score.');
-              return;
+            if (activeGames.length) {
+              console.log(`Found ${activeGames.length} active/final game(s) of ${games.length} total`);
+            } else {
+              console.log('No active games right now.');
             }
-
-            console.log(`Found ${activeGames.length} active/final game(s) of ${games.length} total`);
 
             // allFinal must reflect the ENTIRE fantasy week, not just
             // today — a week spanning multiple real-world nights (e.g.
@@ -965,10 +980,12 @@ jobs:
             // week too long is a far smaller problem than advancing
             // early.
             let isLastGameDayOfWeek = false; // unsafe default was true — see comment above
+            let realWeekGameCount = null;
             try {
               const cachedSeason = await firebaseGet(`/nflSchedule/${SEASON}/${seasonType}.json`);
               const cachedWeek = cachedSeason && cachedSeason.weeks && cachedSeason.weeks[`week${week}`];
               if (Array.isArray(cachedWeek) && cachedWeek.length) {
+                realWeekGameCount = cachedWeek.length;
                 const gameDates = cachedWeek
                   .filter(g => g && g.time)
                   .map(g => new Intl.DateTimeFormat('en-CA', {
@@ -988,10 +1005,32 @@ jobs:
               console.log(`  Could not check full-week schedule for allFinal: ${e.message} — defaulting to NOT allowing allFinal today.`);
             }
 
-            const allFinal = isLastGameDayOfWeek && games.every(g => {
-              const s = (g.gameStatus || g.status || '').toLowerCase();
-              return s.includes('final') || s.includes('completed');
-            });
+            // allFinal checks the REAL, complete week — every game ever
+            // tracked in our own liveGameStatus for this week, cross-
+            // checked against the real schedule's total game count —
+            // rather than today's scoped games array. Confirmed as a
+            // real, live bug: games.every() on an EMPTY array (which
+            // happens on a legitimate no-games gap day, like the day
+            // after a week's last game before the next week starts)
+            // vacuously returns true — meaning "there were zero games
+            // to check," not "all real games for the week are done."
+            // Cross-checking the stored count against the real schedule
+            // count additionally guards against a different false
+            // positive: a partial set of stored games that all happen
+            // to be final would otherwise also vacuously pass, even
+            // though most of the week was never tracked at all.
+            let allFinal = false;
+            try {
+              const liveStatus = await firebaseGet(`/liveGameStatus/${SEASON}/${seasonType}_wk${week}.json`).catch(() => null);
+              const trackedGames = (liveStatus && liveStatus.games) || {};
+              const trackedCount = Object.keys(trackedGames).length;
+              const allTrackedFinal = trackedCount > 0 && Object.values(trackedGames).every(g => g.statusCode === 2);
+              const hasEveryRealGame = realWeekGameCount != null && trackedCount >= realWeekGameCount;
+              allFinal = isLastGameDayOfWeek && allTrackedFinal && hasEveryRealGame;
+              console.log(`  Week ${week} finalization check: tracked ${trackedCount}/${realWeekGameCount != null ? realWeekGameCount : '?'} real games, all tracked final: ${allTrackedFinal} → allFinal=${allFinal}`);
+            } catch (e) {
+              console.log(`  Could not check liveGameStatus for allFinal: ${e.message} — defaulting to NOT final.`);
+            }
 
             // Fetch box scores for active games
             const boxScores = {};
