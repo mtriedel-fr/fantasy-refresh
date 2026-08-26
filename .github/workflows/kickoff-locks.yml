@@ -126,7 +126,29 @@ jobs:
           // window, the real season hasn't started at all, so this
           // would incorrectly report something like "week 3" for a
           // league that actually needs its own real week 1.
-          function getPreseasonCalendarWeek() {
+          async function getPreseasonCalendarWeek(leagueId, seasonKey) {
+            // Real, event-driven signal takes priority whenever it
+            // exists — confirmed as a real, live bug: the static
+            // calendar boundary below and the frontend's real signal
+            // (meta.week+1, which every reader already treats as "the
+            // current week," and which only advances once a week is
+            // genuinely, verifiably finished) can legitimately disagree
+            // by a day, since real games can finish playing before
+            // their calendar window officially ends. The calendar is
+            // only a conservative bootstrap for before any real scoring
+            // has ever happened for this league — once real completion
+            // data exists, it's more trustworthy than a static guess.
+            try {
+              const meta = await firebaseGet(`/leagues/${leagueId}/season/${seasonKey}/meta.json`).catch(() => null);
+              if (meta && typeof meta.week === 'number') {
+                const realWeek = meta.week + 1;
+                console.log(`  Real, event-driven week signal (meta.week+1): ${realWeek} — using this over the static calendar guess.`);
+                return realWeek;
+              }
+            } catch(e) {
+              console.log(`  Could not check real week signal: ${e.message} — falling back to calendar.`);
+            }
+
             const now = new Date();
             const etParts = new Intl.DateTimeFormat('en-CA', {
               timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit'
@@ -138,7 +160,7 @@ jobs:
             else if (mmdd <= 819) psWeek = 2; // Aug 13-19 — real games Aug 13-17
             else if (mmdd <= 826) psWeek = 3; // Aug 20-26 — real games Aug 20-23
             else                  psWeek = 4; // Aug 27 onward — real games Aug 27-30
-            console.log(`Preseason window (by ET date ${etYear}-${String(etMonth).padStart(2,'0')}-${String(etDay).padStart(2,'0')}) — calendar week ${psWeek}`);
+            console.log(`  No real week signal yet — falling back to calendar (ET date ${etYear}-${String(etMonth).padStart(2,'0')}-${String(etDay).padStart(2,'0')}) — calendar week ${psWeek}`);
             return psWeek;
           }
 
@@ -345,7 +367,7 @@ jobs:
                 const seasonKey = leagueIsPreseason ? SEASON + 'P' : SEASON;
                 let week;
                 if (leagueIsPreseason) {
-                  week = getPreseasonCalendarWeek();
+                  week = await getPreseasonCalendarWeek(leagueId, seasonKey);
                 } else {
                   if (regularSeasonWeek === null) regularSeasonWeek = await getRegularSeasonWeek();
                   week = regularSeasonWeek;
