@@ -502,7 +502,7 @@ jobs:
           async function cacheFullSeasonSchedule() {
             const currentWeek = await getGlobalCurrentWeek();
             const seasonTypes = [
-              { type: 'Preseason',  weeks: [0, 1, 2, 3] }, // short enough (4 weeks) that filtering isn't worth the complexity
+              { type: 'Preseason',  weeks: [0, 1, 2, 3, 4] }, // real, confirmed preseason weeks this season (HOF game as week 0, then 1-4) - short enough that filtering isn't worth the complexity. Confirmed as a real, live bug: this previously stopped at 3, so week 4 could never be cached at all regardless of the date or any other logic, no matter how many times this ran.
               { type: 'Regular',    weeks: Array.from({ length: 18 }, (_, i) => i + 1).filter(w => w >= currentWeek) },
               { type: 'Postseason', weeks: [1, 2, 3, 4] } // same reasoning as preseason — short enough not to bother filtering
             ];
