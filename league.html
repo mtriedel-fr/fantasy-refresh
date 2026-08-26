@@ -2491,13 +2491,22 @@ function rosterColumn(lineup, scoreEntry, locks, isMine, gameMap, ownership){
 
 // ── BOOT ───────────────────────────────────────────────────────
 function boot(){
-  buildWeekBar();
-  buildWeekSelect();
+  // currentWeek must be genuinely determined BEFORE buildWeekBar()
+  // runs — confirmed as a real, live bug: buildWeekBar() used to run
+  // first, while currentWeek was still sitting at its raw default of 1
+  // (declared long before this point), not yet the real, calculated
+  // value. That meant every past week's dropdown option got built and
+  // disabled based on "current week is 1" — permanently greying out
+  // every real past week (like reviewing week 3 after the league had
+  // moved on to week 4), since buildWeekBar() is never called again
+  // later once currentWeek actually gets its correct value.
   var loadedWks = Object.keys(seasonData).filter(function(k){
     return !isNaN(Number(k)) && seasonData[k] && seasonData[k].length > 0;
   }).map(Number);
   if(loadedWks.length) currentWeek = Math.max.apply(null, loadedWks);
   console.log('🔎 boot(): loadedWks=' + JSON.stringify(loadedWks) + ' → currentWeek=' + currentWeek);
+  buildWeekBar();
+  buildWeekSelect();
   // Previously forced tab-yourweek (This Week — a full-screen overlay tab)
   // to be the default visible content here, unconditionally, every time
   // boot() ran. That's what was actually causing the full-screen takeover
@@ -2537,6 +2546,7 @@ function boot(){
       .then(function(finalizedAt){
         if(typeof finalizedAt === 'number'){
           currentWeek = currentWeek + 1;
+          buildWeekBar();
           renderAll();
           // Same fix as setWeekFromSelect() — renderAll() alone doesn't
           // refresh an already-open My Team dropdown, since it only
