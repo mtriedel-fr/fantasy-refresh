@@ -5036,7 +5036,7 @@ function getTopPlayers(name, limit){
 // ── STANDINGS ──────────────────────────────────────────────────
 // ── TIER LOGIC ─────────────────────────────────────────────────
 // 2025: tiers lock after week 15. 2026+: after week 14
-var TIER_LOCK_WEEK = 15;
+var TIER_LOCK_WEEK = 14; // confirmed with the user - tiers lock after Week 14, so the bracket's first round (Week 15) has real tiers to work with
 
 function getTiers(sorted){
   var n = sorted.length;
