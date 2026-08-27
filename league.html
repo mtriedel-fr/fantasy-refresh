@@ -4922,8 +4922,8 @@ function renderPreseasonRoster(){
 // Extracted from showEmpty() so the "No results yet" standings empty
 // states can show the same countdown card, not just the This Week tab.
 function buildKickoffCountdown(){
-  var seasonStart = IS_PRESEASON_LEAGUE ? new Date('2026-08-06') : new Date('2026-09-03');
-  var seasonStartLabel = IS_PRESEASON_LEAGUE ? 'Aug 6, 2026' : 'Sep 3, 2026';
+  var seasonStart = IS_PRESEASON_LEAGUE ? new Date('2026-08-06') : new Date('2026-09-09');
+  var seasonStartLabel = IS_PRESEASON_LEAGUE ? 'Aug 6, 2026' : 'Sep 9, 2026';
   var startLabel = IS_PRESEASON_LEAGUE ? 'Preseason Starts' : 'Season Starts';
   var now = new Date();
   var days = Math.ceil((seasonStart - now) / (1000 * 60 * 60 * 24));
@@ -4935,11 +4935,12 @@ function buildKickoffCountdown(){
 
 // ── SHOW EMPTY ────────────────────────────────────────────────────
 function showEmpty(){
-  var seasonStart = IS_PRESEASON_LEAGUE ? new Date('2026-08-06') : new Date('2026-09-03');
-  var seasonStartLabel = IS_PRESEASON_LEAGUE ? 'Aug 6, 2026' : 'Sep 3, 2026';
-  var startLabel = IS_PRESEASON_LEAGUE ? 'Preseason Starts' : 'Season Starts';
-  var now = new Date();
-  var days = Math.ceil((seasonStart - now) / (1000 * 60 * 60 * 24));
+  // Real countdown comes entirely from buildKickoffCountdown() below -
+  // this used to separately recompute the same season-start date here
+  // too, but never actually used the result for anything. Removed as
+  // dead code; it was also silently duplicating the exact same
+  // wrong-date bug fixed in buildKickoffCountdown() just above, just
+  // never surfacing since nothing actually read these variables.
 
   // Empty lineup slots with draft link for My Lineup panel
   var slots = [
