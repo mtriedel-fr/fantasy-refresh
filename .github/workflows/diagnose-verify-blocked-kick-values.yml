@@ -1,0 +1,85 @@
+name: One-Time Diagnostic — Verify Real Blocked Kick Values in teamStats
+
+# ONE-TIME USE — delete this file after running it once.
+# Dumps the full, real teamStats object across all games to see actual
+# blockedPunt/blockedFG/blockedXP values (not just confirm the field
+# names exist), checking for any non-zero occurrence and the complete
+# structure of this section - how it's keyed, what else is in it - to
+# confirm this is genuinely usable real data before building it into
+# live scoring.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dump real teamStats values across all games
+        env:
+          TANK01_KEY: ${{ secrets.TANK01_KEY }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const T01_KEY = process.env.TANK01_KEY;
+          const T01_HOST = 'tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com';
+
+          const GAME_IDS = [
+            '20260820_LV@HOU', '20260820_SF@LAC', '20260821_NYJ@PIT',
+            '20260821_CAR@JAX', '20260821_GB@DEN', '20260822_WSH@DET',
+            '20260822_ATL@IND', '20260822_BAL@MIN', '20260822_BUF@CLE',
+            '20260822_NO@LAR', '20260822_NYG@MIA', '20260822_CHI@CIN',
+            '20260822_PHI@NE', '20260822_KC@TB', '20260822_DAL@ARI',
+            '20260823_SEA@TEN'
+          ];
+
+          function t01(path) {
+            return new Promise((resolve, reject) => {
+              https.get({
+                hostname: T01_HOST, path, headers: {
+                  'X-RapidAPI-Key': T01_KEY, 'X-RapidAPI-Host': T01_HOST
+                }
+              }, res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+
+          async function main() {
+            let anyNonZero = false;
+            let firstFullDump = false;
+
+            for (const gid of GAME_IDS) {
+              try {
+                const bs = await t01(`/getNFLBoxScore?gameID=${gid}&fantasyPoints=true&PPRScoring=true`);
+                if (!bs.body || !bs.body.teamStats) { console.log(`${gid}: no teamStats at all`); continue; }
+                const ts = bs.body.teamStats;
+
+                if (!firstFullDump) {
+                  console.log('=== Full, raw teamStats structure (first game, to see everything else in it) ===');
+                  console.log(JSON.stringify(ts, null, 2));
+                  firstFullDump = true;
+                }
+
+                const homeVals = { punt: ts.home && ts.home.blockedPunt, fg: ts.home && ts.home.blockedFG, xp: ts.home && ts.home.blockedXP };
+                const awayVals = { punt: ts.away && ts.away.blockedPunt, fg: ts.away && ts.away.blockedFG, xp: ts.away && ts.away.blockedXP };
+                const homeNum = [homeVals.punt, homeVals.fg, homeVals.xp].map(v => parseFloat(v) || 0);
+                const awayNum = [awayVals.punt, awayVals.fg, awayVals.xp].map(v => parseFloat(v) || 0);
+                const hasNonZero = [...homeNum, ...awayNum].some(v => v > 0);
+                if (hasNonZero) anyNonZero = true;
+
+                console.log(`${gid}: home(punt=${homeVals.punt}, fg=${homeVals.fg}, xp=${homeVals.xp}) away(punt=${awayVals.punt}, fg=${awayVals.fg}, xp=${awayVals.xp})${hasNonZero ? '  <<< NON-ZERO FOUND' : ''}`);
+              } catch(e) {
+                console.log(`${gid}: fetch failed - ${e.message}`);
+              }
+            }
+
+            console.log(anyNonZero
+              ? '\n✅ At least one real, non-zero blocked-kick value found — this is genuinely usable, live data.'
+              : '\n⚠️  All values across all 16 games were zero — fields exist but we have no confirmed non-zero example yet. Could mean no blocks actually happened this preseason so far, or the fields are unpopulated placeholders. Worth spot-checking a game known to have had a real block.');
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
