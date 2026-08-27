@@ -345,7 +345,18 @@ function switchCardView(cardIdSuffix, view) {
 
 // ── FORMAT HELPERS ───────────────────────────────────────────────
 function formatBadge(s) {
-  if (s.guillotine) return '<span class="badge badge-guillotine">☠️ Guillotine</span>';
+  // A "Last One Standing" league in this app always runs the
+  // cumulative season-long game at the same time — confirmed directly
+  // with the user as the actual source of real confusion: the old
+  // if/else here meant the season-long badge could never show at all
+  // for these leagues, since the guillotine check short-circuited
+  // before ever reaching the format check below. Both badges now show
+  // together, so both games running simultaneously are visible at a
+  // glance instead of only ever showing one of them.
+  if (s.guillotine) {
+    return '<span class="badge badge-guillotine">⚔️ Last One Standing</span>'
+         + '<span class="badge badge-format">📊 Season Long</span>';
+  }
   if (s.format === 'headtohead') return '<span class="badge badge-h2h">⚔️ H2H</span>';
   return '<span class="badge badge-format">📊 Cumulative</span>';
 }
@@ -700,7 +711,7 @@ var WELCOME_TOUR_TITLE = '👋 Welcome to Fantasy Refresh!';
 var WELCOME_TOUR_ITEMS = [
   { icon: '🏆', title: 'Your Leagues', body: 'Every league you\u2019re part of shows here, with your current rank and score. Tap a card to jump into that league.' },
   { icon: '🔀', title: 'Week / Season Toggle', body: 'Switch between this week\u2019s standing and your cumulative season-long total and rank, right on each card.' },
-  { icon: '💀', title: 'Guillotine Status', body: 'In a guillotine league, switch to Season view to see whether you\u2019re still alive or already eliminated.' },
+  { icon: '⚔️', title: 'Two Games, One League', body: 'A "Last One Standing" league runs the season-long cumulative game at the same time — switch to Season view to see whether you\u2019re still alive or already eliminated, plus your season-long standing.' },
   { icon: '⚙️', title: 'League Settings', body: 'If you\u2019re commissioner of a league, the gear icon on its card opens settings for that league.' }
 ];
 
