@@ -1,0 +1,68 @@
+name: One-Time Diagnostic — Check Still-FLEX Players Against Real Pool
+
+# ONE-TIME USE — delete this file after running it once.
+# Checks whether these specific, still-FLEX players exist anywhere in
+# the real player pool at all - to find out whether this is a genuine
+# coverage gap (deep-roster/practice-squad players simply not in
+# Sleeper's pool) versus a different kind of name-matching issue.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check specific players against the real pool
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB_URL = process.env.FIREBASE_DB_URL;
+
+          function fetchJson(url) {
+            return new Promise((resolve, reject) => {
+              https.get(url, res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+
+          function stripNameSuffix(name) {
+            return (name || '').replace(/\s+(jr|sr|ii|iii|iv|v)\.?$/i, '').trim();
+          }
+
+          async function main() {
+            const pool = await fetchJson(`${FB_URL}/playerPool/2026/players.json`);
+            const players = Object.values(pool || {});
+            console.log(`Real pool has ${players.length} total players.\n`);
+
+            const targets = ['Mitchell Tinsley', 'Scott Matlock', 'Greg Desrosiers Jr.', 'Chip Trayanum', 'Max Hurleman', 'Adam Prentice'];
+            targets.forEach(name => {
+              const nLower = name.toLowerCase();
+              const stripped = stripNameSuffix(nLower);
+              const exact = players.find(p => p.name && p.name.toLowerCase() === nLower);
+              const strippedMatch = players.find(p => p.name && stripNameSuffix(p.name.toLowerCase()) === stripped);
+              // Loose partial match too, to catch anything with a
+              // meaningfully different name format we haven't
+              // considered yet (nicknames, different middle initials,
+              // etc.)
+              const lastName = name.split(' ').filter(w => !/^(jr|sr|ii|iii|iv|v)\.?$/i.test(w)).pop();
+              const partial = players.filter(p => p.name && p.name.toLowerCase().includes(lastName.toLowerCase()));
+
+              console.log(`"${name}":`);
+              if (exact) console.log(`  EXACT match: "${exact.name}", pos="${exact.pos}", team="${exact.team}"`);
+              else if (strippedMatch) console.log(`  STRIPPED match: "${strippedMatch.name}", pos="${strippedMatch.pos}"`);
+              else console.log(`  NOT FOUND (exact or stripped)`);
+              if (!exact && !strippedMatch) {
+                console.log(`  Partial last-name matches in pool: ${partial.length ? partial.map(p => `"${p.name}" (${p.pos})`).join(', ') : '(none at all)'}`);
+              }
+              console.log('');
+            });
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
