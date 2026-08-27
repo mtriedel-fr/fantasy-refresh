@@ -794,6 +794,8 @@ function createLeague(){
       var defaultTeamName = (currentUser.displayName || (currentUser.email ? currentUser.email.split('@')[0] : 'Player')).trim() + "'s Team";
       return FR.fb.put('/leagues/'+newLeagueId+'/members/'+currentUser.uid, {
         uid:       currentUser.uid,
+        email:     currentUser.email || '',
+        displayName: currentUser.displayName || '',
         teamName:  defaultTeamName,
         division:  null,
         joined:    Date.now(),
@@ -897,7 +899,8 @@ function joinLeague(){
       if(!settings) throw new Error('League not found');
       // Add member
       return FR.fb.put('/leagues/'+joinTargetLeagueId+'/members/'+currentUser.uid, {
-        uid: currentUser.uid, teamName: defaultTeamName, division: null,
+        uid: currentUser.uid, email: currentUser.email || '', displayName: currentUser.displayName || '',
+        teamName: defaultTeamName, division: null,
         joined: Date.now(), active: true, eliminated: false, role: 'member'
       }).then(function(){
         // Update user profile
