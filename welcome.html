@@ -269,8 +269,8 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
           <div class="preview-week" style="display:flex;align-items:center;gap:6px;"><span class="live-dot"></span>Live</div>
         </div>
         <div class="preview-cap">
-          <div><div class="preview-cap-label">Cap Remaining</div><div class="preview-cap-val" id="prev-cap">$38,500</div></div>
-          <div style="text-align:center;"><div class="preview-cap-label">Avg / Slot</div><div class="preview-cap-avg" id="prev-avg">$5,500</div></div>
+          <div><div class="preview-cap-label">Cap Remaining</div><div class="preview-cap-val" id="prev-cap">$40,500</div></div>
+          <div style="text-align:center;"><div class="preview-cap-label">Avg / Slot</div><div class="preview-cap-avg" id="prev-avg">$5,786</div></div>
           <div style="text-align:right;"><div class="preview-cap-label">Roster</div><div class="preview-cap-avg"><span id="prev-slots">2</span>/9</div></div>
         </div>
         <div class="preview-games">
@@ -281,7 +281,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
         </div>
         <div class="preview-main">
           <div class="preview-roster">
-            <div id="prev-slot-qb1" class="preview-slot"><span class="preview-slot-pos pos-QB">QB</span><span class="preview-slot-name">P. Mahomes</span><span class="preview-slot-sal">$11,200</span></div>
+            <div id="prev-slot-qb1" class="preview-slot"><span class="preview-slot-pos pos-QB">QB</span><span class="preview-slot-name">P. Mahomes</span><span class="preview-slot-sal">$9,200</span></div>
             <div id="prev-slot-rb1" class="preview-slot"><span class="preview-slot-pos pos-RB">RB</span><span class="preview-slot-name">D. Henry</span><span class="preview-slot-sal">$10,300</span></div>
             <div id="prev-slot-rb2" class="preview-slot"><span class="preview-slot-pos pos-RB" style="color:var(--pk);">RB</span><span class="preview-slot-empty">— empty —</span></div>
             <div id="prev-slot-wr1" class="preview-slot"><span class="preview-slot-pos pos-WR" style="color:var(--pu);">WR</span><span class="preview-slot-empty">— empty —</span></div>
@@ -299,11 +299,11 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
                 <div class="preview-player-row"><span class="preview-player-pos pos-RB">RB</span><span class="preview-player-name">I. Pacheco</span><span class="preview-player-sal">$7,800</span><button class="preview-draft-btn">+ Draft</button></div>
                 <div class="preview-player-row anim-highlight" id="prev-p3"><span class="preview-player-pos pos-WR">WR</span><span class="preview-player-name">T. Hill</span><span class="preview-player-sal">$9,200</span><button class="preview-draft-btn">+ Draft</button></div>
                 <div class="preview-player-row"><span class="preview-player-pos pos-WR">WR</span><span class="preview-player-name">J. Watson</span><span class="preview-player-sal">$5,400</span><button class="preview-draft-btn">+ Draft</button></div>
-                <div class="preview-player-row"><span class="preview-player-pos pos-TE">TE</span><span class="preview-player-name">T. Kelce</span><span class="preview-player-sal">$8,600</span><button class="preview-draft-btn">+ Draft</button></div>
+                <div class="preview-player-row"><span class="preview-player-pos pos-TE">TE</span><span class="preview-player-name">T. Kelce</span><span class="preview-player-sal">$7,200</span><button class="preview-draft-btn">+ Draft</button></div>
               </div>
               <div style="overflow:hidden;">
                 <div class="preview-team-hdr">BUF — Draft Wisely 🎯</div>
-                <div class="preview-player-row"><span class="preview-player-pos pos-QB">QB</span><span class="preview-player-name">J. Allen</span><span class="preview-player-sal">$10,800</span><button class="preview-draft-btn">+ Draft</button></div>
+                <div class="preview-player-row"><span class="preview-player-pos pos-QB">QB</span><span class="preview-player-name">J. Allen</span><span class="preview-player-sal">$9,000</span><button class="preview-draft-btn">+ Draft</button></div>
                 <div class="preview-player-row"><span class="preview-player-pos pos-RB">RB</span><span class="preview-player-name">J. Cook</span><span class="preview-player-sal">$8,100</span><button class="preview-draft-btn">+ Draft</button></div>
                 <div class="preview-player-row"><span class="preview-player-pos pos-WR">WR</span><span class="preview-player-name">S. Diggs</span><span class="preview-player-sal">$7,900</span><button class="preview-draft-btn">+ Draft</button></div>
                 <div class="preview-player-row"><span class="preview-player-pos pos-WR">WR</span><span class="preview-player-name">G. Davis</span><span class="preview-player-sal">$5,100</span><button class="preview-draft-btn">+ Draft</button></div>
@@ -516,16 +516,16 @@ function startDraftAnimation() {
       var slot = document.getElementById('prev-slot-rb2');
       slot.classList.add('anim-fade');
       slot.innerHTML = '<span class="preview-slot-pos pos-RB">RB</span><span class="preview-slot-name">I. Pacheco</span><span class="preview-slot-sal">$7,800</span>';
-      document.getElementById('prev-cap').textContent = '$30,700';
-      document.getElementById('prev-avg').textContent = '$4,386';
+      document.getElementById('prev-cap').textContent = '$32,700';
+      document.getElementById('prev-avg').textContent = '$5,450';
       document.getElementById('prev-slots').textContent = '3';
     },
     function() {
       var slot = document.getElementById('prev-slot-wr1');
       slot.classList.add('anim-fade');
       slot.innerHTML = '<span class="preview-slot-pos pos-WR">WR</span><span class="preview-slot-name">T. Hill</span><span class="preview-slot-sal">$9,200</span>';
-      document.getElementById('prev-cap').textContent = '$21,500';
-      document.getElementById('prev-avg').textContent = '$3,583';
+      document.getElementById('prev-cap').textContent = '$23,500';
+      document.getElementById('prev-avg').textContent = '$4,700';
       document.getElementById('prev-slots').textContent = '4';
       var p3 = document.getElementById('prev-p3');
       if (p3) p3.classList.add('anim-highlight');
@@ -538,8 +538,8 @@ function startDraftAnimation() {
         rb2.innerHTML = '<span class="preview-slot-pos pos-RB" style="color:var(--pk);">RB</span><span class="preview-slot-empty">— empty —</span>';
         wr1.classList.remove('anim-fade');
         wr1.innerHTML = '<span class="preview-slot-pos pos-WR" style="color:var(--pu);">WR</span><span class="preview-slot-empty">— empty —</span>';
-        document.getElementById('prev-cap').textContent = '$38,500';
-        document.getElementById('prev-avg').textContent = '$5,500';
+        document.getElementById('prev-cap').textContent = '$40,500';
+        document.getElementById('prev-avg').textContent = '$5,786';
         document.getElementById('prev-slots').textContent = '2';
         var p3 = document.getElementById('prev-p3');
         if (p3) p3.classList.remove('anim-highlight');
