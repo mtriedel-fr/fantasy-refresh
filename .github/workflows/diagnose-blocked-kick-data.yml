@@ -1,0 +1,82 @@
+name: One-Time Diagnostic — Check Blocked Kick Data Availability
+
+# ONE-TIME USE — delete this file after running it once.
+# Checks the real, full box score response for any blocked-kick-
+# related field - the DST aggregate, scoring play descriptions (a
+# blocked kick returned for a TD would show there even without a
+# dedicated counter), and any other special-teams section - to
+# directly verify whether Tank01's data can support this scoring
+# category at all, rather than relying on memory from earlier tonight.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for any blocked-kick data anywhere in the response
+        env:
+          TANK01_KEY: ${{ secrets.TANK01_KEY }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const T01_KEY = process.env.TANK01_KEY;
+          const T01_HOST = 'tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com';
+          // A real, confirmed-complete regular-season-adjacent game -
+          // using the real Week 3 preseason game with the most total
+          // special-teams activity confirmed earlier tonight.
+          const GAME_ID = '20260822_WSH@DET';
+
+          function t01(path) {
+            return new Promise((resolve, reject) => {
+              https.get({
+                hostname: T01_HOST, path, headers: {
+                  'X-RapidAPI-Key': T01_KEY, 'X-RapidAPI-Host': T01_HOST
+                }
+              }, res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+
+          async function main() {
+            const bs = await t01(`/getNFLBoxScore?gameID=${GAME_ID}&fantasyPoints=true&PPRScoring=true`);
+            if (!bs.body) { console.log('No box score body:', JSON.stringify(bs)); return; }
+
+            console.log('=== All top-level keys in the response body ===');
+            console.log(Object.keys(bs.body).join(', '));
+
+            console.log('\n=== Full, raw DST field (both sides) ===');
+            console.log(JSON.stringify(bs.body.DST, null, 2));
+
+            console.log('\n=== Searching every scoring play description for "block" ===');
+            const blocked = (bs.body.scoringPlays || []).filter(p =>
+              /block/i.test(p.score || '') || /block/i.test(p.scoreDetails || '')
+            );
+            if (blocked.length) {
+              blocked.forEach(p => console.log(`  FOUND: [${p.team}] ${p.score}`));
+            } else {
+              console.log('  None found in this specific game\'s scoring plays.');
+            }
+
+            console.log('\n=== Searching ALL scoring play descriptions (full list, for manual review) ===');
+            (bs.body.scoringPlays || []).forEach(p => console.log(`  [${p.team}] ${p.score}`));
+
+            // Check if any individual player entry has a blocked-kick
+            // related stat anywhere in their own Kicking/Defense stats.
+            console.log('\n=== Checking individual player Kicking/Defense stat keys for anything block-related ===');
+            const players = Object.values(bs.body.playerStats || {});
+            const foundKeys = new Set();
+            players.forEach(p => {
+              ['Kicking', 'Defense', 'Punting'].forEach(cat => {
+                if (p[cat]) Object.keys(p[cat]).forEach(k => { if (/block/i.test(k)) foundKeys.add(cat + '.' + k); });
+              });
+            });
+            console.log(foundKeys.size ? [...foundKeys].join(', ') : 'No block-related keys found anywhere in individual player stats either.');
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
