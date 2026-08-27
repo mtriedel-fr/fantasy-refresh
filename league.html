@@ -1074,7 +1074,7 @@ setTimeout(function(){
   </div>
   <div class="nav-tab" id="navtab-guillotine" onclick="handleNav('guillotine')">
     <svg viewBox="0 0 24 24"><path d="M12 22V12"/><path d="M5 12H2a10 10 0 0 0 20 0h-3"/><path d="M8 6a4 4 0 0 1 8 0"/><path d="M5 12a7 7 0 0 1 14 0"/></svg>
-    <span>Guillotine</span>
+    <span>Last One Standing</span>
   </div>
   <div class="nav-tab" id="navtab-playoffs" onclick="handleNav('playoffs')">
     <svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
@@ -1150,7 +1150,7 @@ setTimeout(function(){
 <div id="tab-guillotine" class="content hidden">
   <div class="tab-overlay-close-bar hidden">
     <div class="tab-overlay-close-bar-row">
-      <span class="tab-overlay-close-bar-title">🔪 Guillotine</span>
+      <span class="tab-overlay-close-bar-title">⚔️ Last One Standing</span>
       <button class="tab-overlay-close-btn" onclick="closeH2HTabOverlay()">✕ Close</button>
     </div>
     <div class="myteam-toggle-row" data-myteam-anchor="guillotine">
@@ -3540,7 +3540,7 @@ function renderGuillotine(){
           // Header
           + '<div style="background:linear-gradient(135deg,rgba(255,95,160,.08),rgba(155,109,255,.08));border:1px solid rgba(255,95,160,.2);border-radius:16px;padding:20px;margin-bottom:16px;text-align:center;">'
           + '<div style="font-size:36px;margin-bottom:8px;">☠️</div>'
-          + '<div style="font-family:var(--fd);font-size:22px;font-weight:900;color:var(--pk);text-transform:uppercase;letter-spacing:.3px;margin-bottom:6px;">Guillotine Mode</div>'
+          + '<div style="font-family:var(--fd);font-size:22px;font-weight:900;color:var(--pk);text-transform:uppercase;letter-spacing:.3px;margin-bottom:6px;">Last One Standing</div>'
           + '<div style="font-size:13px;color:var(--ink2);line-height:1.6;max-width:300px;margin:0 auto;">Every week the lowest scorer gets cut. No second chances. Last team standing wins.</div>'
           + '</div>'
 
@@ -3572,7 +3572,7 @@ function renderGuillotine(){
       .catch(function(){
         el.innerHTML = '<div style="padding:32px;text-align:center;">'
           + '<div style="font-size:36px;margin-bottom:12px;">☠️</div>'
-          + '<div style="font-family:var(--fd);font-size:18px;font-weight:800;color:var(--pk);text-transform:uppercase;">Guillotine Mode</div>'
+          + '<div style="font-family:var(--fd);font-size:18px;font-weight:800;color:var(--pk);text-transform:uppercase;">Last One Standing</div>'
           + '<div style="font-size:13px;color:var(--ink3);margin-top:8px;line-height:1.6;">Every week the lowest scorer is eliminated. Season data will show here once Week 1 is imported.</div>'
           + '</div>';
       });
@@ -3687,7 +3687,7 @@ function renderGuillotine(){
   // Progress bar
   var progressPct = Math.round((Object.keys(eliminated).length / (totalTeams - 3)) * 100);
   var progressHTML = '<div class="guill-section">'
-    + '<div class="guill-section-hdr">⚔️ Guillotine Progress</div>'
+    + '<div class="guill-section-hdr">⚔️ Last One Standing Progress</div>'
     + '<div style="padding:14px 18px;">'
     + '<div style="display:flex;justify-content:space-between;font-family:var(--fd);font-size:11px;color:var(--ink2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">'
     + '<span>'+Object.keys(eliminated).length+' eliminated</span><span>'+progressPct+'% complete</span><span>'+(totalTeams-3)+' total to eliminate</span></div>'
@@ -3696,34 +3696,34 @@ function renderGuillotine(){
 
   // ── WINNERS (if complete) ──
   var winnersHTML = '';
-  // Show winners card when week 18 is imported (finale complete)
+  // Show winners card when week 17 is imported (finale complete)
   if(finaleRanking && finaleRanking.length >= 2){
     var w1 = finaleRanking[0], w2 = finaleRanking[1], w3 = finaleRanking[2];
     var isMe1 = myTeam && teamMatch(w1.name, myTeam);
     var isMe2 = myTeam && teamMatch(w2.name, myTeam);
     winnersHTML = '<div class="guill-section">'
-      + '<div class="guill-section-hdr" style="color:var(--or)">🏆 Guillotine Winners — Week 18 Finale</div>'
+      + '<div class="guill-section-hdr" style="color:var(--or)">🏆 Last One Standing Winners — Week 17 Finale</div>'
       + '<div class="guill-winners-podium" style="grid-template-columns:1fr 1fr 1fr;">'
       + '<div class="guill-winner-card" style="border-color:var(--or)">'
       + '<div class="guill-winner-medal">🥇</div>'
       + '<div class="guill-winner-name" style="color:var(--or)">'+(isMe1?'👑 ':'')+w1.name+'</div>'
-      + '<div class="guill-winner-score">'+fmtScore(w1.score)+' pts (Wk 18)</div>'
+      + '<div class="guill-winner-score">'+fmtScore(w1.score)+' pts (Wk 17)</div>'
       + '<div class="guill-winner-score" style="font-size:11px;margin-top:2px;">'+fmtTotal(survivorTotals[w1.name])+' season total</div></div>'
       + '<div class="guill-winner-card" style="border-color:var(--pk)">'
       + '<div class="guill-winner-medal">🥈</div>'
       + '<div class="guill-winner-name" style="color:var(--pk)">'+(isMe2?'👑 ':'')+w2.name+'</div>'
-      + '<div class="guill-winner-score">'+fmtScore(w2.score)+' pts (Wk 18)</div>'
+      + '<div class="guill-winner-score">'+fmtScore(w2.score)+' pts (Wk 17)</div>'
       + '<div class="guill-winner-score" style="font-size:11px;margin-top:2px;">'+fmtTotal(survivorTotals[w2.name])+' season total</div></div>'
       + (w3 ? '<div class="guill-winner-card" style="border-color:var(--pu)">'
         + '<div class="guill-winner-medal">🥉</div>'
         + '<div class="guill-winner-name" style="color:var(--pu)">'+w3.name+'</div>'
-        + '<div class="guill-winner-score">'+fmtScore(w3.score)+' pts (Wk 18)</div>'
+        + '<div class="guill-winner-score">'+fmtScore(w3.score)+' pts (Wk 17)</div>'
         + '<div class="guill-winner-score" style="font-size:11px;margin-top:2px;">'+fmtTotal(survivorTotals[w3.name])+' season total</div></div>' : '')
       + '</div></div>';
   } else if(isComplete){
-    // Fallback if week 18 not yet imported
+    // Fallback if week 17 not yet imported
     var sortedSurvivors = currentSurvivors.slice().sort(function(a,b){ return survivorTotals[b]-survivorTotals[a]; });
-    winnersHTML = '<div class="guill-section"><div class="guill-section-hdr" style="color:var(--ink3)">⏳ Week 18 Finale Pending</div>'
+    winnersHTML = '<div class="guill-section"><div class="guill-section-hdr" style="color:var(--ink3)">⏳ Week 17 Finale Pending</div>'
       + '<div style="padding:16px 18px;font-family:var(--fd);font-size:13px;color:var(--ink2);">3 finalists: '
       + sortedSurvivors.map(function(n){ return '<span class="guill-chip survivor">'+n+'</span>'; }).join(' ')
       + '</div></div>';
@@ -4662,7 +4662,7 @@ function renderLeague(){
       var po          = s.playoffs || {};
       var tiers       = po.tiers      || 3;
       var playoffStart = po.startWeek || 15;
-      var finaleWeek  = po.finaleWeek || 18;
+      var finaleWeek  = po.finaleWeek || 17;
 
       // Helpers
       function pts(v){
@@ -4836,10 +4836,10 @@ function renderLeague(){
                 + winnersHtml
                 + '</div>')
 
-            // Guillotine — skipped for preseason leagues
+            // Last One Standing — skipped for preseason leagues
             + (guillotine
               ? '<div style="background:var(--bg2);border-radius:12px;border:1px solid rgba(255,95,160,.2);padding:16px;margin-bottom:12px;">'
-              + '<div style="font-family:var(--fd);font-size:13px;font-weight:800;color:var(--pk);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">☠️ Guillotine — Concurrent</div>'
+              + '<div style="font-family:var(--fd);font-size:13px;font-weight:800;color:var(--pk);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">⚔️ Last One Standing — Concurrent</div>'
               + '<div style="font-size:12px;color:var(--ink2);line-height:1.6;margin-bottom:10px;">Running alongside the full season for every team — including playoff teams. The lowest weekly scorer is cut each week, no exceptions.</div>'
               + '<div style="display:flex;align-items:center;justify-content:space-between;background:var(--bg3);border-radius:8px;padding:10px 14px;">'
               + '<span style="font-family:var(--fd);font-size:11px;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;">~' + elimPerWeek + ' eliminated/week</span>'
@@ -9906,8 +9906,8 @@ document.addEventListener('DOMContentLoaded', function(){
 <div id="more-menu" style="display:none;position:fixed;bottom:60px;left:0;right:0;background:var(--bg2);border-top:1px solid var(--bdr2);padding:16px;z-index:566;" onclick="event.stopPropagation()">
   <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">
     <button id="more-guillotine-btn" onclick="closeMoreMenu();switchBottomNav('guillotine','bn-more')" style="background:var(--bg3);border:1px solid var(--bdr2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;">
-      <div style="font-size:20px;margin-bottom:4px;">☠️</div>
-      <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink2);text-transform:uppercase;">Guillotine</div>
+      <div style="font-size:20px;margin-bottom:4px;">⚔️</div>
+      <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink2);text-transform:uppercase;">Last One Standing</div>
     </button>
     <button onclick="closeMoreMenu();switchBottomNav('league','bn-more')" style="background:var(--bg3);border:1px solid var(--bdr2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;">
       <div style="font-size:20px;margin-bottom:4px;">🏈</div>

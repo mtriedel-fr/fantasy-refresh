@@ -239,7 +239,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
               <div class="format-opt-desc">You face a different opponent each week. Best record makes the playoffs.</div>
             </div>
             <div class="format-opt" id="fmt-guillotine" onclick="selectFormat('guillotine')">
-              <div class="format-opt-title">☠️ Guillotine</div>
+              <div class="format-opt-title">⚔️ Last One Standing</div>
               <div class="format-opt-desc">Lowest scorer gets knocked out every week. Survive longer than everyone else to win.</div>
             </div>
           </div>
@@ -262,7 +262,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
           </div>
           <div class="toggle-row" id="tog-guillotine-row">
             <div>
-              <div class="toggle-label">☠️ Guillotine</div>
+              <div class="toggle-label">⚔️ Last One Standing</div>
               <div class="toggle-sub">Also run a survival side-game — lowest weekly scorer gets eliminated each week</div>
             </div>
             <label class="toggle"><input type="checkbox" id="tog-guillotine"><span class="toggle-slider"></span></label>
@@ -867,8 +867,8 @@ function lookupLeague(){
       joinTargetLeagueId = settings.leagueId;
       document.getElementById('join-league-name').textContent = settings.name;
       document.getElementById('join-league-meta').textContent =
-        (settings.format==='headtohead'?'⚔️ Head to Head':settings.format==='guillotine'?'☠️ Guillotine':'📊 Cumulative')
-        + (settings.guillotine?' · ☠️ Guillotine':'')
+        (settings.format==='headtohead'?'⚔️ Head to Head':settings.format==='guillotine'?'⚔️ Last One Standing':'📊 Cumulative')
+        + (settings.guillotine?' · ⚔️ Last One Standing':'')
         + ' · ' + (settings.members||0) + '/' + (settings.maxMembers||'—') + ' players';
       preview.style.display = 'block';
     })
@@ -948,7 +948,7 @@ function showSuccess(mode, name, code, format, guillotine){
     document.getElementById('success-details').innerHTML =
       '<strong style="color:var(--ink2);">'+name+'</strong> is ready.<br>'
       + 'Format: '+(format==='headtohead'?'⚔️ Head to Head':'📊 Cumulative')
-      + (guillotine?' + ☠️ Guillotine':'')+'<br><br>'
+      + (guillotine?' + ⚔️ Last One Standing':'')+'<br><br>'
       + 'Share the join code with your players. They\'ll enter it when they sign up.';
   } else {
     document.getElementById('success-title').textContent = 'Joined! 🎉';
