@@ -1185,19 +1185,39 @@ jobs:
               // an approximation, not a perfect reconstruction, since a
               // 2-point attempt after that specific score isn't visible
               // in this data.
+              //
+              // Real defensive/ST TD count, derived directly from the
+              // detailed scoringPlays list rather than trusted from
+              // Tank01's own DST.defTD field — confirmed as a real,
+              // live Tank01 data inconsistency: their own aggregate
+              // field can be wrong even when their own, more detailed
+              // scoringPlays list (same response) shows the real count
+              // directly. This matters doubly here, since the points-
+              // allowed adjustment above is only as accurate as this
+              // count is.
+              function realDefTdCount(teamAbv) {
+                if (!bs.scoringPlays) return null;
+                return bs.scoringPlays.filter(p =>
+                  p.team === teamAbv && p.scoreType === 'TD' &&
+                  /fumble|interception|blocked|return/i.test(p.score || '')
+                ).length;
+              }
+
               const sides = ['home', 'away'];
               sides.forEach((side, i) => {
                 const d = bs.DST && bs.DST[side];
                 if (!d || !d.teamAbv) return;
                 const opp = bs.DST && bs.DST[sides[1 - i]];
-                const oppDefTDs = opp ? (parseFloat(opp.defTD) || 0) : 0;
+                const realDefTd = realDefTdCount(d.teamAbv);
+                const oppRealDefTd = opp ? realDefTdCount(opp.teamAbv) : null;
+                const oppDefTDs = oppRealDefTd != null ? oppRealDefTd : (opp ? (parseFloat(opp.defTD) || 0) : 0);
                 const rawPtsAllowed = parseFloat(d.ptsAllowed) || 0;
                 const adjustedPtsAllowed = Math.max(0, rawPtsAllowed - oppDefTDs * 7);
                 playerStats[d.teamAbv] = {
                   sacks:      d.sacks,
                   defInt:     d.defensiveInterceptions,
                   fumbRec:    d.fumblesRecovered,
-                  defTD:      d.defTD,
+                  defTD:      realDefTd != null ? realDefTd : d.defTD,
                   safety:     d.safeties,
                   ptsAllowed: adjustedPtsAllowed,
                   // Defense entries had no name field at all before,

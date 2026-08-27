@@ -1,0 +1,87 @@
+name: One-Time Diagnostic — Check Blocked Kick Data Availability v2
+
+# ONE-TIME USE — delete this file after running it once.
+# Expanded per the user's request - checks every possible location for
+# blocked-kick data: the DST aggregate, all scoring plays, the FULL raw
+# punting/kicking stats for every player (not just key-name searches),
+# and any top-level possession-change/turnover section of the response.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check every possible location for blocked-kick data
+        env:
+          TANK01_KEY: ${{ secrets.TANK01_KEY }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const T01_KEY = process.env.TANK01_KEY;
+          const T01_HOST = 'tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com';
+          const GAME_ID = '20260822_WSH@DET';
+
+          function t01(path) {
+            return new Promise((resolve, reject) => {
+              https.get({
+                hostname: T01_HOST, path, headers: {
+                  'X-RapidAPI-Key': T01_KEY, 'X-RapidAPI-Host': T01_HOST
+                }
+              }, res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+
+          async function main() {
+            const bs = await t01(`/getNFLBoxScore?gameID=${GAME_ID}&fantasyPoints=true&PPRScoring=true`);
+            if (!bs.body) { console.log('No box score body:', JSON.stringify(bs)); return; }
+
+            console.log('=== All top-level keys in the response body ===');
+            console.log(Object.keys(bs.body).join(', '));
+
+            // Any top-level possession-change/turnover section at all.
+            console.log('\n=== Checking for any top-level possession/turnover-related keys ===');
+            const topKeys = Object.keys(bs.body);
+            const relevantTopKeys = topKeys.filter(k => /possession|turnover|special/i.test(k));
+            console.log(relevantTopKeys.length ? relevantTopKeys.join(', ') : 'None found — no dedicated top-level section for this.');
+
+            console.log('\n=== Full, raw DST field (both sides) ===');
+            console.log(JSON.stringify(bs.body.DST, null, 2));
+
+            console.log('\n=== ALL scoring play descriptions (full list) ===');
+            (bs.body.scoringPlays || []).forEach(p => console.log(`  [${p.team}] ${p.score} (${p.scoreType})`));
+
+            // Full, raw Punting/Kicking stat objects for every player who
+            // has one at all — not just searching key names, showing the
+            // real, complete data so nothing is missed.
+            console.log('\n=== Full, raw Punting stats for every player who has them ===');
+            const players = Object.values(bs.body.playerStats || {});
+            const punters = players.filter(p => p.Punting);
+            if (punters.length) {
+              punters.forEach(p => console.log(`  ${p.longName} (${p.teamAbv}): ${JSON.stringify(p.Punting)}`));
+            } else {
+              console.log('  No player entries with a Punting object at all in this game.');
+            }
+
+            console.log('\n=== Full, raw Kicking stats for every player who has them ===');
+            const kickers = players.filter(p => p.Kicking);
+            if (kickers.length) {
+              kickers.forEach(p => console.log(`  ${p.longName} (${p.teamAbv}): ${JSON.stringify(p.Kicking)}`));
+            } else {
+              console.log('  No player entries with a Kicking object at all in this game.');
+            }
+
+            // Any player at all with a Defense object that includes a
+            // blocked-kick or similar stat - full raw dump, not filtered.
+            console.log('\n=== Full, raw Defense stats for a sample of players (to inspect every real field name) ===');
+            const defPlayers = players.filter(p => p.Defense).slice(0, 3);
+            defPlayers.forEach(p => console.log(`  ${p.longName} (${p.teamAbv}): ${JSON.stringify(p.Defense)}`));
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
