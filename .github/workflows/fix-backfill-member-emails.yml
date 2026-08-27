@@ -1,0 +1,116 @@
+name: One-Time Fix — Backfill Confirmed Member Emails
+
+# ONE-TIME USE — delete this file after running it once.
+# Backfills the 11 confirmed real emails (matched directly against
+# Firebase Auth's own console listing) into member records in both
+# leagues, wherever each UID actually appears. PATCH-style update so
+# only the email field changes - nothing else in each record (teamName,
+# joined, role, etc.) is touched.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type YES to actually write the emails'
+        required: true
+        default: ''
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Backfill confirmed emails into member records
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB_URL   = process.env.FIREBASE_DB_URL;
+          const FB_TOKEN = process.env.FIREBASE_AUTH_TOKEN;
+          const CONFIRM  = process.env.CONFIRM;
+          const LEAGUE_IDS = ['fr_refresh26', 'fr_nth60cij'];
+
+          // Confirmed directly against Firebase Auth's own console
+          // listing, matched by (truncated) UID prefix.
+          const KNOWN_EMAILS = {
+            'XKQuMLob5nSowWfgPHzXOchJNSH2': 'kempfd85@gmail.com',
+            'SBOoaQ9rGVM5dyDtpywQG3lZ8cD3': 'kylebeining@gmail.com',
+            '0dBG2K3MEBfCSHnB6wZGPywtQVV2': 'jeremy.hartert@gmail.com',
+            '8gzoO9aQ6iar7gx7UeDxniZzUoA3': 'facezach2017@gmail.com',
+            '43JTL2wd9fNmGhtXTQHg6W8PMpx2': 'andrew.harlos@gmail.com',
+            'LSWqfI9KrHXusIDQr8ykOTKWuIU2': 'nick.j.korth@gmail.com',
+            'n3XIMYGyylZTcaVT8MZQ0UWw5Lz1': 'williamrhagen@gmail.com',
+            'sgeeYuZGHcQlL91SJbBWSNNJLMT2': 'hutchisomc05@gmail.com',
+            'WnCLpZbAVgRG7yISjeIuGRKcgn13': 'cswesely@gmail.com',
+            'Uu8LAQhiBHfx1WUGXsqRq8q7WV53': 'watson_kaka@yahoo.com',
+            'bUw1041FsMQjHxBUc58NnclGwyJ2': 'mtriedel@gmail.com'
+          };
+
+          function fbAuth(path) {
+            const sep = path.includes('?') ? '&' : '?';
+            return FB_TOKEN ? `${path}${sep}auth=${FB_TOKEN}` : path;
+          }
+          function fetchJson(url) {
+            return new Promise((resolve, reject) => {
+              https.get(url, res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+          function firebasePatch(path, payload) {
+            return new Promise((resolve, reject) => {
+              const body = JSON.stringify(payload);
+              const fullPath = fbAuth(FB_URL + path + '.json');
+              const u = new URL(fullPath);
+              const req = https.request({
+                hostname: u.hostname, path: u.pathname + u.search, method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+              }, res => {
+                let d = '';
+                res.on('data', c => d += c);
+                res.on('end', () => {
+                  if (res.statusCode >= 200 && res.statusCode < 300) resolve(d);
+                  else reject(new Error(`PATCH rejected (HTTP ${res.statusCode}) — ${d.slice(0,200)}`));
+                });
+              });
+              req.on('error', reject);
+              req.write(body); req.end();
+            });
+          }
+
+          async function main() {
+            let totalUpdated = 0;
+            for (const leagueId of LEAGUE_IDS) {
+              const members = await fetchJson(`${FB_URL}/leagues/${leagueId}/members.json`).catch(() => null);
+              if (!members) { console.log(`${leagueId}: no members found.`); continue; }
+
+              console.log(`\n=== ${leagueId} ===`);
+              for (const [uid, email] of Object.entries(KNOWN_EMAILS)) {
+                const member = members[uid];
+                if (!member) continue; // this UID isn't a member of this league
+                if (member.email === email) {
+                  console.log(`  ${member.teamName || uid}: already correct (${email}) — skipping`);
+                  continue;
+                }
+                console.log(`  ${member.teamName || uid}: "${member.email || '(missing)'}" → "${email}"`);
+                totalUpdated++;
+                if (CONFIRM === 'YES') {
+                  await firebasePatch(`/leagues/${leagueId}/members/${uid}`, { email });
+                }
+              }
+            }
+
+            console.log(`\n${totalUpdated} member record(s) updated.`);
+            if (CONFIRM !== 'YES') {
+              console.log('⚠️  Confirm was not "YES" — nothing was written. Re-run with confirm=YES to apply.');
+            } else {
+              console.log('✅ Corrections written.');
+            }
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
