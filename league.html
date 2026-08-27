@@ -4798,6 +4798,26 @@ function renderLeague(){
             + row('Blocked Kick', pts(defBlkKick))
             + '</div>'
 
+            // Points Allowed — a separate block since it's a tiered
+            // scale, not a single value like the rows above. These are
+            // the real, actual values used in live scoring directly
+            // (not read from settings.scoring like the rows above,
+            // since they genuinely aren't configurable in the live
+            // scoring logic) — shown any other way would misrepresent
+            // what can actually be changed.
+            + '<div style="background:var(--bg2);border-radius:12px;border:1px solid var(--bdr);padding:16px;margin-bottom:12px;">'
+            + '<div style="font-family:var(--fd);font-size:13px;font-weight:800;color:var(--or);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">🛡️ Points Allowed (Defense)</div>'
+            + '<div style="font-size:12px;color:var(--ink2);line-height:1.5;margin-bottom:12px;">Based on how many points the opposing offense scores against your defense.</div>'
+            + row('0 points allowed', pts(10))
+            + row('1–6 points allowed', pts(7))
+            + row('7–13 points allowed', pts(4))
+            + row('14–20 points allowed', pts(1))
+            + row('21–27 points allowed', pts(0))
+            + row('28–34 points allowed', pts(-1))
+            + row('35+ points allowed', pts(-4))
+            + '<div style="display:flex;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--bdr);"><span style="color:var(--or);font-weight:700;flex-shrink:0;">•</span><div style="font-size:12px;color:var(--ink2);line-height:1.5;">If the <strong style="color:var(--ink)">opposing defense</strong> scores against your offense (a pick-six, a fumble return, etc.), those points are <strong style="color:var(--ink)">not counted</strong> against your own defense here — they weren\'t on the field for it, so it isn\'t held against their points-allowed tier.</div></div>'
+            + '</div>'
+
 
             // Season — different copy for preseason test leagues
             + (IS_PRESEASON_LEAGUE
