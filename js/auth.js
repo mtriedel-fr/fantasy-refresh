@@ -265,6 +265,19 @@
             dk2025:      null
           };
           setUser(user);
+          // Silent, self-healing backfill — if the member record is
+          // missing email (or has a stale one), correct it here using
+          // the real, current email Firebase Auth already just gave us
+          // above. Fixes a real, confirmed gap: joinLeague() is the
+          // only place email otherwise ever gets written, and it's
+          // never called for anyone who signed up without a join code
+          // and joined a league later through a separate flow — this
+          // fills that in the next time any of those accounts signs in
+          // normally, with no manual cleanup needed. Doesn't block or
+          // affect sign-in itself either way.
+          if (member && data.email && member.email !== data.email) {
+            dbPatch('/leagues/fr_refresh26/members/' + uid, { email: data.email }).catch(function(){});
+          }
           return { user: user, leagueId: 'fr_refresh26' };
         })
         .catch(function() {
