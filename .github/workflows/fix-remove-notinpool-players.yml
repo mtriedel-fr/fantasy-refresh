@@ -1,0 +1,126 @@
+name: One-Time Fix — Remove Not-In-Pool Players From Stored Data
+
+# ONE-TIME USE — delete this file after running it once.
+# The "skip players not in the real pool" fix is already correctly
+# live in auto-scoring.yml, but only affects newly-written gameStats.
+# This removes already-stored entries for players who aren't found in
+# the real pool (exact or suffix-stripped) - same underlying gap as
+# the earlier position-correction fixes, applied to this decision
+# instead.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type YES to actually write the corrections'
+        required: true
+        default: ''
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Remove not-in-pool players from already-stored gameStats
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB_URL   = process.env.FIREBASE_DB_URL;
+          const FB_TOKEN = process.env.FIREBASE_AUTH_TOKEN;
+          const CONFIRM  = process.env.CONFIRM;
+
+          function fbAuth(path) {
+            const sep = path.includes('?') ? '&' : '?';
+            return FB_TOKEN ? `${path}${sep}auth=${FB_TOKEN}` : path;
+          }
+          function fetchJson(url) {
+            return new Promise((resolve, reject) => {
+              https.get(url, res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+          function firebasePut(path, payload) {
+            return new Promise((resolve, reject) => {
+              const body = JSON.stringify(payload);
+              const fullPath = fbAuth(FB_URL + path + '.json');
+              const u = new URL(fullPath);
+              const req = https.request({
+                hostname: u.hostname, path: u.pathname + u.search, method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+              }, res => {
+                let d = '';
+                res.on('data', c => d += c);
+                res.on('end', () => {
+                  if (res.statusCode >= 200 && res.statusCode < 300) resolve(d);
+                  else reject(new Error(`PUT rejected (HTTP ${res.statusCode}) — ${d.slice(0,200)}`));
+                });
+              });
+              req.on('error', reject);
+              req.write(body); req.end();
+            });
+          }
+
+          // Exact same logic as the live auto-scoring.yml fix.
+          function stripNameSuffix(name) {
+            return (name || '').replace(/\s+(jr|sr|ii|iii|iv|v)\.?$/i, '').trim();
+          }
+
+          async function main() {
+            const pool = await fetchJson(`${FB_URL}/playerPool/2026/players.json`);
+            const posByName = {};
+            Object.values(pool || {}).forEach(p => {
+              if (p && p.name) {
+                const n = p.name.toLowerCase();
+                posByName[n] = p.pos || '';
+                const stripped = stripNameSuffix(n);
+                if (stripped && stripped !== n && !posByName[stripped]) posByName[stripped] = p.pos || '';
+              }
+            });
+            console.log(`Loaded ${Object.keys(posByName).length} real player position entries.\n`);
+
+            const allGameStats = await fetchJson(`${FB_URL}/gameStats/2026P.json`).catch(() => null);
+            const gameIds = allGameStats ? Object.keys(allGameStats) : [];
+            console.log(`Found ${gameIds.length} game(s) with stored gameStats.\n`);
+
+            let totalRemoved = 0, totalChecked = 0;
+            for (const gid of gameIds) {
+              const path = `/gameStats/2026P/${gid}`;
+              const data = allGameStats[gid];
+              if (!data || !data.players) continue;
+
+              let changed = false;
+              const kept = data.players.filter(p => {
+                if (p.pos === 'DEF') return true; // defenses are a separate, unaffected path
+                totalChecked++;
+                const n = (p.name || '').toLowerCase();
+                const inPool = posByName[n] || posByName[stripNameSuffix(n)];
+                if (!inPool) {
+                  changed = true;
+                  totalRemoved++;
+                  console.log(`  ${gid}: removing "${p.name}" (not found in real pool)`);
+                  return false;
+                }
+                return true;
+              });
+
+              if (changed && CONFIRM === 'YES') {
+                await firebasePut(path, { ...data, players: kept });
+              }
+            }
+
+            console.log(`\n${totalRemoved} of ${totalChecked} player entries removed (not in real pool).`);
+            if (CONFIRM !== 'YES') {
+              console.log('⚠️  Confirm was not "YES" — nothing was written. Re-run with confirm=YES to apply.');
+            } else {
+              console.log('✅ Corrections written.');
+            }
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT

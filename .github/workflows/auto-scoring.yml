@@ -1134,9 +1134,9 @@ jobs:
                 // instead of always silently falling through to name-matching.
                 if (stats.sleeperBotID) playerStats[stats.sleeperBotID] = stats;
                 const name = (stats.longName || stats.playerName || '').toLowerCase();
+                const stripped = name ? stripNameSuffix(name) : '';
                 if (name) {
                   playerStats[name] = stats;
-                  const stripped = stripNameSuffix(name);
                   if (stripped && stripped !== name && !playerStats[stripped]) playerStats[stripped] = stats;
                 }
                 // Detailed stats for EVERY player in this game, not just
@@ -1147,11 +1147,22 @@ jobs:
                 // of whether their exact position is confirmed.
                 const result = calcDKPoints(stats, null);
                 if (result.pts !== 0 || result.breakdown.length) {
-                  const realPos = name ? realPosLookup[name] : null;
+                  const realPos = name ? (realPosLookup[name] || realPosLookup[stripped]) : null;
+                  // Skip entirely if not found in the real, draftable
+                  // pool — a player who isn't in the pool at all isn't
+                  // draftable, so showing them here with a generic
+                  // FLEX fallback is confusing and not useful. This is
+                  // a real, known gap for two different reasons: some
+                  // are genuinely deep-roster/practice-squad players
+                  // Sleeper's pool doesn't track at all, others use a
+                  // different nickname than their formal pool name
+                  // (e.g. "Chip" vs "DeaMonte" Trayanum) with no
+                  // reliable general way to bridge that automatically.
+                  if (!realPos) return;
                   thisGameStats.push({
                     name: stats.longName || stats.playerName || 'Unknown',
                     team: stats.team || stats.teamAbv || '',
-                    pos: realPos || stats.pos || stats.position || stats.playerPosition || 'FLEX',
+                    pos: realPos,
                     pts: result.pts,
                     breakdown: result.breakdown
                   });
@@ -1307,7 +1318,20 @@ jobs:
               // pool during exactly the runs that most need it.
               const pool = await firebaseGet(`/playerPool/${BASE_SEASON}/players.json`);
               Object.values(pool || {}).forEach(p => {
-                if (p && p.name) playerPosLookup[p.name.toLowerCase()] = p.pos || '';
+                if (p && p.name) {
+                  const n = p.name.toLowerCase();
+                  playerPosLookup[n] = p.pos || '';
+                  // Also index by the stripped (suffix-removed) name —
+                  // confirmed as a real, live bug: a box score's name
+                  // ("Joe Milton III") and the pool's name for the same
+                  // person don't always carry identical suffix
+                  // formatting, so a raw-name-only lookup silently
+                  // fails for every suffixed player, falling back to
+                  // the generic FLEX label. Same pattern already used
+                  // for playerStats indexing above.
+                  const stripped = stripNameSuffix(n);
+                  if (stripped && stripped !== n && !playerPosLookup[stripped]) playerPosLookup[stripped] = p.pos || '';
+                }
               });
             } catch(e) { console.error('  Could not load player pool for position lookup:', e.message); }
             return playerPosLookup;
