@@ -3963,9 +3963,9 @@ function renderSeasonWrap(){
 
   // ── PLAYOFF BRACKET RESULTS ────────────────────────────────
   // Build playoff round results (same logic as playoffs.html)
-  var PLAYOFF_WKS = [16, 17, 18];
+  var PLAYOFF_WKS = [15, 16, 17];
   function applyPlayoffRound(teams, wkEntries){
-    if(!wkEntries || !wkEntries.length) return {advanced: teams, eliminated: [], scores: {}};
+    if(!wkEntries || !wkEntries.length) return {advanced: teams, eliminated: [], scores: []};
     var scored = teams.map(function(name){
       var e = wkEntries.find(function(e){ return teamMatch(e.name, name); });
       return {name: name, score: e ? e.score : 0};
@@ -3981,32 +3981,32 @@ function renderSeasonWrap(){
   // Tier podium ranking — use playoff bracket finish
   // Top 3 within each tier ranked by: how many rounds they won, then final round score
   function getTierPodium(tierTeams){
+    var wk15 = seasonData['15'] || [];
     var wk16 = seasonData['16'] || [];
     var wk17 = seasonData['17'] || [];
-    var wk18 = seasonData['18'] || [];
-    var r1 = applyPlayoffRound(tierTeams, wk16);
-    var r2 = applyPlayoffRound(r1.advanced, wk17);
-    var r3 = applyPlayoffRound(r2.advanced, wk18);
+    var r1 = applyPlayoffRound(tierTeams, wk15);
+    var r2 = applyPlayoffRound(r1.advanced, wk16);
+    var r3 = applyPlayoffRound(r2.advanced, wk17);
 
     // Assign playoff finish position within tier
     var ranked = [];
-    // Week 18 participants ranked by wk18 score
+    // Week 17 participants ranked by wk17 score
     r3.scores.forEach(function(e, i){
       ranked.push({name: e.name, playoffRank: i+1, finalScore: e.score, rounds: 3});
     });
-    // Week 17 eliminated ranked by wk17 score after week 18 participants
+    // Week 16 eliminated ranked by wk16 score after week 17 participants
     var r2elim = r2.eliminated.map(function(name){
-      var e = wk17.find(function(e){ return teamMatch(e.name, name); });
+      var e = wk16.find(function(e){ return teamMatch(e.name, name); });
       return {name: name, playoffRank: r3.scores.length + r2.eliminated.indexOf(name) + 1, finalScore: e ? e.score : 0, rounds: 2};
     }).sort(function(a,b){ return b.finalScore - a.finalScore; });
     r2elim.forEach(function(e, i){ e.playoffRank = r3.scores.length + i + 1; ranked.push(e); });
-    // Week 16 eliminated
+    // Week 15 eliminated
     var r1elim = r1.eliminated.map(function(name){
-      var e = wk16.find(function(e){ return teamMatch(e.name, name); });
+      var e = wk15.find(function(e){ return teamMatch(e.name, name); });
       return {name: name, finalScore: e ? e.score : 0, rounds: 1};
     }).sort(function(a,b){ return b.finalScore - a.finalScore; });
     r1elim.forEach(function(e, i){ e.playoffRank = r3.scores.length + r2elim.length + i + 1; ranked.push(e); });
-    // Teams that didn't play in week 16
+    // Teams that didn't play in week 15
     tierTeams.forEach(function(name){
       if(!ranked.find(function(r){ return r.name === name; })){
         ranked.push({name: name, playoffRank: ranked.length + 1, finalScore: 0, rounds: 0});
