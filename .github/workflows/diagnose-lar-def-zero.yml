@@ -1,0 +1,80 @@
+name: One-Time Diagnostic — Check LAR Defense Zero Score
+
+# ONE-TIME USE — delete this file after running it once.
+# Finds the real LAR@LAC week 4 game, checks its raw DST/teamStats
+# data directly, and checks the actual stored gameStats DEF entry - to
+# see exactly why LAR's defense is showing 0.00 despite real sacks and
+# a real, mid-range points-allowed tier that should both contribute
+# real points.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check LAR defense scoring directly
+        env:
+          TANK01_KEY: ${{ secrets.TANK01_KEY }}
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const T01_KEY = process.env.TANK01_KEY;
+          const T01_HOST = 'tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com';
+          const FB_URL = process.env.FIREBASE_DB_URL;
+
+          function t01(path) {
+            return new Promise((resolve, reject) => {
+              https.get({
+                hostname: T01_HOST, path, headers: {
+                  'X-RapidAPI-Key': T01_KEY, 'X-RapidAPI-Host': T01_HOST
+                }
+              }, res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+          function fetchJson(url) {
+            return new Promise((resolve, reject) => {
+              https.get(url, res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+
+          async function main() {
+            const candidates = ['20260827_LAR@LAC', '20260828_LAR@LAC', '20260829_LAR@LAC', '20260830_LAR@LAC'];
+            let realGid = null, bs = null;
+            for (const gid of candidates) {
+              const result = await t01(`/getNFLBoxScore?gameID=${gid}&fantasyPoints=true&PPRScoring=true`);
+              if (result.body && result.body.gameStatus) { realGid = gid; bs = result; break; }
+            }
+            if (!realGid) { console.log('Could not find the real game ID among candidates.'); return; }
+            console.log(`Found: ${realGid}, status=${bs.body.gameStatus}, score away(${bs.body.away})=${bs.body.awayPts} home(${bs.body.home})=${bs.body.homePts}\n`);
+
+            console.log('=== Real, raw DST field ===');
+            console.log(JSON.stringify(bs.body.DST, null, 2));
+
+            console.log('\n=== Real, raw teamStats.blockedFG/Punt/XP for LAR ===');
+            const side = bs.body.home === 'LAR' ? 'home' : 'away';
+            const ts = bs.body.teamStats && bs.body.teamStats[side];
+            console.log(ts ? JSON.stringify({ blockedFG: ts.blockedFG, blockedPunt: ts.blockedPunt, blockedXP: ts.blockedXP }, null, 2) : 'No teamStats found for LAR at all.');
+
+            console.log('\n=== Real, stored gameStats for this game (what the app actually saved) ===');
+            const stored = await fetchJson(`${FB_URL}/gameStats/2026P/${realGid}.json`).catch(() => null);
+            if (stored && stored.players) {
+              const larDef = stored.players.find(p => p.team === 'LAR' && p.pos === 'DEF');
+              console.log(larDef ? JSON.stringify(larDef, null, 2) : 'No LAR DEF entry found in stored gameStats at all.');
+            } else {
+              console.log('No stored gameStats found for this game at all yet.');
+            }
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
