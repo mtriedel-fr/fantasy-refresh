@@ -419,7 +419,7 @@ jobs:
 
               for (const [slotId, player] of Object.entries(lineup.slots)) {
                 if (!player) continue;
-                let stats = playerStats[player.id] || playerStats[(player.name || '').toLowerCase()] || playerStats[stripNameSuffix((player.name || '').toLowerCase())];
+                let stats = playerStats[player.id] || playerStats[(player.name || '').toLowerCase()] || playerStats[stripNameSuffix((player.name || '').toLowerCase())] || playerStats[player.team];
                 let result;
                 if (stats) {
                   result = calcDKPoints(stats, player.pos);
@@ -1213,6 +1213,19 @@ jobs:
                 const oppDefTDs = oppRealDefTd != null ? oppRealDefTd : (opp ? (parseFloat(opp.defTD) || 0) : 0);
                 const rawPtsAllowed = parseFloat(d.ptsAllowed) || 0;
                 const adjustedPtsAllowed = Math.max(0, rawPtsAllowed - oppDefTDs * 7);
+                // Real blocked-kick data — a completely separate section
+                // (teamStats, not DST) confirmed directly tonight against
+                // a real, independently-verified game (blockedFG=2 for a
+                // team confirmed by real news coverage to have blocked
+                // exactly 2 field goals that game, matching a real
+                // scoring-play description of the return TD too). Summed
+                // across all three kick types since the scoring rule is
+                // a single, generic "Blocked Kick" category, not split
+                // by punt/FG/XP.
+                const ts = bs.teamStats && bs.teamStats[side];
+                const blkKick = ts
+                  ? (parseFloat(ts.blockedFG) || 0) + (parseFloat(ts.blockedPunt) || 0) + (parseFloat(ts.blockedXP) || 0)
+                  : 0;
                 playerStats[d.teamAbv] = {
                   sacks:      d.sacks,
                   defInt:     d.defensiveInterceptions,
@@ -1220,6 +1233,7 @@ jobs:
                   defTD:      realDefTd != null ? realDefTd : d.defTD,
                   safety:     d.safeties,
                   ptsAllowed: adjustedPtsAllowed,
+                  blkKick:    blkKick,
                   // Defense entries had no name field at all before,
                   // which meant archiveWeekStats() silently skipped every
                   // team defense entirely (it requires a real name to
@@ -1229,6 +1243,9 @@ jobs:
                   longName:   d.teamAbv,
                   team:       d.teamAbv
                 };
+                if (blkKick > 0) {
+                  console.log(`  🚫 ${d.teamAbv} blocked ${blkKick} kick(s) this game`);
+                }
                 if (oppDefTDs > 0) {
                   console.log(`  🛡️  ${d.teamAbv} points-allowed adjusted: ${rawPtsAllowed} raw → ${adjustedPtsAllowed} (excluding ${oppDefTDs} opponent def/ST TD)`);
                 }
