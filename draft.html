@@ -1103,7 +1103,7 @@ function buildGamesBar(games){
       var d        = new Date(g.time);
       var day      = d.getDay();
       var hr       = d.getHours();
-      var timeStr  = d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})+' ET';
+      var timeStr  = d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',timeZoneName:'short'});
       var days     = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
       var dayLabel;
       // MNF/SNF/TNF are specific, official NFL prime-time broadcast
