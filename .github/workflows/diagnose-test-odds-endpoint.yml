@@ -1,0 +1,62 @@
+name: One-Time Diagnostic — Test Real /odds Endpoint
+
+# ONE-TIME USE — delete this file after running it once.
+# Tests the real, live /odds endpoint on the Cloudflare worker directly
+# - the games-bar O/U badge feature already exists in draft.html's
+# code, so this checks whether it's actually returning real data right
+# now, or whether it was built but never fully came online.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test the real /odds endpoint directly
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const WORKER = 'fantasy-refresh-news.mtriedel.workers.dev';
+
+          function fetchJson(hostname, path) {
+            return new Promise((resolve, reject) => {
+              https.get({ hostname, path }, res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => {
+                  try { resolve({ status: res.statusCode, body: JSON.parse(data) }); }
+                  catch(e) { resolve({ status: res.statusCode, body: data.slice(0, 300), parseError: e.message }); }
+                });
+              }).on('error', reject);
+            });
+          }
+
+          async function main() {
+            // Real, confirmed dates from this preseason week's games.
+            const dates = ['20260827', '20260828', '20260829', '20260830'];
+            for (const d of dates) {
+              console.log(`\n=== /odds?gameDate=${d} ===`);
+              try {
+                const result = await fetchJson(WORKER, `/odds?gameDate=${d}`);
+                console.log(`HTTP ${result.status}`);
+                console.log(JSON.stringify(result.body, null, 2).slice(0, 1500));
+              } catch(e) {
+                console.log(`Failed: ${e.message}`);
+              }
+            }
+
+            // Also try the no-date-param version, matching the
+            // workerFetch('odds') call seen in draft.html.
+            console.log(`\n=== /odds (no date param) ===`);
+            try {
+              const result = await fetchJson(WORKER, `/odds`);
+              console.log(`HTTP ${result.status}`);
+              console.log(JSON.stringify(result.body, null, 2).slice(0, 1500));
+            } catch(e) {
+              console.log(`Failed: ${e.message}`);
+            }
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
