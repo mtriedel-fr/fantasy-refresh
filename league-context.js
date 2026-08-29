@@ -424,7 +424,7 @@
     var d = new Date(iso);
     if(isNaN(d.getTime())) return '';
     var day = d.toLocaleDateString('en-US', { weekday: 'short' });
-    var time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
+    var time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
     return day + ' ' + time;
   };
 
