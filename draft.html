@@ -50,7 +50,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
 /* ── GAMES BAR ── */
 .games-bar{background:var(--hdr);border-bottom:2px solid var(--pk);padding:8px 16px;overflow-x:auto;display:flex;gap:8px;flex-shrink:0;scrollbar-width:none;}
 .games-bar::-webkit-scrollbar{display:none;}
-.game-chip{flex-shrink:0;padding:5px 12px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:20px;font-family:var(--fd);font-size:12px;font-weight:700;color:var(--ink2);cursor:pointer;transition:all .15s;white-space:nowrap;min-width:96px;min-height:70px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+.game-chip{flex-shrink:0;padding:8px 12px 6px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:20px;font-family:var(--fd);font-size:13px;font-weight:700;color:var(--ink2);cursor:pointer;transition:all .15s;white-space:nowrap;min-width:100px;min-height:76px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;}
 .game-chip:hover{border-color:var(--pk);color:var(--pk);}
 .game-chip.active{background:rgba(255,95,160,.15);border-color:var(--pk);color:var(--pk);}
 .game-chip.all{border-color:var(--bdr2);color:var(--ink3);}
@@ -1129,29 +1129,29 @@ function buildGamesBar(games){
       // same color for its text, never plain light text).
       chipStyle = 'background:#FF1A6E;';
       labelColor = '#4B1528';
-      sub = '<div style="font-size:9px;margin-top:2px;font-weight:800;color:#4B1528;">Final'+(info.scoreLine?' '+info.scoreLine:'')+'</div>';
+      sub = '<div style="font-size:10px;margin-top:2px;font-weight:800;color:#4B1528;">Final'+(info.scoreLine?' '+info.scoreLine:'')+'</div>';
     } else if(info.status === 'live'){
       // Live — bold, filled green chip, same treatment as final above.
       chipStyle = 'background:#5DCAA5;';
       labelColor = '#04342C';
-      sub = '<div style="font-size:9px;margin-top:2px;font-weight:800;color:#04342C;">'+info.quarter+(info.clock?' '+info.clock:'')+(info.scoreLine?' · '+info.scoreLine:'')+'</div>';
+      sub = '<div style="font-size:10px;margin-top:2px;font-weight:800;color:#04342C;">'+info.quarter+(info.clock?' '+info.clock:'')+(info.scoreLine?' · '+info.scoreLine:'')+'</div>';
     } else if(info.dayLabel){
       var intlBadge = info.isIntl
-        ? '<div style="font-size:9px;font-weight:800;color:#FF9A3A;margin-top:1px;">INT&#39;L</div>' : '';
+        ? '<div style="font-size:10px;font-weight:800;color:#FF9A3A;margin-top:1px;">INT&#39;L</div>' : '';
       var ouBadge = info.overUnder
-        ? '<div style="font-size:9px;font-weight:800;color:#9B6DFF;margin-top:1px;">O/U '+info.overUnder+'</div>' : '';
+        ? '<div style="font-size:10px;font-weight:800;color:#9B6DFF;margin-top:1px;">O/U '+info.overUnder+'</div>' : '';
       // Dome/weather-shielded badge — games bar shows the HOME team's
       // stadium type, since that's whose venue the game is actually played at.
       var domeBadge = info.domeIcon
-        ? '<div style="font-size:9px;font-weight:800;color:var(--ink3);margin-top:1px;">'+info.domeIcon+' Dome</div>' : '';
-      sub = '<div style="font-size:9px;margin-top:2px;display:flex;gap:4px;justify-content:center;">'
+        ? '<div style="font-size:10px;font-weight:800;color:var(--ink3);margin-top:1px;">'+info.domeIcon+' Dome</div>' : '';
+      sub = '<div style="font-size:10px;margin-top:2px;display:flex;gap:4px;justify-content:center;">'
           + '<span style="color:var(--pk);font-weight:800;">'+info.dayLabel+'</span>'
           + '<span style="color:var(--ink3);">'+info.timeStr+'</span>'
           + '</div>'
           + intlBadge + ouBadge + domeBadge;
     }
     var labelHtml = labelColor ? '<span style="color:'+labelColor+';">'+label+'</span>' : label;
-    html += '<button class="game-chip" data-game="'+i+'" onclick="setGameFilter('+i+',this)" style="text-align:center;padding:5px 12px;'+chipStyle+'">'+labelHtml+sub+'</button>';
+    html += '<button class="game-chip" data-game="'+i+'" onclick="setGameFilter('+i+',this)" style="text-align:center;'+chipStyle+'">'+labelHtml+sub+'</button>';
   });
   bar.innerHTML = html;
   if(pickerBar) pickerBar.innerHTML = html;
