@@ -536,6 +536,25 @@ function formatQuarterLabel(quarter){
   return /^\d+$/.test(String(quarter)) ? 'Q' + quarter : String(quarter);
 }
 
+// Real opponent + DvP rank lookup for a player's card. Empty string
+// (no badge at all) whenever no real data exists yet for this specific
+// position/opponent combination - always true during Week 1 by design,
+// confirmed directly with the user, since nflDvp itself is empty until
+// at least one week of real games has finished.
+function getDvpBadgeHtml(p){
+  if(!p.team || !p.pos || p.pos === 'FLEX') return '';
+  var game = schedule.find(function(g){ return g.home === p.team || g.away === p.team; });
+  if(!game) return '';
+  var opp = game.home === p.team ? game.away : game.home;
+  if(!opp || !nflDvp[opp] || !nflDvp[opp][p.pos] || nflDvp[opp][p.pos].rank == null) return '';
+  var rank = nflDvp[opp][p.pos].rank;
+  var bg, fg;
+  if(rank <= 10){      bg = '#EAF3DE'; fg = '#173404'; } // good matchup
+  else if(rank >= 23){ bg = '#FCEBEB'; fg = '#501313'; } // tough matchup
+  else {                bg = '#F1EFE8'; fg = '#2C2C2A'; } // mid-range
+  return '<span style="font-size:11px;font-weight:800;color:'+fg+';background:'+bg+';border-radius:10px;padding:2px 8px;margin-left:6px;">'+opp+': #'+rank+' vs '+p.pos+'</span>';
+}
+
 function draftStadiumIcon(teamAbbr){
   var type = STADIUM_TYPE[teamAbbr];
   // Retractable merged into dome — see league.html's stadiumIcon() for why
@@ -870,6 +889,7 @@ function showDraftLockPopup(){
   document.body.insertAdjacentHTML('beforeend', html);
 }
 var gameOdds    = {};
+var nflDvp      = {}; // real, cumulative points-allowed-vs-position rankings — empty until at least one week of real regular-season games has finished
 // teamLocks declared once, near loadLocks() below, where it belongs —
 // removed the redundant, earlier duplicate that used to live here.
 
@@ -982,6 +1002,20 @@ function loadSchedule(){
         buildGamesBar(schedule);
         renderRoster();
       }).catch(function(){});
+
+      // DvP (points allowed vs each position) — real, regular-season
+      // matchup data only, genuinely empty until at least one week of
+      // real games has finished (Week 1 always shows nothing, by
+      // design, confirmed with the user directly). Independent of the
+      // live-status fetch above — unrelated data, no reason to couple
+      // their timing. Re-renders the picker once this resolves so any
+      // already-open player list picks up the badge as soon as real
+      // data arrives.
+      if(!PS_MODE){
+        FR.fb.get('/nflDvp/' + FR.seasonKey()).then(function(d){
+          if(d && d.teams){ nflDvp = d.teams; renderPicker(); }
+        }).catch(function(){});
+      }
 
       // In preseason: re-filter player pool to only teams playing this week
       if(PS_MODE && allPlayers.length){
@@ -1345,7 +1379,7 @@ function renderGamePreviewPickable(game){
       + playerPhotoOrBadge(p)
       + '<div class="p-info" onclick="openNews(\''+p.id+'\',event)" style="cursor:pointer;">'
       +   '<div class="p-name">'+p.name+(p.pos?' · '+p.pos:'')+(p.team&&p.pos!=='DEF'?' · '+p.team:'')+injBadge+'</div>'
-      +   '<div class="p-meta">'+(p.proj?p.proj+' proj':'')+'</div>'
+      +   '<div class="p-meta">'+(p.proj?p.proj+' proj':'')+getDvpBadgeHtml(p)+'</div>'
       + '</div>'
       + '<div class="p-sal">$'+(p.salary||0).toLocaleString()+'</div>'
       + '<button class="'+draftCls2+'" onclick="pickFromPreview(\''+p.id+'\')">' + draftLbl2 + '</button>'
@@ -1907,7 +1941,7 @@ function renderPicker(){
       + playerPhotoOrBadge(p)
       + '<div class="p-info" onclick="openNews(\''+p.id+'\',event)" style="cursor:pointer;">'
       +   '<div class="p-name">'+p.name+(p.pos?' · '+p.pos:'')+(p.team&&p.pos!=='DEF'?' · '+p.team:'')+injBadge+(isElsewhere?' <span style="font-size:10px;color:var(--ink3)">(in lineup)</span>':'')+'</div>'
-      +   '<div class="p-meta">'+gameMeta+(p.proj?(gameMeta?' · ':'')+p.proj+' proj':'')+'</div>'
+      +   '<div class="p-meta">'+gameMeta+(p.proj?(gameMeta?' · ':'')+p.proj+' proj':'')+getDvpBadgeHtml(p)+'</div>'
       + '</div>'
       + '<div class="p-sal">$'+(p.salary||0).toLocaleString()+'</div>'
       + '<button class="'+draftCls+'" onclick="pickPlayer(\''+p.id+'\')">' + draftLabel + '</button>'
