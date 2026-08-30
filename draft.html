@@ -50,7 +50,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
 /* ── GAMES BAR ── */
 .games-bar{background:var(--hdr);border-bottom:2px solid var(--pk);padding:8px 16px;overflow-x:auto;display:flex;gap:8px;flex-shrink:0;scrollbar-width:none;}
 .games-bar::-webkit-scrollbar{display:none;}
-.game-chip{flex-shrink:0;padding:5px 12px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:20px;font-family:var(--fd);font-size:12px;font-weight:700;color:var(--ink2);cursor:pointer;transition:all .15s;white-space:nowrap;}
+.game-chip{flex-shrink:0;padding:5px 12px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:20px;font-family:var(--fd);font-size:12px;font-weight:700;color:var(--ink2);cursor:pointer;transition:all .15s;white-space:nowrap;min-width:96px;min-height:70px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:center;}
 .game-chip:hover{border-color:var(--pk);color:var(--pk);}
 .game-chip.active{background:rgba(255,95,160,.15);border-color:var(--pk);color:var(--pk);}
 .game-chip.all{border-color:var(--bdr2);color:var(--ink3);}
