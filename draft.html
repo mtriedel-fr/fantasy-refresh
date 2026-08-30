@@ -106,6 +106,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
 .picker-header{padding:12px 20px;border-bottom:1px solid var(--bdr);background:var(--bg2);flex-shrink:0;display:flex;align-items:center;gap:12px;}
 .picker-slot-label{font-family:var(--fd);font-size:16px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;}
 .picker-game-filter{font-family:var(--fd);font-size:12px;color:var(--pk);background:rgba(255,95,160,.1);border:1px solid rgba(255,95,160,.3);padding:3px 10px;border-radius:12px;}
+.picker-game-info{font-family:var(--fd);font-size:12px;font-weight:700;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
 .picker-clear-btn{margin-left:auto;background:none;border:none;font-family:var(--fd);font-size:12px;color:var(--ink3);cursor:pointer;text-transform:uppercase;letter-spacing:.5px;padding:4px 8px;border-radius:6px;border:1px solid var(--bdr);}
 .picker-clear-btn:hover{color:var(--or);border-color:var(--or);}
 .picker-clear-btn.way-out{color:#fff;background:var(--pk);border-color:var(--pk);box-shadow:0 0 14px rgba(255,60,120,.7);animation:wayOutPulse 1.4s ease-in-out infinite;}
@@ -301,6 +302,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
     <div class="picker-header">
       <div class="picker-slot-label" id="picker-slot-label" style="color:var(--ink2)">All Players</div>
       <div class="picker-game-filter" id="picker-game-filter" style="display:none;"></div>
+      <div class="picker-game-info" id="picker-game-info" style="display:none;"></div>
       <button id="picker-close-btn" class="picker-clear-btn" onclick="closePicker()">✕ Close</button>
     </div>
     <!-- Games bar inside picker — mobile only -->
@@ -1036,6 +1038,55 @@ function loadSchedule(){
     });
 }
 
+// Shared game status/info computation, used by both the games-bar chip
+// (narrow, vertical stack) and the picker panel header (wide,
+// horizontal line) — returns structured data rather than HTML, so each
+// caller builds its own appropriately-shaped layout while staying
+// automatically in sync with the other, since there's only one real
+// source of truth for what a game's current status actually is.
+function getGameStatusInfo(g){
+  // Live/final status — keyed by either team, since both sides of the
+  // same game carry the same underlying status (myScore/oppScore are
+  // just flipped depending on which team you look up). Falls through
+  // to the normal day/time info below for any game that hasn't started
+  // yet, which is unaffected by any of this.
+  var liveInfo = (g.home && liveGameStatus[g.home]) || (g.away && liveGameStatus[g.away]) || null;
+  var info = { status: 'upcoming' };
+
+  if(liveInfo && liveInfo.liveStatusCode === 2){
+    var homeScore = (g.home && liveGameStatus[g.home]) ? liveGameStatus[g.home].myScore : liveInfo.oppScore;
+    var awayScore = (g.home && liveGameStatus[g.home]) ? liveGameStatus[g.home].oppScore : liveInfo.myScore;
+    info.status = 'final';
+    info.scoreLine = (typeof homeScore === 'number' && typeof awayScore === 'number') ? awayScore + '-' + homeScore : '';
+  } else if(liveInfo && liveInfo.liveStatusCode === 1){
+    var homeScoreL = (g.home && liveGameStatus[g.home]) ? liveGameStatus[g.home].myScore : liveInfo.oppScore;
+    var awayScoreL = (g.home && liveGameStatus[g.home]) ? liveGameStatus[g.home].oppScore : liveInfo.myScore;
+    info.status = 'live';
+    info.quarter = formatQuarterLabel(liveInfo.quarter);
+    info.clock = liveInfo.clock || '';
+    info.scoreLine = (typeof homeScoreL === 'number' && typeof awayScoreL === 'number') ? awayScoreL + '-' + homeScoreL : '';
+  } else if(g.time){
+    var d   = new Date(g.time);
+    var day = d.getDay();
+    var hr  = d.getHours();
+    var days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    // MNF/SNF/TNF are specific, official NFL prime-time broadcast
+    // designations tied to the regular season — a preseason game
+    // landing on a Sunday evening isn't genuinely "SNF" just because
+    // the day/time coincide, since it's not part of that actual
+    // national broadcast slate. Preseason just shows the plain day.
+    if(!PS_MODE && day===1&&hr>=18){       info.dayLabel = 'MNF';
+    } else if(!PS_MODE && day===0&&hr>=19){ info.dayLabel = 'SNF';
+    } else if(!PS_MODE && day===4&&hr>=18){ info.dayLabel = 'TNF';
+    } else {                                info.dayLabel = days[day]; }
+    info.timeStr = d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+    info.isIntl = !!g.international;
+    info.overUnder = (g.gameId && gameOdds[g.gameId] && gameOdds[g.gameId].overUnder) ? gameOdds[g.gameId].overUnder : null;
+    info.domeIcon = draftStadiumIcon(g.home) || null;
+  }
+  return info;
+}
+
 function buildGamesBar(games){
   var bar = document.getElementById('games-bar');
   var pickerBar = document.getElementById('picker-games-bar');
@@ -1068,67 +1119,34 @@ function buildGamesBar(games){
   games.forEach(function(g, i){
     var label = (g.away||'?') + ' @ ' + (g.home||'?');
     var sub   = '';
-    // Live/final status — keyed by either team, since both sides of the
-    // same game carry the same underlying status (myScore/oppScore are
-    // just flipped depending on which team you look up). Falls through
-    // to the normal day/time sub-line below for any game that hasn't
-    // started yet, which is unaffected by any of this.
-    var liveInfo = (g.home && liveGameStatus[g.home]) || (g.away && liveGameStatus[g.away]) || null;
+    var info  = getGameStatusInfo(g);
     var chipStyle = '';
     var labelColor = '';
-    if(liveInfo && liveInfo.liveStatusCode === 2){
-      // myScore/oppScore already line up correctly with home/away in
-      // the common case, since liveInfo is looked up via g.home first.
-      var homeScore = (g.home && liveGameStatus[g.home]) ? liveGameStatus[g.home].myScore : liveInfo.oppScore;
-      var awayScore = (g.home && liveGameStatus[g.home]) ? liveGameStatus[g.home].oppScore : liveInfo.myScore;
-      var finalScoreLine = (typeof homeScore === 'number' && typeof awayScore === 'number') ? ' ' + awayScore + '-' + homeScore : '';
+    if(info.status === 'final'){
       // Final — bold, filled pink chip. Dark text on top for contrast,
       // matching the same treatment already used for colored badges
       // elsewhere (a colored fill always pairs with a dark shade of the
       // same color for its text, never plain light text).
       chipStyle = 'background:#FF1A6E;';
       labelColor = '#4B1528';
-      sub = '<div style="font-size:9px;margin-top:2px;font-weight:800;color:#4B1528;">Final'+finalScoreLine+'</div>';
-    } else if(liveInfo && liveInfo.liveStatusCode === 1){
-      var homeScoreL = (g.home && liveGameStatus[g.home]) ? liveGameStatus[g.home].myScore : liveInfo.oppScore;
-      var awayScoreL = (g.home && liveGameStatus[g.home]) ? liveGameStatus[g.home].oppScore : liveInfo.myScore;
-      var q = formatQuarterLabel(liveInfo.quarter);
-      var clk = liveInfo.clock ? ' '+liveInfo.clock : '';
-      var liveScoreLine = (typeof homeScoreL === 'number' && typeof awayScoreL === 'number') ? ' · ' + awayScoreL + '-' + homeScoreL : '';
+      sub = '<div style="font-size:9px;margin-top:2px;font-weight:800;color:#4B1528;">Final'+(info.scoreLine?' '+info.scoreLine:'')+'</div>';
+    } else if(info.status === 'live'){
       // Live — bold, filled green chip, same treatment as final above.
       chipStyle = 'background:#5DCAA5;';
       labelColor = '#04342C';
-      sub = '<div style="font-size:9px;margin-top:2px;font-weight:800;color:#04342C;">'+q+clk+liveScoreLine+'</div>';
-    } else if(g.time){
-      var d        = new Date(g.time);
-      var day      = d.getDay();
-      var hr       = d.getHours();
-      var timeStr  = d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
-      var days     = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-      var dayLabel;
-      // MNF/SNF/TNF are specific, official NFL prime-time broadcast
-      // designations tied to the regular season — a preseason game
-      // landing on a Sunday evening isn't genuinely "SNF" just because
-      // the day/time coincide, since it's not part of that actual
-      // national broadcast slate. Preseason just shows the plain day.
-      if(!PS_MODE && day===1&&hr>=18){       dayLabel = 'MNF';
-      } else if(!PS_MODE && day===0&&hr>=19){ dayLabel = 'SNF';
-      } else if(!PS_MODE && day===4&&hr>=18){ dayLabel = 'TNF';
-      } else {                                dayLabel = days[day]; }
-      var intlBadge = g.international
+      sub = '<div style="font-size:9px;margin-top:2px;font-weight:800;color:#04342C;">'+info.quarter+(info.clock?' '+info.clock:'')+(info.scoreLine?' · '+info.scoreLine:'')+'</div>';
+    } else if(info.dayLabel){
+      var intlBadge = info.isIntl
         ? '<div style="font-size:9px;font-weight:800;color:#FF9A3A;margin-top:1px;">INT&#39;L</div>' : '';
-      // O/U badge — look up by gameId
-      var ouBadge = '';
-      if(g.gameId && gameOdds[g.gameId] && gameOdds[g.gameId].overUnder){
-        ouBadge = '<div style="font-size:9px;font-weight:800;color:#9B6DFF;margin-top:1px;">O/U '+gameOdds[g.gameId].overUnder+'</div>';
-      }
+      var ouBadge = info.overUnder
+        ? '<div style="font-size:9px;font-weight:800;color:#9B6DFF;margin-top:1px;">O/U '+info.overUnder+'</div>' : '';
       // Dome/weather-shielded badge — games bar shows the HOME team's
       // stadium type, since that's whose venue the game is actually played at.
-      var domeBadge = draftStadiumIcon(g.home)
-        ? '<div style="font-size:9px;font-weight:800;color:var(--ink3);margin-top:1px;">'+draftStadiumIcon(g.home)+' Dome</div>' : '';
+      var domeBadge = info.domeIcon
+        ? '<div style="font-size:9px;font-weight:800;color:var(--ink3);margin-top:1px;">'+info.domeIcon+' Dome</div>' : '';
       sub = '<div style="font-size:9px;margin-top:2px;display:flex;gap:4px;justify-content:center;">'
-          + '<span style="color:var(--pk);font-weight:800;">'+dayLabel+'</span>'
-          + '<span style="color:var(--ink3);">'+timeStr+'</span>'
+          + '<span style="color:var(--pk);font-weight:800;">'+info.dayLabel+'</span>'
+          + '<span style="color:var(--ink3);">'+info.timeStr+'</span>'
           + '</div>'
           + intlBadge + ouBadge + domeBadge;
     }
@@ -1173,11 +1191,28 @@ function setGameFilter(gameIdx, btn){
   activeGame = gameIdx === null ? null : (schedule[gameIdx] || null);
   activeGameTeamFilter = 'both'; // reset whenever the selected game changes
   var badge = document.getElementById('picker-game-filter');
+  var infoEl = document.getElementById('picker-game-info');
   if(activeGame){
     badge.textContent = activeGame.away + ' @ ' + activeGame.home;
     badge.style.display = 'inline-flex';
+
+    var info = getGameStatusInfo(activeGame);
+    var parts = [];
+    if(info.status === 'final'){
+      parts.push('<span style="color:#FF1A6E;">Final'+(info.scoreLine?' '+info.scoreLine:'')+'</span>');
+    } else if(info.status === 'live'){
+      parts.push('<span style="color:#3FAE8C;">'+info.quarter+(info.clock?' '+info.clock:'')+(info.scoreLine?' · '+info.scoreLine:'')+'</span>');
+    } else if(info.dayLabel){
+      parts.push('<span style="color:var(--pk);">'+info.dayLabel+'</span> <span style="color:var(--ink3);">'+info.timeStr+'</span>');
+      if(info.isIntl)    parts.push('<span style="color:#FF9A3A;">INT&#39;L</span>');
+      if(info.overUnder) parts.push('<span style="color:#9B6DFF;">O/U '+info.overUnder+'</span>');
+      if(info.domeIcon)  parts.push('<span style="color:var(--ink3);">'+info.domeIcon+' Dome</span>');
+    }
+    infoEl.innerHTML = parts.join(' <span style="color:var(--bdr2);">·</span> ');
+    infoEl.style.display = parts.length ? 'flex' : 'none';
   } else {
     badge.style.display = 'none';
+    infoEl.style.display = 'none';
   }
 
   if(activeGame){
@@ -1465,6 +1500,8 @@ function pickFromPreview(playerId){
   activeGame = null;
   var badge = document.getElementById('picker-game-filter');
   if(badge) badge.style.display = 'none';
+  var infoEl1 = document.getElementById('picker-game-info');
+  if(infoEl1) infoEl1.style.display = 'none';
 
   showToast(replaced ? (replaced+' replaced with '+p.name+' ✓') : (p.name+' → '+slot.label+' ✓'));
   closeGamePreviewAfterPick();
@@ -1485,6 +1522,8 @@ function closeGamePreviewAfterPick(){
   activeGame = null;
   var badge = document.getElementById('picker-game-filter');
   if(badge) badge.style.display = 'none';
+  var infoEl2 = document.getElementById('picker-game-info');
+  if(infoEl2) infoEl2.style.display = 'none';
   var gtt = document.getElementById('game-team-toggle');
   if(gtt){ gtt.style.display = 'none'; gtt.classList.add('hidden'); }
   activeSlot = null;
@@ -1697,6 +1736,8 @@ function closePicker(){
   });
   var badge = document.getElementById('picker-game-filter');
   if(badge) badge.style.display = 'none';
+  var infoEl3 = document.getElementById('picker-game-info');
+  if(infoEl3) infoEl3.style.display = 'none';
   var gtt = document.getElementById('game-team-toggle');
   if(gtt){ gtt.style.display = 'none'; gtt.classList.add('hidden'); }
   document.getElementById('picker-slot-label').textContent = 'All Players';
