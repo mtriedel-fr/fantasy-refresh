@@ -38,9 +38,13 @@ jobs:
           const TARGET_CEILING = { QB: 9400, RB: 10700, WR: 11300, TE: 7400, DEF: 5000 };
 
           async function main() {
-            const salaries = await fetchJson(`${FB_URL}/leagues/${LEAGUE_ID}/salaries/2026/week1.json`).catch(() => null);
-            if (!salaries) { console.log('No salary data found at all for week 1.'); return; }
+            const raw = await fetchJson(`${FB_URL}/leagues/${LEAGUE_ID}/salaries/2026/week1.json`).catch(() => null);
+            if (!raw) { console.log('No salary data found at all for week 1.'); return; }
 
+            console.log('Real, raw top-level keys:', Object.keys(raw).join(', '));
+            if (raw.meta) console.log('Real meta:', JSON.stringify(raw.meta));
+
+            const salaries = raw.players || raw; // real data nests under "players" — fall back to raw itself just in case
             const players = Object.values(salaries).filter(p => p && p.pos && p.salary != null);
             console.log(`Found ${players.length} total priced players.\n`);
 
