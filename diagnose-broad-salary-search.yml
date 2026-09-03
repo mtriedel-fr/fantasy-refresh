@@ -1,0 +1,63 @@
+name: One-Time Diagnostic — Broad Search For Real Salary Data
+
+# ONE-TIME USE — delete this file after running it once.
+# The exact path guessed at twice now came back completely empty, not
+# just wrongly-structured. This checks the entire /salaries node
+# shallowly (to see whatever real top-level season keys actually exist
+# without pulling everything), the league's real settings/season key,
+# and drills into whatever week-numbered entries are actually found -
+# rather than guessing at the exact path a third time.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Broad search for real salary data
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB_URL = process.env.FIREBASE_DB_URL;
+          const LEAGUE_ID = 'fr_refresh26';
+
+          function fetchJson(url) {
+            return new Promise((resolve, reject) => {
+              https.get(url, res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+
+          async function main() {
+            const settings = await fetchJson(`${FB_URL}/leagues/${LEAGUE_ID}/settings.json`).catch(() => null);
+            console.log('Real league settings:', JSON.stringify(settings, null, 2));
+
+            console.log('\n=== Real, top-level keys under /salaries (shallow) ===');
+            const shallow = await fetchJson(`${FB_URL}/leagues/${LEAGUE_ID}/salaries.json?shallow=true`).catch(() => null);
+            console.log(shallow ? Object.keys(shallow).join(', ') : '(nothing at all under /salaries)');
+
+            if (shallow) {
+              for (const seasonKey of Object.keys(shallow)) {
+                console.log(`\n=== Real, top-level keys under /salaries/${seasonKey} (shallow) ===`);
+                const weeks = await fetchJson(`${FB_URL}/leagues/${LEAGUE_ID}/salaries/${seasonKey}.json?shallow=true`).catch(() => null);
+                console.log(weeks ? Object.keys(weeks).join(', ') : '(nothing found)');
+
+                if (weeks) {
+                  for (const weekKey of Object.keys(weeks)) {
+                    const full = await fetchJson(`${FB_URL}/leagues/${LEAGUE_ID}/salaries/${seasonKey}/${weekKey}.json`).catch(() => null);
+                    const playerCount = full && full.players ? Object.keys(full.players).length : (full ? Object.keys(full).length : 0);
+                    console.log(`  ${weekKey}: meta=${JSON.stringify(full && full.meta)}, real player count found=${playerCount}`);
+                  }
+                }
+              }
+            }
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
