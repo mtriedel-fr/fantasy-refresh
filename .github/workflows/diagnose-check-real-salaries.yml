@@ -1,0 +1,66 @@
+name: One-Time Diagnostic — Check Real Generated Salaries
+
+# ONE-TIME USE — delete this file after running it once.
+# Pulls the real, generated salary data for the real league's week 1,
+# shows the top 5 players by salary at each position, and checks the
+# real max/min/avg against the actual calibrated target ceilings from
+# earlier tonight - to give something concrete to look at rather than
+# just a general "looks off" impression.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check real generated salary data
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB_URL = process.env.FIREBASE_DB_URL;
+          const LEAGUE_ID = 'fr_refresh26';
+
+          function fetchJson(url) {
+            return new Promise((resolve, reject) => {
+              https.get(url, res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+
+          // Real, confirmed target ceilings from tonight's earlier
+          // calibration work.
+          const TARGET_CEILING = { QB: 9400, RB: 10700, WR: 11300, TE: 7400, DEF: 5000 };
+
+          async function main() {
+            const salaries = await fetchJson(`${FB_URL}/leagues/${LEAGUE_ID}/salaries/2026/week1.json`).catch(() => null);
+            if (!salaries) { console.log('No salary data found at all for week 1.'); return; }
+
+            const players = Object.values(salaries).filter(p => p && p.pos && p.salary != null);
+            console.log(`Found ${players.length} total priced players.\n`);
+
+            ['QB', 'RB', 'WR', 'TE', 'DEF'].forEach(pos => {
+              const atPos = players.filter(p => p.pos === pos).sort((a, b) => b.salary - a.salary);
+              if (!atPos.length) { console.log(`${pos}: no players found at all.\n`); return; }
+
+              const max = atPos[0].salary;
+              const min = atPos[atPos.length - 1].salary;
+              const avg = atPos.reduce((s, p) => s + p.salary, 0) / atPos.length;
+              const ceiling = TARGET_CEILING[pos];
+
+              console.log(`=== ${pos} (${atPos.length} players) ===`);
+              console.log(`  Real max: $${max} (target ceiling: $${ceiling}, diff: ${max - ceiling >= 0 ? '+' : ''}${max - ceiling})`);
+              console.log(`  Real min: $${min}, avg: $${Math.round(avg)}`);
+              console.log(`  Top 5 by salary:`);
+              atPos.slice(0, 5).forEach(p => console.log(`    ${p.name}: $${p.salary} (${p.proj || '?'} proj)`));
+              console.log('');
+            });
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
