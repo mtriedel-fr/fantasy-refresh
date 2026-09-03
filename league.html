@@ -8044,6 +8044,24 @@ var SAL_MIN = 4500; // raised from 3700 — the old floor let 5 punt-priced
 var SAL_MAX = 11300;
 var SAL_ROUND = 100;        // round to nearest $100
 
+// Target ceilings — what the top real player at each position should
+// price at, matching the onboarding tour's own examples in
+// welcome.html (Mahomes $9,200, Kelce $7,200, etc.) — those were
+// always meant to reflect how real salary generation should work, but
+// this self-calibrating formula was never actually wired up to the
+// real "Generate Salaries" button until now; it was running an older,
+// separately-tuned linear formula (POSITION_MULTIPLIERS below, kept
+// only for reference/history) that can't guarantee hitting these
+// ceilings, since a fixed multiplier only lands on the real target if
+// this week's actual top projection happens to match whatever
+// reference point the multiplier was originally tuned against.
+var TARGET_CEILING = { QB: 9400, RB: 10700, WR: 11300, TE: 7400, DEF: 5000 };
+// Exponent below 1 compresses the high end relative to pure linear
+// scaling, which is what actually fixes the known problem: mid-tier
+// players priced too cheaply relative to real value, letting a roster
+// stack multiple strong players comfortably within the cap.
+var SALARY_EXPONENT = 0.85;
+
 function salRound(n){
   // Round UP to the next $100 (not nearest) — deliberately biases every
   // price slightly higher, compounding with the multiplier increase to
@@ -9288,21 +9306,40 @@ function generateSalaries(){
                 });
               }
 
+              // First pass: filter to valid players and find each
+              // position's real top projection THIS week, so the
+              // formula calibrates against reality rather than
+              // assuming this week looks like any other week.
+              var validPlayers = [];
+              var maxProj = {};
               projPlayers.forEach(function(p){
                 if(!p.proj || p.proj <= 0) return;
                 if(!['QB','RB','WR','TE','DEF'].includes(p.pos)) return;
+                var poolP = nameMap[p.name.toLowerCase()];
+                var inj   = poolP ? (poolP.status || p.status || null) : (p.status || null);
+                if(inj === 'O' || inj === 'IR') return;
+                validPlayers.push(p);
+                if(!maxProj[p.pos] || p.proj > maxProj[p.pos]) maxProj[p.pos] = p.proj;
+              });
 
-                // Match to pool player by name for Sleeper ID
+              // Second pass: calibrate each position's multiplier
+              // against its own real top projection, so that top
+              // player prices at exactly the target ceiling — then
+              // apply that same multiplier to everyone else at that
+              // position, so relative pricing within a position stays
+              // consistent.
+              var effectiveMult = {};
+              Object.keys(TARGET_CEILING).forEach(function(pos){
+                if(maxProj[pos]) effectiveMult[pos] = TARGET_CEILING[pos] / Math.pow(maxProj[pos], SALARY_EXPONENT);
+              });
+
+              validPlayers.forEach(function(p){
                 var poolP = nameMap[p.name.toLowerCase()];
                 var pid   = poolP ? poolP.id : ('t01_' + p.id);
                 var inj   = poolP ? (poolP.status || p.status || null) : (p.status || null);
 
-                // Skip injured out players
-                if(inj === 'O' || inj === 'IR') return;
-
-                // Calculate salary: proj pts × POSITION-SPECIFIC multiplier, clamped to min/max
-                var mult = POSITION_MULTIPLIERS[p.pos] || POSITION_MULTIPLIERS.WR;
-                var sal = salRound(p.proj * mult);
+                var mult = effectiveMult[p.pos] || effectiveMult.WR;
+                var sal = salRound(Math.pow(p.proj, SALARY_EXPONENT) * mult);
                 sal = Math.max(SAL_MIN, Math.min(SAL_MAX, sal));
 
                 salaries[pid] = {
