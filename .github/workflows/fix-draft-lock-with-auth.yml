@@ -1,0 +1,100 @@
+name: One-Time Fix — Correct Draft Lock (With Real Auth)
+
+# ONE-TIME USE — delete this file after running it once.
+# Every prior attempt at this fix was silently failing with a real
+# 401 Permission Denied - the request was never authenticated at all.
+# Every other successful write tonight (auto-scoring.yml, etc.) uses a
+# FIREBASE_AUTH_TOKEN secret appended as ?auth=token; this fix never
+# included it. Corrected to use that same, real, working pattern, and
+# keeps checking the actual HTTP status so success is only ever
+# reported when Firebase genuinely confirms the write with a real 2xx.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type YES to apply this correction'
+        required: true
+        default: 'NO'
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Correct draftLockedUntil with real authentication
+        if: ${{ github.event.inputs.confirm == 'YES' }}
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB_URL = process.env.FIREBASE_DB_URL;
+          const FB_TOKEN = process.env.FIREBASE_AUTH_TOKEN;
+          const LEAGUE_ID = 'fr_refresh26';
+          const REAL_KICKOFF_MS = 1788913200000;
+          const CORRECTED_LOCK_MS = REAL_KICKOFF_MS - (24 * 60 * 60 * 1000);
+
+          function fbAuth(path) {
+            const sep = path.includes('?') ? '&' : '?';
+            return FB_TOKEN ? `${path}${sep}auth=${FB_TOKEN}` : path;
+          }
+
+          function firebasePut(path, data) {
+            return new Promise((resolve, reject) => {
+              const fullPath = fbAuth(`${FB_URL}${path}`);
+              const url = new URL(fullPath);
+              const body = JSON.stringify(data);
+              const req = https.request({
+                hostname: url.hostname, path: url.pathname + url.search, method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+              }, res => {
+                let d = '';
+                res.on('data', c => d += c);
+                res.on('end', () => resolve({ status: res.statusCode, body: d }));
+              });
+              req.on('error', reject);
+              req.write(body);
+              req.end();
+            });
+          }
+          function fetchJson(path) {
+            return new Promise((resolve, reject) => {
+              const fullPath = fbAuth(`${FB_URL}${path}`);
+              https.get(fullPath, res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve({ status: res.statusCode, body: JSON.parse(data) }); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+
+          async function main() {
+            if (!FB_TOKEN) {
+              console.log('⚠️  FIREBASE_AUTH_TOKEN secret is not set at all — this write will fail again exactly like before. Add it as a repo secret first.');
+              return;
+            }
+
+            const before = await fetchJson(`/leagues/${LEAGUE_ID}/settings/draftLockedUntil.json`).catch(() => null);
+            console.log(`Value BEFORE write: ${before ? JSON.stringify(before.body) : 'fetch failed'}`);
+
+            const putResult = await firebasePut(`/leagues/${LEAGUE_ID}/settings/draftLockedUntil.json`, CORRECTED_LOCK_MS);
+            console.log(`Write HTTP status: ${putResult.status}`);
+            console.log(`Write response body: ${putResult.body}`);
+            if (putResult.status < 200 || putResult.status >= 300) {
+              console.log(`⚠️  WRITE STILL FAILED — non-2xx status even with auth token included. Needs further investigation.`);
+              return;
+            }
+
+            const after = await fetchJson(`/leagues/${LEAGUE_ID}/settings/draftLockedUntil.json`).catch(() => null);
+            console.log(`Value immediately AFTER write: ${after ? JSON.stringify(after.body) : 'fetch failed'}`);
+            console.log(`Expected: ${CORRECTED_LOCK_MS} (${new Date(CORRECTED_LOCK_MS).toISOString()})`);
+            console.log(`Matches expected: ${after && after.body === CORRECTED_LOCK_MS}`);
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
+
+      - name: Skipped - confirmation not provided
+        if: ${{ github.event.inputs.confirm != 'YES' }}
+        run: echo "Skipped — re-run with confirm=YES to actually apply this fix."
