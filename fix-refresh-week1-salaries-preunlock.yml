@@ -1,0 +1,193 @@
+name: One-Time Fix — Refresh Week 1 Salaries Right Before Real Unlock
+
+# ONE-TIME USE — delete this file after it runs successfully once.
+# Refreshes Week 1's salaries with the freshest possible real
+# projections, timed for Tuesday 7:00 PM CT - a deliberate 20-minute
+# buffer before the real, confirmed 7:20 PM CT unlock, so generation
+# has time to finish before anyone could possibly start drafting.
+#
+# This is a deliberate, one-time exception to the "never overwrite
+# existing real salaries" rule used everywhere else tonight - safe
+# specifically because it's timed to complete before the draft can
+# possibly unlock, so nobody could have drafted against the older
+# numbers yet. Runs frequently to reliably catch the target moment,
+# and will only ever actually regenerate once (checks a marker after
+# writing, so a later run past the target time doesn't refresh again).
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Refresh Week 1 salaries if it's time
+        env:
+          TANK01_KEY: ${{ secrets.TANK01_KEY }}
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const T01_KEY = process.env.TANK01_KEY;
+          const T01_HOST = 'tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com';
+          const FB_URL = process.env.FIREBASE_DB_URL;
+          const FB_TOKEN = process.env.FIREBASE_AUTH_TOKEN;
+          const LEAGUE_ID = 'fr_refresh26';
+          const SEASON = 2026;
+          const WEEK = 1;
+
+          // Real, confirmed unlock is 2026-09-09T00:20:00Z (Tue 7:20 PM
+          // CT) - target 20 minutes earlier so generation finishes
+          // with real buffer before anyone could possibly draft.
+          const TARGET_MS = Date.UTC(2026, 8, 9, 0, 0, 0);
+
+          function fbAuth(path) {
+            const sep = path.includes('?') ? '&' : '?';
+            return FB_TOKEN ? `${path}${sep}auth=${FB_TOKEN}` : path;
+          }
+          function t01(path) {
+            return new Promise((resolve, reject) => {
+              https.get({
+                hostname: T01_HOST, path, headers: {
+                  'X-RapidAPI-Key': T01_KEY, 'X-RapidAPI-Host': T01_HOST
+                }
+              }, res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve({ status: res.statusCode, body: JSON.parse(data) }); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+          function firebaseGet(path) {
+            return new Promise((resolve, reject) => {
+              https.get(fbAuth(`${FB_URL}${path}`), res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+          function firebasePut(path, value) {
+            return new Promise((resolve, reject) => {
+              const url = new URL(fbAuth(`${FB_URL}${path}`));
+              const body = JSON.stringify(value);
+              const req = https.request({
+                hostname: url.hostname, path: url.pathname + url.search, method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+              }, res => {
+                let d = '';
+                res.on('data', c => d += c);
+                res.on('end', () => {
+                  if (res.statusCode < 200 || res.statusCode >= 300) reject(new Error(`Firebase write failed: HTTP ${res.statusCode} — ${d}`));
+                  else resolve(d);
+                });
+              });
+              req.on('error', reject);
+              req.write(body);
+              req.end();
+            });
+          }
+
+          const TARGET_CEILING = { QB: 9400, RB: 10700, WR: 11300, TE: 7400, DEF: 5000 };
+          const SALARY_EXPONENT = 0.85;
+          const SAL_MIN = 4500, SAL_MAX = 11300;
+          function salRound(n) { return Math.ceil(Math.max(SAL_MIN, Math.min(SAL_MAX, n)) / 100) * 100; }
+
+          async function getRealProjections(week, season) {
+            const scoring = [
+              'itemFormat=list', 'twoPointConversions=2', 'passYards=.04', 'passTD=4',
+              'passInterceptions=-1', 'pointsPerReception=1', 'rushYards=.1', 'rushTD=6',
+              'fumbles=-1', 'receivingYards=.1', 'receivingTD=6'
+            ].join('&');
+            const attempts = [
+              `/getNFLProjections?week=${week}&${scoring}`,
+              `/getNFLProjections?week=${week}&archiveSeason=${parseInt(season) - 1}&${scoring}`
+            ];
+            for (const path of attempts) {
+              try {
+                const res = await t01(path);
+                const body = (res.body && res.body.body) || {};
+                const playerArr = Array.isArray(body.playerProjections) ? body.playerProjections : [];
+                const defArr = Array.isArray(body.teamDefenseProjections) ? body.teamDefenseProjections : [];
+                if (!playerArr.length && !defArr.length) continue;
+                const players = playerArr.map(p => {
+                  const pts = parseFloat(p.fantasyPoints || 0) ||
+                    ((p.fantasyPointsDefault && p.fantasyPointsDefault.PPR) ? parseFloat(p.fantasyPointsDefault.PPR) : 0);
+                  return { id: p.playerID || '', name: p.longName || p.playerName || '', pos: p.pos || '', team: p.team || p.teamAbv || '', proj: pts, status: p.injuryStatus || p.injury || 'Active' };
+                }).filter(p => p.name && p.pos && ['QB','RB','WR','TE'].includes(p.pos) && p.proj > 0);
+                const defs = defArr.map(d => ({ id: (d.teamAbv || d.team || '') + '_DEF', name: d.teamAbv || d.team || '', pos: 'DEF', team: d.teamAbv || d.team || '', proj: parseFloat(d.fantasyPointsDefault || 0), status: 'Active' })).filter(d => d.name && d.proj > 0);
+                const all = [...players, ...defs];
+                if (all.length) return all;
+              } catch(e) { continue; }
+            }
+            return [];
+          }
+
+          async function main() {
+            const now = Date.now();
+            console.log(`Now: ${new Date(now).toISOString()}, target: ${new Date(TARGET_MS).toISOString()}`);
+            if (now < TARGET_MS) {
+              console.log('Not yet time — will check again next run.');
+              return;
+            }
+
+            // Idempotency — if this already ran at/after the target
+            // time once, don't do it again on a later run.
+            const existingMeta = await firebaseGet(`/leagues/${LEAGUE_ID}/salaries/${SEASON}/week${WEEK}/meta.json`).catch(() => null);
+            if (existingMeta && existingMeta.generated && existingMeta.generated >= TARGET_MS) {
+              console.log('Already refreshed at/after the target time — not refreshing again.');
+              return;
+            }
+
+            const projPlayers = await getRealProjections(WEEK, SEASON);
+            if (!projPlayers.length) {
+              console.log('No real projections available right now — will retry next run (still before target+buffer).');
+              return;
+            }
+
+            const pool = await firebaseGet(`/playerPool/${SEASON}/players.json`).catch(() => null);
+            const nameMap = {};
+            if (pool) Object.values(pool).forEach(p => { if (p && p.name) nameMap[p.name.toLowerCase()] = p; });
+
+            const validPlayers = [];
+            const maxProj = {};
+            projPlayers.forEach(p => {
+              if (!p.proj || p.proj <= 0) return;
+              if (!['QB','RB','WR','TE','DEF'].includes(p.pos)) return;
+              const poolP = nameMap[p.name.toLowerCase()];
+              const inj = poolP ? (poolP.status || p.status || null) : (p.status || null);
+              if (inj === 'O' || inj === 'IR') return;
+              validPlayers.push(p);
+              if (!maxProj[p.pos] || p.proj > maxProj[p.pos]) maxProj[p.pos] = p.proj;
+            });
+
+            const effectiveMult = {};
+            Object.keys(TARGET_CEILING).forEach(pos => {
+              if (maxProj[pos]) effectiveMult[pos] = TARGET_CEILING[pos] / Math.pow(maxProj[pos], SALARY_EXPONENT);
+            });
+
+            const salaries = {};
+            let count = 0;
+            validPlayers.forEach(p => {
+              const poolP = nameMap[p.name.toLowerCase()];
+              const pid = poolP ? poolP.id : ('t01_' + p.id);
+              const inj = poolP ? (poolP.status || p.status || null) : (p.status || null);
+              const mult = effectiveMult[p.pos] || effectiveMult.WR;
+              let sal = salRound(Math.pow(p.proj, SALARY_EXPONENT) * mult);
+              sal = Math.max(SAL_MIN, Math.min(SAL_MAX, sal));
+              salaries[pid] = { id: pid, name: p.name, pos: p.pos, team: p.team, proj: Math.round(p.proj * 10) / 10, salary: sal, status: inj };
+              count++;
+            });
+
+            await firebasePut(`/leagues/${LEAGUE_ID}/salaries/${SEASON}/week${WEEK}.json`, {
+              players: salaries,
+              meta: { cap: 60000, count, flat: false, generated: Date.now(), locked: false, week: WEEK }
+            });
+            console.log(`✅ Refreshed Week 1 salaries with fresh projections (${count} players), right before the real unlock.`);
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
