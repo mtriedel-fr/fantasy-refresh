@@ -431,11 +431,28 @@ jobs:
             // salaries to the wrong, preseason-only path.
             const salarySeason = (settings && settings.isPreseason) ? SEASON + 'P' : SEASON;
 
-            // Don't clobber a week the commissioner already locked manually.
+            // Don't clobber a week the commissioner already locked
+            // manually, AND — confirmed as a real, urgent gap tonight —
+            // don't clobber a week that already has real, non-flat
+            // salaries generated at all, regardless of lock status.
+            // The only previous guard here was "is it locked," with no
+            // check for "does real data already exist" — confirmed via
+            // a real production run that this let the workflow silently
+            // regenerate and overwrite already-correct Week 1 salaries.
+            // Since this runs on a real, recurring weekly schedule, that
+            // risk repeats every single week it runs unless real data
+            // is treated as final once it exists — same philosophy
+            // already applied everywhere else this fairness risk came
+            // up tonight (repriceLineup(), the manual "Generate
+            // Salaries" flat-fallback check, the new auto-open workflow).
             let existingMeta = null;
             try { existingMeta = await firebaseGet(`/leagues/${leagueId}/salaries/${salarySeason}/week${week}/meta.json`); } catch (e) {}
             if (existingMeta && existingMeta.locked) {
               console.log(`  ${leagueId}: week ${week} salaries are locked — skipping`);
+              return;
+            }
+            if (existingMeta && existingMeta.count > 0 && !existingMeta.flat) {
+              console.log(`  ${leagueId}: week ${week} already has real, non-flat salaries — leaving them in place, never overwriting once real data exists`);
               return;
             }
 
