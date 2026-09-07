@@ -1,0 +1,53 @@
+name: One-Time Diagnostic — Check Real Draft Lock Timing
+
+# ONE-TIME USE — delete this file after running it once.
+# Checks the real, current draftLockedUntil setting for the real
+# league, to give a precise answer for when the lock actually lifts
+# rather than describing the mechanism abstractly.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check real draft lock timing
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB_URL = process.env.FIREBASE_DB_URL;
+          const LEAGUE_ID = 'fr_refresh26';
+
+          function fetchJson(url) {
+            return new Promise((resolve, reject) => {
+              https.get(url, res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+
+          async function main() {
+            const settings = await fetchJson(`${FB_URL}/leagues/${LEAGUE_ID}/settings.json`).catch(() => null);
+            if (!settings) { console.log('No settings found at all.'); return; }
+
+            console.log('Real, full settings:', JSON.stringify(settings, null, 2));
+
+            if (typeof settings.draftLockedUntil === 'number') {
+              const lockDate = new Date(settings.draftLockedUntil);
+              const now = Date.now();
+              const msRemaining = settings.draftLockedUntil - now;
+              const daysRemaining = Math.ceil(msRemaining / (24 * 60 * 60 * 1000));
+              console.log(`\ndraftLockedUntil: ${settings.draftLockedUntil} (${lockDate.toISOString()})`);
+              console.log(`Real time remaining: ${daysRemaining} day(s) from right now (${new Date(now).toISOString()})`);
+            } else {
+              console.log('\nNo draftLockedUntil set at all — drafting is currently unlocked for this league.');
+            }
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
