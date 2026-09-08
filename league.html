@@ -1210,7 +1210,7 @@ setTimeout(function(){
   <div class="tab-overlay-close-bar">
     <div class="tab-overlay-close-bar-row">
       <span class="tab-overlay-close-bar-title">💰 Dues</span>
-      <button class="tab-overlay-close-btn" onclick="handleNav('yourweek')">← Back to League</button>
+      <button class="tab-overlay-close-btn" onclick="handleNav('yourweek');renderCumHome()">← Back to League</button>
     </div>
   </div>
   <div id="wdues"></div>
@@ -6993,7 +6993,7 @@ function handleNav(val){
 
   if(val === 'league'){ document.body.style.overflow = 'hidden'; document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); }); document.getElementById('tab-league').classList.remove('hidden'); document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); }); document.getElementById('navtab-league').classList.add('active'); setStatBoxes('hidden'); renderLeague(); return; }
   if(val === 'playoffs'){ document.body.style.overflow = 'hidden'; document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); }); document.getElementById('tab-playoffs').classList.remove('hidden'); document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); }); document.getElementById('navtab-playoffs').classList.add('active'); setStatBoxes('hidden'); renderPlayoffs(); return; }
-  if(val === 'dues'){ document.body.style.overflow = 'hidden'; document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); }); document.getElementById('tab-dues').classList.remove('hidden'); document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); }); setStatBoxes('hidden'); renderDues(); return; }
+  if(val === 'dues'){ document.body.style.overflow = 'hidden'; document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); }); document.getElementById('tab-dues').classList.remove('hidden'); document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); }); setStatBoxes('hidden'); var cumHomeEl = document.getElementById('cum-home'); if(cumHomeEl) cumHomeEl.classList.add('hidden'); renderDues(); return; }
   if(val === 'guillotine'){ document.body.style.overflow = 'hidden'; document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); }); document.getElementById('tab-guillotine').classList.remove('hidden'); document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); }); document.getElementById('navtab-guillotine').classList.add('active'); setStatBoxes('guillotine'); renderGuillotine(); return; }
   if(val === 'yourseason'){
     var completedWeeks = Object.keys(seasonData).filter(function(k){
