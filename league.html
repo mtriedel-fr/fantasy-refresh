@@ -1207,10 +1207,10 @@ setTimeout(function(){
 </div>
 
 <div id="tab-dues" class="content hidden">
-  <div class="tab-overlay-close-bar hidden">
+  <div class="tab-overlay-close-bar">
     <div class="tab-overlay-close-bar-row">
       <span class="tab-overlay-close-bar-title">💰 Dues</span>
-      <button class="tab-overlay-close-btn" onclick="closeH2HTabOverlay()">✕ Close</button>
+      <button class="tab-overlay-close-btn" onclick="handleNav('yourweek')">← Back to League</button>
     </div>
   </div>
   <div id="wdues"></div>
@@ -4403,16 +4403,12 @@ function renderDues(){
   var el = document.getElementById('wdues');
   el.innerHTML = '<div style="padding:40px;text-align:center;color:var(--ink3);font-family:var(--fd);">Loading…</div>';
 
-  Promise.all([
-    FR.fb.get('/leagues/' + leagueId + '/members').catch(function(){ return {}; }),
-    FR.fb.get('/leagues/' + leagueId + '/settings').catch(function(){ return {}; })
-  ]).then(function(results){
-    var members = results[0] || {};
-    var settings = results[1] || {};
+  FR.fb.get('/leagues/' + leagueId + '/members').catch(function(){ return {}; }).then(function(members){
+    members = members || {};
 
     var list = Object.keys(members).map(function(uid){
       var m = members[uid] || {};
-      return { uid: uid, teamName: m.teamName || '(no team name)', displayName: m.displayName || '', paid: !!m.duesPaid };
+      return { uid: uid, teamName: m.teamName || '(no team name)', displayName: m.displayName || '', email: m.email || '', paid: !!m.duesPaid };
     }).filter(function(m){ return m.teamName !== '(no team name)' || m.displayName; });
 
     // Unpaid first, so outstanding dues are immediately visible.
@@ -4421,26 +4417,17 @@ function renderDues(){
       return a.teamName.localeCompare(b.teamName);
     });
 
-    var paidCount = list.filter(function(m){ return m.paid; }).length;
-
     var html = '<div style="padding:16px;">';
-
-    html += '<div style="background:var(--bg2);border:1px solid var(--bdr);border-radius:12px;padding:16px;margin-bottom:16px;">';
-    html += '<div style="font-family:var(--fd);font-size:14px;font-weight:800;color:var(--or);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">💰 Dues Tracker</div>';
-    html += '<div style="font-family:var(--fd);font-size:13px;color:var(--ink2);margin-bottom:4px;">' + paidCount + ' of ' + list.length + ' paid</div>';
-    if(settings.weekMessage){
-      html += '<div style="font-family:var(--fd);font-size:12px;color:var(--ink3);white-space:pre-line;margin-top:8px;padding-top:8px;border-top:1px solid var(--bdr2);">' + escapeHtmlFR(settings.weekMessage) + '</div>';
-    }
-    html += '</div>';
 
     if(!list.length){
       html += '<div style="text-align:center;padding:40px;color:var(--ink3);font-family:var(--fd);">No members found.</div>';
     } else {
       list.forEach(function(m){
+        var subLine = [m.displayName, m.email].filter(Boolean).join(' · ');
         html += '<div style="display:flex;align-items:center;justify-content:space-between;background:var(--bg2);border:1px solid var(--bdr);border-radius:10px;padding:12px 16px;margin-bottom:8px;">'
           + '<div>'
           + '<div style="font-family:var(--fd);font-size:14px;font-weight:800;color:var(--ink);">' + escapeHtmlFR(m.teamName) + '</div>'
-          + (m.displayName ? '<div style="font-family:var(--fd);font-size:12px;color:var(--ink3);">' + escapeHtmlFR(m.displayName) + '</div>' : '')
+          + (subLine ? '<div style="font-family:var(--fd);font-size:12px;color:var(--ink3);">' + escapeHtmlFR(subLine) + '</div>' : '')
           + '</div>'
           + (m.paid
               ? '<span style="font-family:var(--fd);font-size:11px;font-weight:800;color:#173404;background:#EAF3DE;border-radius:14px;padding:5px 12px;">✓ Paid</span>'
