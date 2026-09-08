@@ -119,69 +119,77 @@ jobs:
 
             // === Clone 1: fr_test_full — ALL real teams, anonymized ===
             console.log(`\n=== Creating fr_test_full ===`);
-            const fullMap = [];
-            const fullCloned = JSON.parse(JSON.stringify(source));
-            fullCloned.members = anonymizeMembers(source.members || {}, fullMap);
-            fullCloned.settings = Object.assign({}, fullCloned.settings, {
-              leagueId: 'fr_test_full',
-              name: 'TEST — Full Clone',
-              joinCode: 'TESTFULL26'
-            });
-            await firebasePut(`/leagues/fr_test_full.json`, fullCloned);
-            console.log(`  ✓ Wrote full cloned league (${Object.keys(fullCloned.members).length} anonymized teams)`);
-            console.log(`  ✓ Join code: TESTFULL26`);
-            console.log(`  Real-name mapping (commissioner reference only — not stored in the test league):`);
-            fullMap.forEach(line => console.log(line));
-            await firebasePut(`/users/${COMMISSIONER_UID}/leagues/fr_test_full`, true);
-            console.log(`  ✓ Added to commissioner's home-page league list`);
+            try {
+              const fullMap = [];
+              const fullCloned = JSON.parse(JSON.stringify(source));
+              fullCloned.members = anonymizeMembers(source.members || {}, fullMap);
+              fullCloned.settings = Object.assign({}, fullCloned.settings, {
+                leagueId: 'fr_test_full',
+                name: 'TEST — Full Clone',
+                joinCode: 'TESTFULL26'
+              });
+              await firebasePut(`/leagues/fr_test_full.json`, fullCloned);
+              console.log(`  ✓ Wrote full cloned league (${Object.keys(fullCloned.members).length} anonymized teams)`);
+              console.log(`  ✓ Join code: TESTFULL26`);
+              console.log(`  Real-name mapping (commissioner reference only — not stored in the test league):`);
+              fullMap.forEach(line => console.log(line));
+              await firebasePut(`/users/${COMMISSIONER_UID}/leagues/fr_test_full.json`, true);
+              console.log(`  ✓ Added to commissioner's home-page league list`);
+            } catch (e) {
+              console.error(`  ✗ fr_test_full failed: ${e.message} — continuing to fr_test_h2h regardless.`);
+            }
 
             // === Clone 2: fr_test_h2h — 24 real teams, 4 divisions, H2H ===
             console.log(`\n=== Creating fr_test_h2h ===`);
-            const h2hUids = realMemberUids.slice().sort().slice(0, 24);
-            if (h2hUids.length < 24) {
-              console.log(`  ⚠️  Only ${h2hUids.length} real members available — using all of them, fewer than the requested 24.`);
+            try {
+              const h2hUids = realMemberUids.slice().sort().slice(0, 24);
+              if (h2hUids.length < 24) {
+                console.log(`  ⚠️  Only ${h2hUids.length} real members available — using all of them, fewer than the requested 24.`);
+              }
+              const h2hSourceMembers = {};
+              h2hUids.forEach(uid => { h2hSourceMembers[uid] = source.members[uid]; });
+
+              const h2hMap = [];
+              const h2hMembers = anonymizeMembers(h2hSourceMembers, h2hMap);
+              // Assign each of the (up to) 24 anonymized teams evenly
+              // across 4 real divisions, 6 each — real field confirmed
+              // directly in the app's own division-scheduling logic
+              // (members[uid].division).
+              const DIVISION_COUNT = 4;
+              Object.keys(h2hMembers).sort().forEach((uid, i) => {
+                h2hMembers[uid].division = (i % DIVISION_COUNT) + 1;
+              });
+
+              const h2hCloned = JSON.parse(JSON.stringify(source));
+              h2hCloned.members = h2hMembers;
+              h2hCloned.settings = Object.assign({}, h2hCloned.settings, {
+                leagueId: 'fr_test_h2h',
+                name: 'TEST — Head-to-Head',
+                joinCode: 'TESTH2H26',
+                format: 'headtohead',
+                guillotine: false,
+                divisions: true,
+                divisionCount: DIVISION_COUNT,
+                playoffStartWeek: 15,
+                playoffTeams: 8,
+                seedMethod: 'divwin-topseed'
+              });
+              await firebasePut(`/leagues/fr_test_h2h.json`, h2hCloned);
+              console.log(`  ✓ Wrote H2H cloned league (${Object.keys(h2hCloned.members).length} anonymized teams, ${DIVISION_COUNT} divisions)`);
+              console.log(`  ✓ Format: headtohead, playoffs Week 15-17 (8-team bracket, 3 rounds)`);
+              console.log(`  ✓ Seeding: division winners guaranteed a spot + top seed, best remaining fill wildcards below them`);
+              console.log(`  ✓ Join code: TESTH2H26`);
+              console.log(`  Division assignments:`);
+              Object.keys(h2hMembers).sort().forEach(uid => {
+                console.log(`    ${h2hMembers[uid].teamName}: Division ${h2hMembers[uid].division}`);
+              });
+              console.log(`  Real-name mapping (commissioner reference only — not stored in the test league):`);
+              h2hMap.forEach(line => console.log(line));
+              await firebasePut(`/users/${COMMISSIONER_UID}/leagues/fr_test_h2h.json`, true);
+              console.log(`  ✓ Added to commissioner's home-page league list`);
+            } catch (e) {
+              console.error(`  ✗ fr_test_h2h failed: ${e.message}`);
             }
-            const h2hSourceMembers = {};
-            h2hUids.forEach(uid => { h2hSourceMembers[uid] = source.members[uid]; });
-
-            const h2hMap = [];
-            const h2hMembers = anonymizeMembers(h2hSourceMembers, h2hMap);
-            // Assign each of the (up to) 24 anonymized teams evenly
-            // across 4 real divisions, 6 each — real field confirmed
-            // directly in the app's own division-scheduling logic
-            // (members[uid].division).
-            const DIVISION_COUNT = 4;
-            Object.keys(h2hMembers).sort().forEach((uid, i) => {
-              h2hMembers[uid].division = (i % DIVISION_COUNT) + 1;
-            });
-
-            const h2hCloned = JSON.parse(JSON.stringify(source));
-            h2hCloned.members = h2hMembers;
-            h2hCloned.settings = Object.assign({}, h2hCloned.settings, {
-              leagueId: 'fr_test_h2h',
-              name: 'TEST — Head-to-Head',
-              joinCode: 'TESTH2H26',
-              format: 'headtohead',
-              guillotine: false,
-              divisions: true,
-              divisionCount: DIVISION_COUNT,
-              playoffStartWeek: 15,
-              playoffTeams: 8,
-              seedMethod: 'divwin-topseed'
-            });
-            await firebasePut(`/leagues/fr_test_h2h.json`, h2hCloned);
-            console.log(`  ✓ Wrote H2H cloned league (${Object.keys(h2hCloned.members).length} anonymized teams, ${DIVISION_COUNT} divisions)`);
-            console.log(`  ✓ Format: headtohead, playoffs Week 15-17 (8-team bracket, 3 rounds)`);
-            console.log(`  ✓ Seeding: division winners guaranteed a spot + top seed, best remaining fill wildcards below them`);
-            console.log(`  ✓ Join code: TESTH2H26`);
-            console.log(`  Division assignments:`);
-            Object.keys(h2hMembers).sort().forEach(uid => {
-              console.log(`    ${h2hMembers[uid].teamName}: Division ${h2hMembers[uid].division}`);
-            });
-            console.log(`  Real-name mapping (commissioner reference only — not stored in the test league):`);
-            h2hMap.forEach(line => console.log(line));
-            await firebasePut(`/users/${COMMISSIONER_UID}/leagues/fr_test_h2h`, true);
-            console.log(`  ✓ Added to commissioner's home-page league list`);
 
             console.log(`\nDone. Both test leagues are ready and visible on the commissioner's home page — no real names or emails were written into either one.`);
           }
