@@ -876,17 +876,63 @@ function isDraftLocked(){
 
 function showDraftLockPopup(){
   var msRemaining = DRAFT_LOCKED_UNTIL - Date.now();
-  var daysRemaining = Math.max(0, Math.ceil(msRemaining / (24*60*60*1000)));
-  var dayWord = daysRemaining === 1 ? 'day' : 'days';
+  var ONE_DAY_MS = 24*60*60*1000;
+  var withinLastDay = msRemaining <= ONE_DAY_MS;
+
+  var headline;
+  if(withinLastDay){
+    headline = '<span id="draft-lock-countdown"></span>';
+  } else {
+    var daysRemaining = Math.max(0, Math.ceil(msRemaining / ONE_DAY_MS));
+    var dayWord = daysRemaining === 1 ? 'day' : 'days';
+    headline = 'Drafting opens in ' + daysRemaining + ' ' + dayWord;
+  }
+
   var html = '<div id="draft-lock-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;">'
     + '<div style="background:var(--bg2);border-radius:16px;max-width:380px;width:100%;padding:28px 24px;text-align:center;">'
     + '<div style="font-size:36px;margin-bottom:8px;">🔒</div>'
-    + '<div style="font-family:var(--fd);font-size:19px;font-weight:900;color:var(--ink);">Drafting opens in ' + daysRemaining + ' ' + dayWord + '</div>'
+    + '<div id="draft-lock-headline" style="font-family:var(--fd);font-size:19px;font-weight:900;color:var(--ink);">' + headline + '</div>'
     + '<div style="font-family:var(--fd);font-size:13px;color:var(--ink3);margin-top:8px;line-height:1.5;">Player prices are still settling as real projections come in — drafting opens 1 day before the season kicks off. Feel free to look around and see where prices land.</div>'
-    + '<button onclick="document.getElementById(\'draft-lock-overlay\').remove()" style="width:100%;margin-top:20px;padding:12px;border-radius:10px;border:none;background:var(--pk);color:#fff;font-family:var(--fd);font-size:14px;font-weight:800;cursor:pointer;">Got it, just browsing</button>'
+    + '<button onclick="closeDraftLockPopup()" style="width:100%;margin-top:20px;padding:12px;border-radius:10px;border:none;background:var(--pk);color:#fff;font-family:var(--fd);font-size:14px;font-weight:800;cursor:pointer;">Got it, just browsing</button>'
     + '</div>'
     + '</div>';
   document.body.insertAdjacentHTML('beforeend', html);
+
+  if(withinLastDay){
+    tickDraftLockCountdown(); // paint immediately, don't wait a full second for the first frame
+    DRAFT_LOCK_COUNTDOWN_TIMER = setInterval(tickDraftLockCountdown, 1000);
+  }
+}
+
+// Ticks the live H:M:S countdown once per second. If the draft unlocks
+// while the popup is still open, stops ticking and switches to a clear
+// "drafting is open" state with a reload button, rather than counting
+// into negative numbers.
+var DRAFT_LOCK_COUNTDOWN_TIMER = null;
+function tickDraftLockCountdown(){
+  var el = document.getElementById('draft-lock-countdown');
+  if(!el){ clearInterval(DRAFT_LOCK_COUNTDOWN_TIMER); return; } // popup was dismissed elsewhere
+  var msRemaining = DRAFT_LOCKED_UNTIL - Date.now();
+
+  if(msRemaining <= 0){
+    clearInterval(DRAFT_LOCK_COUNTDOWN_TIMER);
+    var headlineEl = document.getElementById('draft-lock-headline');
+    if(headlineEl) headlineEl.textContent = '🎉 Drafting is now open!';
+    var btn = document.querySelector('#draft-lock-overlay button');
+    if(btn){ btn.textContent = 'Start Drafting'; btn.setAttribute('onclick', 'location.reload()'); }
+    return;
+  }
+
+  var h = Math.floor(msRemaining / (60*60*1000));
+  var m = Math.floor((msRemaining % (60*60*1000)) / (60*1000));
+  var s = Math.floor((msRemaining % (60*1000)) / 1000);
+  el.textContent = h + 'h ' + String(m).padStart(2,'0') + 'm ' + String(s).padStart(2,'0') + 's';
+}
+
+function closeDraftLockPopup(){
+  if(DRAFT_LOCK_COUNTDOWN_TIMER){ clearInterval(DRAFT_LOCK_COUNTDOWN_TIMER); DRAFT_LOCK_COUNTDOWN_TIMER = null; }
+  var overlay = document.getElementById('draft-lock-overlay');
+  if(overlay) overlay.remove();
 }
 var gameOdds    = {};
 var nflDvp      = {}; // real, cumulative points-allowed-vs-position rankings — empty until at least one week of real regular-season games has finished
