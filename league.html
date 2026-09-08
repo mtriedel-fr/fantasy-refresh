@@ -1244,6 +1244,15 @@ setTimeout(function(){
       <div class="csect">💰 Dues</div>
       <div style="font-size:12px;color:var(--ink3);margin-bottom:10px;line-height:1.5;">Mark who's paid — visible to the whole league under More → Dues.</div>
       <div id="comm-dues-list">Loading…</div>
+      <div style="margin-top:16px;">
+        <div style="font-size:12px;color:var(--ink3);margin-bottom:8px;line-height:1.5;">Optional note shown at the top of the Dues page — e.g. payment instructions or a deadline reminder.</div>
+        <textarea id="dues-message-inp" rows="2" placeholder="e.g. $50 via Venmo @your-handle by Week 3." style="width:100%;padding:10px 12px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:10px;color:var(--ink);font-family:var(--fb);font-size:14px;resize:vertical;outline:none;transition:border-color .15s;" onfocus="this.style.borderColor='var(--or)'" onblur="this.style.borderColor='var(--bdr2)'"></textarea>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+          <button onclick="saveDuesMessage()" style="background:linear-gradient(135deg,var(--or),var(--pk));border:none;border-radius:8px;padding:8px 18px;color:#050808;font-family:var(--fd);font-size:13px;font-weight:800;text-transform:uppercase;cursor:pointer;">Save Note</button>
+          <button onclick="clearDuesMessage()" style="background:none;border:1px solid var(--bdr2);border-radius:8px;padding:8px 14px;color:var(--ink3);font-family:var(--fd);font-size:12px;cursor:pointer;text-transform:uppercase;">Clear</button>
+          <span id="dues-message-status" style="font-family:var(--fd);font-size:11px;color:var(--or);text-transform:uppercase;letter-spacing:.5px;"></span>
+        </div>
+      </div>
     </div>
     <div class="comm-cols">
       <div>
@@ -4403,8 +4412,12 @@ function renderDues(){
   var el = document.getElementById('wdues');
   el.innerHTML = '<div style="padding:40px;text-align:center;color:var(--ink3);font-family:var(--fd);">Loading…</div>';
 
-  FR.fb.get('/leagues/' + leagueId + '/members').catch(function(){ return {}; }).then(function(members){
-    members = members || {};
+  Promise.all([
+    FR.fb.get('/leagues/' + leagueId + '/members').catch(function(){ return {}; }),
+    FR.fb.get('/leagues/' + leagueId + '/settings').catch(function(){ return {}; })
+  ]).then(function(results){
+    var members = results[0] || {};
+    var settings = results[1] || {};
 
     var list = Object.keys(members).map(function(uid){
       var m = members[uid] || {};
@@ -4418,6 +4431,12 @@ function renderDues(){
     });
 
     var html = '<div style="padding:16px;">';
+
+    // Optional commissioner note — only shown at all when one has
+    // actually been set, per the user's explicit "optional" request.
+    if(settings.duesMessage){
+      html += '<div style="background:var(--bg2);border:1px solid var(--bdr);border-radius:12px;padding:14px 16px;margin-bottom:16px;font-family:var(--fd);font-size:13px;color:var(--ink2);white-space:pre-line;">' + escapeHtmlFR(settings.duesMessage) + '</div>';
+    }
 
     if(!list.length){
       html += '<div style="text-align:center;padding:40px;color:var(--ink3);font-family:var(--fd);">No members found.</div>';
@@ -5947,6 +5966,7 @@ function openCommPanel(){
   renderHistory();
   renderUserPanel();
   loadLeagueMessage();
+  loadDuesMessage();
   renderCommissionerList();
   loadPoolStatus();
   initSalaryPanel();
@@ -5982,15 +6002,18 @@ function renderCommDues(){
     members = members || {};
     var list = Object.keys(members).map(function(uid){
       var m = members[uid] || {};
-      return { uid: uid, teamName: m.teamName || '(no team name)', paid: !!m.duesPaid };
+      return { uid: uid, teamName: m.teamName || '(no team name)', email: m.email || '', paid: !!m.duesPaid };
     }).sort(function(a, b){ return a.teamName.localeCompare(b.teamName); });
 
     if(!list.length){ el.innerHTML = '<div style="color:var(--ink3);font-size:12px;">No members found.</div>'; return; }
 
     el.innerHTML = list.map(function(m){
       return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--bdr2);">'
-        + '<span style="font-family:var(--fd);font-size:13px;color:var(--ink);">' + escapeHtmlFR(m.teamName) + '</span>'
-        + '<button onclick="toggleDuesPaid(\'' + m.uid + '\',' + (!m.paid) + ')" style="font-family:var(--fd);font-size:11px;font-weight:800;border-radius:14px;padding:5px 14px;cursor:pointer;border:none;'
+        + '<div>'
+        + '<div style="font-family:var(--fd);font-size:13px;color:var(--ink);">' + escapeHtmlFR(m.teamName) + '</div>'
+        + (m.email ? '<div style="font-family:var(--fd);font-size:11px;color:var(--ink3);">' + escapeHtmlFR(m.email) + '</div>' : '')
+        + '</div>'
+        + '<button onclick="toggleDuesPaid(\'' + m.uid + '\',' + (!m.paid) + ')" style="font-family:var(--fd);font-size:11px;font-weight:800;border-radius:14px;padding:5px 14px;cursor:pointer;border:none;flex-shrink:0;'
         + (m.paid ? 'color:#173404;background:#EAF3DE;' : 'color:#501313;background:#FCEBEB;')
         + '">' + (m.paid ? '✓ Paid' : 'Unpaid') + '</button>'
         + '</div>';
@@ -9871,6 +9894,58 @@ function clearLeagueMessage(){
   var ctx = FRAuth.getLeagueCtx();
   if(!ctx) return;
   FRAuth.db.patch('/leagues/' + ctx.leagueId + '/settings', { weekMessage: '' })
+    .then(function(){
+      status.style.color = 'var(--or)';
+      status.textContent = '✓ Cleared';
+      setTimeout(function(){ status.textContent = ''; }, 3000);
+    }).catch(function(){});
+}
+
+function loadDuesMessage(){
+  var ctx = FRAuth.getLeagueCtx();
+  if(!ctx) return;
+  FR.fb.get('/leagues/' + ctx.leagueId + '/settings')
+    .then(function(settings){
+      var inp = document.getElementById('dues-message-inp');
+      if(inp && settings && settings.duesMessage){
+        inp.value = settings.duesMessage;
+      }
+    }).catch(function(){});
+}
+
+function saveDuesMessage(){
+  var inp = document.getElementById('dues-message-inp');
+  var status = document.getElementById('dues-message-status');
+  if(!inp) return;
+  var msg = inp.value.trim();
+  var ctx = FRAuth.getLeagueCtx();
+  if(!ctx) return;
+  status.style.color = 'var(--ink3)';
+  status.textContent = 'Saving…';
+  FRAuth.db.patch('/leagues/' + ctx.leagueId + '/settings', { duesMessage: msg })
+    .then(function(r){
+      if(r && r.error){
+        status.style.color = 'var(--pk)';
+        status.textContent = '✗ ' + r.error;
+        return;
+      }
+      status.style.color = 'var(--or)';
+      status.textContent = '✓ Saved';
+      setTimeout(function(){ status.textContent = ''; }, 3000);
+    }).catch(function(e){
+      status.style.color = 'var(--pk)';
+      status.textContent = '✗ Error saving';
+    });
+}
+
+function clearDuesMessage(){
+  var inp = document.getElementById('dues-message-inp');
+  var status = document.getElementById('dues-message-status');
+  if(!inp) return;
+  inp.value = '';
+  var ctx = FRAuth.getLeagueCtx();
+  if(!ctx) return;
+  FRAuth.db.patch('/leagues/' + ctx.leagueId + '/settings', { duesMessage: '' })
     .then(function(){
       status.style.color = 'var(--or)';
       status.textContent = '✓ Cleared';
