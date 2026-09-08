@@ -1206,6 +1206,16 @@ setTimeout(function(){
   <div id="wplayoffs"></div>
 </div>
 
+<div id="tab-dues" class="content hidden">
+  <div class="tab-overlay-close-bar hidden">
+    <div class="tab-overlay-close-bar-row">
+      <span class="tab-overlay-close-bar-title">💰 Dues</span>
+      <button class="tab-overlay-close-btn" onclick="closeH2HTabOverlay()">✕ Close</button>
+    </div>
+  </div>
+  <div id="wdues"></div>
+</div>
+
 <div class="comm-panel hidden" id="comm-panel">
   <div class="comm-title-bar">
     <span style="font-family:var(--fd);font-size:14px;font-weight:700;color:var(--or);text-transform:uppercase;letter-spacing:1px;">⚙ Commissioner Tools</span>
@@ -1227,6 +1237,13 @@ setTimeout(function(){
         <button onclick="clearLeagueMessage()" style="background:none;border:1px solid var(--bdr2);border-radius:8px;padding:8px 14px;color:var(--ink3);font-family:var(--fd);font-size:12px;cursor:pointer;text-transform:uppercase;">Clear</button>
         <span id="league-message-status" style="font-family:var(--fd);font-size:11px;color:var(--or);text-transform:uppercase;letter-spacing:.5px;"></span>
       </div>
+    </div>
+
+    <!-- DUES -->
+    <div style="margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid var(--bdr);">
+      <div class="csect">💰 Dues</div>
+      <div style="font-size:12px;color:var(--ink3);margin-bottom:10px;line-height:1.5;">Mark who's paid — visible to the whole league under More → Dues.</div>
+      <div id="comm-dues-list">Loading…</div>
     </div>
     <div class="comm-cols">
       <div>
@@ -4380,6 +4397,63 @@ function applyRound(teams, weekScores){
 }
 
 // ── RENDER ─────────────────────────────────────────────────────
+function renderDues(){
+  var ctx = FRAuth.getLeagueCtx();
+  var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+  var el = document.getElementById('wdues');
+  el.innerHTML = '<div style="padding:40px;text-align:center;color:var(--ink3);font-family:var(--fd);">Loading…</div>';
+
+  Promise.all([
+    FR.fb.get('/leagues/' + leagueId + '/members').catch(function(){ return {}; }),
+    FR.fb.get('/leagues/' + leagueId + '/settings').catch(function(){ return {}; })
+  ]).then(function(results){
+    var members = results[0] || {};
+    var settings = results[1] || {};
+
+    var list = Object.keys(members).map(function(uid){
+      var m = members[uid] || {};
+      return { uid: uid, teamName: m.teamName || '(no team name)', displayName: m.displayName || '', paid: !!m.duesPaid };
+    }).filter(function(m){ return m.teamName !== '(no team name)' || m.displayName; });
+
+    // Unpaid first, so outstanding dues are immediately visible.
+    list.sort(function(a, b){
+      if(a.paid !== b.paid) return a.paid ? 1 : -1;
+      return a.teamName.localeCompare(b.teamName);
+    });
+
+    var paidCount = list.filter(function(m){ return m.paid; }).length;
+
+    var html = '<div style="padding:16px;">';
+
+    html += '<div style="background:var(--bg2);border:1px solid var(--bdr);border-radius:12px;padding:16px;margin-bottom:16px;">';
+    html += '<div style="font-family:var(--fd);font-size:14px;font-weight:800;color:var(--or);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">💰 Dues Tracker</div>';
+    html += '<div style="font-family:var(--fd);font-size:13px;color:var(--ink2);margin-bottom:4px;">' + paidCount + ' of ' + list.length + ' paid</div>';
+    if(settings.weekMessage){
+      html += '<div style="font-family:var(--fd);font-size:12px;color:var(--ink3);white-space:pre-line;margin-top:8px;padding-top:8px;border-top:1px solid var(--bdr2);">' + escapeHtmlFR(settings.weekMessage) + '</div>';
+    }
+    html += '</div>';
+
+    if(!list.length){
+      html += '<div style="text-align:center;padding:40px;color:var(--ink3);font-family:var(--fd);">No members found.</div>';
+    } else {
+      list.forEach(function(m){
+        html += '<div style="display:flex;align-items:center;justify-content:space-between;background:var(--bg2);border:1px solid var(--bdr);border-radius:10px;padding:12px 16px;margin-bottom:8px;">'
+          + '<div>'
+          + '<div style="font-family:var(--fd);font-size:14px;font-weight:800;color:var(--ink);">' + escapeHtmlFR(m.teamName) + '</div>'
+          + (m.displayName ? '<div style="font-family:var(--fd);font-size:12px;color:var(--ink3);">' + escapeHtmlFR(m.displayName) + '</div>' : '')
+          + '</div>'
+          + (m.paid
+              ? '<span style="font-family:var(--fd);font-size:11px;font-weight:800;color:#173404;background:#EAF3DE;border-radius:14px;padding:5px 12px;">✓ Paid</span>'
+              : '<span style="font-family:var(--fd);font-size:11px;font-weight:800;color:#501313;background:#FCEBEB;border-radius:14px;padding:5px 12px;">Unpaid</span>')
+          + '</div>';
+      });
+    }
+
+    html += '</div>';
+    el.innerHTML = html;
+  });
+}
+
 function renderPlayoffs(){
   // Head-to-head leagues have a completely different playoff model
   // (seeded bracket vs. tiered elimination) — branch to a dedicated view.
@@ -5889,6 +5963,7 @@ function openCommPanel(){
   renderCommissionerList();
   loadPoolStatus();
   initSalaryPanel();
+  renderCommDues();
   // Check head-to-head schedule status when panel opens
   var ctx2 = FRAuth.getLeagueCtx();
   if(ctx2){
@@ -5909,6 +5984,42 @@ function openCommPanel(){
     zone.addEventListener('dragleave', function(){ zone.classList.remove('drag'); });
     zone.addEventListener('drop', function(e){ e.preventDefault(); zone.classList.remove('drag'); handleFile(e.dataTransfer.files[0]); });
   }
+}
+
+function renderCommDues(){
+  var ctx = FRAuth.getLeagueCtx();
+  var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+  var el = document.getElementById('comm-dues-list');
+  if(!el) return;
+  FR.fb.get('/leagues/' + leagueId + '/members').then(function(members){
+    members = members || {};
+    var list = Object.keys(members).map(function(uid){
+      var m = members[uid] || {};
+      return { uid: uid, teamName: m.teamName || '(no team name)', paid: !!m.duesPaid };
+    }).sort(function(a, b){ return a.teamName.localeCompare(b.teamName); });
+
+    if(!list.length){ el.innerHTML = '<div style="color:var(--ink3);font-size:12px;">No members found.</div>'; return; }
+
+    el.innerHTML = list.map(function(m){
+      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--bdr2);">'
+        + '<span style="font-family:var(--fd);font-size:13px;color:var(--ink);">' + escapeHtmlFR(m.teamName) + '</span>'
+        + '<button onclick="toggleDuesPaid(\'' + m.uid + '\',' + (!m.paid) + ')" style="font-family:var(--fd);font-size:11px;font-weight:800;border-radius:14px;padding:5px 14px;cursor:pointer;border:none;'
+        + (m.paid ? 'color:#173404;background:#EAF3DE;' : 'color:#501313;background:#FCEBEB;')
+        + '">' + (m.paid ? '✓ Paid' : 'Unpaid') + '</button>'
+        + '</div>';
+    }).join('');
+  }).catch(function(){ el.innerHTML = '<div style="color:var(--ink3);font-size:12px;">Failed to load members.</div>'; });
+}
+
+function toggleDuesPaid(uid, newValue){
+  var ctx = FRAuth.getLeagueCtx();
+  var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+  FR.fb.put('/leagues/' + leagueId + '/members/' + uid + '/duesPaid', newValue).then(function(){
+    renderCommDues();
+    // Keep the public tracker in sync too, in case it's already open
+    // somewhere in this same session.
+    if(document.getElementById('tab-dues') && !document.getElementById('tab-dues').classList.contains('hidden')) renderDues();
+  }).catch(function(){ showToast('Failed to update — try again', true); });
 }
 
 function deleteWeek(w){
@@ -6872,6 +6983,7 @@ function handleNav(val){
 
   if(val === 'league'){ document.body.style.overflow = 'hidden'; document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); }); document.getElementById('tab-league').classList.remove('hidden'); document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); }); document.getElementById('navtab-league').classList.add('active'); setStatBoxes('hidden'); renderLeague(); return; }
   if(val === 'playoffs'){ document.body.style.overflow = 'hidden'; document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); }); document.getElementById('tab-playoffs').classList.remove('hidden'); document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); }); document.getElementById('navtab-playoffs').classList.add('active'); setStatBoxes('hidden'); renderPlayoffs(); return; }
+  if(val === 'dues'){ document.body.style.overflow = 'hidden'; document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); }); document.getElementById('tab-dues').classList.remove('hidden'); document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); }); setStatBoxes('hidden'); renderDues(); return; }
   if(val === 'guillotine'){ document.body.style.overflow = 'hidden'; document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); }); document.getElementById('tab-guillotine').classList.remove('hidden'); document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); }); document.getElementById('navtab-guillotine').classList.add('active'); setStatBoxes('guillotine'); renderGuillotine(); return; }
   if(val === 'yourseason'){
     var completedWeeks = Object.keys(seasonData).filter(function(k){
@@ -9974,6 +10086,10 @@ document.addEventListener('DOMContentLoaded', function(){
     <button id="more-playoffs-btn" onclick="closeMoreMenu();switchBottomNav('playoffs','bn-more')" style="background:var(--bg3);border:1px solid var(--bdr2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;">
       <div style="font-size:20px;margin-bottom:4px;">🎯</div>
       <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink2);text-transform:uppercase;">Playoffs</div>
+    </button>
+    <button onclick="closeMoreMenu();switchBottomNav('dues','bn-more')" style="background:var(--bg3);border:1px solid var(--bdr2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;">
+      <div style="font-size:20px;margin-bottom:4px;">💰</div>
+      <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink2);text-transform:uppercase;">Dues</div>
     </button>
     <button onclick="closeMoreMenu();toggleComm()" id="more-comm-btn" style="display:none;background:rgba(0,229,212,.08);border:1px solid rgba(0,229,212,.2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;">
       <div style="font-size:20px;margin-bottom:4px;">⚙️</div>
