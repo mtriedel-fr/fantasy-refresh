@@ -1,0 +1,194 @@
+name: One-Time Fix — Clone League For Pre-Launch Testing
+
+# ONE-TIME USE — delete this file after running it once.
+# Creates two clones of the real league (fr_refresh26) for testing
+# before public rollout, sidestepping the privacy concern directly:
+# every member's teamName/displayName/email is replaced with a
+# generic "Test Team N" label rather than copying real names/emails
+# into a test league. Real UIDs and roster/lineup data are kept
+# intact, since those aren't directly identifying on their own and
+# are what make the clone actually usable for testing.
+#
+#   1. fr_test_full — ALL real teams, anonymized, same format as the
+#      real league.
+#   2. fr_test_h2h — only 24 of the real teams (anonymized), split
+#      evenly across 4 real divisions (6 each), format switched to
+#      head-to-head, guillotine off. playoffStartWeek=15 and
+#      playoffTeams=8 together produce an exact 3-round bracket
+#      (log2(8)=3), landing the championship on Week 17 - verified
+#      directly against the real formula the app itself uses to
+#      compute bracket rounds before using it here.
+#
+# Each clone gets its own distinct join code so it can never be
+# confused with or accidentally joined instead of the real league.
+# Only added to the COMMISSIONER's own home-page index, not every
+# real member's, so this doesn't clutter other people's home screens
+# with test leagues they didn't ask to see.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type YES to create both test league clones'
+        required: true
+        default: 'NO'
+
+jobs:
+  clone:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone the real league into two anonymized test instances
+        if: ${{ github.event.inputs.confirm == 'YES' }}
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB_URL = process.env.FIREBASE_DB_URL;
+          const FB_TOKEN = process.env.FIREBASE_AUTH_TOKEN;
+          const SOURCE_LEAGUE_ID = 'fr_refresh26';
+          const COMMISSIONER_UID = 'bUw1041FsMQjHxBUc58NnclGwyJ2';
+
+          function fbAuth(path) {
+            const sep = path.includes('?') ? '&' : '?';
+            return FB_TOKEN ? `${path}${sep}auth=${FB_TOKEN}` : path;
+          }
+          function fetchJson(path) {
+            return new Promise((resolve, reject) => {
+              https.get(fbAuth(`${FB_URL}${path}`), res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+          function firebasePut(path, value) {
+            return new Promise((resolve, reject) => {
+              const url = new URL(fbAuth(`${FB_URL}${path}`));
+              const body = JSON.stringify(value);
+              const req = https.request({
+                hostname: url.hostname, path: url.pathname + url.search, method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+              }, res => {
+                let d = '';
+                res.on('data', c => d += c);
+                res.on('end', () => {
+                  if (res.statusCode < 200 || res.statusCode >= 300) reject(new Error(`Write failed: HTTP ${res.statusCode} — ${d}`));
+                  else resolve(d);
+                });
+              });
+              req.on('error', reject);
+              req.write(body);
+              req.end();
+            });
+          }
+
+          // Anonymizes every member's real, identifying fields in place
+          // on a cloned members object - team/display name become a
+          // generic "Test Team N" label, email is blanked entirely.
+          // UID and every other field (roster, salary history, etc.)
+          // stay real, since those aren't directly identifying and are
+          // what make the clone actually testable. Deterministic order
+          // (sorted by real UID) so re-running this produces the same
+          // mapping, and the mapping is logged for the commissioner's
+          // own reference (never written into the test league itself).
+          function anonymizeMembers(members, log) {
+            const uids = Object.keys(members).sort();
+            const out = {};
+            uids.forEach((uid, i) => {
+              const label = 'Test Team ' + (i + 1);
+              const real = members[uid] || {};
+              out[uid] = Object.assign({}, real, {
+                teamName: label,
+                displayName: label,
+                email: ''
+              });
+              log.push(`  Test Team ${i + 1}  ←  real UID ${uid} (was "${real.teamName || '(no name)'}")`);
+            });
+            return out;
+          }
+
+          async function main() {
+            console.log(`Fetching real, full source league data from /leagues/${SOURCE_LEAGUE_ID} ...`);
+            const source = await fetchJson(`/leagues/${SOURCE_LEAGUE_ID}.json`);
+            if (!source) { console.log('Source league not found at all — aborting.'); return; }
+            const realMemberUids = Object.keys(source.members || {});
+            console.log(`Found real source league: "${source.settings ? source.settings.name : '(no name)'}"`);
+            console.log(`  Real members: ${realMemberUids.length}`);
+
+            // === Clone 1: fr_test_full — ALL real teams, anonymized ===
+            console.log(`\n=== Creating fr_test_full ===`);
+            const fullMap = [];
+            const fullCloned = JSON.parse(JSON.stringify(source));
+            fullCloned.members = anonymizeMembers(source.members || {}, fullMap);
+            fullCloned.settings = Object.assign({}, fullCloned.settings, {
+              leagueId: 'fr_test_full',
+              name: 'TEST — Full Clone',
+              joinCode: 'TESTFULL26'
+            });
+            await firebasePut(`/leagues/fr_test_full.json`, fullCloned);
+            console.log(`  ✓ Wrote full cloned league (${Object.keys(fullCloned.members).length} anonymized teams)`);
+            console.log(`  ✓ Join code: TESTFULL26`);
+            console.log(`  Real-name mapping (commissioner reference only — not stored in the test league):`);
+            fullMap.forEach(line => console.log(line));
+            await firebasePut(`/users/${COMMISSIONER_UID}/leagues/fr_test_full`, true);
+            console.log(`  ✓ Added to commissioner's home-page league list`);
+
+            // === Clone 2: fr_test_h2h — 24 real teams, 4 divisions, H2H ===
+            console.log(`\n=== Creating fr_test_h2h ===`);
+            const h2hUids = realMemberUids.slice().sort().slice(0, 24);
+            if (h2hUids.length < 24) {
+              console.log(`  ⚠️  Only ${h2hUids.length} real members available — using all of them, fewer than the requested 24.`);
+            }
+            const h2hSourceMembers = {};
+            h2hUids.forEach(uid => { h2hSourceMembers[uid] = source.members[uid]; });
+
+            const h2hMap = [];
+            const h2hMembers = anonymizeMembers(h2hSourceMembers, h2hMap);
+            // Assign each of the (up to) 24 anonymized teams evenly
+            // across 4 real divisions, 6 each — real field confirmed
+            // directly in the app's own division-scheduling logic
+            // (members[uid].division).
+            const DIVISION_COUNT = 4;
+            Object.keys(h2hMembers).sort().forEach((uid, i) => {
+              h2hMembers[uid].division = (i % DIVISION_COUNT) + 1;
+            });
+
+            const h2hCloned = JSON.parse(JSON.stringify(source));
+            h2hCloned.members = h2hMembers;
+            h2hCloned.settings = Object.assign({}, h2hCloned.settings, {
+              leagueId: 'fr_test_h2h',
+              name: 'TEST — Head-to-Head',
+              joinCode: 'TESTH2H26',
+              format: 'headtohead',
+              guillotine: false,
+              divisions: true,
+              divisionCount: DIVISION_COUNT,
+              playoffStartWeek: 15,
+              playoffTeams: 8,
+              seedMethod: 'divwin-topseed'
+            });
+            await firebasePut(`/leagues/fr_test_h2h.json`, h2hCloned);
+            console.log(`  ✓ Wrote H2H cloned league (${Object.keys(h2hCloned.members).length} anonymized teams, ${DIVISION_COUNT} divisions)`);
+            console.log(`  ✓ Format: headtohead, playoffs Week 15-17 (8-team bracket, 3 rounds)`);
+            console.log(`  ✓ Seeding: division winners guaranteed a spot + top seed, best remaining fill wildcards below them`);
+            console.log(`  ✓ Join code: TESTH2H26`);
+            console.log(`  Division assignments:`);
+            Object.keys(h2hMembers).sort().forEach(uid => {
+              console.log(`    ${h2hMembers[uid].teamName}: Division ${h2hMembers[uid].division}`);
+            });
+            console.log(`  Real-name mapping (commissioner reference only — not stored in the test league):`);
+            h2hMap.forEach(line => console.log(line));
+            await firebasePut(`/users/${COMMISSIONER_UID}/leagues/fr_test_h2h`, true);
+            console.log(`  ✓ Added to commissioner's home-page league list`);
+
+            console.log(`\nDone. Both test leagues are ready and visible on the commissioner's home page — no real names or emails were written into either one.`);
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
+
+      - name: Skipped - confirmation not provided
+        if: ${{ github.event.inputs.confirm != 'YES' }}
+        run: echo "Skipped — re-run with confirm=YES to actually create the clones."
