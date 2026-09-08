@@ -1,0 +1,105 @@
+name: One-Time Fix — Delete Preseason Test League
+
+# ONE-TIME USE — delete this file after running it once.
+# Fully, cleanly deletes the preseason test league (fr_nth60cij).
+# Confirmed directly tonight: home.html's card list is actually driven
+# by a separate, per-user /users/{uid}/leagues index, not by scanning
+# the league itself - so simply deleting the league data alone would
+# leave every former member with a stale, broken reference on their
+# home page. This removes each real member's index entry first, then
+# deletes the full league data tree, logging exactly what was found
+# and removed at each step given how destructive and irreversible
+# this is.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type YES to permanently delete the preseason league'
+        required: true
+        default: 'NO'
+
+jobs:
+  delete:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete preseason league and clean up member indexes
+        if: ${{ github.event.inputs.confirm == 'YES' }}
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB_URL = process.env.FIREBASE_DB_URL;
+          const FB_TOKEN = process.env.FIREBASE_AUTH_TOKEN;
+          const LEAGUE_ID = 'fr_nth60cij';
+
+          function fbAuth(path) {
+            const sep = path.includes('?') ? '&' : '?';
+            return FB_TOKEN ? `${path}${sep}auth=${FB_TOKEN}` : path;
+          }
+          function fetchJson(path) {
+            return new Promise((resolve, reject) => {
+              https.get(fbAuth(`${FB_URL}${path}`), res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+          function firebaseDelete(path) {
+            return new Promise((resolve, reject) => {
+              const url = new URL(fbAuth(`${FB_URL}${path}`));
+              const req = https.request({
+                hostname: url.hostname, path: url.pathname + url.search, method: 'DELETE'
+              }, res => {
+                let d = '';
+                res.on('data', c => d += c);
+                res.on('end', () => {
+                  if (res.statusCode < 200 || res.statusCode >= 300) reject(new Error(`Delete failed: HTTP ${res.statusCode} — ${d}`));
+                  else resolve(d);
+                });
+              });
+              req.on('error', reject);
+              req.end();
+            });
+          }
+
+          async function main() {
+            const league = await fetchJson(`/leagues/${LEAGUE_ID}.json`).catch(() => null);
+            if (!league) {
+              console.log(`No league found at all at /leagues/${LEAGUE_ID} — nothing to delete.`);
+              return;
+            }
+            console.log(`Found real league: "${league.settings ? league.settings.name : '(no name)'}"`);
+
+            const members = league.members || {};
+            const memberUids = Object.keys(members);
+            console.log(`\nFound ${memberUids.length} real member(s) to clean up:`);
+            memberUids.forEach(uid => console.log(`  ${uid}: ${members[uid].teamName || '(no team name)'}`));
+
+            console.log(`\n=== Removing each member's per-user league index entry ===`);
+            for (const uid of memberUids) {
+              try {
+                await firebaseDelete(`/users/${uid}/leagues/${LEAGUE_ID}.json`);
+                console.log(`  ✓ Removed /users/${uid}/leagues/${LEAGUE_ID}`);
+              } catch(e) {
+                console.log(`  ⚠️  Failed for ${uid}: ${e.message}`);
+              }
+            }
+
+            console.log(`\n=== Deleting the full league data tree ===`);
+            await firebaseDelete(`/leagues/${LEAGUE_ID}.json`);
+            console.log(`✓ Deleted /leagues/${LEAGUE_ID}`);
+
+            const verify = await fetchJson(`/leagues/${LEAGUE_ID}.json`).catch(() => null);
+            console.log(`\nVerification — real value now at that path: ${verify === null ? 'null (genuinely gone)' : JSON.stringify(verify)}`);
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
+
+      - name: Skipped - confirmation not provided
+        if: ${{ github.event.inputs.confirm != 'YES' }}
+        run: echo "Skipped — re-run with confirm=YES to actually delete the league."
