@@ -176,8 +176,7 @@ jobs:
                 joinCode: 'TESTH2H26',
                 format: 'headtohead',
                 guillotine: false,
-                divisions: true,
-                divisionCount: DIVISION_COUNT,
+                h2hDivisions: DIVISION_COUNT,
                 playoffStartWeek: 15,
                 playoffTeams: 8,
                 seedMethod: 'divwin-topseed'
