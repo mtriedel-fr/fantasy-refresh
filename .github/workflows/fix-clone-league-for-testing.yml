@@ -142,7 +142,15 @@ jobs:
             // === Clone 2: fr_test_h2h — 24 real teams, 4 divisions, H2H ===
             console.log(`\n=== Creating fr_test_h2h ===`);
             try {
-              const h2hUids = realMemberUids.slice().sort().slice(0, 24);
+              // Guarantee the commissioner's own real account is always
+              // included, regardless of where it falls alphabetically -
+              // confirmed as the real, direct cause of the H2H clone
+              // failing to open: a purely alphabetical top-24 selection
+              // had excluded the commissioner's own UID entirely (it
+              // was #39 of 61), leaving them with no actual membership
+              // in a league that was otherwise fully, correctly created.
+              const otherUids = realMemberUids.filter(uid => uid !== COMMISSIONER_UID).sort();
+              const h2hUids = [COMMISSIONER_UID, ...otherUids.slice(0, 23)];
               if (h2hUids.length < 24) {
                 console.log(`  ⚠️  Only ${h2hUids.length} real members available — using all of them, fewer than the requested 24.`);
               }
