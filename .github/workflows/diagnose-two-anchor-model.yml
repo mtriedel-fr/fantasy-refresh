@@ -1,0 +1,100 @@
+name: One-Time Diagnostic — Test Two-Anchor Calibration Per Position
+
+# ONE-TIME USE — delete this file after running it once.
+# Combines all pieces discussed: (1) shared cross-position rate sets
+# each position's TOP anchor price (preserving RB > WR > QB > TE >
+# DEF ordering, validated against real projections), (2) a SECOND
+# anchor at each position's own median, targeted at $3,500 - well
+# clear of the $2,400 floor. Solving both anchors simultaneously for
+# a power curve (salary = A * proj^B) derives a naturally different
+# exponent per position, automatically giving positions with steeper
+# real skew (TE) a gentler slope than positions with less skew (RB/
+# WR), rather than guessing one shared exponent for all three.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test two-anchor per-position calibration
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB_URL = process.env.FIREBASE_DB_URL;
+          const FB_TOKEN = process.env.FIREBASE_AUTH_TOKEN;
+          const LEAGUE_ID = 'fr_refresh26';
+          const SEASON = 2026;
+          const WEEK = 1;
+
+          const SAL_MAX = 11300;
+          const SAL_MIN = 2400;
+          const TOP_ANCHOR_EXPONENT = 0.6; // used only to derive each position's top anchor price via the shared rate
+          const MEDIAN_TARGET = 3500;      // second anchor: every position's own median should land here
+
+          function fbAuth(path) {
+            const sep = path.includes('?') ? '&' : '?';
+            return FB_TOKEN ? `${path}${sep}auth=${FB_TOKEN}` : path;
+          }
+          function fetchJson(path) {
+            return new Promise((resolve, reject) => {
+              https.get(fbAuth(`${FB_URL}${path}`), res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+
+          function percentile(sortedAsc, p) {
+            const idx = Math.floor(sortedAsc.length * p);
+            return sortedAsc[Math.min(idx, sortedAsc.length - 1)];
+          }
+
+          async function main() {
+            const salaryData = await fetchJson(`/leagues/${LEAGUE_ID}/salaries/${SEASON}/week${WEEK}.json`).catch(() => null);
+            if (!salaryData || !salaryData.players) { console.log('No real salary data found.'); return; }
+
+            const players = Object.values(salaryData.players).filter(p => p.proj > 0);
+            const positions = ['QB', 'RB', 'WR', 'TE', 'DEF'];
+
+            // Step 1: shared cross-position rate for the TOP anchor only.
+            const globalMaxProj = Math.max(...players.map(p => p.proj));
+            const sharedMult = SAL_MAX / Math.pow(globalMaxProj, TOP_ANCHOR_EXPONENT);
+
+            positions.forEach(pos => {
+              const posPlayers = players.filter(p => p.pos === pos);
+              if (!posPlayers.length) return;
+
+              const projsAsc = posPlayers.map(p => p.proj).sort((a, b) => a - b);
+              const maxProj = projsAsc[projsAsc.length - 1];
+              const medianProj = percentile(projsAsc, 0.50);
+
+              // Top anchor from the shared rate.
+              const topAnchorPrice = Math.pow(maxProj, TOP_ANCHOR_EXPONENT) * sharedMult;
+
+              // Step 2: solve A and B from the two anchors (top, median).
+              const B = Math.log(topAnchorPrice / MEDIAN_TARGET) / Math.log(maxProj / medianProj);
+              const A = topAnchorPrice / Math.pow(maxProj, B);
+
+              const rawValues = posPlayers.map(p => A * Math.pow(p.proj, B));
+              const clamped = rawValues.filter(v => v < SAL_MIN).length;
+              const pct = (clamped / posPlayers.length * 100).toFixed(1);
+              const sortedRaw = rawValues.slice().sort((a, b) => a - b);
+              const resultingMedian = percentile(sortedRaw, 0.50);
+
+              console.log(`=== ${pos} (${posPlayers.length} players) ===`);
+              console.log(`  Top anchor: ${maxProj.toFixed(1)} pts -> $${topAnchorPrice.toFixed(0)}`);
+              console.log(`  Median anchor: ${medianProj.toFixed(1)} pts -> target $${MEDIAN_TARGET} (actual result: $${resultingMedian.toFixed(0)})`);
+              console.log(`  Derived exponent (B): ${B.toFixed(3)}`);
+              console.log(`  Below $${SAL_MIN} floor: ${clamped} of ${posPlayers.length} (${pct}%)`);
+              console.log('');
+            });
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
