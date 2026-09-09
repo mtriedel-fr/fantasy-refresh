@@ -1,0 +1,78 @@
+name: One-Time Diagnostic — Test Candidate Floor Values
+
+# ONE-TIME USE — delete this file after running it once.
+# Tests several candidate SAL_MIN floor values ($1,500 / $2,000 /
+# $2,500 / $3,000, plus the real DraftKings-equivalent $2,400 - 4% of
+# this app's $60,000 cap, matching DK's real $2,000-on-$50,000
+# proportion) against the real, current Week 1 raw projections, to
+# find the floor that actually fixes the pile-up without going so low
+# it becomes unrealistically cheap.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test candidate floor values against real data
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB_URL = process.env.FIREBASE_DB_URL;
+          const FB_TOKEN = process.env.FIREBASE_AUTH_TOKEN;
+          const LEAGUE_ID = 'fr_refresh26';
+          const SEASON = 2026;
+          const WEEK = 1;
+
+          const SALARY_EXPONENT = 0.85;
+          const TARGET_CEILING = { QB: 9400, RB: 10700, WR: 11300, TE: 7400, DEF: 6900 };
+          const CANDIDATE_FLOORS = [1500, 2000, 2400, 2500, 3000];
+
+          function fbAuth(path) {
+            const sep = path.includes('?') ? '&' : '?';
+            return FB_TOKEN ? `${path}${sep}auth=${FB_TOKEN}` : path;
+          }
+          function fetchJson(path) {
+            return new Promise((resolve, reject) => {
+              https.get(fbAuth(`${FB_URL}${path}`), res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+
+          async function main() {
+            const salaryData = await fetchJson(`/leagues/${LEAGUE_ID}/salaries/${SEASON}/week${WEEK}.json`).catch(() => null);
+            if (!salaryData || !salaryData.players) { console.log('No real salary data found.'); return; }
+
+            const players = Object.values(salaryData.players);
+            const positions = ['RB', 'WR', 'TE'];
+
+            positions.forEach(pos => {
+              const posPlayers = players.filter(p => p.pos === pos && p.proj > 0);
+              if (!posPlayers.length) return;
+
+              const maxProj = Math.max(...posPlayers.map(p => p.proj));
+              const mult = TARGET_CEILING[pos] / Math.pow(maxProj, SALARY_EXPONENT);
+              const rawValues = posPlayers.map(p => Math.pow(p.proj, SALARY_EXPONENT) * mult);
+
+              console.log(`=== ${pos} (${posPlayers.length} players) ===`);
+              CANDIDATE_FLOORS.forEach(floor => {
+                const atOrBelow = rawValues.filter(v => v <= floor).length;
+                const pct = (atOrBelow / posPlayers.length * 100).toFixed(1);
+                console.log(`  Floor $${floor}: ${atOrBelow} of ${posPlayers.length} would clamp (${pct}%)`);
+              });
+              console.log('');
+            });
+
+            console.log('For reference: real DraftKings floor is $2,000 on a $50,000 cap (4% of cap).');
+            console.log('The equivalent proportion on this app\'s $60,000 cap would be $2,400.');
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
