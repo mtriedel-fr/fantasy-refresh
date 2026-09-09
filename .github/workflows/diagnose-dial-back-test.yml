@@ -1,0 +1,86 @@
+name: One-Time Diagnostic — Test Dialed-Back Cap/Floor Combination
+
+# ONE-TIME USE — delete this file after running it once.
+# Tests a modest combination - cap raised from $60,000 to $65,000,
+# floor raised from $2,400 to $3,200 - against the already-tuned,
+# gentler per-position exponents (0.6/0.45/0.45/0.4 for QB/RB/WR/TE),
+# to see whether the higher floor still keeps floor-clamping
+# reasonable now that the curve itself is gentler than the original
+# steep 0.85, and reports how much more headroom the higher cap gives
+# a realistic "solid players, no true scrubs" build.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test dialed-back cap and floor
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB_URL = process.env.FIREBASE_DB_URL;
+          const FB_TOKEN = process.env.FIREBASE_AUTH_TOKEN;
+          const LEAGUE_ID = 'fr_refresh26';
+          const SEASON = 2026;
+          const WEEK = 1;
+
+          const SAL_MAX = 11300;
+          const TOP_ANCHOR_EXPONENT = 0.6;
+          const POSITION_EXPONENTS = { QB: 0.6, RB: 0.45, WR: 0.45, TE: 0.4, DEF: 0.6 };
+          const OLD_FLOOR = 2400;
+          const NEW_FLOOR = 3200;
+
+          function fbAuth(path) {
+            const sep = path.includes('?') ? '&' : '?';
+            return FB_TOKEN ? `${path}${sep}auth=${FB_TOKEN}` : path;
+          }
+          function fetchJson(path) {
+            return new Promise((resolve, reject) => {
+              https.get(fbAuth(`${FB_URL}${path}`), res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+
+          async function main() {
+            const salaryData = await fetchJson(`/leagues/${LEAGUE_ID}/salaries/${SEASON}/week${WEEK}.json`).catch(() => null);
+            if (!salaryData || !salaryData.players) { console.log('No real salary data found.'); return; }
+
+            const players = Object.values(salaryData.players).filter(p => p.proj > 0);
+            const positions = ['QB', 'RB', 'WR', 'TE', 'DEF'];
+
+            const globalMaxProj = Math.max(...players.map(p => p.proj));
+            const sharedMult = SAL_MAX / Math.pow(globalMaxProj, TOP_ANCHOR_EXPONENT);
+
+            console.log('=== Floor-clamping: $2,400 (current) vs $3,200 (dialed back) ===\n');
+            positions.forEach(pos => {
+              const posPlayers = players.filter(p => p.pos === pos);
+              if (!posPlayers.length) return;
+              const maxProj = Math.max(...posPlayers.map(p => p.proj));
+              const exp = POSITION_EXPONENTS[pos];
+              const topAnchor = Math.pow(maxProj, TOP_ANCHOR_EXPONENT) * sharedMult;
+              const mult = topAnchor / Math.pow(maxProj, exp);
+              const rawValues = posPlayers.map(p => Math.pow(p.proj, exp) * mult);
+
+              const clampOld = rawValues.filter(v => v < OLD_FLOOR).length;
+              const clampNew = rawValues.filter(v => v < NEW_FLOOR).length;
+              console.log(`${pos}: $2,400 floor -> ${clampOld} clamp (${(clampOld/posPlayers.length*100).toFixed(1)}%)   |   $3,200 floor -> ${clampNew} clamp (${(clampNew/posPlayers.length*100).toFixed(1)}%)`);
+            });
+
+            console.log('\n=== Cap headroom check ===');
+            console.log('"All proven starters" test lineup real cost: $76,700 (established earlier)');
+            console.log('"2 stars + solid mid-tier, no scrubs" test lineup real cost: $81,000 (established earlier)');
+            console.log('At $60,000 cap: neither fits at all.');
+            console.log('At $65,000 cap: neither fits without at least one real downgrade.');
+            console.log('At $70,000 cap: "all starters" still doesn\'t fit; "2 stars + mid-tier" needs a ~$11,000 trim (roughly 1 slot down from mid-tier to cheap-but-not-scrub).');
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
