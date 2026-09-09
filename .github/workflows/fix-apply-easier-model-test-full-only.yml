@@ -1,0 +1,153 @@
+name: One-Time Fix — Apply Slightly-Easier Model To fr_test_full ONLY
+
+# ONE-TIME USE — delete this file after it runs successfully once.
+#
+# Re-tuned model based on real hands-on feedback that the previous
+# version (cap $10,000) was too difficult to build a good lineup
+# with. Key correction: raising the ceiling doesn't add budget - it
+# makes every player more expensive relative to the same fixed
+# $60,000 team cap, so it was the wrong direction. LOWERED the
+# ceiling instead, to $8,600, which makes players cost less overall
+# while keeping the same exponents/premiums that preserve RB/WR as
+# genuinely premium and QB/TE properly separated. TE and DEF premiums
+# re-tuned (1.21 / 0.97) to hold their confirmed target ranges
+# ($7,900-8,200 and $5,200-5,400) at this new, lower ceiling.
+#
+# LEAGUE_ID is hardcoded to fr_test_full specifically - this workflow
+# has no path that can touch fr_refresh26 (the real league) or
+# fr_test_h2h (the other clone).
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type YES to apply the easier model to fr_test_full Week 1 salaries'
+        required: true
+        default: 'NO'
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Apply slightly-easier model to fr_test_full only
+        if: ${{ github.event.inputs.confirm == 'YES' }}
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB_URL = process.env.FIREBASE_DB_URL;
+          const FB_TOKEN = process.env.FIREBASE_AUTH_TOKEN;
+          const LEAGUE_ID = 'fr_test_full'; // hardcoded - this workflow cannot touch any other league
+          const SEASON = 2026;
+          const WEEK = 1;
+
+          function fbAuth(path) {
+            const sep = path.includes('?') ? '&' : '?';
+            return FB_TOKEN ? `${path}${sep}auth=${FB_TOKEN}` : path;
+          }
+          function fetchJson(path) {
+            return new Promise((resolve, reject) => {
+              https.get(fbAuth(`${FB_URL}${path}`), res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+          function firebasePut(path, value) {
+            return new Promise((resolve, reject) => {
+              const url = new URL(fbAuth(`${FB_URL}${path}`));
+              const body = JSON.stringify(value);
+              const req = https.request({
+                hostname: url.hostname, path: url.pathname + url.search, method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+              }, res => {
+                let d = '';
+                res.on('data', c => d += c);
+                res.on('end', () => {
+                  if (res.statusCode < 200 || res.statusCode >= 300) reject(new Error(`Write failed: HTTP ${res.statusCode} — ${d}`));
+                  else resolve(d);
+                });
+              });
+              req.on('error', reject);
+              req.write(body);
+              req.end();
+            });
+          }
+
+          const SAL_MAX = 8600;
+          const MIN_SANITY = 100;
+          const TOP_ANCHOR_EXP = 0.6;
+          const POSITIONS = {
+            QB:  { exp: 1.3,  premium: 1.0  },
+            RB:  { exp: 0.35, premium: 1.10 },
+            WR:  { exp: 0.35, premium: 1.05 },
+            TE:  { exp: 0.7,  premium: 1.21 },
+            DEF: { exp: 0.6,  premium: 0.97 }
+          };
+
+          function salRound(n) {
+            return Math.max(MIN_SANITY, Math.min(SAL_MAX, Math.ceil(n / 100) * 100));
+          }
+
+          async function main() {
+            console.log(`Confirmed target: ${LEAGUE_ID} ONLY. Fetching its current Week 1 salary pool...`);
+            const salaryData = await fetchJson(`/leagues/${LEAGUE_ID}/salaries/${SEASON}/week${WEEK}.json`).catch(() => null);
+            if (!salaryData || !salaryData.players) {
+              console.log(`No existing Week 1 salary pool found for ${LEAGUE_ID} — nothing to update onto. Aborting.`);
+              return;
+            }
+
+            const players = salaryData.players;
+            const playerList = Object.values(players);
+            console.log(`Found ${playerList.length} real players with existing salary/projection data.`);
+
+            const withProj = playerList.filter(p => p.proj > 0);
+            const globalMaxProj = Math.max(...withProj.map(p => p.proj));
+            const baseRate = SAL_MAX / Math.pow(globalMaxProj, TOP_ANCHOR_EXP);
+
+            const maxProjByPos = {};
+            Object.keys(POSITIONS).forEach(pos => {
+              const posPlayers = withProj.filter(p => p.pos === pos);
+              if (posPlayers.length) maxProjByPos[pos] = Math.max(...posPlayers.map(p => p.proj));
+            });
+
+            const multByPos = {};
+            Object.entries(POSITIONS).forEach(([pos, conf]) => {
+              if (!maxProjByPos[pos]) return;
+              let topAnchor = Math.pow(maxProjByPos[pos], TOP_ANCHOR_EXP) * baseRate * conf.premium;
+              topAnchor = Math.min(topAnchor, SAL_MAX);
+              multByPos[pos] = topAnchor / Math.pow(maxProjByPos[pos], conf.exp);
+            });
+
+            let updated = 0;
+            Object.keys(players).forEach(pid => {
+              const p = players[pid];
+              const conf = POSITIONS[p.pos];
+              if (!conf || !p.proj || p.proj <= 0) {
+                players[pid].salary = MIN_SANITY;
+              } else {
+                players[pid].salary = salRound(Math.pow(p.proj, conf.exp) * multByPos[p.pos]);
+              }
+              updated++;
+            });
+
+            salaryData.meta = Object.assign({}, salaryData.meta, {
+              cap: 60000,
+              easierModelAppliedAt: Date.now(),
+              flat: false
+            });
+
+            await firebasePut(`/leagues/${LEAGUE_ID}/salaries/${SEASON}/week${WEEK}.json`, salaryData);
+            console.log(`\n✓ Updated ${updated} players in ${LEAGUE_ID}'s Week 1 salary pool with the re-tuned, easier model.`);
+            console.log(`  This ONLY touched ${LEAGUE_ID} - fr_refresh26 and fr_test_h2h were never read or written.`);
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
+
+      - name: Skipped - confirmation not provided
+        if: ${{ github.event.inputs.confirm != 'YES' }}
+        run: echo "Skipped — re-run with confirm=YES to actually apply the model."
