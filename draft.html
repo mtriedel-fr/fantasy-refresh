@@ -807,9 +807,33 @@ function loadSalaries(){
       if(data && data.players && Object.keys(data.players).length){
         var flatBanner = document.getElementById('flat-sal-banner');
         if(flatBanner) flatBanner.style.display = 'none';
-        allPlayers = Object.values(data.players).filter(function(p){ return p && p.name && p.pos; });
-        renderPicker();
-        repriceLineup();   // saved lineup may have loaded first with stale snapshot prices
+        var rawPlayers = Object.values(data.players).filter(function(p){ return p && p.name && p.pos; });
+        // Real salary data never carries headshot (the salary-generation
+        // formula doesn't write it) - merge it in from the player pool,
+        // matched by id. A player successfully matched during salary
+        // generation already uses the pool's own id as its key, so this
+        // is a direct, exact lookup rather than a fuzzy name match.
+        // Players not in the pool (tank01-only, id prefixed "t01_")
+        // correctly have no headshot available either way.
+        FR.fb.getPlayerPool().then(function(pool){
+          if(pool){
+            var nameMap = {};
+            Object.values(pool).forEach(function(poolP){
+              if(poolP && poolP.name) nameMap[poolP.name.toLowerCase()] = poolP;
+            });
+            rawPlayers.forEach(function(p){
+              var poolP = nameMap[(p.name||'').toLowerCase()];
+              if(poolP && poolP.headshot) p.headshot = poolP.headshot;
+            });
+          }
+          allPlayers = rawPlayers;
+          renderPicker();
+          repriceLineup();
+        }).catch(function(){
+          allPlayers = rawPlayers;
+          renderPicker();
+          repriceLineup();
+        });
         return;
       }
       // Real salaries haven't been generated for this week yet — fall back
