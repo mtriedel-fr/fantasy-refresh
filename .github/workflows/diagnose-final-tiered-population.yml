@@ -1,0 +1,127 @@
+name: One-Time Diagnostic — Final Model Full Population By Tier
+
+# ONE-TIME USE — delete this file after running it once.
+# Final, locked-in model: cap $10,000, QB{exp:1.3,premium:1.0},
+# RB{exp:0.35,premium:1.10}, WR{exp:0.35,premium:1.05},
+# TE{exp:0.7,premium:1.04}, DEF{exp:0.6,premium:0.84} - the
+# configuration that keeps RB/WR premium on average across the whole
+# pool, not just the top handful, confirmed via the two-roster
+# comparison. Applies this to every real player and splits each
+# position into 4 tiers by percentile (Elite top 15%, Starter next
+# 25%, Value next 30%, Deep bottom 30%) rather than a flat list.
+# Read-only, does not write anything back to Firebase.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Full population by tier - final locked-in model
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB_URL = process.env.FIREBASE_DB_URL;
+          const FB_TOKEN = process.env.FIREBASE_AUTH_TOKEN;
+          const LEAGUE_ID = 'fr_refresh26';
+          const SEASON = 2026;
+          const WEEK = 1;
+
+          function fbAuth(path) {
+            const sep = path.includes('?') ? '&' : '?';
+            return FB_TOKEN ? `${path}${sep}auth=${FB_TOKEN}` : path;
+          }
+          function fetchJson(path) {
+            return new Promise((resolve, reject) => {
+              https.get(fbAuth(`${FB_URL}${path}`), res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+
+          // Final, locked-in model.
+          const SAL_MAX = 10000;
+          const MIN_SANITY = 100;
+          const TOP_ANCHOR_EXP = 0.6;
+          const POSITIONS = {
+            QB:  { exp: 1.3,  premium: 1.0  },
+            RB:  { exp: 0.35, premium: 1.10 },
+            WR:  { exp: 0.35, premium: 1.05 },
+            TE:  { exp: 0.7,  premium: 1.04 },
+            DEF: { exp: 0.6,  premium: 0.84 }
+          };
+
+          function salRound(n) {
+            return Math.max(MIN_SANITY, Math.min(SAL_MAX, Math.ceil(n / 100) * 100));
+          }
+
+          const TIER_BOUNDS = [0.15, 0.40, 0.70]; // cumulative: Elite/Starter/Value, rest is Deep
+          const TIER_NAMES = ['ELITE', 'STARTER', 'VALUE', 'DEEP'];
+
+          async function main() {
+            const salaryData = await fetchJson(`/leagues/${LEAGUE_ID}/salaries/${SEASON}/week${WEEK}.json`).catch(() => null);
+            if (!salaryData || !salaryData.players) { console.log('No real salary data found.'); return; }
+
+            const players = Object.values(salaryData.players);
+            const withProj = players.filter(p => p.proj > 0);
+
+            const globalMaxProj = Math.max(...withProj.map(p => p.proj));
+            const baseRate = SAL_MAX / Math.pow(globalMaxProj, TOP_ANCHOR_EXP);
+
+            const maxProjByPos = {};
+            Object.keys(POSITIONS).forEach(pos => {
+              const posPlayers = withProj.filter(p => p.pos === pos);
+              if (posPlayers.length) maxProjByPos[pos] = Math.max(...posPlayers.map(p => p.proj));
+            });
+
+            const multByPos = {};
+            Object.entries(POSITIONS).forEach(([pos, conf]) => {
+              if (!maxProjByPos[pos]) return;
+              let topAnchor = Math.pow(maxProjByPos[pos], TOP_ANCHOR_EXP) * baseRate * conf.premium;
+              topAnchor = Math.min(topAnchor, SAL_MAX);
+              multByPos[pos] = topAnchor / Math.pow(maxProjByPos[pos], conf.exp);
+            });
+
+            const results = players.map(p => {
+              const conf = POSITIONS[p.pos];
+              let newSal;
+              if (!conf || !p.proj || p.proj <= 0) {
+                newSal = MIN_SANITY;
+              } else {
+                newSal = salRound(Math.pow(p.proj, conf.exp) * multByPos[p.pos]);
+              }
+              return { name: p.name, pos: p.pos, team: p.team, proj: p.proj || 0, salary: newSal };
+            });
+
+            Object.keys(POSITIONS).forEach(pos => {
+              const posResults = results.filter(r => r.pos === pos).sort((a, b) => b.salary - a.salary);
+              if (!posResults.length) return;
+
+              const n = posResults.length;
+              const cut1 = Math.ceil(n * TIER_BOUNDS[0]);
+              const cut2 = Math.ceil(n * TIER_BOUNDS[1]);
+              const cut3 = Math.ceil(n * TIER_BOUNDS[2]);
+              const cuts = [cut1, cut2, cut3, n];
+
+              console.log(`\n########## ${pos} (${n} players) ##########`);
+              let start = 0;
+              cuts.forEach((end, i) => {
+                if (end <= start) return;
+                const tierPlayers = posResults.slice(start, end);
+                const tierTop = tierPlayers[0].salary;
+                const tierBottom = tierPlayers[tierPlayers.length - 1].salary;
+                console.log(`\n--- ${TIER_NAMES[i]} (${tierPlayers.length} players, $${tierBottom}-$${tierTop}) ---`);
+                tierPlayers.forEach(p => console.log(`  ${p.name.padEnd(24)} ${p.team.padEnd(4)} ${p.proj.toFixed(1).padStart(5)}pt  $${p.salary}`));
+                start = end;
+              });
+            });
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
