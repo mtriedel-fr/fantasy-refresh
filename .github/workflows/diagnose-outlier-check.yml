@@ -1,0 +1,85 @@
+name: One-Time Diagnostic — Check If Top Projection Is An Outlier
+
+# ONE-TIME USE — delete this file after running it once.
+# Compares the single top real projection per position against the
+# 95th/90th percentile and median of the rest of that position's real
+# pool, to directly test whether calibrating the entire salary curve
+# off that one #1 player is fragile (i.e. the #1 player is a
+# meaningful outlier above the rest of the elite tier) or reasonable
+# (the #1 player is close to what the next several players project).
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check whether the top projection is an outlier
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB_URL = process.env.FIREBASE_DB_URL;
+          const FB_TOKEN = process.env.FIREBASE_AUTH_TOKEN;
+          const LEAGUE_ID = 'fr_refresh26';
+          const SEASON = 2026;
+          const WEEK = 1;
+
+          function fbAuth(path) {
+            const sep = path.includes('?') ? '&' : '?';
+            return FB_TOKEN ? `${path}${sep}auth=${FB_TOKEN}` : path;
+          }
+          function fetchJson(path) {
+            return new Promise((resolve, reject) => {
+              https.get(fbAuth(`${FB_URL}${path}`), res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+
+          function percentile(sortedArr, p) {
+            const idx = Math.floor(sortedArr.length * p);
+            return sortedArr[Math.min(idx, sortedArr.length - 1)];
+          }
+
+          async function main() {
+            const salaryData = await fetchJson(`/leagues/${LEAGUE_ID}/salaries/${SEASON}/week${WEEK}.json`).catch(() => null);
+            if (!salaryData || !salaryData.players) { console.log('No real salary data found.'); return; }
+
+            const players = Object.values(salaryData.players);
+            const positions = ['QB', 'RB', 'WR', 'TE', 'DEF'];
+
+            positions.forEach(pos => {
+              const posPlayers = players.filter(p => p.pos === pos && p.proj > 0);
+              if (!posPlayers.length) return;
+
+              const projs = posPlayers.map(p => p.proj).sort((a, b) => b - a); // descending
+              const top1 = projs[0];
+              const top2 = projs[1];
+              const top5avg = projs.slice(0, 5).reduce((a, b) => a + b, 0) / Math.min(5, projs.length);
+              const ascending = projs.slice().sort((a, b) => a - b);
+              const p95 = percentile(ascending, 0.95);
+              const p90 = percentile(ascending, 0.90);
+              const median = percentile(ascending, 0.50);
+
+              const topPlayerName = posPlayers.find(p => p.proj === top1).name;
+
+              console.log(`=== ${pos} (${posPlayers.length} players) ===`);
+              console.log(`  #1: ${topPlayerName} — ${top1.toFixed(1)} pts`);
+              console.log(`  #2: ${top2.toFixed(1)} pts  (gap from #1: ${(top1 - top2).toFixed(1)}, ${(((top1 - top2) / top2) * 100).toFixed(0)}% higher)`);
+              console.log(`  Top-5 average: ${top5avg.toFixed(1)} pts  (gap from #1: ${(top1 - top5avg).toFixed(1)}, ${(((top1 - top5avg) / top5avg) * 100).toFixed(0)}% higher)`);
+              console.log(`  95th percentile: ${p95.toFixed(1)} pts`);
+              console.log(`  90th percentile: ${p90.toFixed(1)} pts`);
+              console.log(`  Median: ${median.toFixed(1)} pts`);
+              console.log(`  #1 is ${(top1 / median).toFixed(1)}x the median`);
+              console.log('');
+            });
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
