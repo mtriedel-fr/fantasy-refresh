@@ -1,0 +1,105 @@
+name: One-Time Diagnostic — Full SEA DEF Status Check
+
+# ONE-TIME USE — delete this file after running it once.
+# Comprehensive check: real game status (final vs in-progress), the
+# current fresh gameStats value for SEA DEF, the current stored
+# value for each of the three previously-identified teams (to see
+# whether the earlier 3-point backfill already ran and needs
+# re-correcting), and raw game state to understand why the value
+# keeps changing between checks. Read-only.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Full current status check
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB_URL = process.env.FIREBASE_DB_URL;
+          const FB_TOKEN = process.env.FIREBASE_AUTH_TOKEN;
+          const LEAGUE_ID = 'fr_refresh26';
+          const SEASON = 2026;
+          const WEEK = 1;
+
+          function fbAuth(path) {
+            const sep = path.includes('?') ? '&' : '?';
+            return FB_TOKEN ? `${path}${sep}auth=${FB_TOKEN}` : path;
+          }
+          function fetchJson(path) {
+            return new Promise((resolve, reject) => {
+              https.get(fbAuth(`${FB_URL}${path}`), res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+
+          async function main() {
+            console.log('Current real time:', new Date().toISOString());
+            console.log('');
+
+            // Live game status - is this game actually final now?
+            const liveStatus = await fetchJson(`/liveGameStatus/${SEASON}/Regular_wk${WEEK}.json`).catch(() => null);
+            if (liveStatus) {
+              const seaGame = Object.entries(liveStatus).find(([gid, g]) => gid.includes('SEA') || (g && (g.home === 'SEA' || g.away === 'SEA')));
+              console.log('Real liveGameStatus for SEA game:', seaGame ? JSON.stringify(seaGame[1]) : '(not found)');
+            } else {
+              console.log('No liveGameStatus data found at all.');
+            }
+            console.log('');
+
+            // Fresh gameStats value, right now
+            const allGameStats = await fetchJson(`/gameStats/${SEASON}.json`).catch(() => null);
+            let seaGameId = null, seaFreshStats = null;
+            let rawGameStats = null;
+            if (allGameStats) {
+              for (const [gameId, gs] of Object.entries(allGameStats)) {
+                if (gs && gs.players) {
+                  const seaEntry = gs.players.find(p => p.pos === 'DEF' && p.name === 'SEA');
+                  if (seaEntry) {
+                    seaGameId = gameId;
+                    seaFreshStats = seaEntry;
+                    rawGameStats = gs;
+                    break;
+                  }
+                }
+              }
+            }
+            console.log(`Current fresh SEA DEF (gameId=${seaGameId}):`);
+            console.log(JSON.stringify(seaFreshStats, null, 2));
+            console.log('Raw gameStats writtenAt / updatedAt if present:', rawGameStats ? (rawGameStats.updatedAt || rawGameStats.writtenAt || '(no timestamp field)') : '(n/a)');
+            console.log('');
+
+            // Current stored value for the three teams checked earlier
+            const TARGETS = [
+              { uid: 'Nc8JIyTdbYNlZotuBBj7F6Cm7YA2', team: "Got Moss'd" },
+              { uid: 'ZDD7DGkGWfWxeyvXPb3G94ZymB73', team: 'Enze' },
+              { uid: 'lfEUUyEKVwWvmzINHZBZmTpN0PE2', team: "Brad's Team" }
+            ];
+            console.log('--- Current stored values for the three previously-checked teams ---');
+            for (const t of TARGETS) {
+              const entry = await fetchJson(`/leagues/${LEAGUE_ID}/season/${SEASON}/${WEEK}/${t.uid}.json`).catch(() => null);
+              if (!entry) { console.log(`${t.team}: no entry found`); continue; }
+              const slotId = Object.keys(entry.slotPts || {}).find(sid => {
+                const bd = entry.slotBreakdown && entry.slotBreakdown[sid];
+                return Array.isArray(bd) && bd.some(b => (b.label || '').includes('Interception') || (b.label || '').includes('Fumble Recovery') || (b.label || '').includes('Sack'));
+              });
+              console.log(`${t.team}: locked=${entry.locked} status=${entry.status} updatedAt=${entry.updatedAt ? new Date(entry.updatedAt).toISOString() : '(none)'}`);
+              if (slotId) {
+                console.log(`  slot=${slotId} points=${entry.slotPts[slotId]} breakdown=${JSON.stringify(entry.slotBreakdown[slotId])}`);
+              } else {
+                console.log(`  (no matching DEF slot found — may have changed shape since last check)`);
+              }
+            }
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
