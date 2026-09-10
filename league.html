@@ -3132,15 +3132,30 @@ function computeCumStandings(){
   var weekKey = String(currentWeek);
   if(fullStandingsCache[weekKey]) return fullStandingsCache[weekKey];
 
-  // Build the full list once, in the background — every real league
-  // member should always show here, not just the ones who happen to
-  // already have a score entry written. A member who hasn't submitted a
-  // lineup at all reads "Roster Not Submitted" instead of a score; one
-  // who has submitted but hasn't been scored yet (or scored 0) shows
-  // 0.00 like anyone else. Re-renders standings once this resolves.
   var ctx = FRAuth.getLeagueCtx();
   var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
   var season = FR.seasonKey();
+
+  // Prefer the server-computed snapshot (written by auto-scoring.yml
+  // right after each real scoring run) when it exists — same exact
+  // logic, computed once server-side with the freshest data already in
+  // memory, instead of every client independently re-fetching members +
+  // lineups and recomputing this from scratch. Falls back to the
+  // original client-side computation below if no snapshot exists yet
+  // (e.g. an older week, or before the server has scored this week for
+  // the first time) — nothing is lost, this is purely additive.
+  FR.fb.get('/leagues/' + leagueId + '/standings/' + season + '/week' + currentWeek)
+    .then(function(snapshot){
+      if(snapshot && Array.isArray(snapshot.entries) && snapshot.entries.length){
+        fullStandingsCache[weekKey] = snapshot.entries;
+        if(String(currentWeek) === weekKey && typeof renderCumStandingsPage === 'function') renderCumStandingsPage(0);
+        return;
+      }
+      fetchAndBuildStandingsClientSide();
+    })
+    .catch(function(){ fetchAndBuildStandingsClientSide(); });
+
+  function fetchAndBuildStandingsClientSide(){
   Promise.all([
     FR.fb.get('/leagues/' + leagueId + '/members').catch(function(){ return {}; }),
     // Full fetch, not a shallow query-string variant — FR.fb.get()
@@ -3179,6 +3194,7 @@ function computeCumStandings(){
     fullStandingsCache[weekKey] = full;
     if(String(currentWeek) === weekKey && typeof renderCumStandingsPage === 'function') renderCumStandingsPage(0);
   });
+  }
 
   return scored; // fallback shown immediately while the full list loads
 }
