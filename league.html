@@ -1930,6 +1930,7 @@ function startLivePolling(week){
         });
         if(changed){
           seasonData[week] = entries;
+          delete fullStandingsCache[String(week)]; // force a fresh rebuild, not the frozen first-computed snapshot
           boot(); // re-render standings
           showToast('Scores updated 📡');
         }
@@ -3626,9 +3627,27 @@ function renderGuillotine(){
   }
   var gsTeams = guillotineStatusCache[gsKey].teams || {};
 
+  // Real, total active membership — NOT week1.length, which only counts
+  // members who already have a submitted, scored Week 1 entry so far.
+  // Confirmed as the direct cause of "Started With" reading low (e.g.
+  // 57 instead of the real, full member count) early in the week while
+  // people are still drafting. Cached the same way guillotineStatus is,
+  // so this doesn't re-fetch on every render.
+  if(!memberCountCache[leagueId2]){
+    FR.fb.get('/leagues/' + leagueId2 + '/members')
+      .then(function(members){
+        var active = members ? Object.values(members).filter(function(m){ return m && m.teamName && m.active !== false; }) : [];
+        memberCountCache[leagueId2] = active.length;
+        renderGuillotine();
+      })
+      .catch(function(){ memberCountCache[leagueId2] = (seasonData[String(weeks[0])]||[]).length; renderGuillotine(); });
+    el.innerHTML = '<div style="padding:32px;text-align:center;color:var(--ink3);font-family:var(--fd);font-size:13px;">Loading…</div>';
+    return;
+  }
+
   // Get all teams from week 1
   var week1 = seasonData[String(weeks[0])] || [];
-  var totalTeams = week1.length;
+  var totalTeams = memberCountCache[leagueId2];
   var totalWeeks = WEEKS; // 18
   var schedule = buildElimSchedule(totalTeams, totalWeeks);
 
@@ -6486,6 +6505,7 @@ function ensureWeekLineups(week){
 }
 
 var guillotineStatusCache = {}; // seasonKey -> {teams: {name: {status, eliminatedWeek, score, noShow}}} — real, persisted elimination status, fetched separately since it's computed once on the backend rather than replayed client-side
+var memberCountCache = {}; // leagueId -> real, total active member count, used for Last One Standing's "Started With" instead of week1.length (which only counts members with an already-submitted, scored entry so far)
 var weekLineupsCache = {}; // week -> {uid: {slots: {...}}, ...} — real lineup data, fetched separately since score entries never actually carry a lineup field (see below)
 var weekLocksCache = {}; // week -> {team: true, ...} — which teams have locked (kicked off), used to gate player identity in Roster/Most Started until their game has actually started
 
