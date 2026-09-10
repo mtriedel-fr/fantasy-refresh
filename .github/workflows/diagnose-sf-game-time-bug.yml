@@ -1,0 +1,83 @@
+name: One-Time Diagnostic — Find SF Game Time Bug
+
+# ONE-TIME USE — delete this file after running it once.
+# Checks the real, raw schedule time value stored for tonight's SF
+# game, and simulates exactly what new Date(g.time) and
+# toLocaleTimeString() (the real client-side logic in draft.html)
+# would produce from it - to pinpoint exactly where the reported
+# 8-hour discrepancy (7:35pm expected vs 3:35am shown) is
+# introduced. Read-only.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the real, raw SF game time value
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB_URL = process.env.FIREBASE_DB_URL;
+          const FB_TOKEN = process.env.FIREBASE_AUTH_TOKEN;
+          const SEASON = 2026;
+          const WEEK = 1;
+
+          function fbAuth(path) {
+            const sep = path.includes('?') ? '&' : '?';
+            return FB_TOKEN ? `${path}${sep}auth=${FB_TOKEN}` : path;
+          }
+          function fetchJson(path) {
+            return new Promise((resolve, reject) => {
+              https.get(fbAuth(`${FB_URL}${path}`), res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+
+          async function main() {
+            console.log('Current real time (UTC):', new Date().toISOString());
+            console.log('');
+
+            const schedulePaths = [
+              `/schedule/${SEASON}/week${WEEK}.json`,
+              `/nflSchedule/${SEASON}/week${WEEK}.json`
+            ];
+            let schedule = null, usedPath = null;
+            for (const p of schedulePaths) {
+              const result = await fetchJson(p).catch(() => null);
+              if (result) { schedule = result; usedPath = p; break; }
+            }
+            if (!schedule) { console.log('No schedule data found at any known path.'); return; }
+            console.log(`Real schedule found at: ${usedPath}`);
+            console.log('');
+
+            const games = Array.isArray(schedule) ? schedule : Object.values(schedule);
+            const sfGame = games.find(g => g && (g.home === 'SF' || g.away === 'SF'));
+            if (!sfGame) { console.log('No SF game found in the real schedule.'); return; }
+
+            console.log('Real, raw SF game object:');
+            console.log(JSON.stringify(sfGame, null, 2));
+            console.log('');
+
+            if (sfGame.time) {
+              const raw = sfGame.time;
+              const d = new Date(raw);
+              console.log(`Raw g.time value: "${raw}"`);
+              console.log(`new Date(g.time) parses to (real UTC instant): ${d.toISOString()}`);
+              console.log(`  As if in America/Chicago (real CT): ${d.toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit',timeZone:'America/Chicago'})}`);
+              console.log(`  As if in America/New_York (real ET): ${d.toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit',timeZone:'America/New_York'})}`);
+              console.log(`  Same call with NO timeZone override, run on this UTC server (shows what the bug LOOKS like server-side, not what the user's own device renders): ${d.toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit'})} ET  <- labeled ET but this is actually server-local (UTC) time`);
+            } else {
+              console.log('sfGame has no .time field at all.');
+            }
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
