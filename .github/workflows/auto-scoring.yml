@@ -400,6 +400,11 @@ jobs:
               return;
             }
 
+            // Load real, active members — needed below to build a
+            // complete standings snapshot (every active member, not just
+            // the ones who already have a score entry).
+            const members = await firebaseGet(`/leagues/${leagueId}/members.json`).catch(() => ({}));
+
             // Load existing scores to preserve locked ones
             const existingScores = await firebaseGet(`/leagues/${leagueId}/season/${SEASON}/${week}.json`).catch(() => ({}));
             const scoreUpdates = {};
@@ -469,6 +474,57 @@ jobs:
             if (Object.keys(scoreUpdates).length) {
               await firebasePatch(`/leagues/${leagueId}/season/${SEASON}/${week}.json`, scoreUpdates);
               console.log(`  ✅ Wrote ${Object.keys(scoreUpdates).length} scores`);
+            }
+
+            // ── STANDINGS SNAPSHOT ──────────────────────────────────────
+            // Computed server-side, once, right here — where the freshest
+            // real data already exists in memory — rather than leaving
+            // every client to recompute this independently from raw
+            // scores/members/lineups on every page load. Mirrors the
+            // exact same real logic as league.html's computeCumStandings()
+            // client-side fallback, so both stay consistent: every active
+            // member appears; real score if scored; 0 if a lineup was
+            // submitted but not yet scored; null/notSubmitted if no
+            // lineup at all. Not-submitted entries always rank last;
+            // everyone else sorts by score descending.
+            try {
+              const allScores = Object.assign({}, existingScores, scoreUpdates);
+              const activeMembers = Object.entries(members || {})
+                .filter(([, m]) => m && m.teamName && m.active !== false);
+
+              const standingsEntries = activeMembers.map(([uid, m]) => {
+                const scored = allScores[uid];
+                if (scored) {
+                  return {
+                    uid, name: scored.team || m.teamName, score: scored.score,
+                    notSubmitted: false
+                  };
+                }
+                const hasLineup = !!(lineups[uid] && lineups[uid].slots);
+                return {
+                  uid, name: m.teamName,
+                  score: hasLineup ? 0 : null,
+                  notSubmitted: !hasLineup
+                };
+              });
+
+              standingsEntries.sort((a, b) => {
+                if (a.notSubmitted && !b.notSubmitted) return 1;
+                if (!a.notSubmitted && b.notSubmitted) return -1;
+                return (b.score || 0) - (a.score || 0);
+              });
+
+              standingsEntries.forEach((e, i) => { e.rank = i + 1; });
+
+              await firebasePut(`/leagues/${leagueId}/standings/${SEASON}/week${week}.json`, {
+                entries: standingsEntries,
+                updatedAt: Date.now()
+              });
+              console.log(`  📋 Wrote standings snapshot (${standingsEntries.length} teams)`);
+            } catch (e) {
+              // Never let a standings-snapshot failure break real score
+              // writing above, which already succeeded by this point.
+              console.log(`  ⚠️  Standings snapshot failed (scores above were still written fine): ${e.message}`);
             }
 
             // ── OWNERSHIP % ────────────────────────────────────────────
