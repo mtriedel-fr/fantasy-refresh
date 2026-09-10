@@ -1,0 +1,160 @@
+name: One-Time Fix — Backfill Interception/Fumble Lost Scoring Bug
+
+# ONE-TIME USE — delete this file after it runs successfully once.
+#
+# Corrects already-stored Week 1 score data directly, in place -
+# no external stat re-fetch needed. auto-scoring.yml was scoring
+# Interceptions and Fumbles Lost at -1 instead of the real, correct
+# -2 (confirmed against league.html's settings display, which
+# correctly defaults both to -2). This workflow scans every real
+# team's stored slotBreakdown for any "Interception" or "Fumble
+# Lost" entry whose points value matches the old, wrong -1-per-stat
+# math, and corrects that entry, that slot's points, and the team's
+# total score by exactly the real difference: -1 additional point
+# per occurrence (since it should have been counted twice as
+# negative, not once).
+#
+# Skips any team whose score is already locked (won't touch
+# finalized weeks). Only touches entries that actually match the
+# old, wrong math - anything already correct (e.g. a fresh
+# recalculation that already happened) is left untouched.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type YES to apply the backfill correction to fr_refresh26 Week 1'
+        required: true
+        default: 'NO'
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Backfill interception/fumble-lost scoring correction
+        if: ${{ github.event.inputs.confirm == 'YES' }}
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB_URL = process.env.FIREBASE_DB_URL;
+          const FB_TOKEN = process.env.FIREBASE_AUTH_TOKEN;
+          const LEAGUE_ID = 'fr_refresh26';
+          const SEASON = 2026;
+          const WEEK = 1;
+
+          function fbAuth(path) {
+            const sep = path.includes('?') ? '&' : '?';
+            return FB_TOKEN ? `${path}${sep}auth=${FB_TOKEN}` : path;
+          }
+          function fetchJson(path) {
+            return new Promise((resolve, reject) => {
+              https.get(fbAuth(`${FB_URL}${path}`), res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+          function firebasePatch(path, value) {
+            return new Promise((resolve, reject) => {
+              const url = new URL(fbAuth(`${FB_URL}${path}`));
+              const body = JSON.stringify(value);
+              const req = https.request({
+                hostname: url.hostname, path: url.pathname + url.search, method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+              }, res => {
+                let d = '';
+                res.on('data', c => d += c);
+                res.on('end', () => {
+                  if (res.statusCode < 200 || res.statusCode >= 300) reject(new Error(`Write failed: HTTP ${res.statusCode} — ${d}`));
+                  else resolve(d);
+                });
+              });
+              req.on('error', reject);
+              req.write(body);
+              req.end();
+            });
+          }
+
+          async function main() {
+            const weekData = await fetchJson(`/leagues/${LEAGUE_ID}/season/${SEASON}/${WEEK}.json`).catch(() => null);
+            if (!weekData) { console.log('No Week 1 score data found — nothing to backfill.'); return; }
+
+            const updates = {};
+            let teamsCorrected = 0;
+            let entriesCorrected = 0;
+
+            for (const [uid, entry] of Object.entries(weekData)) {
+              if (!entry || typeof entry !== 'object') continue;
+              if (entry.locked) {
+                console.log(`⏭️  ${entry.team || uid}: locked, skipping`);
+                continue;
+              }
+              if (!entry.slotBreakdown) continue;
+
+              let teamDelta = 0;
+              const newSlotBreakdown = JSON.parse(JSON.stringify(entry.slotBreakdown));
+              const newSlotPts = Object.assign({}, entry.slotPts);
+              let teamChanged = false;
+
+              for (const [slotId, breakdown] of Object.entries(newSlotBreakdown)) {
+                if (!Array.isArray(breakdown)) continue;
+                let slotDelta = 0;
+
+                breakdown.forEach(item => {
+                  if (!item || (item.label !== 'Interception' && item.label !== 'Fumble Lost')) return;
+                  const statCount = parseFloat(item.stat) || 0;
+                  if (!statCount) return;
+                  const expectedOldPts = Math.round(statCount * -1 * 100) / 100; // old, wrong math
+                  const actualPts = Math.round((item.points || 0) * 100) / 100;
+                  // Only correct entries that actually match the old, wrong
+                  // -1-per-stat math - anything else (already fixed, or a
+                  // different value entirely) is left untouched.
+                  if (Math.abs(actualPts - expectedOldPts) < 0.005) {
+                    const correctedPts = Math.round(statCount * -2 * 100) / 100;
+                    const diff = Math.round((correctedPts - actualPts) * 100) / 100;
+                    item.points = correctedPts;
+                    slotDelta += diff;
+                    entriesCorrected++;
+                    console.log(`  🔧 ${entry.team || uid} / slot ${slotId}: ${item.label} (${statCount}) corrected ${actualPts} -> ${correctedPts}`);
+                  }
+                });
+
+                if (slotDelta !== 0) {
+                  newSlotPts[slotId] = Math.round(((newSlotPts[slotId] || 0) + slotDelta) * 100) / 100;
+                  teamDelta += slotDelta;
+                  teamChanged = true;
+                }
+              }
+
+              if (teamChanged) {
+                const newScore = Math.round(((entry.score || 0) + teamDelta) * 100) / 100;
+                updates[uid] = Object.assign({}, entry, {
+                  score: newScore,
+                  slotPts: newSlotPts,
+                  slotBreakdown: newSlotBreakdown,
+                  updatedAt: Date.now()
+                });
+                teamsCorrected++;
+                console.log(`✅ ${entry.team || uid}: total score ${entry.score} -> ${newScore} (${teamDelta} pt correction)`);
+              }
+            }
+
+            if (!teamsCorrected) {
+              console.log('\nNo teams needed correction — nothing matched the old, wrong math.');
+              return;
+            }
+
+            await firebasePatch(`/leagues/${LEAGUE_ID}/season/${SEASON}/${WEEK}.json`, updates);
+            console.log(`\n✓ Corrected ${teamsCorrected} team(s), ${entriesCorrected} entr${entriesCorrected === 1 ? 'y' : 'ies'} total.`);
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
+
+      - name: Skipped - confirmation not provided
+        if: ${{ github.event.inputs.confirm != 'YES' }}
+        run: echo "Skipped — re-run with confirm=YES to actually apply the backfill."
