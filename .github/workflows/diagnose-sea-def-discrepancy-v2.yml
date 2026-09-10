@@ -1,0 +1,95 @@
+name: One-Time Diagnostic — Find SEA Defense Score Discrepancy V2
+
+# ONE-TIME USE — delete this file after running it once.
+# Corrected version - V1 matched team==='SEA' (any Seahawks player,
+# offense included) instead of specifically the DEF entry, producing
+# false "mismatches" against unrelated players. This searches
+# specifically for pos==='DEF' && name==='SEA' for the real, fresh
+# defense score, and only compares it against lineup slots that
+# actually store SEA's defense (id="t01_SEA_DEF"), not any SEA
+# player. Read-only.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Compare fresh SEA DEF stats against stored lineup scores (corrected)
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB_URL = process.env.FIREBASE_DB_URL;
+          const FB_TOKEN = process.env.FIREBASE_AUTH_TOKEN;
+          const LEAGUE_ID = 'fr_refresh26';
+          const SEASON = 2026;
+          const WEEK = 1;
+
+          function fbAuth(path) {
+            const sep = path.includes('?') ? '&' : '?';
+            return FB_TOKEN ? `${path}${sep}auth=${FB_TOKEN}` : path;
+          }
+          function fetchJson(path) {
+            return new Promise((resolve, reject) => {
+              https.get(fbAuth(`${FB_URL}${path}`), res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+
+          async function main() {
+            const allGameStats = await fetchJson(`/gameStats/${SEASON}.json`).catch(() => null);
+            let seaGameId = null, seaFreshStats = null, seaFreshPts = null;
+            if (allGameStats) {
+              for (const [gameId, gs] of Object.entries(allGameStats)) {
+                if (gs && gs.players) {
+                  // Specifically the DEF entry, not any player from SEA
+                  const seaEntry = gs.players.find(p => p.pos === 'DEF' && p.name === 'SEA');
+                  if (seaEntry) {
+                    seaGameId = gameId;
+                    seaFreshStats = seaEntry;
+                    seaFreshPts = seaEntry.pts;
+                    break;
+                  }
+                }
+              }
+            }
+            console.log(`Real, fresh SEA DEF data (what "All Players" reads): gameId=${seaGameId}`);
+            console.log(JSON.stringify(seaFreshStats, null, 2));
+
+            const lineups = await fetchJson(`/leagues/${LEAGUE_ID}/lineups/${SEASON}/week${WEEK}.json`).catch(() => ({}));
+            const scores = await fetchJson(`/leagues/${LEAGUE_ID}/season/${SEASON}/${WEEK}.json`).catch(() => ({}));
+
+            console.log(`\n--- Teams actually rostering SEA's DEFENSE (id="t01_SEA_DEF") ---`);
+            let anyMismatch = false;
+            for (const [uid, lineup] of Object.entries(lineups || {})) {
+              if (!lineup || !lineup.slots) continue;
+              for (const [slotId, player] of Object.entries(lineup.slots)) {
+                if (!player) continue;
+                // Specifically the defense slot, not any SEA-affiliated player
+                const isSeaDef = player.id === 't01_SEA_DEF' || (player.pos === 'DEF' && (player.name || '').toUpperCase() === 'SEA');
+                if (!isSeaDef) continue;
+                const scoreEntry = scores[uid];
+                const storedPts = scoreEntry && scoreEntry.slotPts ? scoreEntry.slotPts[slotId] : undefined;
+                const storedBreakdown = scoreEntry && scoreEntry.slotBreakdown ? scoreEntry.slotBreakdown[slotId] : undefined;
+                const mismatch = storedPts !== seaFreshPts;
+                if (mismatch) anyMismatch = true;
+                console.log(`\nTeam: ${lineup.team || uid} (uid=${uid})`);
+                console.log(`  Lineup slot player: id="${player.id}" name="${player.name}"`);
+                console.log(`  Stored slot points: ${storedPts}  (fresh real value: ${seaFreshPts})`);
+                console.log(`  locked: ${scoreEntry ? scoreEntry.locked : '(no score entry at all)'}`);
+                console.log(`  Stored breakdown: ${JSON.stringify(storedBreakdown)}`);
+                console.log(mismatch ? `  ⚠️  MISMATCH` : `  ✅ matches`);
+              }
+            }
+            if (!anyMismatch) console.log(`\nNo real mismatches found — every team's stored SEA DEF score matches the fresh value.`);
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
