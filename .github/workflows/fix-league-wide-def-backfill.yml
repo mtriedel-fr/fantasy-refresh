@@ -1,0 +1,192 @@
+name: One-Time Fix — League-Wide DEF Score Backfill
+
+# ONE-TIME USE — delete this file after it runs successfully once.
+#
+# Root cause (already fixed in auto-scoring.yml going forward):
+# DEF entries are keyed in playerStats by the raw, uppercase team
+# abbreviation ("SEA"), but scoreLeague()'s lookup only ever tried
+# player.id (a synthetic id like "t01_SEA_DEF") and the LOWERCASED
+# player name ("sea") — neither can match an uppercase key in
+# JavaScript, since object key lookups are case-sensitive. This
+# meant EVERY team's defense score got frozen at whatever it first
+# computed, then silently never updated again for the rest of the
+# live game — confirmed directly: SEA's real stats show 13 pts right
+# now (3 sacks, 3 INT, 10 pts allowed), but three checked teams were
+# still stuck at 6 pts from hours earlier.
+#
+# This is a league-wide backfill, not limited to SEA — scans every
+# real team's lineup for any DEF slot, recalculates each one fresh
+# against the real, current per-game stats using the same scoring
+# formula as the live app (mirrors calcDKPoints exactly, including
+# the already-corrected -2 interception/fumble-lost values), and
+# only writes an update where the recalculated value actually
+# differs from what's currently stored. Skips any locked entry.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type YES to backfill-correct every team''s DEF score'
+        required: true
+        default: 'NO'
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: League-wide DEF score backfill
+        if: ${{ github.event.inputs.confirm == 'YES' }}
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB_URL = process.env.FIREBASE_DB_URL;
+          const FB_TOKEN = process.env.FIREBASE_AUTH_TOKEN;
+          const LEAGUE_ID = 'fr_refresh26';
+          const SEASON = 2026;
+          const WEEK = 1;
+          // Confirmed real Week 1 game — the 8/15-prefixed entries are
+          // stale preseason test data and must never be included here.
+          const REAL_GAME_IDS = ['20260909_NE@SEA'];
+
+          function fbAuth(path) {
+            const sep = path.includes('?') ? '&' : '?';
+            return FB_TOKEN ? `${path}${sep}auth=${FB_TOKEN}` : path;
+          }
+          function fetchJson(path) {
+            return new Promise((resolve, reject) => {
+              https.get(fbAuth(`${FB_URL}${path}`), res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+          function firebasePatch(path, value) {
+            return new Promise((resolve, reject) => {
+              const url = new URL(fbAuth(`${FB_URL}${path}`));
+              const body = JSON.stringify(value);
+              const req = https.request({
+                hostname: url.hostname, path: url.pathname + url.search, method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+              }, res => {
+                let d = '';
+                res.on('data', c => d += c);
+                res.on('end', () => {
+                  if (res.statusCode < 200 || res.statusCode >= 300) reject(new Error(`Write failed: HTTP ${res.statusCode} — ${d}`));
+                  else resolve(d);
+                });
+              });
+              req.on('error', reject);
+              req.write(body);
+              req.end();
+            });
+          }
+
+          // Exact same real DEF scoring math as calcDKPoints() in
+          // auto-scoring.yml, kept in sync with the already-fixed -2
+          // interception/fumble-lost values.
+          function calcDefPoints(stats) {
+            let pts = 0;
+            const breakdown = [];
+            function add(label, statValue, multiplier, formatStat) {
+              const val = parseFloat(statValue) || 0;
+              if (!val) return;
+              const contributed = Math.round(val * multiplier * 100) / 100;
+              pts += contributed;
+              breakdown.push({ label, stat: formatStat ? formatStat(val) : val, points: contributed });
+            }
+            add('Sack', stats.sacks, 1);
+            add('Interception', stats.defInt, 2);
+            add('Fumble Recovery', stats.fumbRec, 2);
+            add('Defensive/ST TD', stats.defTD, 6);
+            add('Safety', stats.safety, 2);
+            add('Blocked Kick', stats.blkKick, 2);
+            const pa = stats.ptsAllowed != null ? parseFloat(stats.ptsAllowed) : null;
+            if (pa !== null) {
+              let paBonus = 0, tierRange = '';
+              if      (pa === 0)  { paBonus = 10; tierRange = '0'; }
+              else if (pa <= 6)   { paBonus = 7;  tierRange = '1-6'; }
+              else if (pa <= 13)  { paBonus = 4;  tierRange = '7-13'; }
+              else if (pa <= 20)  { paBonus = 1;  tierRange = '14-20'; }
+              else if (pa <= 27)  { paBonus = 0;  tierRange = '21-27'; }
+              else if (pa <= 34)  { paBonus = -1; tierRange = '28-34'; }
+              else                { paBonus = -4; tierRange = '35+'; }
+              pts += paBonus;
+              breakdown.push({ label: `Points Allowed (${pa})`, stat: `${pa} pts allowed, ${tierRange} tier`, points: paBonus });
+            }
+            return { pts: Math.round(pts * 100) / 100, breakdown };
+          }
+
+          async function main() {
+            // Build a real, fresh team-abbreviation -> DEF-points map
+            // from only the real Week 1 games, never the stale 8/15 ones.
+            const defStatsByTeam = {};
+            for (const gameId of REAL_GAME_IDS) {
+              const gs = await fetchJson(`/gameStats/${SEASON}/${gameId}.json`).catch(() => null);
+              if (!gs || !gs.players) continue;
+              gs.players.forEach(p => {
+                if (p.pos === 'DEF' && p.name) {
+                  defStatsByTeam[p.name] = { pts: p.pts, breakdown: p.breakdown };
+                }
+              });
+            }
+            console.log('Real, fresh DEF scores found:', Object.keys(defStatsByTeam).map(t => `${t}=${defStatsByTeam[t].pts}`).join(', ') || '(none)');
+
+            const lineups = await fetchJson(`/leagues/${LEAGUE_ID}/lineups/${SEASON}/week${WEEK}.json`).catch(() => ({}));
+            const scores = await fetchJson(`/leagues/${LEAGUE_ID}/season/${SEASON}/${WEEK}.json`).catch(() => ({}));
+
+            let teamsChecked = 0, teamsCorrected = 0;
+            for (const [uid, lineup] of Object.entries(lineups || {})) {
+              if (!lineup || !lineup.slots) continue;
+              const scoreEntry = scores[uid];
+              if (!scoreEntry) continue;
+              if (scoreEntry.locked) { console.log(`⏭️  ${lineup.team || uid}: locked, skipping`); continue; }
+
+              let teamChanged = false;
+              let teamDelta = 0;
+              const newSlotPts = Object.assign({}, scoreEntry.slotPts);
+              const newSlotBreakdown = Object.assign({}, scoreEntry.slotBreakdown);
+
+              for (const [slotId, player] of Object.entries(lineup.slots)) {
+                if (!player || player.pos !== 'DEF') continue;
+                teamsChecked++;
+                const teamAbv = (player.name || player.team || '').toUpperCase();
+                const fresh = defStatsByTeam[teamAbv];
+                if (!fresh) continue; // no real stats for this team's DEF yet (game not started/found)
+
+                const storedPts = scoreEntry.slotPts ? scoreEntry.slotPts[slotId] : undefined;
+                if (storedPts === fresh.pts) continue; // already correct
+
+                const diff = Math.round((fresh.pts - (storedPts || 0)) * 100) / 100;
+                newSlotPts[slotId] = fresh.pts;
+                newSlotBreakdown[slotId] = fresh.breakdown;
+                teamDelta += diff;
+                teamChanged = true;
+                console.log(`  🔧 ${lineup.team || uid} / ${teamAbv} DEF: ${storedPts} -> ${fresh.pts}`);
+              }
+
+              if (teamChanged) {
+                const newScore = Math.round(((scoreEntry.score || 0) + teamDelta) * 100) / 100;
+                await firebasePatch(`/leagues/${LEAGUE_ID}/season/${SEASON}/${WEEK}/${uid}.json`, {
+                  score: newScore,
+                  slotPts: newSlotPts,
+                  slotBreakdown: newSlotBreakdown,
+                  updatedAt: Date.now()
+                });
+                teamsCorrected++;
+                console.log(`✅ ${lineup.team || uid}: total score ${scoreEntry.score} -> ${newScore}`);
+              }
+            }
+
+            console.log(`\nChecked ${teamsChecked} DEF slot(s) across the league, corrected ${teamsCorrected} team(s).`);
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
+
+      - name: Skipped - confirmation not provided
+        if: ${{ github.event.inputs.confirm != 'YES' }}
+        run: echo "Skipped — re-run with confirm=YES to actually apply the backfill."

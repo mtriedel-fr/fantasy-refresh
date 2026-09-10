@@ -424,7 +424,7 @@ jobs:
 
               for (const [slotId, player] of Object.entries(lineup.slots)) {
                 if (!player) continue;
-                let stats = playerStats[player.id] || playerStats[(player.name || '').toLowerCase()] || playerStats[stripNameSuffix((player.name || '').toLowerCase())];
+                let stats = playerStats[player.id] || playerStats[(player.name || '').toLowerCase()] || playerStats[stripNameSuffix((player.name || '').toLowerCase())] || playerStats[(player.name || '').toUpperCase()];
                 let result;
                 if (stats) {
                   result = calcDKPoints(stats, player.pos);
