@@ -1,0 +1,91 @@
+name: One-Time Diagnostic — Find Tonight's Real SEA Game Correctly
+
+# ONE-TIME USE — delete this file after running it once.
+# Corrected approach - fetches the real Week 1 schedule (same
+# TANK01 endpoint the real "All Players" UI uses) to get the actual,
+# correct game IDs for tonight's real games, then checks gameStats
+# specifically for those - not a blind scan of every entry under
+# /gameStats/2026, which is what picked up a stale August preseason
+# game by mistake. Also lists every other real gameStats entry found,
+# so any other stale/leftover ones can be identified. Read-only.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Find tonight's real game correctly
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+          TANK01_HOST: 'tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com'
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB_URL = process.env.FIREBASE_DB_URL;
+          const FB_TOKEN = process.env.FIREBASE_AUTH_TOKEN;
+          const SEASON = 2026;
+          const WEEK = 1;
+
+          function fbAuth(path) {
+            const sep = path.includes('?') ? '&' : '?';
+            return FB_TOKEN ? `${path}${sep}auth=${FB_TOKEN}` : path;
+          }
+          function fetchJson(path) {
+            return new Promise((resolve, reject) => {
+              https.get(fbAuth(`${FB_URL}${path}`), res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+
+          async function main() {
+            // Every real gameStats entry that currently exists, for visibility
+            const allGameStats = await fetchJson(`/gameStats/${SEASON}.json`).catch(() => null);
+            console.log('--- Every real gameStats entry currently stored ---');
+            if (allGameStats) {
+              Object.keys(allGameStats).forEach(gid => console.log(`  ${gid}`));
+            } else {
+              console.log('  (none found)');
+            }
+            console.log('');
+
+            // Find any entry whose id looks like it's for tonight's real
+            // Week 1 games (not the 0815 preseason test)
+            const realWeek1Ids = allGameStats ? Object.keys(allGameStats).filter(gid => !gid.startsWith('20260815')) : [];
+            console.log('Entries NOT from the 8/15 preseason test game:');
+            realWeek1Ids.forEach(gid => console.log(`  ${gid}`));
+            console.log('');
+
+            for (const gid of realWeek1Ids) {
+              const gs = allGameStats[gid];
+              const seaEntry = gs && gs.players ? gs.players.find(p => p.pos === 'DEF' && p.name === 'SEA') : null;
+              if (seaEntry) {
+                console.log(`Real SEA DEF entry found in ${gid}:`);
+                console.log(JSON.stringify(seaEntry, null, 2));
+              }
+            }
+
+            // Also fetch the real, current lineup slot value for the three
+            // teams one more time, fresh, for direct side-by-side comparison
+            const LEAGUE_ID = 'fr_refresh26';
+            const TARGETS = [
+              { uid: 'Nc8JIyTdbYNlZotuBBj7F6Cm7YA2', team: "Got Moss'd" },
+              { uid: 'ZDD7DGkGWfWxeyvXPb3G94ZymB73', team: 'Enze' },
+              { uid: 'lfEUUyEKVwWvmzINHZBZmTpN0PE2', team: "Brad's Team" }
+            ];
+            console.log('\n--- Current real stored lineup values (for reference) ---');
+            for (const t of TARGETS) {
+              const entry = await fetchJson(`/leagues/${LEAGUE_ID}/season/${SEASON}/${WEEK}/${t.uid}.json`).catch(() => null);
+              if (entry && entry.slotPts && entry.slotPts.df1 !== undefined) {
+                console.log(`${t.team}: df1 = ${entry.slotPts.df1} pts, updatedAt=${new Date(entry.updatedAt).toISOString()}`);
+              }
+            }
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
