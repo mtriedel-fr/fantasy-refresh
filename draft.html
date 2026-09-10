@@ -13,6 +13,8 @@
 <title>Fantasy Refresh — Draft</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20400%20400'><defs><linearGradient%20id='tg'%20x1='100%'%20y1='0%'%20x2='0%'%20y2='100%'><stop%20offset='0%'%20stop-color='%2300E5D4'/><stop%20offset='100%'%20stop-color='%2300E5D4'%20stop-opacity='0.6'/></linearGradient><linearGradient%20id='pg'%20x1='0%'%20y1='100%'%20x2='100%'%20y2='0%'><stop%20offset='0%'%20stop-color='%23FF5FA0'/><stop%20offset='100%'%20stop-color='%23FF5FA0'%20stop-opacity='0.6'/></linearGradient></defs><rect%20x='25'%20y='25'%20width='350'%20height='350'%20rx='70'%20fill='%23050808'/><g%20transform='translate(200,200)%20scale(3.79)%20translate(-475.5,-241.6)'><path%20fill='url(%23tg)'%20d='M504.547,265.443h-9.019a30.964,30.964,0,0,0-29.042-52.733,1.5,1.5,0,1,0,.792,2.894,27.955,27.955,0,0,1,25.512,48.253l0-10.169h-.011a1.493,1.493,0,0,0-2.985,0h0v13.255a1.5,1.5,0,0,0,1.5,1.5h13.256a1.5,1.5,0,1,0,0-3Z'/><path%20fill='url(%23pg)'%20d='M485.389,267.995a27.956,27.956,0,0,1-25.561-48.213l0,10.2h.015a1.491,1.491,0,0,0,2.978,0h.007V216.791a1.484,1.484,0,0,0-1.189-1.532l-.018-.005a1.533,1.533,0,0,0-.223-.022c-.024,0-.046-.007-.07-.007H448.071a1.5,1.5,0,0,0,0,3h8.995a30.963,30.963,0,0,0,29.115,52.664,1.5,1.5,0,0,0-.792-2.894Z'/></g></svg>">
   <link rel="apple-touch-icon" href="/icons/icon.svg">
+<circle cx='50' cy='50' r='50' fill='%23050808'/><!-- Top-right arc (teal) — from ~200deg to ~20deg clockwise --><path d='M 22 62 A 32 32 0 1 1 78 62' fill='none' stroke='%2300E5D4' stroke-width='9' stroke-linecap='round'/><!-- Teal arrowhead pointing right at top --><polygon points='78,50 68,44 72,58' fill='%2300E5D4'/><!-- Bottom arc (pink) — short return arc --><path d='M 78 62 A 32 32 0 0 1 22 62' fill='none' stroke='%23FF5FA0' stroke-width='9' stroke-linecap='round'/><!-- Pink arrowhead pointing left at bottom --><polygon points='22,50 32,44 28,58' fill='%23FF5FA0'/></svg>">
+<circle cx='50' cy='50' r='50' fill='%23050808'/><path d='M80 50 C80 28 66 14 50 14 C34 14 20 28 20 50' fill='none' stroke='%2300E5D4' stroke-width='7' stroke-linecap='round'/><line x1='50' y1='14' x2='42' y2='24' stroke='%2300E5D4' stroke-width='7' stroke-linecap='round'/><line x1='50' y1='14' x2='58' y2='24' stroke='%2300E5D4' stroke-width='7' stroke-linecap='round'/><path d='M20 50 C20 72 34 86 50 86 C66 86 80 72 80 50' fill='none' stroke='%23FF5FA0' stroke-width='7' stroke-linecap='round'/><line x1='50' y1='86' x2='42' y2='76' stroke='%23FF5FA0' stroke-width='7' stroke-linecap='round'/><line x1='50' y1='86' x2='58' y2='76' stroke='%23FF5FA0' stroke-width='7' stroke-linecap='round'/><line x1='35' y1='50' x2='65' y2='50' stroke='%23F0FAFA' stroke-width='2' stroke-linecap='round'/><line x1='46' y1='44' x2='46' y2='56' stroke='%23F0FAFA' stroke-width='2' stroke-linecap='round'/><line x1='54' y1='44' x2='54' y2='56' stroke='%23F0FAFA' stroke-width='2' stroke-linecap='round'/></svg>">
 <script src="league-context.js"></script>
 <script src="/js/auth.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
@@ -48,7 +50,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
 /* ── GAMES BAR ── */
 .games-bar{background:var(--hdr);border-bottom:2px solid var(--pk);padding:8px 16px;overflow-x:auto;display:flex;gap:8px;flex-shrink:0;scrollbar-width:none;}
 .games-bar::-webkit-scrollbar{display:none;}
-.game-chip{flex-shrink:0;padding:8px 12px 6px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:20px;font-family:var(--fd);font-size:13px;font-weight:700;color:var(--ink2);cursor:pointer;transition:all .15s;white-space:nowrap;min-width:100px;min-height:76px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;}
+.game-chip{flex-shrink:0;padding:5px 12px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:20px;font-family:var(--fd);font-size:12px;font-weight:700;color:var(--ink2);cursor:pointer;transition:all .15s;white-space:nowrap;}
 .game-chip:hover{border-color:var(--pk);color:var(--pk);}
 .game-chip.active{background:rgba(255,95,160,.15);border-color:var(--pk);color:var(--pk);}
 .game-chip.all{border-color:var(--bdr2);color:var(--ink3);}
@@ -104,7 +106,6 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
 .picker-header{padding:12px 20px;border-bottom:1px solid var(--bdr);background:var(--bg2);flex-shrink:0;display:flex;align-items:center;gap:12px;}
 .picker-slot-label{font-family:var(--fd);font-size:16px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;}
 .picker-game-filter{font-family:var(--fd);font-size:12px;color:var(--pk);background:rgba(255,95,160,.1);border:1px solid rgba(255,95,160,.3);padding:3px 10px;border-radius:12px;}
-.picker-game-info{font-family:var(--fd);font-size:12px;font-weight:700;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
 .picker-clear-btn{margin-left:auto;background:none;border:none;font-family:var(--fd);font-size:12px;color:var(--ink3);cursor:pointer;text-transform:uppercase;letter-spacing:.5px;padding:4px 8px;border-radius:6px;border:1px solid var(--bdr);}
 .picker-clear-btn:hover{color:var(--or);border-color:var(--or);}
 .picker-clear-btn.way-out{color:#fff;background:var(--pk);border-color:var(--pk);box-shadow:0 0 14px rgba(255,60,120,.7);animation:wayOutPulse 1.4s ease-in-out infinite;}
@@ -300,7 +301,6 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
     <div class="picker-header">
       <div class="picker-slot-label" id="picker-slot-label" style="color:var(--ink2)">All Players</div>
       <div class="picker-game-filter" id="picker-game-filter" style="display:none;"></div>
-      <div class="picker-game-info" id="picker-game-info" style="display:none;"></div>
       <button id="picker-close-btn" class="picker-clear-btn" onclick="closePicker()">✕ Close</button>
     </div>
     <!-- Games bar inside picker — mobile only -->
@@ -532,25 +532,6 @@ var STADIUM_TYPE = {
 function formatQuarterLabel(quarter){
   if(quarter == null || quarter === '') return 'Live';
   return /^\d+$/.test(String(quarter)) ? 'Q' + quarter : String(quarter);
-}
-
-// Real opponent + DvP rank lookup for a player's card. Empty string
-// (no badge at all) whenever no real data exists yet for this specific
-// position/opponent combination - always true during Week 1 by design,
-// confirmed directly with the user, since nflDvp itself is empty until
-// at least one week of real games has finished.
-function getDvpBadgeHtml(p){
-  if(!p.team || !p.pos || p.pos === 'FLEX') return '';
-  var game = schedule.find(function(g){ return g.home === p.team || g.away === p.team; });
-  if(!game) return '';
-  var opp = game.home === p.team ? game.away : game.home;
-  if(!opp || !nflDvp[opp] || !nflDvp[opp][p.pos] || nflDvp[opp][p.pos].rank == null) return '';
-  var rank = nflDvp[opp][p.pos].rank;
-  var bg, fg;
-  if(rank <= 10){      bg = '#EAF3DE'; fg = '#173404'; } // good matchup
-  else if(rank >= 23){ bg = '#FCEBEB'; fg = '#501313'; } // tough matchup
-  else {                bg = '#F1EFE8'; fg = '#2C2C2A'; } // mid-range
-  return '<span style="font-size:11px;font-weight:800;color:'+fg+';background:'+bg+';border-radius:10px;padding:2px 8px;margin-left:6px;">'+opp+': #'+rank+' vs '+p.pos+'</span>';
 }
 
 function draftStadiumIcon(teamAbbr){
@@ -805,42 +786,9 @@ function loadSalaries(){
       if(data && data.players && Object.keys(data.players).length){
         var flatBanner = document.getElementById('flat-sal-banner');
         if(flatBanner) flatBanner.style.display = 'none';
-        var rawPlayers = Object.values(data.players).filter(function(p){ return p && p.name && p.pos; });
-        // Real salary data never carries headshot (the salary-generation
-        // formula doesn't write it) - merge it in from the player pool,
-        // matched by id. A player successfully matched during salary
-        // generation already uses the pool's own id as its key, so this
-        // is a direct, exact lookup rather than a fuzzy name match.
-        // Players not in the pool (tank01-only, id prefixed "t01_")
-        // correctly have no headshot available either way.
-        // Strips common name suffixes before comparing, since Tank01
-        // (source of the real salary data) and Sleeper (source of the
-        // player pool) don't always format these the same way - one
-        // matched player showing up as "James Cook III" in one source
-        // and "James Cook" in the other would otherwise silently fail
-        // an exact match and lose its headshot.
-        function normalizeName(name){
-          return (name||'').toLowerCase().replace(/\s+(jr|sr|ii|iii|iv|v)\.?$/i, '').trim();
-        }
-        FR.fb.getPlayerPool().then(function(pool){
-          if(pool){
-            var nameMap = {};
-            Object.values(pool).forEach(function(poolP){
-              if(poolP && poolP.name) nameMap[normalizeName(poolP.name)] = poolP;
-            });
-            rawPlayers.forEach(function(p){
-              var poolP = nameMap[normalizeName(p.name)];
-              if(poolP && poolP.headshot) p.headshot = poolP.headshot;
-            });
-          }
-          allPlayers = rawPlayers;
-          renderPicker();
-          repriceLineup();
-        }).catch(function(){
-          allPlayers = rawPlayers;
-          renderPicker();
-          repriceLineup();
-        });
+        allPlayers = Object.values(data.players).filter(function(p){ return p && p.name && p.pos; });
+        renderPicker();
+        repriceLineup();   // saved lineup may have loaded first with stale snapshot prices
         return;
       }
       // Real salaries haven't been generated for this week yet — fall back
@@ -907,66 +855,19 @@ function isDraftLocked(){
 
 function showDraftLockPopup(){
   var msRemaining = DRAFT_LOCKED_UNTIL - Date.now();
-  var ONE_DAY_MS = 24*60*60*1000;
-  var withinLastDay = msRemaining <= ONE_DAY_MS;
-
-  var headline;
-  if(withinLastDay){
-    headline = '<span id="draft-lock-countdown"></span>';
-  } else {
-    var daysRemaining = Math.max(0, Math.ceil(msRemaining / ONE_DAY_MS));
-    var dayWord = daysRemaining === 1 ? 'day' : 'days';
-    headline = 'Drafting opens in ' + daysRemaining + ' ' + dayWord;
-  }
-
+  var daysRemaining = Math.max(0, Math.ceil(msRemaining / (24*60*60*1000)));
+  var dayWord = daysRemaining === 1 ? 'day' : 'days';
   var html = '<div id="draft-lock-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;">'
     + '<div style="background:var(--bg2);border-radius:16px;max-width:380px;width:100%;padding:28px 24px;text-align:center;">'
     + '<div style="font-size:36px;margin-bottom:8px;">🔒</div>'
-    + '<div id="draft-lock-headline" style="font-family:var(--fd);font-size:19px;font-weight:900;color:var(--ink);">' + headline + '</div>'
+    + '<div style="font-family:var(--fd);font-size:19px;font-weight:900;color:var(--ink);">Drafting opens in ' + daysRemaining + ' ' + dayWord + '</div>'
     + '<div style="font-family:var(--fd);font-size:13px;color:var(--ink3);margin-top:8px;line-height:1.5;">Player prices are still settling as real projections come in — drafting opens 1 day before the season kicks off. Feel free to look around and see where prices land.</div>'
-    + '<button onclick="closeDraftLockPopup()" style="width:100%;margin-top:20px;padding:12px;border-radius:10px;border:none;background:var(--pk);color:#fff;font-family:var(--fd);font-size:14px;font-weight:800;cursor:pointer;">Got it, just browsing</button>'
+    + '<button onclick="document.getElementById(\'draft-lock-overlay\').remove()" style="width:100%;margin-top:20px;padding:12px;border-radius:10px;border:none;background:var(--pk);color:#fff;font-family:var(--fd);font-size:14px;font-weight:800;cursor:pointer;">Got it, just browsing</button>'
     + '</div>'
     + '</div>';
   document.body.insertAdjacentHTML('beforeend', html);
-
-  if(withinLastDay){
-    tickDraftLockCountdown(); // paint immediately, don't wait a full second for the first frame
-    DRAFT_LOCK_COUNTDOWN_TIMER = setInterval(tickDraftLockCountdown, 1000);
-  }
-}
-
-// Ticks the live H:M:S countdown once per second. If the draft unlocks
-// while the popup is still open, stops ticking and switches to a clear
-// "drafting is open" state with a reload button, rather than counting
-// into negative numbers.
-var DRAFT_LOCK_COUNTDOWN_TIMER = null;
-function tickDraftLockCountdown(){
-  var el = document.getElementById('draft-lock-countdown');
-  if(!el){ clearInterval(DRAFT_LOCK_COUNTDOWN_TIMER); return; } // popup was dismissed elsewhere
-  var msRemaining = DRAFT_LOCKED_UNTIL - Date.now();
-
-  if(msRemaining <= 0){
-    clearInterval(DRAFT_LOCK_COUNTDOWN_TIMER);
-    var headlineEl = document.getElementById('draft-lock-headline');
-    if(headlineEl) headlineEl.textContent = '🎉 Drafting is now open!';
-    var btn = document.querySelector('#draft-lock-overlay button');
-    if(btn){ btn.textContent = 'Start Drafting'; btn.setAttribute('onclick', 'location.reload()'); }
-    return;
-  }
-
-  var h = Math.floor(msRemaining / (60*60*1000));
-  var m = Math.floor((msRemaining % (60*60*1000)) / (60*1000));
-  var s = Math.floor((msRemaining % (60*1000)) / 1000);
-  el.textContent = h + 'h ' + String(m).padStart(2,'0') + 'm ' + String(s).padStart(2,'0') + 's';
-}
-
-function closeDraftLockPopup(){
-  if(DRAFT_LOCK_COUNTDOWN_TIMER){ clearInterval(DRAFT_LOCK_COUNTDOWN_TIMER); DRAFT_LOCK_COUNTDOWN_TIMER = null; }
-  var overlay = document.getElementById('draft-lock-overlay');
-  if(overlay) overlay.remove();
 }
 var gameOdds    = {};
-var nflDvp      = {}; // real, cumulative points-allowed-vs-position rankings — empty until at least one week of real regular-season games has finished
 // teamLocks declared once, near loadLocks() below, where it belongs —
 // removed the redundant, earlier duplicate that used to live here.
 
@@ -1080,20 +981,6 @@ function loadSchedule(){
         renderRoster();
       }).catch(function(){});
 
-      // DvP (points allowed vs each position) — real, regular-season
-      // matchup data only, genuinely empty until at least one week of
-      // real games has finished (Week 1 always shows nothing, by
-      // design, confirmed with the user directly). Independent of the
-      // live-status fetch above — unrelated data, no reason to couple
-      // their timing. Re-renders the picker once this resolves so any
-      // already-open player list picks up the badge as soon as real
-      // data arrives.
-      if(!PS_MODE){
-        FR.fb.get('/nflDvp/' + FR.seasonKey()).then(function(d){
-          if(d && d.teams){ nflDvp = d.teams; renderPicker(); }
-        }).catch(function(){});
-      }
-
       // In preseason: re-filter player pool to only teams playing this week
       if(PS_MODE && allPlayers.length){
         filterPlayersToSchedule();
@@ -1149,55 +1036,6 @@ function loadSchedule(){
     });
 }
 
-// Shared game status/info computation, used by both the games-bar chip
-// (narrow, vertical stack) and the picker panel header (wide,
-// horizontal line) — returns structured data rather than HTML, so each
-// caller builds its own appropriately-shaped layout while staying
-// automatically in sync with the other, since there's only one real
-// source of truth for what a game's current status actually is.
-function getGameStatusInfo(g){
-  // Live/final status — keyed by either team, since both sides of the
-  // same game carry the same underlying status (myScore/oppScore are
-  // just flipped depending on which team you look up). Falls through
-  // to the normal day/time info below for any game that hasn't started
-  // yet, which is unaffected by any of this.
-  var liveInfo = (g.home && liveGameStatus[g.home]) || (g.away && liveGameStatus[g.away]) || null;
-  var info = { status: 'upcoming' };
-
-  if(liveInfo && liveInfo.liveStatusCode === 2){
-    var homeScore = (g.home && liveGameStatus[g.home]) ? liveGameStatus[g.home].myScore : liveInfo.oppScore;
-    var awayScore = (g.home && liveGameStatus[g.home]) ? liveGameStatus[g.home].oppScore : liveInfo.myScore;
-    info.status = 'final';
-    info.scoreLine = (typeof homeScore === 'number' && typeof awayScore === 'number') ? awayScore + '-' + homeScore : '';
-  } else if(liveInfo && liveInfo.liveStatusCode === 1){
-    var homeScoreL = (g.home && liveGameStatus[g.home]) ? liveGameStatus[g.home].myScore : liveInfo.oppScore;
-    var awayScoreL = (g.home && liveGameStatus[g.home]) ? liveGameStatus[g.home].oppScore : liveInfo.myScore;
-    info.status = 'live';
-    info.quarter = formatQuarterLabel(liveInfo.quarter);
-    info.clock = liveInfo.clock || '';
-    info.scoreLine = (typeof homeScoreL === 'number' && typeof awayScoreL === 'number') ? awayScoreL + '-' + homeScoreL : '';
-  } else if(g.time){
-    var d   = new Date(g.time);
-    var day = d.getDay();
-    var hr  = d.getHours();
-    var days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-    // MNF/SNF/TNF are specific, official NFL prime-time broadcast
-    // designations tied to the regular season — a preseason game
-    // landing on a Sunday evening isn't genuinely "SNF" just because
-    // the day/time coincide, since it's not part of that actual
-    // national broadcast slate. Preseason just shows the plain day.
-    if(!PS_MODE && day===1&&hr>=18){       info.dayLabel = 'MNF';
-    } else if(!PS_MODE && day===0&&hr>=19){ info.dayLabel = 'SNF';
-    } else if(!PS_MODE && day===4&&hr>=18){ info.dayLabel = 'TNF';
-    } else {                                info.dayLabel = days[day]; }
-    info.timeStr = d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
-    info.isIntl = !!g.international;
-    info.overUnder = (g.gameId && gameOdds[g.gameId] && gameOdds[g.gameId].overUnder) ? gameOdds[g.gameId].overUnder : null;
-    info.domeIcon = draftStadiumIcon(g.home) || null;
-  }
-  return info;
-}
-
 function buildGamesBar(games){
   var bar = document.getElementById('games-bar');
   var pickerBar = document.getElementById('picker-games-bar');
@@ -1230,39 +1068,73 @@ function buildGamesBar(games){
   games.forEach(function(g, i){
     var label = (g.away||'?') + ' @ ' + (g.home||'?');
     var sub   = '';
-    var info  = getGameStatusInfo(g);
+    // Live/final status — keyed by either team, since both sides of the
+    // same game carry the same underlying status (myScore/oppScore are
+    // just flipped depending on which team you look up). Falls through
+    // to the normal day/time sub-line below for any game that hasn't
+    // started yet, which is unaffected by any of this.
+    var liveInfo = (g.home && liveGameStatus[g.home]) || (g.away && liveGameStatus[g.away]) || null;
     var chipStyle = '';
     var labelColor = '';
-    if(info.status === 'final'){
+    if(liveInfo && liveInfo.liveStatusCode === 2){
+      // myScore/oppScore already line up correctly with home/away in
+      // the common case, since liveInfo is looked up via g.home first.
+      var homeScore = (g.home && liveGameStatus[g.home]) ? liveGameStatus[g.home].myScore : liveInfo.oppScore;
+      var awayScore = (g.home && liveGameStatus[g.home]) ? liveGameStatus[g.home].oppScore : liveInfo.myScore;
+      var finalScoreLine = (typeof homeScore === 'number' && typeof awayScore === 'number') ? ' ' + awayScore + '-' + homeScore : '';
       // Final — bold, filled pink chip. Dark text on top for contrast,
       // matching the same treatment already used for colored badges
       // elsewhere (a colored fill always pairs with a dark shade of the
       // same color for its text, never plain light text).
       chipStyle = 'background:#FF1A6E;';
       labelColor = '#4B1528';
-      sub = '<div style="font-size:10px;margin-top:2px;font-weight:800;color:#4B1528;">Final'+(info.scoreLine?' '+info.scoreLine:'')+'</div>';
-    } else if(info.status === 'live'){
+      sub = '<div style="font-size:9px;margin-top:2px;font-weight:800;color:#4B1528;">Final'+finalScoreLine+'</div>';
+    } else if(liveInfo && liveInfo.liveStatusCode === 1){
+      var homeScoreL = (g.home && liveGameStatus[g.home]) ? liveGameStatus[g.home].myScore : liveInfo.oppScore;
+      var awayScoreL = (g.home && liveGameStatus[g.home]) ? liveGameStatus[g.home].oppScore : liveInfo.myScore;
+      var q = formatQuarterLabel(liveInfo.quarter);
+      var clk = liveInfo.clock ? ' '+liveInfo.clock : '';
+      var liveScoreLine = (typeof homeScoreL === 'number' && typeof awayScoreL === 'number') ? ' · ' + awayScoreL + '-' + homeScoreL : '';
       // Live — bold, filled green chip, same treatment as final above.
       chipStyle = 'background:#5DCAA5;';
       labelColor = '#04342C';
-      sub = '<div style="font-size:10px;margin-top:2px;font-weight:800;color:#04342C;">'+info.quarter+(info.clock?' '+info.clock:'')+(info.scoreLine?' · '+info.scoreLine:'')+'</div>';
-    } else if(info.dayLabel){
-      var intlBadge = info.isIntl
-        ? '<div style="font-size:10px;font-weight:800;color:#FF9A3A;margin-top:1px;">INT&#39;L</div>' : '';
-      var ouBadge = info.overUnder
-        ? '<div style="font-size:10px;font-weight:800;color:#9B6DFF;margin-top:1px;">O/U '+info.overUnder+'</div>' : '';
+      sub = '<div style="font-size:9px;margin-top:2px;font-weight:800;color:#04342C;">'+q+clk+liveScoreLine+'</div>';
+    } else if(g.time){
+      var d        = new Date(g.time);
+      var day      = d.getDay();
+      var hr       = d.getHours();
+      var timeStr  = d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})+' ET';
+      var days     = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+      var dayLabel;
+      // MNF/SNF/TNF are specific, official NFL prime-time broadcast
+      // designations tied to the regular season — a preseason game
+      // landing on a Sunday evening isn't genuinely "SNF" just because
+      // the day/time coincide, since it's not part of that actual
+      // national broadcast slate. Preseason just shows the plain day.
+      if(!PS_MODE && day===1&&hr>=18){       dayLabel = 'MNF';
+      } else if(!PS_MODE && day===0&&hr>=19){ dayLabel = 'SNF';
+      } else if(!PS_MODE && day===4&&hr>=18){ dayLabel = 'TNF';
+      } else {                                dayLabel = days[day]; }
+      var intlBadge = g.international
+        ? '<div style="font-size:9px;font-weight:800;color:#FF9A3A;margin-top:1px;">INT&#39;L</div>' : '';
+      // O/U badge — look up by gameId
+      var ouBadge = '';
+      if(g.gameId && gameOdds[g.gameId] && gameOdds[g.gameId].overUnder){
+        ouBadge = '<div style="font-size:9px;font-weight:800;color:#9B6DFF;margin-top:1px;">O/U '+gameOdds[g.gameId].overUnder+'</div>';
+      }
       // Dome/weather-shielded badge — games bar shows the HOME team's
       // stadium type, since that's whose venue the game is actually played at.
-      var domeBadge = info.domeIcon
-        ? '<div style="font-size:10px;font-weight:800;color:var(--ink3);margin-top:1px;">'+info.domeIcon+' Dome</div>' : '';
-      sub = '<div style="font-size:10px;margin-top:2px;display:flex;gap:4px;justify-content:center;">'
-          + '<span style="color:var(--pk);font-weight:800;">'+info.dayLabel+'</span>'
-          + '<span style="color:var(--ink3);">'+info.timeStr+'</span>'
+      var domeBadge = draftStadiumIcon(g.home)
+        ? '<div style="font-size:9px;font-weight:800;color:var(--ink3);margin-top:1px;">'+draftStadiumIcon(g.home)+' Dome</div>' : '';
+      sub = '<div style="font-size:9px;margin-top:2px;display:flex;gap:4px;justify-content:center;">'
+          + '<span style="color:var(--pk);font-weight:800;">'+dayLabel+'</span>'
+          + '<span style="color:var(--ink3);">'+timeStr+'</span>'
           + '</div>'
           + intlBadge + ouBadge + domeBadge;
     }
     var labelHtml = labelColor ? '<span style="color:'+labelColor+';">'+label+'</span>' : label;
-    html += '<button class="game-chip" data-game="'+i+'" onclick="setGameFilter('+i+',this)" style="text-align:center;'+chipStyle+'">'+labelHtml+sub+'</button>';
+    var gameKey = normTeam(g.home||'') + '@' + normTeam(g.away||'');
+    html += '<button class="game-chip" data-game="'+gameKey+'" onclick="setGameFilter(\''+gameKey+'\',this)" style="text-align:center;padding:5px 12px;'+chipStyle+'">'+labelHtml+sub+'</button>';
   });
   bar.innerHTML = html;
   if(pickerBar) pickerBar.innerHTML = html;
@@ -1288,42 +1160,34 @@ function buildGamesBarFromPlayers(){
   var html = '<button class="game-chip all active" data-game="all" onclick="setGameFilter(null,this)">All Games</button>';
   games.forEach(function(g, i){
     var label = g.away ? g.away + ' @ ' + g.home : g.home;
-    html += '<button class="game-chip" data-game="'+i+'" onclick="setGameFilter('+i+',this)">'+label+'</button>';
+    var gameKey = normTeam(g.home||'') + '@' + normTeam(g.away||'');
+    html += '<button class="game-chip" data-game="'+gameKey+'" onclick="setGameFilter(\''+gameKey+'\',this)">'+label+'</button>';
   });
   if(bar) bar.innerHTML = html;
   if(pickerBar) pickerBar.innerHTML = html;
 }
 
-function setGameFilter(gameIdx, btn){
-  var key = gameIdx === null ? 'all' : String(gameIdx);
+function setGameFilter(gameKey, btn){
+  var key = gameKey === null ? 'all' : String(gameKey);
   document.querySelectorAll('.game-chip').forEach(function(b){
     b.classList.toggle('active', b.getAttribute('data-game') === key);
   });
-  activeGame = gameIdx === null ? null : (schedule[gameIdx] || null);
+  // Find by matching home@away identity, never by array position — the
+  // games-bar's own array can be sorted differently than schedule (e.g.
+  // final games pushed to the end), so the same numeric index can point
+  // to two different games in each. Confirmed as the direct cause of
+  // games "shifting" and the last game losing its players once any
+  // earlier game went final and got resorted to the end.
+  activeGame = gameKey === null ? null : (schedule.find(function(g){
+    return (normTeam(g.home||'') + '@' + normTeam(g.away||'')) === gameKey;
+  }) || null);
   activeGameTeamFilter = 'both'; // reset whenever the selected game changes
   var badge = document.getElementById('picker-game-filter');
-  var infoEl = document.getElementById('picker-game-info');
   if(activeGame){
     badge.textContent = activeGame.away + ' @ ' + activeGame.home;
     badge.style.display = 'inline-flex';
-
-    var info = getGameStatusInfo(activeGame);
-    var parts = [];
-    if(info.status === 'final'){
-      parts.push('<span style="color:#FF1A6E;">Final'+(info.scoreLine?' '+info.scoreLine:'')+'</span>');
-    } else if(info.status === 'live'){
-      parts.push('<span style="color:#3FAE8C;">'+info.quarter+(info.clock?' '+info.clock:'')+(info.scoreLine?' · '+info.scoreLine:'')+'</span>');
-    } else if(info.dayLabel){
-      parts.push('<span style="color:var(--pk);">'+info.dayLabel+'</span> <span style="color:var(--ink3);">'+info.timeStr+'</span>');
-      if(info.isIntl)    parts.push('<span style="color:#FF9A3A;">INT&#39;L</span>');
-      if(info.overUnder) parts.push('<span style="color:#9B6DFF;">O/U '+info.overUnder+'</span>');
-      if(info.domeIcon)  parts.push('<span style="color:var(--ink3);">'+info.domeIcon+' Dome</span>');
-    }
-    infoEl.innerHTML = parts.join(' <span style="color:var(--bdr2);">·</span> ');
-    infoEl.style.display = parts.length ? 'flex' : 'none';
   } else {
     badge.style.display = 'none';
-    infoEl.style.display = 'none';
   }
 
   if(activeGame){
@@ -1456,7 +1320,7 @@ function renderGamePreviewPickable(game){
       + playerPhotoOrBadge(p)
       + '<div class="p-info" onclick="openNews(\''+p.id+'\',event)" style="cursor:pointer;">'
       +   '<div class="p-name">'+p.name+(p.pos?' · '+p.pos:'')+(p.team&&p.pos!=='DEF'?' · '+p.team:'')+injBadge+'</div>'
-      +   '<div class="p-meta">'+(p.proj?p.proj+' proj':'')+getDvpBadgeHtml(p)+'</div>'
+      +   '<div class="p-meta">'+(p.proj?p.proj+' proj':'')+'</div>'
       + '</div>'
       + '<div class="p-sal">$'+(p.salary||0).toLocaleString()+'</div>'
       + '<button class="'+draftCls2+'" onclick="pickFromPreview(\''+p.id+'\')">' + draftLbl2 + '</button>'
@@ -1611,8 +1475,6 @@ function pickFromPreview(playerId){
   activeGame = null;
   var badge = document.getElementById('picker-game-filter');
   if(badge) badge.style.display = 'none';
-  var infoEl1 = document.getElementById('picker-game-info');
-  if(infoEl1) infoEl1.style.display = 'none';
 
   showToast(replaced ? (replaced+' replaced with '+p.name+' ✓') : (p.name+' → '+slot.label+' ✓'));
   closeGamePreviewAfterPick();
@@ -1633,8 +1495,6 @@ function closeGamePreviewAfterPick(){
   activeGame = null;
   var badge = document.getElementById('picker-game-filter');
   if(badge) badge.style.display = 'none';
-  var infoEl2 = document.getElementById('picker-game-info');
-  if(infoEl2) infoEl2.style.display = 'none';
   var gtt = document.getElementById('game-team-toggle');
   if(gtt){ gtt.style.display = 'none'; gtt.classList.add('hidden'); }
   activeSlot = null;
@@ -1847,8 +1707,6 @@ function closePicker(){
   });
   var badge = document.getElementById('picker-game-filter');
   if(badge) badge.style.display = 'none';
-  var infoEl3 = document.getElementById('picker-game-info');
-  if(infoEl3) infoEl3.style.display = 'none';
   var gtt = document.getElementById('game-team-toggle');
   if(gtt){ gtt.style.display = 'none'; gtt.classList.add('hidden'); }
   document.getElementById('picker-slot-label').textContent = 'All Players';
@@ -2018,7 +1876,7 @@ function renderPicker(){
       + playerPhotoOrBadge(p)
       + '<div class="p-info" onclick="openNews(\''+p.id+'\',event)" style="cursor:pointer;">'
       +   '<div class="p-name">'+p.name+(p.pos?' · '+p.pos:'')+(p.team&&p.pos!=='DEF'?' · '+p.team:'')+injBadge+(isElsewhere?' <span style="font-size:10px;color:var(--ink3)">(in lineup)</span>':'')+'</div>'
-      +   '<div class="p-meta">'+gameMeta+(p.proj?(gameMeta?' · ':'')+p.proj+' proj':'')+getDvpBadgeHtml(p)+'</div>'
+      +   '<div class="p-meta">'+gameMeta+(p.proj?(gameMeta?' · ':'')+p.proj+' proj':'')+'</div>'
       + '</div>'
       + '<div class="p-sal">$'+(p.salary||0).toLocaleString()+'</div>'
       + '<button class="'+draftCls+'" onclick="pickPlayer(\''+p.id+'\')">' + draftLabel + '</button>'
