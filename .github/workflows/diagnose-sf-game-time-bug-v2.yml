@@ -1,0 +1,74 @@
+name: One-Time Diagnostic — Find SF Game Time Bug V2
+
+# ONE-TIME USE — delete this file after running it once.
+# Corrected - the real schedule data isn't in Firebase at all. It's
+# fetched live from the real Cloudflare Worker endpoint (confirmed
+# directly from draft.html's loadSchedule()):
+#   WORKER + '/schedule?week=' + apiWeek + '&season=' + season + '&seasonType=' + seasonType
+# Hits that same real endpoint to get the actual live schedule data,
+# finds SF's raw time value, and simulates the exact same
+# new Date()/toLocaleTimeString() logic draft.html itself runs.
+# Read-only.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the real, live schedule endpoint for SF's game time
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const WORKER = 'https://fantasy-refresh-news.mtriedel.workers.dev';
+          const SEASON = 2026;
+          const WEEK = 1;
+          const SEASON_TYPE = 'Regular';
+
+          function fetchJson(url) {
+            return new Promise((resolve, reject) => {
+              https.get(url, res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(new Error('Parse failed: ' + data.slice(0,300))); } });
+              }).on('error', reject);
+            });
+          }
+
+          async function main() {
+            console.log('Current real time (UTC):', new Date().toISOString());
+            const url = `${WORKER}/schedule?week=${WEEK}&season=${SEASON}&seasonType=${SEASON_TYPE}`;
+            console.log('Fetching real, live schedule from:', url);
+            console.log('');
+
+            const data = await fetchJson(url).catch(e => { console.log('Fetch failed:', e.message); return null; });
+            if (!data || !data.games) { console.log('No games in response. Raw response:', JSON.stringify(data)); return; }
+
+            console.log(`Total real games returned: ${data.games.length}`);
+            const sfGame = data.games.find(g => g.home === 'SF' || g.away === 'SF');
+            if (!sfGame) {
+              console.log('No SF game found. All games:', data.games.map(g => `${g.away}@${g.home}`).join(', '));
+              return;
+            }
+
+            console.log('');
+            console.log('Real, raw SF game object:');
+            console.log(JSON.stringify(sfGame, null, 2));
+
+            if (sfGame.time) {
+              const raw = sfGame.time;
+              const d = new Date(raw);
+              console.log('');
+              console.log(`Raw g.time value: "${raw}"`);
+              console.log(`new Date(g.time) parses to (real UTC instant): ${d.toISOString()}`);
+              console.log(`  As real America/Chicago (CT): ${d.toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit',timeZone:'America/Chicago'})}`);
+              console.log(`  As real America/New_York (ET): ${d.toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit',timeZone:'America/New_York'})}`);
+              console.log(`  Same call with NO timeZone override (labeled "ET" by the app regardless of what this actually renders as): ${d.toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit'})}`);
+            } else {
+              console.log('sfGame has no .time field at all.');
+            }
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
