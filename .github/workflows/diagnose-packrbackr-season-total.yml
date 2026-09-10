@@ -1,0 +1,73 @@
+name: One-Time Diagnostic — Find PackrBackr Season Total Discrepancy
+
+# ONE-TIME USE — delete this file after running it once.
+# Checks every real key under /leagues/fr_refresh26/season/2026/, not
+# just "1" - getPlayerWeekData() sums across every key that exists
+# there. Looks specifically for PackrBackr's entries across all of
+# them to find whichever stale/leftover key is inflating their
+# season total (real Week 1: 7.8, displayed season total: 13.4).
+# Read-only, does not write anything.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Find the stale entry
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB_URL = process.env.FIREBASE_DB_URL;
+          const FB_TOKEN = process.env.FIREBASE_AUTH_TOKEN;
+          const LEAGUE_ID = 'fr_refresh26';
+          const SEASON = 2026;
+          const TEAM_NAME = 'PackrBackr';
+
+          function fbAuth(path) {
+            const sep = path.includes('?') ? '&' : '?';
+            return FB_TOKEN ? `${path}${sep}auth=${FB_TOKEN}` : path;
+          }
+          function fetchJson(path) {
+            return new Promise((resolve, reject) => {
+              https.get(fbAuth(`${FB_URL}${path}`), res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+
+          async function main() {
+            const season = await fetchJson(`/leagues/${LEAGUE_ID}/season/${SEASON}.json`).catch(() => null);
+            if (!season) { console.log('No season data found at all.'); return; }
+
+            const keys = Object.keys(season);
+            console.log(`Real keys under /leagues/${LEAGUE_ID}/season/${SEASON}/: ${keys.join(', ')}`);
+            console.log('');
+
+            let total = 0;
+            for (const key of keys) {
+              const val = season[key];
+              if (!Array.isArray(val)) {
+                console.log(`  [${key}]: not an array (${typeof val}) — skipped by the real client-side filter too (!isNaN(Number(k)) check), likely fine (e.g. "meta").`);
+                continue;
+              }
+              const numKey = Number(key);
+              const passesRealFilter = !isNaN(numKey) && val.length > 0;
+              const entry = val.find(e => e && typeof e.name === 'string' && e.name.toLowerCase() === TEAM_NAME.toLowerCase());
+              console.log(`  [${key}] (passes real client filter: ${passesRealFilter}, ${val.length} teams): PackrBackr entry = ${entry ? JSON.stringify({score: entry.score, uid: entry.uid, status: entry.status}) : '(none)'}`);
+              if (passesRealFilter && entry) total += entry.score;
+            }
+
+            console.log(`\nSum across every key that passes the real client-side filter: ${total}`);
+            console.log(`Reported "Season Total" on the page: 13.4`);
+            console.log(`Reported real Week 1 score: 7.8`);
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
