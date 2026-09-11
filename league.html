@@ -1931,6 +1931,7 @@ function startLivePolling(week){
         if(changed){
           seasonData[week] = entries;
           delete fullStandingsCache[String(week)]; // force a fresh rebuild, not the frozen first-computed snapshot
+          delete fullStandingsFetchInFlight[String(week)];
           boot(); // re-render standings
           showToast('Scores updated 📡');
         }
@@ -3124,6 +3125,7 @@ function renderCumHome(){
 }
 
 var fullStandingsCache = {}; // week -> full merged list (every real member, not just ones with a score entry)
+var fullStandingsFetchInFlight = {}; // week -> true while a fetch chain is already pending, to prevent multiple concurrent computeCumStandings() calls from racing each other and letting a slower, stale result overwrite a faster, correct one
 
 function computeCumStandings(){
   var entries = seasonData[String(currentWeek)] || [];
@@ -3131,6 +3133,17 @@ function computeCumStandings(){
 
   var weekKey = String(currentWeek);
   if(fullStandingsCache[weekKey] && fullStandingsCache[weekKey].length) return fullStandingsCache[weekKey];
+
+  // Guard against concurrent fetch chains — computeCumStandings() can
+  // legitimately get called more than once in quick succession while
+  // the cache is still empty (multiple sections of the page booting up
+  // at once). Without this, each call kicked off its own independent
+  // fetch, and whichever one happened to resolve LAST won — including a
+  // slower, redundant fallback fetch stomping over a faster, already-
+  // correct snapshot result. Confirmed as the direct cause of scores
+  // popping in correctly, then clearing shortly after.
+  if(fullStandingsFetchInFlight[weekKey]) return scored;
+  fullStandingsFetchInFlight[weekKey] = true;
 
   var ctx = FRAuth.getLeagueCtx();
   var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
@@ -3148,6 +3161,7 @@ function computeCumStandings(){
     .then(function(snapshot){
       if(snapshot && Array.isArray(snapshot.entries) && snapshot.entries.length){
         fullStandingsCache[weekKey] = snapshot.entries;
+        delete fullStandingsFetchInFlight[weekKey];
         if(String(currentWeek) === weekKey && typeof renderCumStandingsPage === 'function') renderCumStandingsPage(0);
         return;
       }
@@ -3192,7 +3206,10 @@ function computeCumStandings(){
     });
 
     fullStandingsCache[weekKey] = full;
+    delete fullStandingsFetchInFlight[weekKey];
     if(String(currentWeek) === weekKey && typeof renderCumStandingsPage === 'function') renderCumStandingsPage(0);
+  }).catch(function(){
+    delete fullStandingsFetchInFlight[weekKey];
   });
   }
 
