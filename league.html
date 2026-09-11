@@ -2746,20 +2746,21 @@ function exportDuesLineupReport(){
     var members = results[0] || {};
     var lineups = results[1] || {};
 
-    var rows = [['User Name', 'Team Name', 'Dues', 'Lineup — Week ' + wk]];
+    var rows = [['User Name', 'Email', 'Team Name', 'Dues', 'Lineup — Week ' + wk]];
     Object.keys(members).forEach(function(uid){
       var m = members[uid];
       if(!m || m.active === false) return; // inactive/removed members excluded, same as everywhere else in the app
       var userName = m.displayName || m.email || '(no name on file)';
+      var email = m.email || '';
       var teamName = m.teamName || '(no team name)';
       var paid = m.duesPaid ? 'Paid' : 'Not Paid';
       var hasLineup = !!(lineups[uid] && lineups[uid].slots); // same real check used everywhere else in the app
-      rows.push([userName, teamName, paid, hasLineup ? 'Submitted' : 'Not Submitted']);
+      rows.push([userName, email, teamName, paid, hasLineup ? 'Submitted' : 'Not Submitted']);
     });
 
     // Sorted by team name so it reads the same order as the standings/roster lists elsewhere in the app
     var header = rows.shift();
-    rows.sort(function(a, b){ return a[1].localeCompare(b[1]); });
+    rows.sort(function(a, b){ return a[2].localeCompare(b[2]); });
     rows.unshift(header);
 
     function csvCell(v){
