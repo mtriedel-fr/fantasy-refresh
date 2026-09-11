@@ -3130,7 +3130,7 @@ function computeCumStandings(){
   var scored = entries.slice().sort(function(a,b){ return b.score - a.score; });
 
   var weekKey = String(currentWeek);
-  if(fullStandingsCache[weekKey]) return fullStandingsCache[weekKey];
+  if(fullStandingsCache[weekKey] && fullStandingsCache[weekKey].length) return fullStandingsCache[weekKey];
 
   var ctx = FRAuth.getLeagueCtx();
   var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
