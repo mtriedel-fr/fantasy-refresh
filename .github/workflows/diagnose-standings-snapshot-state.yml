@@ -1,0 +1,81 @@
+name: One-Time Diagnostic — Check Standings Snapshot State
+
+# ONE-TIME USE — delete this file after running it once.
+# Checks the real, current state of the standings snapshot feature
+# built earlier tonight: does it exist at all (tells us whether the
+# auto-scoring.yml update has actually been deployed), what does it
+# currently contain, how fresh is it, and how does it compare to the
+# real, current raw score data. Read-only.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check standings snapshot vs raw score data
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB_URL = process.env.FIREBASE_DB_URL;
+          const FB_TOKEN = process.env.FIREBASE_AUTH_TOKEN;
+          const LEAGUE_ID = 'fr_refresh26';
+          const SEASON = 2026;
+          const WEEK = 1;
+
+          function fbAuth(path) {
+            const sep = path.includes('?') ? '&' : '?';
+            return FB_TOKEN ? `${path}${sep}auth=${FB_TOKEN}` : path;
+          }
+          function fetchJson(path) {
+            return new Promise((resolve, reject) => {
+              https.get(fbAuth(`${FB_URL}${path}`), res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+
+          async function main() {
+            console.log('Current real time:', new Date().toISOString());
+            console.log('');
+
+            const snapshot = await fetchJson(`/leagues/${LEAGUE_ID}/standings/${SEASON}/week${WEEK}.json`).catch(() => null);
+            if (!snapshot) {
+              console.log('❌ No standings snapshot exists at all at /leagues/fr_refresh26/standings/2026/week1.');
+              console.log('   This means the auto-scoring.yml standings-snapshot code has not run successfully yet -');
+              console.log('   either it was never deployed, or every run since deploy has hit the try/catch fallback.');
+            } else {
+              console.log(`✅ Snapshot exists. Written at: ${new Date(snapshot.updatedAt).toISOString()}`);
+              console.log(`   Age: ${Math.round((Date.now() - snapshot.updatedAt) / 60000)} minutes old`);
+              console.log(`   Entries: ${(snapshot.entries || []).length}`);
+              console.log('   Top 5 by rank:');
+              (snapshot.entries || []).slice(0, 5).forEach(e => {
+                console.log(`     #${e.rank} ${e.name}: score=${e.score} notSubmitted=${e.notSubmitted}`);
+              });
+              const allZero = (snapshot.entries || []).every(e => !e.score);
+              console.log(`   All scores zero in snapshot: ${allZero}`);
+            }
+
+            console.log('');
+            const rawScores = await fetchJson(`/leagues/${LEAGUE_ID}/season/${SEASON}/${WEEK}.json`).catch(() => null);
+            if (rawScores) {
+              const entries = Object.values(rawScores);
+              const nonZero = entries.filter(e => e && e.score);
+              console.log(`Real, raw score data: ${entries.length} entries, ${nonZero.length} with a nonzero score right now.`);
+              if (nonZero.length) {
+                const sample = nonZero[0];
+                console.log(`   Sample: team="${sample.team}" score=${sample.score} updatedAt=${sample.updatedAt ? new Date(sample.updatedAt).toISOString() : '(none)'}`);
+              }
+            } else {
+              console.log('No raw score data found either.');
+            }
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
