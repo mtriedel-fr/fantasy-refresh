@@ -550,6 +550,14 @@ jobs:
                 ownership[playerId] = Math.round((count / ownershipTeamCount) * 1000) / 10;
               }
               await firebasePut(`/leagues/${leagueId}/season/${SEASON}/${week}/ownership.json`, ownership);
+              // Separate, sibling write — the total team count this
+              // percentage was computed against. Written alongside rather
+              // than mixed into the ownership map itself, so nothing that
+              // already reads ownership[playerId] as a flat percentage
+              // needs to change. Lets the client show a real "X teams"
+              // count instead of reconstructing an approximation from the
+              // rounded percentage.
+              await firebasePut(`/leagues/${leagueId}/season/${SEASON}/${week}/ownershipMeta.json`, { totalTeams: ownershipTeamCount });
               console.log(`  📊 Wrote ownership % for ${Object.keys(ownership).length} players (${ownershipTeamCount} teams)`);
             }
 
