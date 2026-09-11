@@ -3241,7 +3241,7 @@ function renderCumStandingsPage(page){
     var isMe = myTeam && teamMatch(t.name, myTeam);
     var rosterId = 'cum-home-roster-' + page + '-' + i;
     var expandBtn = (t.uid && !t.notSubmitted)
-      ? '<button onclick="toggleStandingsRoster(\'' + t.name.replace(/'/g,"\\'") + '\',\'' + t.uid + '\',\'' + rosterId + '\')" style="background:none;border:none;cursor:pointer;font-size:15px;color:var(--ink3);padding:2px 4px;vertical-align:middle;" title="View roster">▾</button>'
+      ? '<button onclick="toggleStandingsRoster(\'' + t.name.replace(/'/g,"\\'") + '\',\'' + t.uid + '\',\'' + rosterId + '\')" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--ink3);padding:2px 4px;vertical-align:middle;display:inline-block;" title="View roster">▾</button>'
       : '';
     var scoreCell = t.notSubmitted
       ? '<span style="font-family:var(--fd);font-size:12px;font-style:italic;color:var(--ink3);">Roster Not Submitted</span>'
@@ -5255,7 +5255,7 @@ function renderStandings(sorted, prevRank, curMap, wkHighName){
     var teamUid = entry ? entry.uid : '';
     var rosterId = 'std-roster-' + i;
     var expandBtn = teamUid
-      ? '<button onclick="toggleStandingsRoster(\'' + t.name.replace(/'/g,"\\'") + '\',\'' + teamUid + '\',\'' + rosterId + '\')" style="background:none;border:none;cursor:pointer;font-size:15px;color:var(--ink3);padding:2px 4px;" title="View roster">▾</button>'
+      ? '<button onclick="toggleStandingsRoster(\'' + t.name.replace(/'/g,"\\'") + '\',\'' + teamUid + '\',\'' + rosterId + '\')" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--ink3);padding:2px 4px;vertical-align:middle;display:inline-block;" title="View roster">▾</button>'
       : '';
 
     return '<tr class="' + tierClass + divider + (isMe ? ' my-team' : '') + '">'
