@@ -1930,8 +1930,7 @@ function startLivePolling(week){
         });
         if(changed){
           seasonData[week] = entries;
-          delete fullStandingsCache[String(week)]; // force a fresh rebuild, not the frozen first-computed snapshot
-          delete fullStandingsFetchInFlight[String(week)];
+          refreshCumStandings(String(week)); // stale-while-revalidate — old data stays visible until the new fetch actually resolves, never a blank gap
           boot(); // re-render standings
           showToast('Scores updated 📡');
         }
@@ -3127,27 +3126,23 @@ function renderCumHome(){
 var fullStandingsCache = {}; // week -> full merged list (every real member, not just ones with a score entry)
 var fullStandingsFetchInFlight = {}; // week -> true while a fetch chain is already pending, to prevent multiple concurrent computeCumStandings() calls from racing each other and letting a slower, stale result overwrite a faster, correct one
 
-function computeCumStandings(){
-  var entries = seasonData[String(currentWeek)] || [];
-  var scored = entries.slice().sort(function(a,b){ return b.score - a.score; });
-
-  var weekKey = String(currentWeek);
-  if(fullStandingsCache[weekKey] && fullStandingsCache[weekKey].length) return fullStandingsCache[weekKey];
-
-  // Guard against concurrent fetch chains — computeCumStandings() can
-  // legitimately get called more than once in quick succession while
-  // the cache is still empty (multiple sections of the page booting up
-  // at once). Without this, each call kicked off its own independent
-  // fetch, and whichever one happened to resolve LAST won — including a
-  // slower, redundant fallback fetch stomping over a faster, already-
-  // correct snapshot result. Confirmed as the direct cause of scores
-  // popping in correctly, then clearing shortly after.
-  if(fullStandingsFetchInFlight[weekKey]) return scored;
+function refreshCumStandings(weekKey){
+  // Stale-while-revalidate — deliberately does NOT touch/clear
+  // fullStandingsCache[weekKey] until the new data is actually ready.
+  // Whatever was already cached (even if a little behind) stays fully
+  // visible the whole time a refresh is running, so the page never
+  // flashes to empty/countdown between "old data cleared" and "new
+  // data arrived." Confirmed as the real cause of standings popping in
+  // correctly and then clearing shortly after — the live-score-change
+  // handler used to delete the cache first, leaving a real gap.
+  if(fullStandingsFetchInFlight[weekKey]) return;
   fullStandingsFetchInFlight[weekKey] = true;
 
   var ctx = FRAuth.getLeagueCtx();
   var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
   var season = FR.seasonKey();
+  var entries = seasonData[weekKey] || [];
+  var scored = entries.slice().sort(function(a,b){ return b.score - a.score; });
 
   // Prefer the server-computed snapshot (written by auto-scoring.yml
   // right after each real scoring run) when it exists — same exact
@@ -3157,7 +3152,7 @@ function computeCumStandings(){
   // original client-side computation below if no snapshot exists yet
   // (e.g. an older week, or before the server has scored this week for
   // the first time) — nothing is lost, this is purely additive.
-  FR.fb.get('/leagues/' + leagueId + '/standings/' + season + '/week' + currentWeek)
+  FR.fb.get('/leagues/' + leagueId + '/standings/' + season + '/week' + weekKey)
     .then(function(snapshot){
       if(snapshot && Array.isArray(snapshot.entries) && snapshot.entries.length){
         fullStandingsCache[weekKey] = snapshot.entries;
@@ -3178,7 +3173,7 @@ function computeCumStandings(){
     // fetch() + FR.paths.url() instead, never FR.fb.get() with a
     // query string tacked on). This is the same full-lineup-fetch
     // pattern already proven correct elsewhere in this file.
-    FR.fb.get('/leagues/' + leagueId + '/lineups/' + season + '/week' + currentWeek).catch(function(){ return {}; })
+    FR.fb.get('/leagues/' + leagueId + '/lineups/' + season + '/week' + weekKey).catch(function(){ return {}; })
   ]).then(function(results){
     var members = results[0] || {};
     var lineups = results[1] || {};
@@ -3212,8 +3207,16 @@ function computeCumStandings(){
     delete fullStandingsFetchInFlight[weekKey];
   });
   }
+}
 
-  return scored; // fallback shown immediately while the full list loads
+function computeCumStandings(){
+  var weekKey = String(currentWeek);
+  if(fullStandingsCache[weekKey] && fullStandingsCache[weekKey].length) return fullStandingsCache[weekKey];
+
+  refreshCumStandings(weekKey);
+
+  var entries = seasonData[weekKey] || [];
+  return entries.slice().sort(function(a,b){ return b.score - a.score; }); // fallback shown immediately while the full list loads
 }
 
 function renderCumStandingsPage(page){
