@@ -61,23 +61,30 @@ jobs:
           // with real weekly projections (confirmed directly: the real
           // #1 QB one week landed 26.5% below the reference the old
           // multiplier was built around).
-          const TARGET_CEILING = { QB: 9400, RB: 10700, WR: 11300, TE: 7400, DEF: 5000 };
-
-          // Bends the price curve so it's no longer purely linear
-          // against projection — a player at, say, 60% of the real #1
-          // player's projection now costs meaningfully MORE than 60% of
-          // the ceiling, not exactly 60%. Confirmed directly against a
-          // real, reported "too easy to build a stacked roster"
-          // complaint: at exponent=1.0 (pure linear), a real 2-stud
-          // roster landed only $2,100 over the $60,000 cap — barely
-          // forcing any real choices. Tuned by feel through live play:
-          // 0.75 (that same real roster landed $7,400 over) felt too
-          // restrictive, 0.80 still too tough, moved to 0.85 — a
-          // gentler bend, still meaningfully tighter than pure linear.
-          // Easy to tune further from here.
-          const SALARY_EXPONENT = 0.85;
-          const SAL_MIN_DEFAULT = 4500; // raised from 3700 — see SALARY_METHODOLOGY.md "Floor recalibration" for why
-          const SAL_MAX_DEFAULT = 11300;
+          // Final, validated philosophy-driven model — replaces the old
+          // single flat ceiling + single shared exponent approach above.
+          // Confirmed via a real, two-full-roster side-by-side comparison:
+          // keeps RB/WR genuinely premium on AVERAGE across the whole
+          // pool (not just the top handful of stars, which the old
+          // approach's per-position-only ceiling didn't guarantee), while
+          // still requiring real, felt trade-offs to stack multiple
+          // stars. No artificial floor — MIN_SANITY is a sanity minimum
+          // only, never a chosen target; a real, low-projection player's
+          // price is a consequence of their real projection, not a fixed
+          // floor every deep-bench player alike gets pushed up to.
+          const TOP_ANCHOR_EXP = 0.6; // shared cross-position rate, calibrated off whichever position has the single highest real projection this week
+          const SHARED_CAP = 8600;   // QB, TE, DEF clamp
+          const RB_WR_MAX = 9100;    // RB, WR get their own, higher clamp — confirmed needed for real separation from TE specifically
+          const MIN_SANITY = 100;
+          const POSITIONS = {
+            QB:  { exp: 1.3,  premium: 1.0,   clamp: SHARED_CAP },
+            RB:  { exp: 0.55, premium: 1.058, clamp: RB_WR_MAX },
+            WR:  { exp: 0.55, premium: 1.12,  clamp: RB_WR_MAX },
+            TE:  { exp: 0.7,  premium: 1.21,  clamp: SHARED_CAP },
+            DEF: { exp: 0.6,  premium: 0.97,  clamp: SHARED_CAP }
+          };
+          const SAL_MIN_DEFAULT = 100;   // matches MIN_SANITY — the old $4,500 default was the artificial floor this whole redesign specifically removed
+          const SAL_MAX_DEFAULT = 9100;  // matches the highest real position clamp (RB/WR) — each position's own clamp above is what actually governs pricing; this is just an outer safety bound
           const SAL_ROUND = 100;
           const FLAT = { QB: 8500, RB: 6500, WR: 6000, TE: 5500, DEF: 5000 };
 
@@ -362,14 +369,32 @@ jobs:
             const nameMap = {};
             Object.values(poolPlayers || {}).forEach(p => { if (p && p.name) nameMap[normalizeNameForMatch(p.name)] = p; });
 
-            // Real, current top projection at each position this week —
-            // computed fresh every run so the formula can never drift
-            // out of sync with reality the way a hardcoded reference
-            // point did before.
+            // Real, current max projection PER POSITION this week — used
+            // to anchor each position's own top price. Computed fresh
+            // every run, same as before.
             const maxProjByPos = {};
             ['QB','RB','WR','TE','DEF'].forEach(pos => {
               const atPos = projPlayers.filter(p => p.pos === pos && p.proj > 0);
               maxProjByPos[pos] = atPos.length ? Math.max(...atPos.map(p => p.proj)) : 0;
+            });
+            // Real, current max projection ACROSS ALL POSITIONS this week
+            // — this is what actually calibrates the shared base rate the
+            // whole model anchors off of, per the validated formula.
+            const globalMaxProj = Math.max(...Object.values(maxProjByPos).filter(v => v > 0), 1);
+            const baseRate = SHARED_CAP / Math.pow(globalMaxProj, TOP_ANCHOR_EXP);
+
+            // Per-position multiplier, calibrated once per run so each
+            // position's own #1 player lands almost exactly on that
+            // position's real target (its own premium applied, clamped to
+            // its own ceiling) — same "recalibrated fresh every run"
+            // property the old formula had, just per-position now instead
+            // of a single shared exponent.
+            const multByPos = {};
+            Object.entries(POSITIONS).forEach(([pos, conf]) => {
+              if (!maxProjByPos[pos]) return;
+              let topAnchor = Math.pow(maxProjByPos[pos], TOP_ANCHOR_EXP) * baseRate * conf.premium;
+              topAnchor = Math.min(topAnchor, conf.clamp);
+              multByPos[pos] = topAnchor / Math.pow(maxProjByPos[pos], conf.exp);
             });
 
             const salaries = {};
@@ -377,38 +402,41 @@ jobs:
             const BACKUP_QB_SALARY = 3800; // floor for a QB with no real projection yet — covers both a genuine deep-bench backup and a suddenly-elevated starter (e.g. an injury replacement) whose projection just hasn't caught up to the depth chart change yet, so they're never mispriced at an unrealistically low number
 
             projPlayers.forEach(p => {
-              // Backup QBs specifically get a carve-out here: included with
-              // a flat, minimum price instead of being excluded from the
-              // pool entirely. This ONLY applies to QB — every other
-              // position's existing zero-proj exclusion below is completely
-              // untouched, so RB/WR/TE/DEF behavior can't be affected.
-              if (p.pos === 'QB' && (!p.proj || p.proj <= 0)) {
-                const poolP = nameMap[normalizeNameForMatch(p.name)];
-                const pid = poolP ? poolP.id : ('t01_' + p.id);
-                const inj = poolP ? (poolP.status || p.status || null) : (p.status || null);
-                if (inj === 'O' || inj === 'IR') return; // still exclude injured/IR backups, same standard as everyone else
-                salaries[pid] = { id: pid, name: p.name, pos: 'QB', team: p.team, proj: 0, salary: BACKUP_QB_SALARY, status: inj, tank01PlayerID: poolP ? poolP.tank01PlayerID : null, headshot: poolP ? poolP.headshot : null };
-                count++;
-                return;
-              }
-
               if (!p.proj || p.proj <= 0) return;
-              if (!['QB','RB','WR','TE','DEF'].includes(p.pos)) return;
+              if (!POSITIONS[p.pos]) return;
               const poolP = nameMap[normalizeNameForMatch(p.name)];
               const pid = poolP ? poolP.id : ('t01_' + p.id);
               const inj = poolP ? (poolP.status || p.status || null) : (p.status || null);
               if (inj === 'O' || inj === 'IR') return;
-              const maxProj = maxProjByPos[p.pos] || p.proj; // fallback: this player IS the max if something odd happened above
-              const ceiling = TARGET_CEILING[p.pos] || TARGET_CEILING.WR; // fallback, shouldn't hit given the position filter above
-              // Effective multiplier recalibrated every run so the real
-              // #1 player at this position lands on the target ceiling,
-              // then the same exponent curve applied to every other
-              // player at the position — see SALARY_METHODOLOGY.md
-              // "Round-up + exponent recalibration" for why.
-              const effectiveMult = ceiling / Math.pow(maxProj, SALARY_EXPONENT);
-              let sal = Math.ceil((Math.pow(p.proj, SALARY_EXPONENT) * effectiveMult) / SAL_ROUND) * SAL_ROUND;
-              sal = Math.max(min, Math.min(max, sal));
+              const conf = POSITIONS[p.pos];
+              const mult = multByPos[p.pos] || 0;
+              let sal = Math.ceil((Math.pow(p.proj, conf.exp) * mult) / SAL_ROUND) * SAL_ROUND;
+              sal = Math.max(MIN_SANITY, Math.min(conf.clamp, sal)); // each position's own real clamp — no artificial shared floor
+              sal = Math.max(min, Math.min(max, sal)); // outer safety bound from league settings, if ever configured
               salaries[pid] = { id: pid, name: p.name, pos: p.pos, team: p.team, proj: Math.round(p.proj*10)/10, salary: sal, status: inj, tank01PlayerID: poolP ? poolP.tank01PlayerID : null, headshot: poolP ? poolP.headshot : null };
+              count++;
+            });
+
+            // Backup QBs specifically: confirmed directly (real diagnostic
+            // run against the live projections feed) that a player with no
+            // meaningful role — the exact case this is meant to catch —
+            // isn't returned by the projections source AT ALL, not even
+            // with proj:0. That made the equivalent check previously
+            // placed inside the loop above dead code — it could never
+            // actually fire, since projPlayers never contains a
+            // zero-projection QB to trigger it. This second pass instead
+            // checks the real, full player pool (which does include every
+            // real QB, backups included) for anyone with no entry in
+            // salaries after the main loop above — the only way to
+            // actually catch someone the projections source doesn't list
+            // in the first place. ONLY applies to QB — every other
+            // position's existing exclusion is completely untouched.
+            Object.values(poolPlayers || {}).forEach(poolP => {
+              if (!poolP || poolP.pos !== 'QB') return;
+              if (salaries[poolP.id]) return; // already has a real projection-based price
+              const inj = poolP.status || null;
+              if (inj === 'O' || inj === 'IR') return; // still exclude injured/IR backups, same standard as everyone else
+              salaries[poolP.id] = { id: poolP.id, name: poolP.name, pos: 'QB', team: poolP.team, proj: 0, salary: BACKUP_QB_SALARY, status: inj, tank01PlayerID: poolP.tank01PlayerID || null, headshot: poolP.headshot || null };
               count++;
             });
             return { salaries, count };
