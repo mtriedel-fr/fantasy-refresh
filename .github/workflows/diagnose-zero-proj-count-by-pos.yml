@@ -1,0 +1,55 @@
+name: One-Time Diagnostic — Count Zero-Projection Players By Position
+
+# ONE-TIME USE — delete this file after running it once.
+# Checks the real, raw projections endpoint (same source
+# weekly-prep.yml itself uses) for Week 1, and counts how many real
+# players at each position have proj <= 0 or missing - the exact
+# population that currently gets excluded from the salary pool
+# entirely for every position except QB (which now has the new
+# $3,800 floor). Read-only.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Count zero-projection players by position
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const WORKER = 'https://fantasy-refresh-news.mtriedel.workers.dev';
+
+          function fetchJson(url) {
+            return new Promise((resolve, reject) => {
+              https.get(url, res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+
+          async function main() {
+            const url = `${WORKER}/projections?week=1&season=2026`;
+            const data = await fetchJson(url).catch(e => { console.log('Fetch failed:', e.message); return null; });
+            if (!data || !data.players) { console.log('No players in response.'); return; }
+
+            const players = data.players;
+            console.log(`Total real players in projections: ${players.length}`);
+            console.log('');
+
+            ['QB', 'RB', 'WR', 'TE', 'DEF'].forEach(pos => {
+              const atPos = players.filter(p => p.pos === pos);
+              const zeroProj = atPos.filter(p => !p.proj || p.proj <= 0);
+              const realProj = atPos.filter(p => p.proj > 0);
+              console.log(`${pos}: ${atPos.length} total, ${realProj.length} with real proj, ${zeroProj.length} at zero/missing proj (currently excluded${pos === 'QB' ? ' — but QB now gets the $3,800 floor instead' : ''})`);
+              if (zeroProj.length && zeroProj.length <= 15) {
+                console.log(`  Zero-proj ${pos}s: ${zeroProj.map(p => p.name).join(', ')}`);
+              }
+            });
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
