@@ -1,0 +1,88 @@
+name: One-Time Diagnostic — Confirm Test League Lineups Are Populated
+
+# ONE-TIME USE — delete this file after running it once.
+# Checks the real, current lineup state for both test leagues -
+# fr_test_full and fr_test_h2h - member counts, how many actually
+# have a real, submitted Week 1 lineup, and a sample of real lineup
+# contents to confirm they're genuinely populated with players, not
+# just an empty or malformed entry. Read-only.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check both test leagues' real lineup state
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB_URL = process.env.FIREBASE_DB_URL;
+          const FB_TOKEN = process.env.FIREBASE_AUTH_TOKEN;
+          const SEASON = 2026;
+          const WEEK = 1;
+          const LEAGUES = ['fr_test_full', 'fr_test_h2h'];
+
+          function fbAuth(path) {
+            const sep = path.includes('?') ? '&' : '?';
+            return FB_TOKEN ? `${path}${sep}auth=${FB_TOKEN}` : path;
+          }
+          function fetchJson(path) {
+            return new Promise((resolve, reject) => {
+              https.get(fbAuth(`${FB_URL}${path}`), res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+
+          async function checkLeague(leagueId) {
+            console.log(`\n========== ${leagueId} ==========`);
+            const members = await fetchJson(`/leagues/${leagueId}/members.json`).catch(() => null);
+            const memberCount = members ? Object.keys(members).length : 0;
+            console.log(`Real members: ${memberCount}`);
+
+            const lineups = await fetchJson(`/leagues/${leagueId}/lineups/${SEASON}/week${WEEK}.json`).catch(() => null);
+            if (!lineups) {
+              console.log(`❌ No lineup data found at all for Week ${WEEK}.`);
+              return;
+            }
+
+            const uids = Object.keys(lineups);
+            let withRealSlots = 0, emptyOrMalformed = 0;
+            let sample = null;
+
+            uids.forEach(uid => {
+              const l = lineups[uid];
+              const slotCount = l && l.slots ? Object.values(l.slots).filter(Boolean).length : 0;
+              if (slotCount > 0) {
+                withRealSlots++;
+                if (!sample) sample = { team: l.team || uid, slotCount, players: Object.values(l.slots).filter(Boolean).slice(0, 3).map(p => p.name) };
+              } else {
+                emptyOrMalformed++;
+              }
+            });
+
+            console.log(`Lineup entries found: ${uids.length}`);
+            console.log(`  With real, populated slots: ${withRealSlots}`);
+            console.log(`  Empty or malformed: ${emptyOrMalformed}`);
+            if (sample) {
+              console.log(`  Sample real lineup — "${sample.team}": ${sample.slotCount} slots, e.g. ${sample.players.join(', ')}...`);
+            } else {
+              console.log(`  ⚠️  No real, populated lineup found in this league at all.`);
+            }
+          }
+
+          async function main() {
+            for (const leagueId of LEAGUES) {
+              await checkLeague(leagueId);
+            }
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
