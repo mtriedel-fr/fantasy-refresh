@@ -1,0 +1,111 @@
+name: One-Time Fix — Force-Refresh Stale Standings Snapshot
+
+# ONE-TIME USE — delete this file after it runs successfully once.
+#
+# The standings snapshot only ever gets recomputed as part of
+# auto-scoring.yml's live-game scoring cycle - once a week's games
+# are all final, that workflow stops running, and the snapshot is
+# frozen at its last-ever value even if lineup data changes after
+# that point. Confirmed directly: 5 real members submitted/edited
+# their real lineup after the snapshot's last write, and it never
+# had a chance to reflect that. This recomputes it right now, using
+# the exact same real logic auto-scoring.yml itself uses.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type YES to force-refresh the Week 1 standings snapshot'
+        required: true
+        default: 'NO'
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Force-refresh the standings snapshot
+        if: ${{ github.event.inputs.confirm == 'YES' }}
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB_URL = process.env.FIREBASE_DB_URL;
+          const FB_TOKEN = process.env.FIREBASE_AUTH_TOKEN;
+          const LEAGUE_ID = 'fr_refresh26';
+          const SEASON = 2026;
+          const WEEK = 1;
+
+          function fbAuth(path) {
+            const sep = path.includes('?') ? '&' : '?';
+            return FB_TOKEN ? `${path}${sep}auth=${FB_TOKEN}` : path;
+          }
+          function fetchJson(path) {
+            return new Promise((resolve, reject) => {
+              https.get(fbAuth(`${FB_URL}${path}`), res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+          function firebasePut(path, value) {
+            return new Promise((resolve, reject) => {
+              const url = new URL(fbAuth(`${FB_URL}${path}`));
+              const body = JSON.stringify(value);
+              const req = https.request({
+                hostname: url.hostname, path: url.pathname + url.search, method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+              }, res => {
+                let d = '';
+                res.on('data', c => d += c);
+                res.on('end', () => {
+                  if (res.statusCode < 200 || res.statusCode >= 300) reject(new Error(`Write failed: HTTP ${res.statusCode} — ${d}`));
+                  else resolve(d);
+                });
+              });
+              req.on('error', reject);
+              req.write(body);
+              req.end();
+            });
+          }
+
+          async function main() {
+            const members = await fetchJson(`/leagues/${LEAGUE_ID}/members.json`).catch(() => ({})) || {};
+            const lineups = await fetchJson(`/leagues/${LEAGUE_ID}/lineups/${SEASON}/week${WEEK}.json`).catch(() => ({})) || {};
+            const scores = await fetchJson(`/leagues/${LEAGUE_ID}/season/${SEASON}/${WEEK}.json`).catch(() => ({})) || {};
+
+            const activeMembers = Object.entries(members).filter(([, m]) => m && m.teamName && m.active !== false);
+
+            const entries = activeMembers.map(([uid, m]) => {
+              const scored = scores[uid];
+              if (scored) {
+                return { uid, name: scored.team || m.teamName, score: scored.score, notSubmitted: false };
+              }
+              const hasLineup = !!(lineups[uid] && lineups[uid].slots && Object.values(lineups[uid].slots).filter(Boolean).length > 0);
+              return { uid, name: m.teamName, score: hasLineup ? 0 : null, notSubmitted: !hasLineup };
+            });
+
+            entries.sort((a, b) => {
+              if (a.notSubmitted && !b.notSubmitted) return 1;
+              if (!a.notSubmitted && b.notSubmitted) return -1;
+              return (b.score || 0) - (a.score || 0);
+            });
+            entries.forEach((e, i) => { e.rank = i + 1; });
+
+            await firebasePut(`/leagues/${LEAGUE_ID}/standings/${SEASON}/week${WEEK}.json`, {
+              entries,
+              updatedAt: Date.now()
+            });
+
+            const stillNotSubmitted = entries.filter(e => e.notSubmitted).length;
+            console.log(`✓ Refreshed. ${entries.length} entries written, ${stillNotSubmitted} genuinely not submitted right now.`);
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
+
+      - name: Skipped - confirmation not provided
+        if: ${{ github.event.inputs.confirm != 'YES' }}
+        run: echo "Skipped — re-run with confirm=YES to actually refresh the snapshot."
