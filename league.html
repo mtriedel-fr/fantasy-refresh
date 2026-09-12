@@ -3240,7 +3240,51 @@ function refreshCumStandings(weekKey){
   FR.fb.get('/leagues/' + leagueId + '/standings/' + season + '/week' + weekKey)
     .then(function(snapshot){
       if(snapshot && Array.isArray(snapshot.entries) && snapshot.entries.length){
-        fullStandingsCache[weekKey] = snapshot.entries;
+        var snapshotEntries = snapshot.entries;
+        var notSubmittedUids = snapshotEntries.filter(function(e){ return e.notSubmitted; }).map(function(e){ return e.uid; });
+
+        // Real-time correction — the actual structural fix. The snapshot
+        // only ever gets recomputed as a side effect of auto-scoring.yml's
+        // live-game runs, so once a week's games are all final, it's
+        // frozen even if someone submits or edits their lineup afterward.
+        // Confirmed directly: real members submitted real lineups well
+        // after the last snapshot write, and stayed shown as "not
+        // submitted" indefinitely with no mechanism to ever correct it.
+        // Every lineup write already stamps a real `submitted` timestamp
+        // (see saveLineupToFirebase() in draft.html) — cross-checking
+        // that against the snapshot's own updatedAt, for just the
+        // currently-flagged uids, catches this with one small, targeted
+        // fetch rather than re-fetching everyone's lineup every time.
+        if(notSubmittedUids.length && snapshot.updatedAt){
+          Promise.all(notSubmittedUids.map(function(uid){
+            return FR.fb.get('/leagues/' + leagueId + '/lineups/' + season + '/week' + weekKey + '/' + uid).catch(function(){ return null; });
+          })).then(function(lineupChecks){
+            var corrected = false;
+            lineupChecks.forEach(function(l, i){
+              var uid = notSubmittedUids[i];
+              var hasRealLineup = !!(l && l.slots && Object.values(l.slots).filter(Boolean).length > 0);
+              var submittedAfterSnapshot = !!(l && l.submitted && l.submitted > snapshot.updatedAt);
+              if(hasRealLineup && submittedAfterSnapshot){
+                var entry = snapshotEntries.find(function(e){ return e.uid === uid; });
+                if(entry){ entry.notSubmitted = false; entry.score = 0; corrected = true; }
+              }
+            });
+            if(corrected){
+              // Re-sort with the same real rules as everywhere else, since
+              // one or more entries just moved out of "not submitted."
+              snapshotEntries.sort(function(a,b){
+                if(a.notSubmitted && !b.notSubmitted) return 1;
+                if(!a.notSubmitted && b.notSubmitted) return -1;
+                return (b.score||0) - (a.score||0);
+              });
+              snapshotEntries.forEach(function(e,i){ e.rank = i+1; });
+              fullStandingsCache[weekKey] = snapshotEntries;
+              if(String(currentWeek) === weekKey && typeof renderCumStandingsPage === 'function') renderCumStandingsPage(0);
+            }
+          });
+        }
+
+        fullStandingsCache[weekKey] = snapshotEntries;
         delete fullStandingsFetchInFlight[weekKey];
         if(String(currentWeek) === weekKey && typeof renderCumStandingsPage === 'function') renderCumStandingsPage(0);
         return;
