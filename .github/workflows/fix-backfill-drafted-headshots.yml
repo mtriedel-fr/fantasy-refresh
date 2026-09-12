@@ -1,0 +1,140 @@
+name: One-Time Fix — Backfill Missing Headshots On Drafted Players
+
+# ONE-TIME USE — delete this file after it runs successfully once.
+#
+# The draft.html fix only affects the picker going forward - a player
+# already drafted before that fix was live has headshot:null baked
+# permanently into their stored lineup slot, since the roster view
+# reads that stored snapshot directly rather than looking anything up
+# live. This scans every real week that has lineup data, checks every
+# slot in every real team's lineup, and merges in a real headshot from
+# the player pool by name (same suffix-stripping normalization as the
+# client fix) wherever one is missing.
+#
+# Only writes a slot back if it actually gets a headshot added - a
+# slot that already has one, or one with no real match in the pool
+# (e.g. a player with no headshot on file at all), is left completely
+# untouched.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type YES to backfill missing headshots across all real lineups'
+        required: true
+        default: 'NO'
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Backfill missing headshots
+        if: ${{ github.event.inputs.confirm == 'YES' }}
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB_URL = process.env.FIREBASE_DB_URL;
+          const FB_TOKEN = process.env.FIREBASE_AUTH_TOKEN;
+          const LEAGUE_ID = 'fr_refresh26';
+          const SEASON = 2026;
+          const MAX_WEEK_TO_CHECK = 18;
+
+          function stripNameSuffix(name) {
+            return (name || '').replace(/\s+(jr|sr|ii|iii|iv|v)\.?$/i, '').trim();
+          }
+
+          function fbAuth(path) {
+            const sep = path.includes('?') ? '&' : '?';
+            return FB_TOKEN ? `${path}${sep}auth=${FB_TOKEN}` : path;
+          }
+          function fetchJson(path) {
+            return new Promise((resolve, reject) => {
+              https.get(fbAuth(`${FB_URL}${path}`), res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+          function firebasePatch(path, value) {
+            return new Promise((resolve, reject) => {
+              const url = new URL(fbAuth(`${FB_URL}${path}`));
+              const body = JSON.stringify(value);
+              const req = https.request({
+                hostname: url.hostname, path: url.pathname + url.search, method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+              }, res => {
+                let d = '';
+                res.on('data', c => d += c);
+                res.on('end', () => {
+                  if (res.statusCode < 200 || res.statusCode >= 300) reject(new Error(`Write failed: HTTP ${res.statusCode} — ${d}`));
+                  else resolve(d);
+                });
+              });
+              req.on('error', reject);
+              req.write(body);
+              req.end();
+            });
+          }
+
+          async function main() {
+            const pool = await fetchJson(`/playerPool/${SEASON}/players.json`).catch(() => null);
+            if (!pool) { console.log('No player pool found — cannot backfill.'); return; }
+
+            const byName = {};
+            Object.values(pool).forEach(p => {
+              if (p && p.name && p.headshot) byName[stripNameSuffix(p.name).toLowerCase()] = p.headshot;
+            });
+            console.log(`Real player pool loaded: ${Object.keys(byName).length} players with a real headshot on file.`);
+            console.log('');
+
+            let totalSlotsFixed = 0, totalTeamsTouched = 0;
+
+            for (let week = 1; week <= MAX_WEEK_TO_CHECK; week++) {
+              const lineups = await fetchJson(`/leagues/${LEAGUE_ID}/lineups/${SEASON}/week${week}.json`).catch(() => null);
+              if (!lineups) continue; // no lineups for this week at all — nothing to check
+
+              let weekSlotsFixed = 0, weekTeamsTouched = 0;
+
+              for (const [uid, lineup] of Object.entries(lineups)) {
+                if (!lineup || !lineup.slots) continue;
+
+                const updatedSlots = {};
+                for (const [slotId, player] of Object.entries(lineup.slots)) {
+                  if (!player || player.headshot) continue; // already has one, or empty slot — skip
+                  if (player.pos === 'DEF') continue; // defenses use a team logo, not a player headshot
+                  const hs = byName[stripNameSuffix(player.name || '').toLowerCase()];
+                  if (!hs) continue; // no real match in the pool — leave untouched rather than guess
+
+                  updatedSlots[slotId] = Object.assign({}, player, { headshot: hs });
+                  weekSlotsFixed++;
+                  console.log(`  🔧 Week ${week} / ${lineup.team || uid} / ${slotId}: added headshot for ${player.name}`);
+                }
+
+                if (Object.keys(updatedSlots).length) {
+                  const patchBody = {};
+                  Object.keys(updatedSlots).forEach(slotId => { patchBody['slots/' + slotId] = updatedSlots[slotId]; });
+                  await firebasePatch(`/leagues/${LEAGUE_ID}/lineups/${SEASON}/week${week}/${uid}.json`, patchBody);
+                  weekTeamsTouched++;
+                }
+              }
+
+              if (weekSlotsFixed) {
+                console.log(`Week ${week}: fixed ${weekSlotsFixed} slot(s) across ${weekTeamsTouched} team(s).`);
+                totalSlotsFixed += weekSlotsFixed;
+                totalTeamsTouched += weekTeamsTouched;
+              }
+            }
+
+            console.log(`\n✓ Done. Fixed ${totalSlotsFixed} slot(s) total across ${totalTeamsTouched} team-week combination(s).`);
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
+
+      - name: Skipped - confirmation not provided
+        if: ${{ github.event.inputs.confirm != 'YES' }}
+        run: echo "Skipped — re-run with confirm=YES to actually apply the backfill."
