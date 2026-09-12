@@ -1,0 +1,90 @@
+name: One-Time Diagnostic — Find Notsubmitted Mismatch
+
+# ONE-TIME USE — delete this file after running it once.
+# Compares the real, current standings snapshot's notSubmitted flags
+# against a fresh, real-time check of the actual lineup data, to
+# find exactly which members are affected and why: snapshot
+# staleness (submitted after the last scoring run), a UID mismatch
+# (lineup stored under a different id than the member record uses),
+# or something else. Read-only.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Compare snapshot vs real-time lineup state
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB_URL = process.env.FIREBASE_DB_URL;
+          const FB_TOKEN = process.env.FIREBASE_AUTH_TOKEN;
+          const LEAGUE_ID = 'fr_refresh26';
+          const SEASON = 2026;
+          const WEEK = 1;
+
+          function fbAuth(path) {
+            const sep = path.includes('?') ? '&' : '?';
+            return FB_TOKEN ? `${path}${sep}auth=${FB_TOKEN}` : path;
+          }
+          function fetchJson(path) {
+            return new Promise((resolve, reject) => {
+              https.get(fbAuth(`${FB_URL}${path}`), res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+
+          async function main() {
+            console.log('Current real time:', new Date().toISOString());
+
+            const snapshot = await fetchJson(`/leagues/${LEAGUE_ID}/standings/${SEASON}/week${WEEK}.json`).catch(() => null);
+            if (snapshot) {
+              console.log(`Snapshot last written: ${new Date(snapshot.updatedAt).toISOString()} (${Math.round((Date.now()-snapshot.updatedAt)/60000)} min ago)`);
+            } else {
+              console.log('No snapshot found.');
+            }
+
+            const members = await fetchJson(`/leagues/${LEAGUE_ID}/members.json`).catch(() => ({}));
+            const lineups = await fetchJson(`/leagues/${LEAGUE_ID}/lineups/${SEASON}/week${WEEK}.json`).catch(() => ({}));
+            const scores = await fetchJson(`/leagues/${LEAGUE_ID}/season/${SEASON}/${WEEK}.json`).catch(() => ({}));
+
+            console.log(`\nReal members: ${Object.keys(members || {}).length}`);
+            console.log(`Real lineup entries: ${Object.keys(lineups || {}).length}`);
+            console.log('');
+
+            const snapshotNotSubmitted = new Set(
+              (snapshot && snapshot.entries || []).filter(e => e.notSubmitted).map(e => e.uid)
+            );
+            console.log(`Snapshot currently marks ${snapshotNotSubmitted.size} member(s) as not submitted.`);
+            console.log('');
+
+            let mismatchCount = 0;
+            for (const uid of snapshotNotSubmitted) {
+              const m = members[uid];
+              const realLineup = lineups[uid];
+              const hasRealLineupNow = !!(realLineup && realLineup.slots && Object.values(realLineup.slots).filter(Boolean).length > 0);
+              if (hasRealLineupNow) {
+                mismatchCount++;
+                console.log(`⚠️  MISMATCH: ${m ? m.teamName : uid} (uid=${uid})`);
+                console.log(`    Snapshot says notSubmitted, but a real lineup EXISTS right now with ${Object.values(realLineup.slots).filter(Boolean).length} real slot(s).`);
+                console.log(`    Has a score entry: ${!!scores[uid]}`);
+              }
+            }
+
+            if (!mismatchCount) {
+              console.log('No mismatches found — every "not submitted" in the snapshot genuinely has no real lineup right now.');
+            } else {
+              console.log(`\n${mismatchCount} real mismatch(es) found — snapshot is stale relative to real, current lineup data.`);
+            }
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
