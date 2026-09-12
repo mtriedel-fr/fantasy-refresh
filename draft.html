@@ -765,6 +765,10 @@ function workerFetch(endpoint, params){
   var base = WORKER + (TEST_MODE ? '/test?endpoint=' + endpoint : '/' + endpoint + (params ? '?' + params : ''));
   return fetch(base).then(function(r){ return r.json(); });
 }
+function stripNameSuffix(name) {
+  return (name || '').replace(/\s+(jr|sr|ii|iii|iv|v)\.?$/i, '').trim();
+}
+
 function loadSalaries(){
   // Test mode — use mock HOF salaries from worker
   if(TEST_MODE){
@@ -789,6 +793,28 @@ function loadSalaries(){
         allPlayers = Object.values(data.players).filter(function(p){ return p && p.name && p.pos; });
         renderPicker();
         repriceLineup();   // saved lineup may have loaded first with stale snapshot prices
+
+        // Real salary generation never writes a headshot field — confirmed
+        // as the direct, recurring cause of headshots "falling off" once
+        // real Week N salaries replace flat testing prices. Merge them in
+        // from the player pool (which has them natively), by name, with
+        // the same suffix-stripping normalization used elsewhere in the
+        // app, so this can't quietly regress again the same way.
+        FR.fb.getPlayerPool().then(function(pool){
+          if(!pool) return;
+          var byName = {};
+          Object.values(pool).forEach(function(p){
+            if(p && p.name && p.headshot) byName[stripNameSuffix(p.name).toLowerCase()] = p.headshot;
+          });
+          var changed = false;
+          allPlayers.forEach(function(p){
+            if(!p.headshot){
+              var hs = byName[stripNameSuffix(p.name || '').toLowerCase()];
+              if(hs){ p.headshot = hs; changed = true; }
+            }
+          });
+          if(changed) renderPicker();
+        }).catch(function(){});
         return;
       }
       // Real salaries haven't been generated for this week yet — fall back
