@@ -1,0 +1,128 @@
+name: One-Time Fix — Sync Real Lineups Into Empty Test League Teams
+
+# ONE-TIME USE — delete this file after it runs successfully once.
+#
+# Confirmed directly: fr_test_full has 61 real members but only 11
+# with a real, populated Week 1 lineup; fr_test_h2h has 24 real
+# members, also only 11 populated. Both test leagues were cloned
+# from the real league (fr_refresh26) with the same real UIDs
+# preserved, so this copies each real member's actual Week 1 lineup
+# into the corresponding test league entry for that same UID -
+# wherever that member is part of the test league AND doesn't
+# already have a real, populated lineup there.
+#
+# Safety: only ever writes to a test league uid that currently has
+# NO real, populated slots (checked directly, right before writing)
+# - never touches or overwrites the 11 real lineups already there in
+# each league. Only copies for uids that are actually real members
+# of the target test league.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type YES to sync real lineups into empty test league teams'
+        required: true
+        default: 'NO'
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sync real lineups into empty test teams
+        if: ${{ github.event.inputs.confirm == 'YES' }}
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB_URL = process.env.FIREBASE_DB_URL;
+          const FB_TOKEN = process.env.FIREBASE_AUTH_TOKEN;
+          const SEASON = 2026;
+          const WEEK = 1;
+          const REAL_LEAGUE = 'fr_refresh26';
+          const TEST_LEAGUES = ['fr_test_full', 'fr_test_h2h'];
+
+          function fbAuth(path) {
+            const sep = path.includes('?') ? '&' : '?';
+            return FB_TOKEN ? `${path}${sep}auth=${FB_TOKEN}` : path;
+          }
+          function fetchJson(path) {
+            return new Promise((resolve, reject) => {
+              https.get(fbAuth(`${FB_URL}${path}`), res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+          function firebasePut(path, value) {
+            return new Promise((resolve, reject) => {
+              const url = new URL(fbAuth(`${FB_URL}${path}`));
+              const body = JSON.stringify(value);
+              const req = https.request({
+                hostname: url.hostname, path: url.pathname + url.search, method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+              }, res => {
+                let d = '';
+                res.on('data', c => d += c);
+                res.on('end', () => {
+                  if (res.statusCode < 200 || res.statusCode >= 300) reject(new Error(`Write failed: HTTP ${res.statusCode} — ${d}`));
+                  else resolve(d);
+                });
+              });
+              req.on('error', reject);
+              req.write(body);
+              req.end();
+            });
+          }
+
+          function hasRealSlots(lineup) {
+            return !!(lineup && lineup.slots && Object.values(lineup.slots).filter(Boolean).length > 0);
+          }
+
+          async function syncLeague(testLeagueId, realLineups) {
+            console.log(`\n========== ${testLeagueId} ==========`);
+            const members = await fetchJson(`/leagues/${testLeagueId}/members.json`).catch(() => null);
+            if (!members) { console.log('No real members found — skipping.'); return; }
+
+            const testLineups = await fetchJson(`/leagues/${testLeagueId}/lineups/${SEASON}/week${WEEK}.json`).catch(() => ({})) || {};
+
+            let synced = 0, skippedAlreadyPopulated = 0, skippedNoRealLineup = 0;
+
+            for (const uid of Object.keys(members)) {
+              if (hasRealSlots(testLineups[uid])) {
+                skippedAlreadyPopulated++;
+                continue; // already has a real, populated lineup — never overwrite
+              }
+              const realLineup = realLineups[uid];
+              if (!hasRealSlots(realLineup)) {
+                skippedNoRealLineup++;
+                continue; // this real member has no real lineup to copy either
+              }
+
+              await firebasePut(`/leagues/${testLeagueId}/lineups/${SEASON}/week${WEEK}/${uid}.json`, realLineup);
+              synced++;
+              console.log(`  ✅ Synced real lineup for uid=${uid} (${realLineup.team || 'unknown team'})`);
+            }
+
+            console.log(`\n${testLeagueId}: synced ${synced}, already populated (untouched) ${skippedAlreadyPopulated}, no real lineup to copy ${skippedNoRealLineup}`);
+          }
+
+          async function main() {
+            const realLineups = await fetchJson(`/leagues/${REAL_LEAGUE}/lineups/${SEASON}/week${WEEK}.json`).catch(() => null);
+            if (!realLineups) { console.log('No real lineups found for the real league — nothing to sync from.'); return; }
+            console.log(`Real league (${REAL_LEAGUE}) has ${Object.keys(realLineups).length} real lineup entries to sync from.`);
+
+            for (const testLeagueId of TEST_LEAGUES) {
+              await syncLeague(testLeagueId, realLineups);
+            }
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
+
+      - name: Skipped - confirmation not provided
+        if: ${{ github.event.inputs.confirm != 'YES' }}
+        run: echo "Skipped — re-run with confirm=YES to actually apply the sync."
