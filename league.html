@@ -3681,12 +3681,37 @@ function renderAll(){
 
   // Your score this week
   var myEntry = myTeam ? curEntries.find(function(e){ return teamMatch(e.name, myTeam); }) : null;
-  var myWkRank = myEntry ? sortedEntries.findIndex(function(e){ return e.name === myEntry.name; }) + 1 : null;
+  // Corrected lookup first (same real, unified data the standings page
+  // itself uses) — falls back to the old, raw calculation only while
+  // that data hasn't loaded yet. This drives the prominent header "Live
+  // Place"/"Current Place" number directly, so it's the most visible
+  // instance of the same gap fixed everywhere else tonight.
+  var myWkRank = myEntry ? (getCorrectedRank(myEntry.uid) || (sortedEntries.findIndex(function(e){ return e.name === myEntry.name; }) + 1)) : null;
 
-  // Your season movement (rank this week vs last week)
-  var mySeasonRankNow = myTeam ? sorted.findIndex(function(t){ return teamMatch(t.name, myTeam); }) + 1 : null;
-  var mySeasonRankPrev = myTeam && mySeasonRankNow ? (prevRank[sorted[mySeasonRankNow-1].name] || null) : null;
+  // Your season movement (rank this week vs last week). oldSortedIdx
+  // stays consistent with `sorted`'s own ordering specifically for the
+  // prevRank lookup below (which indexes INTO `sorted` by position) —
+  // the corrected rank can differ from that array's own indexing since
+  // it includes more real members, so using it to index `sorted`
+  // directly could silently point at the wrong team or throw on an
+  // out-of-range index. The DISPLAYED rank still uses the corrected
+  // value; only the internal index for this one lookup does not.
+  var oldSortedIdx = myTeam ? sorted.findIndex(function(t){ return teamMatch(t.name, myTeam); }) : -1;
+  var mySeasonRankNow = myTeam && myEntry ? (getCorrectedRank(myEntry.uid) || (oldSortedIdx + 1)) : null;
+  var mySeasonRankPrev = myTeam && oldSortedIdx >= 0 ? (prevRank[sorted[oldSortedIdx].name] || null) : null;
   var myMove = (mySeasonRankNow && mySeasonRankPrev) ? mySeasonRankPrev - mySeasonRankNow : null;
+
+  // Proactively warm the corrected standings data and re-run this whole
+  // render once it's ready, so the header's rank numbers self-correct
+  // automatically rather than only updating if something else happens to
+  // trigger a re-render later. Only registers when genuinely not ready
+  // yet — the callback fires synchronously if already warm, and this
+  // function is its own callback, so registering unconditionally would
+  // re-trigger itself forever.
+  var curWkKey = String(currentWeek);
+  if(!fullStandingsCache[curWkKey] || !fullStandingsCache[curWkKey].length){
+    onStandingsReady(curWkKey, function(){ renderAll(); });
+  }
 
   var el = function(id){ return document.getElementById(id); };
   if(el('s-myscore')){
