@@ -3242,47 +3242,74 @@ function refreshCumStandings(weekKey){
       if(snapshot && Array.isArray(snapshot.entries) && snapshot.entries.length){
         var snapshotEntries = snapshot.entries;
         var notSubmittedUids = snapshotEntries.filter(function(e){ return e.notSubmitted; }).map(function(e){ return e.uid; });
+        var snapshotUidSet = {};
+        snapshotEntries.forEach(function(e){ snapshotUidSet[e.uid] = true; });
 
-        // Real-time correction — the actual structural fix. The snapshot
-        // only ever gets recomputed as a side effect of auto-scoring.yml's
-        // live-game runs, so once a week's games are all final, it's
-        // frozen even if someone submits or edits their lineup afterward.
-        // Confirmed directly: real members submitted real lineups well
-        // after the last snapshot write, and stayed shown as "not
-        // submitted" indefinitely with no mechanism to ever correct it.
-        // Every lineup write already stamps a real `submitted` timestamp
-        // (see saveLineupToFirebase() in draft.html) — cross-checking
-        // that against the snapshot's own updatedAt, for just the
-        // currently-flagged uids, catches this with one small, targeted
-        // fetch rather than re-fetching everyone's lineup every time.
-        if(notSubmittedUids.length && snapshot.updatedAt){
-          Promise.all(notSubmittedUids.map(function(uid){
-            return FR.fb.get('/leagues/' + leagueId + '/lineups/' + season + '/week' + weekKey + '/' + uid).catch(function(){ return null; });
-          })).then(function(lineupChecks){
-            var corrected = false;
-            lineupChecks.forEach(function(l, i){
-              var uid = notSubmittedUids[i];
-              var hasRealLineup = !!(l && l.slots && Object.values(l.slots).filter(Boolean).length > 0);
-              var submittedAfterSnapshot = !!(l && l.submitted && l.submitted > snapshot.updatedAt);
-              if(hasRealLineup && submittedAfterSnapshot){
-                var entry = snapshotEntries.find(function(e){ return e.uid === uid; });
-                if(entry){ entry.notSubmitted = false; entry.score = 0; corrected = true; }
-              }
-            });
-            if(corrected){
-              // Re-sort with the same real rules as everywhere else, since
-              // one or more entries just moved out of "not submitted."
-              snapshotEntries.sort(function(a,b){
-                if(a.notSubmitted && !b.notSubmitted) return 1;
-                if(!a.notSubmitted && b.notSubmitted) return -1;
-                return (b.score||0) - (a.score||0);
-              });
-              snapshotEntries.forEach(function(e,i){ e.rank = i+1; });
-              fullStandingsCache[weekKey] = snapshotEntries;
-              if(String(currentWeek) === weekKey && typeof renderCumStandingsPage === 'function') renderCumStandingsPage(0);
+        // Two real, distinct gaps corrected together here, since both stem
+        // from the same root cause: the snapshot only ever gets recomputed
+        // as a side effect of auto-scoring.yml's live-game runs, so it's
+        // frozen the moment a week's games are all final — even if reality
+        // keeps changing after that (someone submits/edits a lineup, or a
+        // brand new member joins the league). Confirmed both directly:
+        // (1) real members submitted lineups after the snapshot's last
+        // write and stayed shown as "not submitted" indefinitely; (2) real,
+        // newly-added members were entirely absent from the entries array,
+        // not just mismarked — a real count of "77 members, only 73
+        // showing."
+        var membersPromise = FR.fb.get('/leagues/' + leagueId + '/members').catch(function(){ return null; });
+        var notSubmittedLineupsPromise = notSubmittedUids.length
+          ? Promise.all(notSubmittedUids.map(function(uid){
+              return FR.fb.get('/leagues/' + leagueId + '/lineups/' + season + '/week' + weekKey + '/' + uid).catch(function(){ return null; });
+            }))
+          : Promise.resolve([]);
+
+        Promise.all([membersPromise, notSubmittedLineupsPromise]).then(function(results){
+          var members = results[0], lineupChecks = results[1];
+          var corrected = false;
+
+          // Gap 1: entries the snapshot already has, but wrongly marked
+          // notSubmitted — every lineup write stamps a real `submitted`
+          // timestamp (see saveLineupToFirebase() in draft.html);
+          // cross-checking that against the snapshot's own updatedAt
+          // catches anyone who submitted after the snapshot was computed.
+          lineupChecks.forEach(function(l, i){
+            var uid = notSubmittedUids[i];
+            var hasRealLineup = !!(l && l.slots && Object.values(l.slots).filter(Boolean).length > 0);
+            var submittedAfterSnapshot = !!(l && l.submitted && snapshot.updatedAt && l.submitted > snapshot.updatedAt);
+            if(hasRealLineup && submittedAfterSnapshot){
+              var entry = snapshotEntries.find(function(e){ return e.uid === uid; });
+              if(entry){ entry.notSubmitted = false; entry.score = 0; corrected = true; }
             }
           });
-        }
+
+          // Gap 2: real, active members with NO entry at all in the
+          // snapshot — added in fresh, marked not-submitted by default
+          // (accurate for a brand new member; a real lineup for them would
+          // only exist if they joined AND drafted after the last snapshot,
+          // which the next real recomputation will pick up normally).
+          if(members){
+            Object.keys(members).forEach(function(uid){
+              var m = members[uid];
+              if(!m || !m.teamName || m.active === false) return;
+              if(snapshotUidSet[uid]) return; // already has an entry, handled above if needed
+              snapshotEntries.push({ uid: uid, name: m.teamName, score: null, notSubmitted: true });
+              corrected = true;
+            });
+          }
+
+          if(corrected){
+            // Re-sort with the same real rules as everywhere else, since
+            // entries just got corrected and/or added.
+            snapshotEntries.sort(function(a,b){
+              if(a.notSubmitted && !b.notSubmitted) return 1;
+              if(!a.notSubmitted && b.notSubmitted) return -1;
+              return (b.score||0) - (a.score||0);
+            });
+            snapshotEntries.forEach(function(e,i){ e.rank = i+1; });
+            fullStandingsCache[weekKey] = snapshotEntries;
+            if(String(currentWeek) === weekKey && typeof renderCumStandingsPage === 'function') renderCumStandingsPage(0);
+          }
+        });
 
         fullStandingsCache[weekKey] = snapshotEntries;
         delete fullStandingsFetchInFlight[weekKey];
@@ -3346,6 +3373,25 @@ function computeCumStandings(){
 
   var entries = seasonData[weekKey] || [];
   return entries.slice().sort(function(a,b){ return b.score - a.score; }); // fallback shown immediately while the full list loads
+}
+
+// Single, shared rank lookup — replaces three separate, independently
+// drifting calculations (My Season, the team-compare view, the share
+// card) that all summed scores by team NAME from raw seasonData. That
+// old pattern is exactly the PackrBackr-style double-counting bug from
+// earlier tonight (two uids sharing one name get summed together), and
+// also silently excluded any real member with no score entry yet. This
+// looks up the SAME corrected, uid-keyed data the main standings table
+// itself uses, so a rank shown anywhere in the app is always consistent
+// with what the standings page shows. Returns null if the corrected
+// data isn't loaded yet rather than silently falling back to the old,
+// less accurate math — callers should treat null as "not ready yet."
+function getCorrectedRank(uid, weekKey){
+  var wk = weekKey || String(currentWeek);
+  var list = fullStandingsCache[wk];
+  if(!list || !list.length) return null;
+  var entry = list.find(function(e){ return e.uid === uid; });
+  return entry ? entry.rank : null;
 }
 
 function renderCumStandingsPage(page){
@@ -5678,7 +5724,8 @@ function renderCompare(){
     var worst = scores.length ? Math.min.apply(null,scores) : 0;
     var allTotals = {};
     weeks.forEach(function(w){ (seasonData[String(w)]||[]).forEach(function(e){ allTotals[e.name]=(allTotals[e.name]||0)+e.score; }); });
-    var sznRank = Object.keys(allTotals).sort(function(a,b){ return allTotals[b]-allTotals[a]; }).indexOf(name)+1;
+    var curWeekData = weeklyData[weeklyData.length-1];
+    var sznRank = (curWeekData && getCorrectedRank(curWeekData.uid)) || Object.keys(allTotals).sort(function(a,b){ return allTotals[b]-allTotals[a]; }).indexOf(name)+1;
     var h2h = {};
     compareTeams.forEach(function(other){
       if(other === name) return;
@@ -6427,7 +6474,8 @@ function renderMySeasonInline(){
   weeks.forEach(function(w){
     (seasonData[String(w)]||[]).forEach(function(e){ allTotals[e.name] = (allTotals[e.name]||0) + e.score; });
   });
-  var sznRank = Object.keys(allTotals).sort(function(a,b){ return allTotals[b]-allTotals[a]; }).indexOf(resolvedName) + 1;
+  var myCurEntry = (seasonData[String(currentWeek)]||[]).find(function(e){ return teamMatch(e.name, resolvedName); });
+  var sznRank = (myCurEntry && getCorrectedRank(myCurEntry.uid)) || Object.keys(allTotals).sort(function(a,b){ return allTotals[b]-allTotals[a]; }).indexOf(resolvedName) + 1;
 
   var scoreChart = buildScoreChartInline(weekData);
   var rankChart = buildRankChartInline(weekData);
@@ -7294,7 +7342,7 @@ function openShareCard(){
   var wkRank = sorted.findIndex(function(e){ return e.name === myEntry.name; }) + 1;
   var totals = {};
   weeks.forEach(function(w){ (seasonData[String(w)]||[]).forEach(function(e){ totals[e.name]=(totals[e.name]||0)+e.score; }); });
-  var sznRank = Object.keys(totals).sort(function(a,b){ return totals[b]-totals[a]; }).indexOf(myEntry.name) + 1;
+  var sznRank = getCorrectedRank(myEntry.uid) || Object.keys(totals).sort(function(a,b){ return totals[b]-totals[a]; }).indexOf(myEntry.name) + 1;
   var medals = ['🥇','🥈','🥉'];
 
   document.getElementById('share-preview').innerHTML = '<div style="padding:30px;text-align:center;color:var(--ink3);font-family:var(--fd);font-size:13px;">Loading…</div>';
