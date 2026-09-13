@@ -816,7 +816,7 @@ body{padding-bottom:calc(76px + env(safe-area-inset-bottom));}
 .recap-box{background:#080E0E;border:2px solid var(--or);border-radius:16px;max-width:460px;width:100%;max-height:85vh;display:flex;flex-direction:column;color:var(--ink);overflow:hidden;}
 .recap-hdr{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--bdr);flex-shrink:0;}
 .recap-close-btn{background:transparent;border:1px solid var(--bdr2);color:var(--ink3);border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:14px;}
-.recap-body{overflow-y:auto;overflow-x:auto;padding:16px 20px 24px;}
+.recap-body{overflow-y:auto;padding:16px 20px 24px;}
 .recap-section{margin-bottom:16px;padding:14px;background:var(--bg2);border-radius:10px;border:1px solid var(--bdr);}
 .recap-section-label{font-family:var(--fd);font-size:10.5px;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;}
 .recap-section-main{font-family:var(--fd);font-size:16px;font-weight:800;color:var(--ink);}
@@ -1252,20 +1252,6 @@ setTimeout(function(){
           <button onclick="clearDuesMessage()" style="background:none;border:1px solid var(--bdr2);border-radius:8px;padding:8px 14px;color:var(--ink3);font-family:var(--fd);font-size:12px;cursor:pointer;text-transform:uppercase;">Clear</button>
           <span id="dues-message-status" style="font-family:var(--fd);font-size:11px;color:var(--or);text-transform:uppercase;letter-spacing:.5px;"></span>
         </div>
-      </div>
-    </div>
-
-    <!-- DUES + LINEUP EXPORT -->
-    <div style="margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid var(--bdr);">
-      <div class="csect">📤 Export Report</div>
-      <div style="font-size:12px;color:var(--ink3);margin-bottom:10px;line-height:1.5;">Downloads a CSV with every real member's name, team, dues status, and whether they've submitted a lineup for the week you pick below.</div>
-      <div class="wk-sel-row">
-        <label>Week</label>
-        <select id="export-wk"><option value="">Select week...</option></select>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px;margin-top:10px;">
-        <button onclick="exportDuesLineupReport()" style="background:linear-gradient(135deg,var(--or),var(--pk));border:none;border-radius:8px;padding:8px 18px;color:#050808;font-family:var(--fd);font-size:13px;font-weight:800;text-transform:uppercase;cursor:pointer;">↓ Download CSV</button>
-        <span id="export-status" style="font-family:var(--fd);font-size:11px;color:var(--or);text-transform:uppercase;letter-spacing:.5px;"></span>
       </div>
     </div>
     <div class="comm-cols">
@@ -1944,7 +1930,6 @@ function startLivePolling(week){
         });
         if(changed){
           seasonData[week] = entries;
-          refreshCumStandings(String(week)); // stale-while-revalidate — old data stays visible until the new fetch actually resolves, never a blank gap
           boot(); // re-render standings
           showToast('Scores updated 📡');
         }
@@ -2445,7 +2430,7 @@ function buildLineupPlayerCard(p, pts, hasStarted, gameMap, showNotStartedTag, s
     +   gameLine
     + '</div>'
     + '<div class="lineup-card-pts-stack">'
-    +   '<div class="lineup-card-pts" style="display:flex;align-items:center;justify-content:flex-end;gap:2px;">' + ptsLabel + (hasDropdownContent ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ink3)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>' : '') + '</div>'
+    +   '<div class="lineup-card-pts">' + ptsLabel + (hasDropdownContent ? ' <span style="font-size:10px;color:var(--ink3);">▾</span>' : '') + '</div>'
     +   (statusTag ? '<span class="lineup-card-status-tag' + statusClass + '">' + escapeHtmlFR(statusTag) + '</span>' : '')
     + '</div>'
     + '</div>'
@@ -2548,7 +2533,6 @@ function boot(){
   console.log('🔎 boot(): loadedWks=' + JSON.stringify(loadedWks) + ' → currentWeek=' + currentWeek);
   buildWeekBar();
   buildWeekSelect();
-  buildExportWeekSelect();
   // Previously forced tab-yourweek (This Week — a full-screen overlay tab)
   // to be the default visible content here, unconditionally, every time
   // boot() ran. That's what was actually causing the full-screen takeover
@@ -2714,76 +2698,6 @@ function buildWeekSelect(){
     o.textContent = 'Week ' + i + (hasData ? ' (update)' : '');
     sel.appendChild(o);
   }
-}
-
-function buildExportWeekSelect(){
-  var sel = document.getElementById('export-wk');
-  if(!sel) return;
-  sel.innerHTML = '';
-  for(var i = 1; i <= WEEKS; i++){
-    var o = document.createElement('option');
-    o.value = i;
-    o.textContent = 'Week ' + i;
-    if(i === currentWeek) o.selected = true; // default to the real current week — the one a commissioner is almost always checking
-    sel.appendChild(o);
-  }
-}
-
-function exportDuesLineupReport(){
-  var wk = document.getElementById('export-wk').value;
-  var statusEl = document.getElementById('export-status');
-  if(!wk){ statusEl.textContent = 'Pick a week first'; return; }
-
-  var ctx = FRAuth.getLeagueCtx();
-  var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
-  var season = FR.seasonKey();
-  statusEl.textContent = 'Building…';
-
-  Promise.all([
-    FR.fb.get('/leagues/' + leagueId + '/members').catch(function(){ return {}; }),
-    FR.fb.get('/leagues/' + leagueId + '/lineups/' + season + '/week' + wk).catch(function(){ return {}; })
-  ]).then(function(results){
-    var members = results[0] || {};
-    var lineups = results[1] || {};
-
-    var rows = [['User Name', 'Email', 'Team Name', 'Dues', 'Lineup — Week ' + wk]];
-    Object.keys(members).forEach(function(uid){
-      var m = members[uid];
-      if(!m || m.active === false) return; // inactive/removed members excluded, same as everywhere else in the app
-      var userName = m.displayName || m.email || '(no name on file)';
-      var email = m.email || '';
-      var teamName = m.teamName || '(no team name)';
-      var paid = m.duesPaid ? 'Paid' : 'Not Paid';
-      var hasLineup = !!(lineups[uid] && lineups[uid].slots); // same real check used everywhere else in the app
-      rows.push([userName, email, teamName, paid, hasLineup ? 'Submitted' : 'Not Submitted']);
-    });
-
-    // Sorted by team name so it reads the same order as the standings/roster lists elsewhere in the app
-    var header = rows.shift();
-    rows.sort(function(a, b){ return a[2].localeCompare(b[2]); });
-    rows.unshift(header);
-
-    function csvCell(v){
-      var s = String(v == null ? '' : v);
-      return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
-    }
-    var csv = rows.map(function(r){ return r.map(csvCell).join(','); }).join('\r\n');
-
-    var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement('a');
-    a.href = url;
-    a.download = 'week' + wk + '-dues-lineup-report.csv';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-
-    statusEl.textContent = rows.length - 1 + ' teams exported';
-    setTimeout(function(){ statusEl.textContent = ''; }, 4000);
-  }).catch(function(){
-    statusEl.textContent = 'Export failed — try again';
-  });
 }
 
 // ── RENDER ALL ─────────────────────────────────────────────────
@@ -3209,157 +3123,23 @@ function renderCumHome(){
 }
 
 var fullStandingsCache = {}; // week -> full merged list (every real member, not just ones with a score entry)
-var fullStandingsFetchInFlight = {}; // week -> true while a fetch chain is already pending, to prevent multiple concurrent computeCumStandings() calls from racing each other and letting a slower, stale result overwrite a faster, correct one
-var standingsReadyCallbacks = {}; // week -> array of callbacks waiting for the corrected data to be ready
 
-// Lets any widget that shows a rank (My Season, the compare view, a share
-// card) register interest in the corrected standings data and get called
-// back the moment it's actually ready — instead of rendering once, too
-// early, with the old fallback math, and never finding out once the real
-// data arrives. If the data is already ready, fires immediately. Confirmed
-// as the direct cause of a real, reported "My Season says #55, standings
-// says #49" split: My Season rendered before anything had ever warmed the
-// corrected cache, so getCorrectedRank() had nothing to find and silently
-// used the old, less accurate calculation instead.
-function onStandingsReady(weekKey, cb){
-  var wk = weekKey || String(currentWeek);
-  if(fullStandingsCache[wk] && fullStandingsCache[wk].length){ cb(); return; }
-  (standingsReadyCallbacks[wk] = standingsReadyCallbacks[wk] || []).push(cb);
-  refreshCumStandings(wk); // ensure a fetch is actually in flight — safe to call even if one already is
-}
-function fireStandingsReady(weekKey){
-  var cbs = standingsReadyCallbacks[weekKey];
-  if(!cbs || !cbs.length) return;
-  delete standingsReadyCallbacks[weekKey];
-  cbs.forEach(function(cb){ try{ cb(); }catch(e){} });
-}
+function computeCumStandings(){
+  var entries = seasonData[String(currentWeek)] || [];
+  var scored = entries.slice().sort(function(a,b){ return b.score - a.score; });
 
-function renderStandingsAndHeader(weekKey){
-  // Keeps the standings page and the header's rank numbers in sync on
-  // EVERY real update, not just the first one — confirmed as the direct
-  // cause of a real, persistent "standings says #59, header says #65"
-  // split during a live game. The one-time ready-callback registry
-  // (onStandingsReady) only ever notified the header once, the first
-  // time the cache went from empty to populated; it had no way to know
-  // when refreshCumStandings() later replaced that data with fresher
-  // live scores, so the header kept showing whatever it rendered on
-  // that first pass while the standings table kept moving forward.
-  if(String(currentWeek) === weekKey && typeof renderCumStandingsPage === 'function') renderCumStandingsPage(0);
-  if(String(currentWeek) === weekKey && typeof renderAll === 'function') renderAll();
-}
+  var weekKey = String(currentWeek);
+  if(fullStandingsCache[weekKey]) return fullStandingsCache[weekKey];
 
-function refreshCumStandings(weekKey){
-  // Stale-while-revalidate — deliberately does NOT touch/clear
-  // fullStandingsCache[weekKey] until the new data is actually ready.
-  // Whatever was already cached (even if a little behind) stays fully
-  // visible the whole time a refresh is running, so the page never
-  // flashes to empty/countdown between "old data cleared" and "new
-  // data arrived." Confirmed as the real cause of standings popping in
-  // correctly and then clearing shortly after — the live-score-change
-  // handler used to delete the cache first, leaving a real gap.
-  if(fullStandingsFetchInFlight[weekKey]) return;
-  fullStandingsFetchInFlight[weekKey] = true;
-
+  // Build the full list once, in the background — every real league
+  // member should always show here, not just the ones who happen to
+  // already have a score entry written. A member who hasn't submitted a
+  // lineup at all reads "Roster Not Submitted" instead of a score; one
+  // who has submitted but hasn't been scored yet (or scored 0) shows
+  // 0.00 like anyone else. Re-renders standings once this resolves.
   var ctx = FRAuth.getLeagueCtx();
   var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
   var season = FR.seasonKey();
-  var entries = seasonData[weekKey] || [];
-  var scored = entries.slice().sort(function(a,b){ return b.score - a.score; });
-
-  // Prefer the server-computed snapshot (written by auto-scoring.yml
-  // right after each real scoring run) when it exists — same exact
-  // logic, computed once server-side with the freshest data already in
-  // memory, instead of every client independently re-fetching members +
-  // lineups and recomputing this from scratch. Falls back to the
-  // original client-side computation below if no snapshot exists yet
-  // (e.g. an older week, or before the server has scored this week for
-  // the first time) — nothing is lost, this is purely additive.
-  FR.fb.get('/leagues/' + leagueId + '/standings/' + season + '/week' + weekKey)
-    .then(function(snapshot){
-      if(snapshot && Array.isArray(snapshot.entries) && snapshot.entries.length){
-        var snapshotEntries = snapshot.entries;
-        var notSubmittedUids = snapshotEntries.filter(function(e){ return e.notSubmitted; }).map(function(e){ return e.uid; });
-        var snapshotUidSet = {};
-        snapshotEntries.forEach(function(e){ snapshotUidSet[e.uid] = true; });
-
-        // Two real, distinct gaps corrected together here, since both stem
-        // from the same root cause: the snapshot only ever gets recomputed
-        // as a side effect of auto-scoring.yml's live-game runs, so it's
-        // frozen the moment a week's games are all final — even if reality
-        // keeps changing after that (someone submits/edits a lineup, or a
-        // brand new member joins the league). Confirmed both directly:
-        // (1) real members submitted lineups after the snapshot's last
-        // write and stayed shown as "not submitted" indefinitely; (2) real,
-        // newly-added members were entirely absent from the entries array,
-        // not just mismarked — a real count of "77 members, only 73
-        // showing."
-        var membersPromise = FR.fb.get('/leagues/' + leagueId + '/members').catch(function(){ return null; });
-        var notSubmittedLineupsPromise = notSubmittedUids.length
-          ? Promise.all(notSubmittedUids.map(function(uid){
-              return FR.fb.get('/leagues/' + leagueId + '/lineups/' + season + '/week' + weekKey + '/' + uid).catch(function(){ return null; });
-            }))
-          : Promise.resolve([]);
-
-        Promise.all([membersPromise, notSubmittedLineupsPromise]).then(function(results){
-          var members = results[0], lineupChecks = results[1];
-          var corrected = false;
-
-          // Gap 1: entries the snapshot already has, but wrongly marked
-          // notSubmitted — every lineup write stamps a real `submitted`
-          // timestamp (see saveLineupToFirebase() in draft.html);
-          // cross-checking that against the snapshot's own updatedAt
-          // catches anyone who submitted after the snapshot was computed.
-          lineupChecks.forEach(function(l, i){
-            var uid = notSubmittedUids[i];
-            var hasRealLineup = !!(l && l.slots && Object.values(l.slots).filter(Boolean).length > 0);
-            var submittedAfterSnapshot = !!(l && l.submitted && snapshot.updatedAt && l.submitted > snapshot.updatedAt);
-            if(hasRealLineup && submittedAfterSnapshot){
-              var entry = snapshotEntries.find(function(e){ return e.uid === uid; });
-              if(entry){ entry.notSubmitted = false; entry.score = 0; corrected = true; }
-            }
-          });
-
-          // Gap 2: real, active members with NO entry at all in the
-          // snapshot — added in fresh, marked not-submitted by default
-          // (accurate for a brand new member; a real lineup for them would
-          // only exist if they joined AND drafted after the last snapshot,
-          // which the next real recomputation will pick up normally).
-          if(members){
-            Object.keys(members).forEach(function(uid){
-              var m = members[uid];
-              if(!m || !m.teamName || m.active === false) return;
-              if(snapshotUidSet[uid]) return; // already has an entry, handled above if needed
-              snapshotEntries.push({ uid: uid, name: m.teamName, score: null, notSubmitted: true });
-              corrected = true;
-            });
-          }
-
-          if(corrected){
-            // Re-sort with the same real rules as everywhere else, since
-            // entries just got corrected and/or added.
-            snapshotEntries.sort(function(a,b){
-              if(a.notSubmitted && !b.notSubmitted) return 1;
-              if(!a.notSubmitted && b.notSubmitted) return -1;
-              return (b.score||0) - (a.score||0);
-            });
-            snapshotEntries.forEach(function(e,i){ e.rank = i+1; });
-            fullStandingsCache[weekKey] = snapshotEntries;
-            fireStandingsReady(weekKey);
-            renderStandingsAndHeader(weekKey);
-          }
-        });
-
-        fullStandingsCache[weekKey] = snapshotEntries;
-        delete fullStandingsFetchInFlight[weekKey];
-        fireStandingsReady(weekKey);
-        renderStandingsAndHeader(weekKey);
-        return;
-      }
-      fetchAndBuildStandingsClientSide();
-    })
-    .catch(function(){ fetchAndBuildStandingsClientSide(); });
-
-  function fetchAndBuildStandingsClientSide(){
   Promise.all([
     FR.fb.get('/leagues/' + leagueId + '/members').catch(function(){ return {}; }),
     // Full fetch, not a shallow query-string variant — FR.fb.get()
@@ -3368,7 +3148,7 @@ function refreshCumStandings(weekKey){
     // fetch() + FR.paths.url() instead, never FR.fb.get() with a
     // query string tacked on). This is the same full-lineup-fetch
     // pattern already proven correct elsewhere in this file.
-    FR.fb.get('/leagues/' + leagueId + '/lineups/' + season + '/week' + weekKey).catch(function(){ return {}; })
+    FR.fb.get('/leagues/' + leagueId + '/lineups/' + season + '/week' + currentWeek).catch(function(){ return {}; })
   ]).then(function(results){
     var members = results[0] || {};
     var lineups = results[1] || {};
@@ -3394,45 +3174,12 @@ function refreshCumStandings(weekKey){
       if(!a.notSubmitted && b.notSubmitted) return -1;
       return (b.score||0) - (a.score||0);
     });
-    full.forEach(function(e,i){ e.rank = i+1; }); // was missing entirely — getCorrectedRank() would find every entry but every rank would be undefined
 
     fullStandingsCache[weekKey] = full;
-    delete fullStandingsFetchInFlight[weekKey];
-    fireStandingsReady(weekKey);
-    renderStandingsAndHeader(weekKey);
-  }).catch(function(){
-    delete fullStandingsFetchInFlight[weekKey];
+    if(String(currentWeek) === weekKey && typeof renderCumStandingsPage === 'function') renderCumStandingsPage(0);
   });
-  }
-}
 
-function computeCumStandings(){
-  var weekKey = String(currentWeek);
-  if(fullStandingsCache[weekKey] && fullStandingsCache[weekKey].length) return fullStandingsCache[weekKey];
-
-  refreshCumStandings(weekKey);
-
-  var entries = seasonData[weekKey] || [];
-  return entries.slice().sort(function(a,b){ return b.score - a.score; }); // fallback shown immediately while the full list loads
-}
-
-// Single, shared rank lookup — replaces three separate, independently
-// drifting calculations (My Season, the team-compare view, the share
-// card) that all summed scores by team NAME from raw seasonData. That
-// old pattern is exactly the PackrBackr-style double-counting bug from
-// earlier tonight (two uids sharing one name get summed together), and
-// also silently excluded any real member with no score entry yet. This
-// looks up the SAME corrected, uid-keyed data the main standings table
-// itself uses, so a rank shown anywhere in the app is always consistent
-// with what the standings page shows. Returns null if the corrected
-// data isn't loaded yet rather than silently falling back to the old,
-// less accurate math — callers should treat null as "not ready yet."
-function getCorrectedRank(uid, weekKey){
-  var wk = weekKey || String(currentWeek);
-  var list = fullStandingsCache[wk];
-  if(!list || !list.length) return null;
-  var entry = list.find(function(e){ return e.uid === uid; });
-  return entry ? entry.rank : null;
+  return scored; // fallback shown immediately while the full list loads
 }
 
 function renderCumStandingsPage(page){
@@ -3457,7 +3204,7 @@ function renderCumStandingsPage(page){
     var isMe = myTeam && teamMatch(t.name, myTeam);
     var rosterId = 'cum-home-roster-' + page + '-' + i;
     var expandBtn = (t.uid && !t.notSubmitted)
-      ? '<button onclick="toggleStandingsRoster(\'' + t.name.replace(/'/g,"\\'") + '\',\'' + t.uid + '\',\'' + rosterId + '\')" style="background:none;border:none;cursor:pointer;color:var(--ink3);padding:2px 4px;vertical-align:middle;display:inline-flex;align-items:center;justify-content:center;" title="View roster"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></button>'
+      ? '<button onclick="toggleStandingsRoster(\'' + t.name.replace(/'/g,"\\'") + '\',\'' + t.uid + '\',\'' + rosterId + '\')" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--ink3);padding:2px 4px;vertical-align:middle;" title="View roster">▾</button>'
       : '';
     var scoreCell = t.notSubmitted
       ? '<span style="font-family:var(--fd);font-size:12px;font-style:italic;color:var(--ink3);">Roster Not Submitted</span>'
@@ -3695,37 +3442,12 @@ function renderAll(){
 
   // Your score this week
   var myEntry = myTeam ? curEntries.find(function(e){ return teamMatch(e.name, myTeam); }) : null;
-  // Corrected lookup first (same real, unified data the standings page
-  // itself uses) — falls back to the old, raw calculation only while
-  // that data hasn't loaded yet. This drives the prominent header "Live
-  // Place"/"Current Place" number directly, so it's the most visible
-  // instance of the same gap fixed everywhere else tonight.
-  var myWkRank = myEntry ? (getCorrectedRank(myEntry.uid) || (sortedEntries.findIndex(function(e){ return e.name === myEntry.name; }) + 1)) : null;
+  var myWkRank = myEntry ? sortedEntries.findIndex(function(e){ return e.name === myEntry.name; }) + 1 : null;
 
-  // Your season movement (rank this week vs last week). oldSortedIdx
-  // stays consistent with `sorted`'s own ordering specifically for the
-  // prevRank lookup below (which indexes INTO `sorted` by position) —
-  // the corrected rank can differ from that array's own indexing since
-  // it includes more real members, so using it to index `sorted`
-  // directly could silently point at the wrong team or throw on an
-  // out-of-range index. The DISPLAYED rank still uses the corrected
-  // value; only the internal index for this one lookup does not.
-  var oldSortedIdx = myTeam ? sorted.findIndex(function(t){ return teamMatch(t.name, myTeam); }) : -1;
-  var mySeasonRankNow = myTeam && myEntry ? (getCorrectedRank(myEntry.uid) || (oldSortedIdx + 1)) : null;
-  var mySeasonRankPrev = myTeam && oldSortedIdx >= 0 ? (prevRank[sorted[oldSortedIdx].name] || null) : null;
+  // Your season movement (rank this week vs last week)
+  var mySeasonRankNow = myTeam ? sorted.findIndex(function(t){ return teamMatch(t.name, myTeam); }) + 1 : null;
+  var mySeasonRankPrev = myTeam && mySeasonRankNow ? (prevRank[sorted[mySeasonRankNow-1].name] || null) : null;
   var myMove = (mySeasonRankNow && mySeasonRankPrev) ? mySeasonRankPrev - mySeasonRankNow : null;
-
-  // Proactively warm the corrected standings data and re-run this whole
-  // render once it's ready, so the header's rank numbers self-correct
-  // automatically rather than only updating if something else happens to
-  // trigger a re-render later. Only registers when genuinely not ready
-  // yet — the callback fires synchronously if already warm, and this
-  // function is its own callback, so registering unconditionally would
-  // re-trigger itself forever.
-  var curWkKey = String(currentWeek);
-  if(!fullStandingsCache[curWkKey] || !fullStandingsCache[curWkKey].length){
-    onStandingsReady(curWkKey, function(){ renderAll(); });
-  }
 
   var el = function(id){ return document.getElementById(id); };
   if(el('s-myscore')){
@@ -3904,27 +3626,9 @@ function renderGuillotine(){
   }
   var gsTeams = guillotineStatusCache[gsKey].teams || {};
 
-  // Real, total active membership — NOT week1.length, which only counts
-  // members who already have a submitted, scored Week 1 entry so far.
-  // Confirmed as the direct cause of "Started With" reading low (e.g.
-  // 57 instead of the real, full member count) early in the week while
-  // people are still drafting. Cached the same way guillotineStatus is,
-  // so this doesn't re-fetch on every render.
-  if(!memberCountCache[leagueId2]){
-    FR.fb.get('/leagues/' + leagueId2 + '/members')
-      .then(function(members){
-        var active = members ? Object.values(members).filter(function(m){ return m && m.teamName && m.active !== false; }) : [];
-        memberCountCache[leagueId2] = active.length;
-        renderGuillotine();
-      })
-      .catch(function(){ memberCountCache[leagueId2] = (seasonData[String(weeks[0])]||[]).length; renderGuillotine(); });
-    el.innerHTML = '<div style="padding:32px;text-align:center;color:var(--ink3);font-family:var(--fd);font-size:13px;">Loading…</div>';
-    return;
-  }
-
   // Get all teams from week 1
   var week1 = seasonData[String(weeks[0])] || [];
-  var totalTeams = memberCountCache[leagueId2];
+  var totalTeams = week1.length;
   var totalWeeks = WEEKS; // 18
   var schedule = buildElimSchedule(totalTeams, totalWeeks);
 
@@ -5496,7 +5200,7 @@ function renderStandings(sorted, prevRank, curMap, wkHighName){
     var teamUid = entry ? entry.uid : '';
     var rosterId = 'std-roster-' + i;
     var expandBtn = teamUid
-      ? '<button onclick="toggleStandingsRoster(\'' + t.name.replace(/'/g,"\\'") + '\',\'' + teamUid + '\',\'' + rosterId + '\')" style="background:none;border:none;cursor:pointer;color:var(--ink3);padding:2px 4px;vertical-align:middle;display:inline-flex;align-items:center;justify-content:center;" title="View roster"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></button>'
+      ? '<button onclick="toggleStandingsRoster(\'' + t.name.replace(/'/g,"\\'") + '\',\'' + teamUid + '\',\'' + rosterId + '\')" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--ink3);padding:2px 4px;" title="View roster">▾</button>'
       : '';
 
     return '<tr class="' + tierClass + divider + (isMe ? ' my-team' : '') + '">'
@@ -5790,8 +5494,7 @@ function renderCompare(){
     var worst = scores.length ? Math.min.apply(null,scores) : 0;
     var allTotals = {};
     weeks.forEach(function(w){ (seasonData[String(w)]||[]).forEach(function(e){ allTotals[e.name]=(allTotals[e.name]||0)+e.score; }); });
-    var curWeekData = weeklyData[weeklyData.length-1];
-    var sznRank = (curWeekData && getCorrectedRank(curWeekData.uid)) || Object.keys(allTotals).sort(function(a,b){ return allTotals[b]-allTotals[a]; }).indexOf(name)+1;
+    var sznRank = Object.keys(allTotals).sort(function(a,b){ return allTotals[b]-allTotals[a]; }).indexOf(name)+1;
     var h2h = {};
     compareTeams.forEach(function(other){
       if(other === name) return;
@@ -6510,20 +6213,6 @@ function renderMySeasonInline(){
   var el = document.getElementById('my-season-wrap');
   if(!el) return;
 
-  // Ensure the corrected standings data is actually being fetched, and
-  // re-render this widget once it's ready — without this, the rank shown
-  // here depended entirely on some OTHER part of the page happening to
-  // have already warmed fullStandingsCache first (e.g. visiting the
-  // standings tab). Confirmed as the direct cause of a real, reported
-  // "My Season says #55, standings says #49" split. Only registers when
-  // genuinely not ready yet — onStandingsReady() fires synchronously if
-  // the cache is already warm, and this function IS that callback, so
-  // registering unconditionally would re-trigger itself forever.
-  var wkKeyNow = String(currentWeek);
-  if(!fullStandingsCache[wkKeyNow] || !fullStandingsCache[wkKeyNow].length){
-    onStandingsReady(wkKeyNow, function(){ renderMySeasonInline(); });
-  }
-
   if(!myTeam){
     el.innerHTML = '<div class="myteam-empty"><div class="myteam-empty-icon">📅</div>'
       + '<div class="myteam-empty-title">No team set</div>'
@@ -6554,8 +6243,7 @@ function renderMySeasonInline(){
   weeks.forEach(function(w){
     (seasonData[String(w)]||[]).forEach(function(e){ allTotals[e.name] = (allTotals[e.name]||0) + e.score; });
   });
-  var myCurEntry = (seasonData[String(currentWeek)]||[]).find(function(e){ return teamMatch(e.name, resolvedName); });
-  var sznRank = (myCurEntry && getCorrectedRank(myCurEntry.uid)) || Object.keys(allTotals).sort(function(a,b){ return allTotals[b]-allTotals[a]; }).indexOf(resolvedName) + 1;
+  var sznRank = Object.keys(allTotals).sort(function(a,b){ return allTotals[b]-allTotals[a]; }).indexOf(resolvedName) + 1;
 
   var scoreChart = buildScoreChartInline(weekData);
   var rankChart = buildRankChartInline(weekData);
@@ -6798,7 +6486,6 @@ function ensureWeekLineups(week){
 }
 
 var guillotineStatusCache = {}; // seasonKey -> {teams: {name: {status, eliminatedWeek, score, noShow}}} — real, persisted elimination status, fetched separately since it's computed once on the backend rather than replayed client-side
-var memberCountCache = {}; // leagueId -> real, total active member count, used for Last One Standing's "Started With" instead of week1.length (which only counts members with an already-submitted, scored entry so far)
 var weekLineupsCache = {}; // week -> {uid: {slots: {...}}, ...} — real lineup data, fetched separately since score entries never actually carry a lineup field (see below)
 var weekLocksCache = {}; // week -> {team: true, ...} — which teams have locked (kicked off), used to gate player identity in Roster/Most Started until their game has actually started
 
@@ -7422,7 +7109,7 @@ function openShareCard(){
   var wkRank = sorted.findIndex(function(e){ return e.name === myEntry.name; }) + 1;
   var totals = {};
   weeks.forEach(function(w){ (seasonData[String(w)]||[]).forEach(function(e){ totals[e.name]=(totals[e.name]||0)+e.score; }); });
-  var sznRank = getCorrectedRank(myEntry.uid) || Object.keys(totals).sort(function(a,b){ return totals[b]-totals[a]; }).indexOf(myEntry.name) + 1;
+  var sznRank = Object.keys(totals).sort(function(a,b){ return totals[b]-totals[a]; }).indexOf(myEntry.name) + 1;
   var medals = ['🥇','🥈','🥉'];
 
   document.getElementById('share-preview').innerHTML = '<div style="padding:30px;text-align:center;color:var(--ink3);font-family:var(--fd);font-size:13px;">Loading…</div>';
@@ -7530,6 +7217,7 @@ var fbsAllPlayers = []; // cached once loaded, filtered client-side on position 
 var fbsActivePos = 'ALL';
 var fbsSortCol = 'pts'; // matches the initial sort already applied when the data loads
 var fbsSortDir = 'desc';
+var fbsSavedScrollY = 0; // real page scroll position saved on open, restored exactly on close
 
 function openFullBoardStats(){
   var w = currentWeek;
@@ -7537,7 +7225,17 @@ function openFullBoardStats(){
   document.getElementById('fbs-body').innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--ink3);font-size:13px;">Loading…</div>';
   document.getElementById('fbs-pos-filter').innerHTML = '';
   document.getElementById('fbs-overlay').classList.add('open');
-  document.body.style.overflow = 'hidden'; // locks the background page from scrolling while open — without this, a drag on any blank part of the modal falls through and scrolls the page behind it instead
+  // Locks the background page from scrolling while open. overflow:hidden
+  // alone is known to be unreliable for this on iOS Safari specifically —
+  // touch-drags can still scroll the page behind a modal even with it
+  // set. Pinning the body with position:fixed at its current scroll
+  // position is the standard, iOS-safe way to actually block it; the
+  // saved offset gets restored exactly on close so the page doesn't jump.
+  fbsSavedScrollY = window.scrollY || window.pageYOffset || 0;
+  document.body.style.position = 'fixed';
+  document.body.style.top = '-' + fbsSavedScrollY + 'px';
+  document.body.style.width = '100%';
+  document.body.style.overflow = 'hidden';
   fbsActivePos = 'ALL';
   fbsSortCol = 'pts';
   fbsSortDir = 'desc';
@@ -7558,9 +7256,6 @@ function openFullBoardStats(){
   // ownership; the data source already guarantees it.
   var ownershipPromise = leagueId
     ? FR.fb.get('/leagues/' + leagueId + '/season/' + season + '/' + w + '/ownership').catch(function(){ return null; })
-    : Promise.resolve(null);
-  var ownershipMetaPromise = leagueId
-    ? FR.fb.get('/leagues/' + leagueId + '/season/' + season + '/' + w + '/ownershipMeta').catch(function(){ return null; })
     : Promise.resolve(null);
   var salaryPromise = leagueId
     ? FR.fb.get(FR.paths.weekSalaries(w)).catch(function(){ return null; })
@@ -7584,14 +7279,12 @@ function openFullBoardStats(){
           return FR.fb.get('/gameStats/' + season + '/' + gid).catch(function(){ return null; });
         })),
         ownershipPromise,
-        ownershipMetaPromise,
         salaryPromise
       ]);
     })
     .then(function(combined){
       if(!combined) return; // no games case already handled above
-      var results = combined[0], ownership = combined[1] || {}, ownershipMeta = combined[2], salaryData = combined[3];
-      var totalOwnershipTeams = (ownershipMeta && typeof ownershipMeta.totalTeams === 'number') ? ownershipMeta.totalTeams : null;
+      var results = combined[0], ownership = combined[1] || {}, salaryData = combined[2];
 
       // Name → id map, built from salary data — the only place both a
       // real id and a matchable name exist together. Same normalization
@@ -7616,14 +7309,6 @@ function openFullBoardStats(){
       all.forEach(function(p){
         var id = nameToId[normalizeNameForFbs(p.name)];
         p.ownership = (id && typeof ownership[id] === 'number') ? ownership[id] : null;
-        // Real count, derived from the actual total teams this
-        // percentage was computed against — not reconstructed by
-        // guessing at a total, and not shown at all if that real total
-        // isn't available (an older week scored before ownershipMeta
-        // existed), rather than risk showing a wrong count.
-        p.ownershipTeams = (typeof p.ownership === 'number' && totalOwnershipTeams)
-          ? Math.round((p.ownership / 100) * totalOwnershipTeams)
-          : null;
       });
       all.sort(function(a, b){ return b.pts - a.pts; });
       fbsAllPlayers = all;
@@ -7648,7 +7333,11 @@ function normalizeNameForFbs(name){
 
 function closeFullBoardStats(){
   document.getElementById('fbs-overlay').classList.remove('open');
+  document.body.style.position = '';
+  document.body.style.top = '';
+  document.body.style.width = '';
   document.body.style.overflow = '';
+  window.scrollTo(0, fbsSavedScrollY || 0);
 }
 
 function renderFbsPosFilter(){
@@ -7718,15 +7407,16 @@ function renderFbsBody(){
   function headerCell(label, key, align){
     var active = fbsSortCol === key;
     var arrow = active ? (fbsSortDir === 'asc' ? ' ▲' : ' ▼') : '';
-    return '<th onclick="setFbsSort(\'' + key + '\')" style="text-align:' + align + ';padding:8px 6px;font-family:var(--fd);font-size:10px;font-weight:800;color:' + (active ? 'var(--pu)' : '#7AACAC') + ';text-transform:uppercase;letter-spacing:.4px;cursor:pointer;white-space:nowrap;user-select:none;">' + label + arrow + '</th>';
+    return '<th onclick="setFbsSort(\'' + key + '\')" style="text-align:' + align + ';padding:8px 12px;font-family:var(--fd);font-size:10px;font-weight:800;color:' + (active ? 'var(--pu)' : '#7AACAC') + ';text-transform:uppercase;letter-spacing:.4px;cursor:pointer;white-space:nowrap;user-select:none;">' + label + arrow + '</th>';
   }
 
   var html = '<table style="width:100%;border-collapse:collapse;">'
     + '<thead><tr style="border-bottom:1px solid #1A3A3A;position:sticky;top:0;background:#080E0E;">'
     +   headerCell('Player', 'name', 'left')
     +   headerCell('Pos', 'pos', 'center')
+    +   headerCell('Team', 'team', 'center')
     +   headerCell('Pts', 'pts', 'right')
-    +   headerCell('Own', 'ownership', 'right')
+    +   headerCell('Own%', 'ownership', 'right')
     + '</tr></thead><tbody>';
 
   html += list.map(function(p, i){
@@ -7741,17 +7431,15 @@ function renderFbsBody(){
         + '</div>';
     }).join('') : '';
     var rowClick = hasBreakdown ? ' onclick="var el=document.getElementById(\'' + breakdownId + '\');el.style.display=el.style.display===\'none\'?\'block\':\'none\';" style="cursor:pointer;"' : '';
-    var ownText = (typeof p.ownership !== 'number') ? '—'
-      : (typeof p.ownershipTeams === 'number')
-        ? p.ownershipTeams + ' (' + p.ownership.toFixed(1) + '%)'
-        : p.ownership.toFixed(1) + '%';
+    var ownText = (typeof p.ownership === 'number') ? p.ownership.toFixed(1) + '%' : '—';
     return '<tr' + rowClick + ' style="border-top:1px solid #1A3A3A;">'
-      + '<td style="padding:10px 6px;font-family:var(--fd);font-size:13px;font-weight:700;color:#E8F8F8;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtmlFR(p.name) + (p.team ? ' <span style="font-weight:600;color:#7AACAC;">(' + escapeHtmlFR(p.team) + ')</span>' : '') + '</td>'
-      + '<td style="padding:10px 4px;text-align:center;font-family:var(--fd);font-size:11px;color:#7AACAC;">' + escapeHtmlFR(p.pos || '') + '</td>'
-      + '<td style="padding:10px 4px;text-align:right;font-family:var(--fd);font-size:14px;font-weight:900;color:var(--or);">' + p.pts.toFixed(2) + '</td>'
-      + '<td style="padding:10px 6px;text-align:right;font-family:var(--fd);font-size:12px;font-weight:700;color:#B8DCDC;white-space:nowrap;">' + ownText + '</td>'
+      + '<td style="padding:10px 12px;font-family:var(--fd);font-size:14px;font-weight:700;color:#E8F8F8;">' + escapeHtmlFR(p.name) + '</td>'
+      + '<td style="padding:10px 12px;text-align:center;font-family:var(--fd);font-size:12px;color:#7AACAC;">' + escapeHtmlFR(p.pos || '') + '</td>'
+      + '<td style="padding:10px 12px;text-align:center;font-family:var(--fd);font-size:12px;color:#7AACAC;">' + escapeHtmlFR(p.team || '') + '</td>'
+      + '<td style="padding:10px 12px;text-align:right;font-family:var(--fd);font-size:15px;font-weight:900;color:var(--or);">' + p.pts.toFixed(2) + '</td>'
+      + '<td style="padding:10px 12px;text-align:right;font-family:var(--fd);font-size:13px;font-weight:700;color:#B8DCDC;">' + ownText + '</td>'
       + '</tr>'
-      + '<tr><td colspan="4" style="padding:0;"><div id="' + breakdownId + '" style="display:none;padding:6px 20px 12px;background:#0D1616;">' + rows + '</div></td></tr>';
+      + '<tr><td colspan="5" style="padding:0;"><div id="' + breakdownId + '" style="display:none;padding:6px 20px 12px;background:#0D1616;">' + rows + '</div></td></tr>';
   }).join('');
 
   html += '</tbody></table>';
