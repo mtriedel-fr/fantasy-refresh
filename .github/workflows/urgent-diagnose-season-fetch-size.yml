@@ -1,0 +1,70 @@
+name: URGENT Diagnostic — Check Full Season Fetch Size
+
+# ONE-TIME USE — delete this file after running it once.
+# Checks the real, actual response size of the full
+# /leagues/{id}/season/{seasonKey} fetch - the same one loadFromCloud()
+# uses on every page load, fetching every week at once. If this has
+# grown large enough (much more detailed per-player breakdowns now
+# that the live game has progressed further), it could be failing on
+# the client even though the underlying data itself is completely
+# healthy. Read-only.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check full season fetch size
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB_URL = process.env.FIREBASE_DB_URL;
+          const FB_TOKEN = process.env.FIREBASE_AUTH_TOKEN;
+          const LEAGUE_ID = 'fr_refresh26';
+          const SEASON = 2026;
+
+          function fbAuth(path) {
+            const sep = path.includes('?') ? '&' : '?';
+            return FB_TOKEN ? `${path}${sep}auth=${FB_TOKEN}` : path;
+          }
+          function fetchRaw(path) {
+            return new Promise((resolve, reject) => {
+              const start = Date.now();
+              https.get(fbAuth(`${FB_URL}${path}`), res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => resolve({ data, ms: Date.now() - start, status: res.statusCode }));
+              }).on('error', reject);
+            });
+          }
+
+          async function main() {
+            const path = `/leagues/${LEAGUE_ID}/season/${SEASON}.json`;
+            console.log(`Fetching the exact same path the client fetches: ${path}`);
+            const result = await fetchRaw(path);
+            const sizeBytes = Buffer.byteLength(result.data, 'utf8');
+            console.log(`Real response size: ${(sizeBytes / 1024 / 1024).toFixed(2)} MB (${sizeBytes} bytes)`);
+            console.log(`Real fetch time from this server: ${result.ms}ms`);
+            console.log(`HTTP status: ${result.status}`);
+
+            try {
+              const parsed = JSON.parse(result.data);
+              console.log(`Parses successfully. Top-level keys: ${Object.keys(parsed).join(', ')}`);
+              Object.keys(parsed).forEach(week => {
+                if (week === 'meta') return;
+                const weekData = parsed[week];
+                const count = weekData && typeof weekData === 'object' ? Object.keys(weekData).length : 0;
+                console.log(`  week ${week}: ${count} entries`);
+              });
+            } catch (e) {
+              console.log(`❌ FAILED TO PARSE as JSON: ${e.message}`);
+            }
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
