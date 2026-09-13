@@ -7537,6 +7537,7 @@ function openFullBoardStats(){
   document.getElementById('fbs-body').innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--ink3);font-size:13px;">Loading…</div>';
   document.getElementById('fbs-pos-filter').innerHTML = '';
   document.getElementById('fbs-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden'; // locks the background page from scrolling while open — without this, a drag on any blank part of the modal falls through and scrolls the page behind it instead
   fbsActivePos = 'ALL';
   fbsSortCol = 'pts';
   fbsSortDir = 'desc';
@@ -7647,6 +7648,7 @@ function normalizeNameForFbs(name){
 
 function closeFullBoardStats(){
   document.getElementById('fbs-overlay').classList.remove('open');
+  document.body.style.overflow = '';
 }
 
 function renderFbsPosFilter(){
