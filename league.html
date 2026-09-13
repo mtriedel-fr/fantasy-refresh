@@ -3210,6 +3210,29 @@ function renderCumHome(){
 
 var fullStandingsCache = {}; // week -> full merged list (every real member, not just ones with a score entry)
 var fullStandingsFetchInFlight = {}; // week -> true while a fetch chain is already pending, to prevent multiple concurrent computeCumStandings() calls from racing each other and letting a slower, stale result overwrite a faster, correct one
+var standingsReadyCallbacks = {}; // week -> array of callbacks waiting for the corrected data to be ready
+
+// Lets any widget that shows a rank (My Season, the compare view, a share
+// card) register interest in the corrected standings data and get called
+// back the moment it's actually ready — instead of rendering once, too
+// early, with the old fallback math, and never finding out once the real
+// data arrives. If the data is already ready, fires immediately. Confirmed
+// as the direct cause of a real, reported "My Season says #55, standings
+// says #49" split: My Season rendered before anything had ever warmed the
+// corrected cache, so getCorrectedRank() had nothing to find and silently
+// used the old, less accurate calculation instead.
+function onStandingsReady(weekKey, cb){
+  var wk = weekKey || String(currentWeek);
+  if(fullStandingsCache[wk] && fullStandingsCache[wk].length){ cb(); return; }
+  (standingsReadyCallbacks[wk] = standingsReadyCallbacks[wk] || []).push(cb);
+  refreshCumStandings(wk); // ensure a fetch is actually in flight — safe to call even if one already is
+}
+function fireStandingsReady(weekKey){
+  var cbs = standingsReadyCallbacks[weekKey];
+  if(!cbs || !cbs.length) return;
+  delete standingsReadyCallbacks[weekKey];
+  cbs.forEach(function(cb){ try{ cb(); }catch(e){} });
+}
 
 function refreshCumStandings(weekKey){
   // Stale-while-revalidate — deliberately does NOT touch/clear
@@ -3307,12 +3330,14 @@ function refreshCumStandings(weekKey){
             });
             snapshotEntries.forEach(function(e,i){ e.rank = i+1; });
             fullStandingsCache[weekKey] = snapshotEntries;
+            fireStandingsReady(weekKey);
             if(String(currentWeek) === weekKey && typeof renderCumStandingsPage === 'function') renderCumStandingsPage(0);
           }
         });
 
         fullStandingsCache[weekKey] = snapshotEntries;
         delete fullStandingsFetchInFlight[weekKey];
+        fireStandingsReady(weekKey);
         if(String(currentWeek) === weekKey && typeof renderCumStandingsPage === 'function') renderCumStandingsPage(0);
         return;
       }
@@ -3355,9 +3380,11 @@ function refreshCumStandings(weekKey){
       if(!a.notSubmitted && b.notSubmitted) return -1;
       return (b.score||0) - (a.score||0);
     });
+    full.forEach(function(e,i){ e.rank = i+1; }); // was missing entirely — getCorrectedRank() would find every entry but every rank would be undefined
 
     fullStandingsCache[weekKey] = full;
     delete fullStandingsFetchInFlight[weekKey];
+    fireStandingsReady(weekKey);
     if(String(currentWeek) === weekKey && typeof renderCumStandingsPage === 'function') renderCumStandingsPage(0);
   }).catch(function(){
     delete fullStandingsFetchInFlight[weekKey];
@@ -6443,6 +6470,20 @@ function buildDotPlot(curEntries, myEntry){
 function renderMySeasonInline(){
   var el = document.getElementById('my-season-wrap');
   if(!el) return;
+
+  // Ensure the corrected standings data is actually being fetched, and
+  // re-render this widget once it's ready — without this, the rank shown
+  // here depended entirely on some OTHER part of the page happening to
+  // have already warmed fullStandingsCache first (e.g. visiting the
+  // standings tab). Confirmed as the direct cause of a real, reported
+  // "My Season says #55, standings says #49" split. Only registers when
+  // genuinely not ready yet — onStandingsReady() fires synchronously if
+  // the cache is already warm, and this function IS that callback, so
+  // registering unconditionally would re-trigger itself forever.
+  var wkKeyNow = String(currentWeek);
+  if(!fullStandingsCache[wkKeyNow] || !fullStandingsCache[wkKeyNow].length){
+    onStandingsReady(wkKeyNow, function(){ renderMySeasonInline(); });
+  }
 
   if(!myTeam){
     el.innerHTML = '<div class="myteam-empty"><div class="myteam-empty-icon">📅</div>'
