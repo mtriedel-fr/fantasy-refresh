@@ -3234,6 +3234,20 @@ function fireStandingsReady(weekKey){
   cbs.forEach(function(cb){ try{ cb(); }catch(e){} });
 }
 
+function renderStandingsAndHeader(weekKey){
+  // Keeps the standings page and the header's rank numbers in sync on
+  // EVERY real update, not just the first one — confirmed as the direct
+  // cause of a real, persistent "standings says #59, header says #65"
+  // split during a live game. The one-time ready-callback registry
+  // (onStandingsReady) only ever notified the header once, the first
+  // time the cache went from empty to populated; it had no way to know
+  // when refreshCumStandings() later replaced that data with fresher
+  // live scores, so the header kept showing whatever it rendered on
+  // that first pass while the standings table kept moving forward.
+  if(String(currentWeek) === weekKey && typeof renderCumStandingsPage === 'function') renderCumStandingsPage(0);
+  if(String(currentWeek) === weekKey && typeof renderAll === 'function') renderAll();
+}
+
 function refreshCumStandings(weekKey){
   // Stale-while-revalidate — deliberately does NOT touch/clear
   // fullStandingsCache[weekKey] until the new data is actually ready.
@@ -3331,14 +3345,14 @@ function refreshCumStandings(weekKey){
             snapshotEntries.forEach(function(e,i){ e.rank = i+1; });
             fullStandingsCache[weekKey] = snapshotEntries;
             fireStandingsReady(weekKey);
-            if(String(currentWeek) === weekKey && typeof renderCumStandingsPage === 'function') renderCumStandingsPage(0);
+            renderStandingsAndHeader(weekKey);
           }
         });
 
         fullStandingsCache[weekKey] = snapshotEntries;
         delete fullStandingsFetchInFlight[weekKey];
         fireStandingsReady(weekKey);
-        if(String(currentWeek) === weekKey && typeof renderCumStandingsPage === 'function') renderCumStandingsPage(0);
+        renderStandingsAndHeader(weekKey);
         return;
       }
       fetchAndBuildStandingsClientSide();
@@ -3385,7 +3399,7 @@ function refreshCumStandings(weekKey){
     fullStandingsCache[weekKey] = full;
     delete fullStandingsFetchInFlight[weekKey];
     fireStandingsReady(weekKey);
-    if(String(currentWeek) === weekKey && typeof renderCumStandingsPage === 'function') renderCumStandingsPage(0);
+    renderStandingsAndHeader(weekKey);
   }).catch(function(){
     delete fullStandingsFetchInFlight[weekKey];
   });
