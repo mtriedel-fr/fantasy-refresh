@@ -5948,23 +5948,33 @@ function buildRosterComparison(teamStats, weeks){
   }
   var wkLineups = weekLineupsCache[String(cmpSelectedWeek)] || {};
 
+  // Real, per-slot scoring data — separate fetch from lineups, since a
+  // lineup only carries player identity, not points. slotPts is keyed
+  // by the same slot id (qb1, rb1, fx1, etc.) as the lineup itself.
+  if(!weekScoresCache[String(cmpSelectedWeek)]){
+    ensureWeekScores(cmpSelectedWeek).then(function(){ setCmpWeek(cmpSelectedWeek); });
+  }
+  var wkScores = weekScoresCache[String(cmpSelectedWeek)] || {};
+
   var slotDefs = [
     {pos:'QB',label:'QB'},{pos:'RB',label:'RB'},{pos:'RB',label:'RB'},
     {pos:'WR',label:'WR'},{pos:'WR',label:'WR'},{pos:'WR',label:'WR'},
     {pos:'TE',label:'TE'},{pos:'FLEX',label:'FLEX'},{pos:'DEF',label:'DEF'}
   ];
 
-  // Each roster becomes a flat list of {player, pos} from the real
-  // lineup's slots, matching the shape the rest of this function
-  // already expects below.
+  // Each roster becomes a flat list of {player, pos, pts} from the real
+  // lineup's slots, cross-referenced against that same team's real
+  // slotPts for this week (by slot id) to attach real, per-player points.
   var teamRosters = teamStats.map(function(t){
     var d = t.weeklyData[wi];
     if(!d || !d.uid) return null;
     var lineup = wkLineups[d.uid];
     if(!lineup || !lineup.slots) return null;
+    var scoreEntry = wkScores[d.uid];
+    var slotPts = (scoreEntry && scoreEntry.slotPts) || {};
     return Object.keys(lineup.slots).map(function(slotId){
       var p = lineup.slots[slotId];
-      return p ? {player: p.name, pos: p.pos} : null;
+      return p ? {player: p.name, pos: p.pos, pts: slotPts[slotId]} : null;
     }).filter(Boolean);
   });
 
@@ -6022,8 +6032,9 @@ function buildRosterComparison(teamStats, weeks){
           if(!player) return '<div style="padding:9px 8px;background:var(--bg3);display:flex;align-items:center;justify-content:center;border-right:1px solid var(--bdr);"><span style="color:var(--ink3);font-size:12px;font-family:var(--fd);">—</span></div>';
           var playerColor = playerColorMap[player.player] || null;
           var isShared = !!playerColor;
+          var ptsLabel = (typeof player.pts === 'number') ? ' (' + player.pts.toFixed(1) + ' pts)' : '';
           return '<div style="padding:9px 8px;background:'+(isShared?playerColor+'12':'var(--bg3)')+';display:flex;align-items:center;justify-content:center;text-align:center;border-right:1px solid var(--bdr);'+(isShared?'border-top:2px solid '+playerColor+';':'')+'">'
-            + '<span style="font-family:var(--fd);font-size:13px;font-weight:700;color:'+(isShared?playerColor:'var(--ink)')+';">'+player.player+'</span>'
+            + '<span style="font-family:var(--fd);font-size:13px;font-weight:700;color:'+(isShared?playerColor:'var(--ink)')+';">'+player.player+'<span style="font-weight:600;color:var(--ink3);">'+ptsLabel+'</span></span>'
             + '</div>';
         }).join('')
       + '</div>';
@@ -6809,8 +6820,20 @@ function ensureWeekLineups(week){
     .catch(function(){ weekLineupsCache[weekKey] = {}; return weekLineupsCache[weekKey]; });
 }
 
+function ensureWeekScores(week){
+  var weekKey = String(week);
+  if(weekScoresCache[weekKey]) return Promise.resolve(weekScoresCache[weekKey]);
+  var ctx = FRAuth.getLeagueCtx();
+  var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+  var season = FR.seasonKey();
+  return FR.fb.get('/leagues/' + leagueId + '/season/' + season + '/' + week)
+    .then(function(data){ weekScoresCache[weekKey] = data || {}; return weekScoresCache[weekKey]; })
+    .catch(function(){ weekScoresCache[weekKey] = {}; return weekScoresCache[weekKey]; });
+}
+
 var guillotineStatusCache = {}; // seasonKey -> {teams: {name: {status, eliminatedWeek, score, noShow}}} — real, persisted elimination status, fetched separately since it's computed once on the backend rather than replayed client-side
 var weekLineupsCache = {}; // week -> {uid: {slots: {...}}, ...} — real lineup data, fetched separately since score entries never actually carry a lineup field (see below)
+var weekScoresCache = {}; // week -> {uid: {score, slotPts: {slotId: points}, ...}, ...} — real, per-slot scoring data, fetched separately from lineups since the lineup itself only has player identity, not points
 var weekLocksCache = {}; // week -> {team: true, ...} — which teams have locked (kicked off), used to gate player identity in Roster/Most Started until their game has actually started
 
 function renderNumbers(curEntries){
