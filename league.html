@@ -3123,6 +3123,26 @@ function renderCumHome(){
   renderCumStandingsPage(0);
 }
 
+var realActiveMemberUids = null; // uid -> true, for every real, active member — null until first loaded
+var realActiveMemberUidsLoading = false;
+function loadRealActiveMemberUids(){
+  if(realActiveMemberUids) return Promise.resolve(realActiveMemberUids);
+  if(realActiveMemberUidsLoading) return Promise.resolve(null);
+  realActiveMemberUidsLoading = true;
+  var ctx = FRAuth.getLeagueCtx();
+  var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+  return FR.fb.get('/leagues/' + leagueId + '/members').then(function(members){
+    var set = {};
+    Object.entries(members || {}).forEach(function(entry){
+      var uid = entry[0], m = entry[1];
+      if(m && m.teamName && m.active !== false) set[uid] = true;
+    });
+    realActiveMemberUids = set;
+    realActiveMemberUidsLoading = false;
+    return set;
+  }).catch(function(){ realActiveMemberUidsLoading = false; return null; });
+}
+
 var fullStandingsCache = {}; // week -> full merged list (every real member, not just ones with a score entry)
 var fullStandingsFetchInFlight = {}; // week -> true while a fetch chain is already pending, to prevent multiple concurrent computeCumStandings() calls from racing each other and letting a slower, stale result overwrite a faster, correct one
 var standingsReadyCallbacks = {}; // week -> array of callbacks waiting for the corrected data to be ready
@@ -3594,8 +3614,23 @@ function renderAll(){
   var prevRank = {};
   prevSorted.forEach(function(name, i){ prevRank[name] = i + 1; });
 
-  // Current week
-  var curEntries = seasonData[curKey] || [];
+  // Current week — filtered against the real, active member list before
+  // anything downstream (wkHighName, curMap, the dot plot, the This Week
+  // standings table) ever sees it. Confirmed directly: 11 real score
+  // entries in the raw data don't correspond to any real, active
+  // member — leftover test accounts, plus a genuine bug where the
+  // ownership/ownershipMeta feature was written into this exact same
+  // object namespace as real per-team scores, appearing as fake
+  // "teams" with an undefined name and score. Without this filter, the
+  // "high score this week" callout could pick one of these instead of
+  // a real team's real top score.
+  var curEntriesRaw = seasonData[curKey] || [];
+  var curEntries = realActiveMemberUids
+    ? curEntriesRaw.filter(function(e){ return e.uid && realActiveMemberUids[e.uid]; })
+    : curEntriesRaw;
+  if(!realActiveMemberUids){
+    loadRealActiveMemberUids().then(function(){ if(String(currentWeek) === curKey && typeof renderAll === 'function') renderAll(); });
+  }
   var curMap = {};
   curEntries.forEach(function(e){ curMap[e.name] = e; });
   var curScores = curEntries.map(function(e){ return e.score; });
