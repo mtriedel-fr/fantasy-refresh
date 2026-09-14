@@ -3606,15 +3606,24 @@ function renderAll(){
   var bnSeason = document.getElementById('bn-season');
   if(bnSeason){ var lbl = bnSeason.querySelector('.bn-label'); if(lbl) lbl.textContent = weeks.length >= WEEKS ? 'Wrap' : 'Season'; }
 
-  // Cumulative totals
+  // Cumulative totals — filtered against the real, active member list
+  // before anything sums by name. Confirmed directly: without this,
+  // orphaned/stale entries (leftover test accounts, the
+  // ownership/ownershipMeta collision) inflate team counts and, since
+  // this sums by NAME not uid, can even merge into a real team's total
+  // if names happen to collide.
   var totals = {};
   weeks.forEach(function(w){
     seasonData[w].forEach(function(entry){
+      if(realActiveMemberUids && (!entry.uid || !realActiveMemberUids[entry.uid])) return;
       if(!totals[entry.name]) totals[entry.name] = {total:0, cnt:0};
       totals[entry.name].total += entry.score;
       totals[entry.name].cnt++;
     });
   });
+  if(!realActiveMemberUids){
+    loadRealActiveMemberUids().then(function(){ if(typeof renderAll === 'function') renderAll(); });
+  }
 
   var sorted = Object.keys(totals).map(function(name){
     var d = totals[name];
@@ -3627,6 +3636,7 @@ function renderAll(){
   var prevTotals = {};
   prevWeeks.forEach(function(w){
     seasonData[w].forEach(function(entry){
+      if(realActiveMemberUids && (!entry.uid || !realActiveMemberUids[entry.uid])) return;
       prevTotals[entry.name] = (prevTotals[entry.name] || 0) + entry.score;
     });
   });
@@ -3648,9 +3658,6 @@ function renderAll(){
   var curEntries = realActiveMemberUids
     ? curEntriesRaw.filter(function(e){ return e.uid && realActiveMemberUids[e.uid]; })
     : curEntriesRaw;
-  if(!realActiveMemberUids){
-    loadRealActiveMemberUids().then(function(){ if(String(currentWeek) === curKey && typeof renderAll === 'function') renderAll(); });
-  }
   var curMap = {};
   curEntries.forEach(function(e){ curMap[e.name] = e; });
   var curScores = curEntries.map(function(e){ return e.score; });
