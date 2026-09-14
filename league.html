@@ -6032,9 +6032,9 @@ function buildRosterComparison(teamStats, weeks){
           if(!player) return '<div style="padding:9px 8px;background:var(--bg3);display:flex;align-items:center;justify-content:center;border-right:1px solid var(--bdr);"><span style="color:var(--ink3);font-size:12px;font-family:var(--fd);">—</span></div>';
           var playerColor = playerColorMap[player.player] || null;
           var isShared = !!playerColor;
-          var ptsLabel = (typeof player.pts === 'number') ? ' (' + player.pts.toFixed(1) + ' pts)' : '';
+          var ptsLabel = (typeof player.pts === 'number') ? '(' + player.pts.toFixed(2) + ' pts)' : '';
           return '<div style="padding:9px 8px;background:'+(isShared?playerColor+'12':'var(--bg3)')+';display:flex;align-items:center;justify-content:center;text-align:center;border-right:1px solid var(--bdr);'+(isShared?'border-top:2px solid '+playerColor+';':'')+'">'
-            + '<span style="font-family:var(--fd);font-size:13px;font-weight:700;color:'+(isShared?playerColor:'var(--ink)')+';">'+player.player+'<span style="font-weight:600;color:var(--ink3);">'+ptsLabel+'</span></span>'
+            + '<span style="font-family:var(--fd);font-size:13px;font-weight:700;color:'+(isShared?playerColor:'var(--ink)')+';">'+player.player+(ptsLabel ? ' ' : '')+'<span style="font-weight:600;color:var(--ink3);">'+ptsLabel+'</span></span>'
             + '</div>';
         }).join('')
       + '</div>';
