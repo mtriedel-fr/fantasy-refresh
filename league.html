@@ -5951,7 +5951,7 @@ function buildRosterComparison(teamStats, weeks){
   var slotDefs = [
     {pos:'QB',label:'QB'},{pos:'RB',label:'RB'},{pos:'RB',label:'RB'},
     {pos:'WR',label:'WR'},{pos:'WR',label:'WR'},{pos:'WR',label:'WR'},
-    {pos:'TE',label:'TE'},{pos:'FLEX',label:'FLEX'},{pos:'DST',label:'DEF'}
+    {pos:'TE',label:'TE'},{pos:'FLEX',label:'FLEX'},{pos:'DEF',label:'DEF'}
   ];
 
   // Each roster becomes a flat list of {player, pos} from the real
@@ -5986,12 +5986,15 @@ function buildRosterComparison(teamStats, weeks){
   });
 
   // Resolve each team roster into ordered slots
+  var FLEX_ELIGIBLE = ['RB','WR','TE'];
   var resolved = teamStats.map(function(t, ti){
     var roster = teamRosters[ti];
     if(!roster) return slotDefs.map(function(){ return null; });
     var remaining = roster.slice();
     return slotDefs.map(function(slot){
-      var idx = remaining.findIndex(function(p){ return p.pos === slot.pos; });
+      var idx = slot.pos === 'FLEX'
+        ? remaining.findIndex(function(p){ return FLEX_ELIGIBLE.indexOf(p.pos) >= 0; })
+        : remaining.findIndex(function(p){ return p.pos === slot.pos; });
       if(idx < 0) return null;
       return remaining.splice(idx,1)[0];
     });
