@@ -3301,6 +3301,26 @@ function computeCumStandings(){
   return entries.slice().sort(function(a,b){ return b.score - a.score; }); // fallback shown immediately while the full list loads
 }
 
+var cumStandingsLineupsCache = {}; // week -> full lineups object for that week, fetched once
+var cumStandingsGameMapCache = {}; // week -> real game-status map (same source/shape as fetchWeekSchedule() everywhere else)
+var cumStandingsPlayersLeftInFlight = {}; // week -> true while the background fetch for the "Left" column is already running
+
+// How many of a real lineup's slots still have a chance to score more —
+// same real "has this game gone final" signal already used for the
+// lock icon/game-status tag on individual player cards elsewhere in the
+// app (game.liveStatusCode === 2 means final; anything else still
+// counts as remaining, including not-yet-started).
+function countPlayersLeft(lineup, gameMap){
+  if(!lineup || !lineup.slots) return null;
+  var slots = Object.values(lineup.slots).filter(Boolean);
+  if(!slots.length) return null;
+  var left = slots.filter(function(p){
+    var game = (gameMap && p.team) ? gameMap[p.team] : null;
+    return !game || game.liveStatusCode !== 2; // no game info yet, or genuinely not final
+  }).length;
+  return { left: left, total: slots.length };
+}
+
 function renderCumStandingsPage(page){
   var wrap = document.getElementById('cum-standings-wrap');
   var pager = document.getElementById('cum-standings-pager');
@@ -3318,6 +3338,11 @@ function renderCumStandingsPage(page){
   if(page >= totalPages) page = totalPages - 1;
   if(page < 0) page = 0;
 
+  var weekKey = String(currentWeek);
+  var lineupsData = cumStandingsLineupsCache[weekKey];
+  var gameMapData = cumStandingsGameMapCache[weekKey];
+  var haveLeftData = !!(lineupsData && gameMapData);
+
   var pageRows = all.slice(page*perPage, page*perPage + perPage);
   var rows = pageRows.map(function(t, i){
     var isMe = myTeam && teamMatch(t.name, myTeam);
@@ -3328,15 +3353,43 @@ function renderCumStandingsPage(page){
     var scoreCell = t.notSubmitted
       ? '<span style="font-family:var(--fd);font-size:12px;font-style:italic;color:var(--ink3);">Roster Not Submitted</span>'
       : fmtScore(t.score);
+    var leftCell = '—';
+    if(!t.notSubmitted && haveLeftData && t.uid){
+      var pl = countPlayersLeft(lineupsData[t.uid], gameMapData);
+      if(pl) leftCell = pl.left + '/' + pl.total;
+    }
     return '<tr' + (isMe ? ' class="my-team"' : '') + '>'
       + '<td class="rk">' + (page*perPage + i + 1) + '</td>'
       + '<td style="font-family:var(--fd);font-size:14px;font-weight:700;color:' + (isMe ? 'var(--or)' : 'var(--ink)') + ';">' + escapeHtmlFR(t.name) + ' ' + expandBtn + '</td>'
+      + '<td style="text-align:center;font-family:var(--fd);font-size:12px;color:var(--ink3);" title="Players left to play">' + leftCell + '</td>'
       + '<td style="text-align:right;font-family:var(--fd);color:var(--ink2);">' + scoreCell + '</td>'
       + '</tr>'
-      + '<tr id="' + rosterId + '" style="display:none;"><td colspan="3" style="padding:0;background:var(--bg2);"></td></tr>';
+      + '<tr id="' + rosterId + '" style="display:none;"><td colspan="4" style="padding:0;background:var(--bg2);"></td></tr>';
   }).join('');
 
-  wrap.innerHTML = '<table class="st-table"><thead><tr><th class="rk">#</th><th>Team</th><th style="text-align:right;">Score</th></tr></thead><tbody>' + rows + '</tbody></table>';
+  wrap.innerHTML = '<table class="st-table"><thead><tr><th class="rk">#</th><th>Team</th><th style="text-align:center;">Left</th><th style="text-align:right;">Score</th></tr></thead><tbody>' + rows + '</tbody></table>';
+
+  // Background-load the data needed for the "Left" column — never
+  // blocks the table above from showing immediately. Cached per week
+  // and guarded against duplicate concurrent fetches, same pattern as
+  // the standings data itself; re-renders this same page once ready so
+  // the column fills in a moment later without a visible flash.
+  if(!haveLeftData && !cumStandingsPlayersLeftInFlight[weekKey]){
+    cumStandingsPlayersLeftInFlight[weekKey] = true;
+    var ctx = FRAuth.getLeagueCtx();
+    var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+    var season = FR.seasonKey();
+    Promise.all([
+      FR.fb.get('/leagues/' + leagueId + '/lineups/' + season + '/week' + weekKey).catch(function(){ return null; }),
+      fetchWeekSchedule(weekKey)
+    ]).then(function(results){
+      delete cumStandingsPlayersLeftInFlight[weekKey];
+      if(!results[0] || !results[1]) return; // couldn't load — leave the "—" placeholders rather than show something misleading
+      cumStandingsLineupsCache[weekKey] = results[0];
+      cumStandingsGameMapCache[weekKey] = results[1];
+      if(String(currentWeek) === weekKey) renderCumStandingsPage(page);
+    }).catch(function(){ delete cumStandingsPlayersLeftInFlight[weekKey]; });
+  }
 
   if(pager){
     if(totalPages <= 1){
