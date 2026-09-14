@@ -3238,6 +3238,19 @@ function refreshCumStandings(weekKey){
               snapshotEntries.push({ uid: uid, name: m.teamName, score: null, notSubmitted: true });
               corrected = true;
             });
+
+            // Gap 3: the reverse of Gap 2 — a snapshot entry whose member
+            // has since been deleted or deactivated (e.g. via
+            // Commissioner Tools) entirely. Removed from Firebase
+            // immediately on deletion, but the snapshot has no way to
+            // know until it's recomputed, so a removed member would
+            // otherwise keep showing up on standings indefinitely.
+            var beforeCount = snapshotEntries.length;
+            snapshotEntries = snapshotEntries.filter(function(e){
+              var m = members[e.uid];
+              return m && m.teamName && m.active !== false;
+            });
+            if(snapshotEntries.length !== beforeCount) corrected = true;
           }
 
           if(corrected){
