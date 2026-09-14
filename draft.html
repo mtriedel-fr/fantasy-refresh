@@ -2195,7 +2195,12 @@ function updateSubmitBtn(){
 function submitLineup(){
   if(isDraftLocked()){ showToast('🔒 Drafting isn\'t open yet — check back closer to kickoff.', true); return; }
   if(!currentUser){ showToast('Sign in first',true); return; }
-  if(Object.values(lineup).filter(Boolean).length===0){ showToast('Add at least one player first',true); return; }
+  var emptySlots = SLOT_DEFS.filter(function(s){ return !lineup[s.id]; });
+  if(emptySlots.length){
+    var names = emptySlots.map(function(s){ return s.label; }).join(', ');
+    showToast('Fill every roster spot before submitting — missing: ' + names, true);
+    return;
+  }
   if(getSpent()>CAP){ showToast('Over cap',true); return; }
   var btn = document.getElementById('submit-btn');
   btn.disabled=true; btn.textContent='Checking session…';
