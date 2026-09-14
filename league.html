@@ -4126,9 +4126,27 @@ function renderGuillotine(){
       + upRows + '</div>';
   }
 
+  // ── FULL SCHEDULE (all weeks, at a glance) ──
+  var fullSchedRows = schedule.map(function(s){
+    var isPast = weeks.indexOf(s.week) >= 0;
+    var rowColor = s.finale ? 'var(--pu)' : (isPast ? 'var(--ink3)' : 'var(--ink2)');
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--bdr);">'
+      + '<span style="font-family:var(--fd);font-size:13px;font-weight:700;color:'+rowColor+';">Week '+s.week+(s.finale ? ' (Finale)' : '')+(isPast ? ' ✓' : '')+'</span>'
+      + (s.finale
+          ? '<span style="font-family:var(--fd);font-size:12px;color:var(--pu);">Top 3 crowned</span>'
+          : '<span style="font-family:var(--fd);font-size:12px;color:var(--pk);">-'+s.eliminate+' eliminated</span>')
+      + '<span style="font-family:var(--fd);font-size:12px;color:var(--ink3);">'+s.remaining+' survive</span>'
+      + '</div>';
+  }).join('');
+  var fullScheduleHTML = '<div class="guill-section">'
+    + '<div class="guill-section-hdr">📋 Full Elimination Schedule — '+totalTeams+' Teams</div>'
+    + '<div style="padding:14px 18px;">' + fullSchedRows + '</div>'
+    + '</div>';
+
   el.innerHTML = '<div class="guill-wrap">'
     + heroHTML
     + progressHTML
+    + fullScheduleHTML
     + (winnersHTML || '')
     + survivorsHTML
     + '<div class="guill-section">'
