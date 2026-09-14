@@ -3798,16 +3798,20 @@ function buildElimSchedule(totalTeams, totalWeeks){
   var extra = toElim % weeksToElim;
   var schedule = [];
   var remaining = totalTeams;
-  for(var w = 1; w <= totalWeeks; w++){
+  // Never generate a schedule entry beyond the real finale week — the
+  // competition is over by then, so a week-18+ row here has no real
+  // meaning and only confuses anything that renders this schedule (like
+  // the "Upcoming Eliminations" list, which would otherwise show a
+  // trailing "Wk 18 — Eliminate 0" row implying the competition
+  // continues past its actual Week 17 finale).
+  var lastScheduleWeek = Math.min(totalWeeks, finaleWeek);
+  for(var w = 1; w <= lastScheduleWeek; w++){
     if(w < finaleWeek){
       var elim = base + (w <= extra ? 1 : 0);
       remaining -= elim;
       schedule.push({week: w, eliminate: elim, remaining: remaining, finale: false});
     } else if(w === finaleWeek){
       schedule.push({week: w, eliminate: 0, remaining: remaining, finale: true});
-    } else {
-      // weeks 18+ not used in guillotine
-      schedule.push({week: w, eliminate: 0, remaining: remaining, finale: false});
     }
   }
   return schedule;
@@ -3908,8 +3912,18 @@ function renderGuillotine(){
   }
   var gsTeams = guillotineStatusCache[gsKey].teams || {};
 
-  // Get all teams from week 1
-  var week1 = seasonData[String(weeks[0])] || [];
+  // Get all teams from week 1 — filtered against the real, active
+  // member list before counting. Confirmed directly: raw seasonData can
+  // contain orphaned/stale entries (leftover test accounts, the
+  // ownership/ownershipMeta collision) that inflate this count above
+  // the real, actual number of league members.
+  var week1Raw = seasonData[String(weeks[0])] || [];
+  var week1 = realActiveMemberUids
+    ? week1Raw.filter(function(e){ return e.uid && realActiveMemberUids[e.uid]; })
+    : week1Raw;
+  if(!realActiveMemberUids){
+    loadRealActiveMemberUids().then(function(){ renderGuillotine(); });
+  }
   var totalTeams = week1.length;
   var totalWeeks = WEEKS; // 18
   var schedule = buildElimSchedule(totalTeams, totalWeeks);
