@@ -2651,6 +2651,22 @@ function buildWeekBar(){
   }
 }
 
+var nextWeekSalariesReadyCache = {}; // "season:week" -> true/false, once confirmed
+function checkNextWeekSalariesReady(nextWeek){
+  var ctx = FRAuth.getLeagueCtx();
+  var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+  var season = FR.seasonKey();
+  var cacheKey = season + ':' + nextWeek;
+  if(nextWeekSalariesReadyCache[cacheKey] !== undefined) return Promise.resolve(nextWeekSalariesReadyCache[cacheKey]);
+  return FR.fb.get('/leagues/' + leagueId + '/salaries/' + season + '/week' + nextWeek + '/meta')
+    .then(function(meta){
+      var ready = !!(meta && meta.count > 0);
+      nextWeekSalariesReadyCache[cacheKey] = ready;
+      return ready;
+    })
+    .catch(function(){ nextWeekSalariesReadyCache[cacheKey] = false; return false; });
+}
+
 function buildWeekBarRange(sel, lastWeek){
   sel.innerHTML = '';
   // Hard safety net: if lastWeek is ever 0, NaN, or undefined for any
@@ -2660,6 +2676,15 @@ function buildWeekBarRange(sel, lastWeek){
   // Same guard on the other boundary — currentWeek defaults to 1 in this
   // file, but falling back defensively here too in case that ever changes.
   var effectiveCurrentWeek = currentWeek || 1;
+  var nextWeek = effectiveCurrentWeek + 1;
+  var nextWeekReady = nextWeekSalariesReadyCache[FR.seasonKey() + ':' + nextWeek];
+  if(nextWeekReady === undefined){
+    // Not yet confirmed — check now, then rebuild this same dropdown once
+    // we actually know. Defaults to NOT selectable below in the
+    // meantime, since showing a week that turns out not to be ready is
+    // worse than a brief delay before it becomes available.
+    checkNextWeekSalariesReady(nextWeek).then(function(){ buildWeekBar(); });
+  }
   for(var i = 1; i <= safeLastWeek; i++){
     var k = String(i);
     var hasData = seasonData[k] && seasonData[k].length > 0;
@@ -2668,13 +2693,14 @@ function buildWeekBarRange(sel, lastWeek){
     o.textContent = 'Week ' + i + (hasData ? ' ✓' : '');
     // Weeks beyond the current week haven't happened yet — disable them
     // rather than letting someone pick a week with no real data. The
-    // immediate NEXT week is the exception: that's the active draft
-    // week, which by definition has no scores yet (it hasn't been
-    // played), but still needs to be selectable so someone can actually
-    // get in and draft for it. Browsers render disabled <option>
-    // elements greyed-out and unselectable by default, which matches
-    // "lighter and not clickable" with no extra CSS.
-    if(i > effectiveCurrentWeek + 1) o.disabled = true;
+    // immediate NEXT week is the intended exception (the active draft
+    // week) — but only once its real salaries actually exist. Confirmed
+    // directly: the dropdown was making next week selectable the moment
+    // it became "next" numerically, regardless of whether
+    // weekly-auto-open.yml (or a manual generation) had actually run
+    // yet, sending people into a draft room with nothing real to draft.
+    if(i > nextWeek) o.disabled = true;
+    else if(i === nextWeek) o.disabled = !nextWeekReady;
     if(i === effectiveCurrentWeek) o.selected = true;
     sel.appendChild(o);
   }
