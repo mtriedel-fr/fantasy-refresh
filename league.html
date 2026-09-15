@@ -754,7 +754,7 @@ body{padding-bottom:calc(76px + env(safe-area-inset-bottom));}
 .guill-wrap{padding:20px 24px;display:flex;flex-direction:column;gap:20px;}
 .guill-hero{background:linear-gradient(135deg,var(--hdr) 0%,var(--hdr2) 100%);border-radius:14px;padding:20px 24px;border-top:3px solid var(--or);border-bottom:3px solid var(--pk);display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1px;background-blend-mode:normal;}
 .guill-stat{background:rgba(0,0,0,.3);padding:14px 16px;text-align:center;border-radius:8px;}
-.guill-stat-lbl{font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;}
+.guill-stat-lbl{font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;min-height:26px;display:flex;align-items:flex-end;justify-content:center;line-height:1.3;}
 .guill-stat-val{font-family:var(--fd);font-size:28px;font-weight:800;color:var(--or);}
 .guill-stat-sub{font-family:var(--fd);font-size:11px;color:var(--ink3);margin-top:2px;}
 .guill-section{background:var(--bg3);border-radius:12px;overflow:hidden;border:1px solid var(--bdr);}
@@ -3930,8 +3930,9 @@ function renderGuillotine(){
 
   var eliminated = {}; // name → {week, score, noShow} — direct from the persisted status
   var stillIn = [];
-  Object.keys(gsTeams).forEach(function(team){
-    var t = gsTeams[team];
+  Object.keys(gsTeams).forEach(function(key){
+    var t = gsTeams[key];
+    var team = t.team || key; // real, original name if present — falls back to the key for any older, pre-fix entry that never had it
     if(t.status === 'alive') stillIn.push(team);
     else if(t.status === 'eliminated') eliminated[team] = {week: t.eliminatedWeek, score: t.score, noShow: !!t.noShow};
   });
@@ -3949,10 +3950,10 @@ function renderGuillotine(){
 
     // Teams still in at the START of this week: everyone except those
     // eliminated in a strictly earlier week.
-    var inAtStart = Object.keys(gsTeams).filter(function(team){
-      var t = gsTeams[team];
+    var inAtStart = Object.keys(gsTeams).filter(function(key){
+      var t = gsTeams[key];
       return t.status === 'alive' || t.eliminatedWeek >= w;
-    });
+    }).map(function(key){ return gsTeams[key].team || key; });
     var entries = inAtStart.map(function(team){
       var found = wkData.find(function(e){ return teamMatch(e.name, team); });
       return found ? {name: found.name, score: found.score} : {name: team, score: 0, noShow: true};
@@ -3965,14 +3966,18 @@ function renderGuillotine(){
       return;
     }
 
-    var elimThisWeek = Object.keys(gsTeams).filter(function(team){ return gsTeams[team].eliminatedWeek === w; })
-      .map(function(team){ return {name: team, score: gsTeams[team].score, noShow: !!gsTeams[team].noShow}; });
+    var elimThisWeek = Object.keys(gsTeams).filter(function(key){ return gsTeams[key].eliminatedWeek === w; })
+      .map(function(key){ var t = gsTeams[key]; return {name: t.team || key, score: t.score, noShow: !!t.noShow}; });
 
     weekResults.push({
       week: w,
       scores: entries,
       eliminatedThisWeek: elimThisWeek,
-      survivors: inAtStart.filter(function(t){ return gsTeams[t].status === 'alive' || gsTeams[t].eliminatedWeek > w; }),
+      survivors: inAtStart.filter(function(team){
+        var key = Object.keys(gsTeams).find(function(k){ return (gsTeams[k].team || k) === team; });
+        var t = key ? gsTeams[key] : null;
+        return t && (t.status === 'alive' || t.eliminatedWeek > w);
+      }),
       elimCount: sched ? sched.eliminate : 0,
       finale: false
     });
@@ -4018,30 +4023,25 @@ function renderGuillotine(){
 
   // ── WINNERS (if complete) ──
   var winnersHTML = '';
-  // Show winners card when week 17 is imported (finale complete)
-  if(finaleRanking && finaleRanking.length >= 2){
-    var w1 = finaleRanking[0], w2 = finaleRanking[1], w3 = finaleRanking[2];
+  // Show winner card when week 17 is imported (finale complete). Last
+  // One Standing is winner-take-all — confirmed directly — not a
+  // 1st/2nd/3rd podium. That structure belongs to the separate playoff
+  // tiers instead.
+  if(finaleRanking && finaleRanking.length >= 1){
+    var w1 = finaleRanking[0];
+    var otherFinalists = finaleRanking.slice(1);
     var isMe1 = myTeam && teamMatch(w1.name, myTeam);
-    var isMe2 = myTeam && teamMatch(w2.name, myTeam);
     winnersHTML = '<div class="guill-section">'
-      + '<div class="guill-section-hdr" style="color:var(--or)">🏆 Last One Standing Winners — Week 17 Finale</div>'
-      + '<div class="guill-winners-podium" style="grid-template-columns:1fr 1fr 1fr;">'
+      + '<div class="guill-section-hdr" style="color:var(--or)">🏆 Last One Standing Winner — Week 17 Finale</div>'
+      + '<div class="guill-winners-podium" style="grid-template-columns:1fr;">'
       + '<div class="guill-winner-card" style="border-color:var(--or)">'
-      + '<div class="guill-winner-medal">🥇</div>'
+      + '<div class="guill-winner-medal">👑</div>'
       + '<div class="guill-winner-name" style="color:var(--or)">'+(isMe1?'👑 ':'')+w1.name+'</div>'
       + '<div class="guill-winner-score">'+fmtScore(w1.score)+' pts (Wk 17)</div>'
       + '<div class="guill-winner-score" style="font-size:11px;margin-top:2px;">'+fmtTotal(survivorTotals[w1.name])+' season total</div></div>'
-      + '<div class="guill-winner-card" style="border-color:var(--pk)">'
-      + '<div class="guill-winner-medal">🥈</div>'
-      + '<div class="guill-winner-name" style="color:var(--pk)">'+(isMe2?'👑 ':'')+w2.name+'</div>'
-      + '<div class="guill-winner-score">'+fmtScore(w2.score)+' pts (Wk 17)</div>'
-      + '<div class="guill-winner-score" style="font-size:11px;margin-top:2px;">'+fmtTotal(survivorTotals[w2.name])+' season total</div></div>'
-      + (w3 ? '<div class="guill-winner-card" style="border-color:var(--pu)">'
-        + '<div class="guill-winner-medal">🥉</div>'
-        + '<div class="guill-winner-name" style="color:var(--pu)">'+w3.name+'</div>'
-        + '<div class="guill-winner-score">'+fmtScore(w3.score)+' pts (Wk 17)</div>'
-        + '<div class="guill-winner-score" style="font-size:11px;margin-top:2px;">'+fmtTotal(survivorTotals[w3.name])+' season total</div></div>' : '')
-      + '</div></div>';
+      + '</div>'
+      + (otherFinalists.length ? '<div style="padding:10px 18px;font-family:var(--fd);font-size:12px;color:var(--ink3);">Also reached the finale: '+otherFinalists.map(function(f){ return f.name; }).join(', ')+'</div>' : '')
+      + '</div>';
   } else if(isComplete){
     // Fallback if week 17 not yet imported
     var sortedSurvivors = currentSurvivors.slice().sort(function(a,b){ return survivorTotals[b]-survivorTotals[a]; });
@@ -4130,11 +4130,14 @@ function renderGuillotine(){
   var fullSchedRows = schedule.map(function(s){
     var isPast = weeks.indexOf(s.week) >= 0;
     var rowColor = s.finale ? 'var(--pu)' : (isPast ? 'var(--ink3)' : 'var(--ink2)');
+    if(s.finale){
+      return '<div style="display:flex;align-items:center;padding:8px 0;border-bottom:1px solid var(--bdr);">'
+        + '<span style="font-family:var(--fd);font-size:13px;font-weight:700;color:'+rowColor+';">Week '+s.week+' - The Last One Standing \uD83D\uDC51</span>'
+        + '</div>';
+    }
     return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--bdr);">'
-      + '<span style="font-family:var(--fd);font-size:13px;font-weight:700;color:'+rowColor+';">Week '+s.week+(s.finale ? ' (Finale)' : '')+(isPast ? ' ✓' : '')+'</span>'
-      + (s.finale
-          ? '<span style="font-family:var(--fd);font-size:12px;color:var(--pu);">Top 3 crowned</span>'
-          : '<span style="font-family:var(--fd);font-size:12px;color:var(--pk);">-'+s.eliminate+' eliminated</span>')
+      + '<span style="font-family:var(--fd);font-size:13px;font-weight:700;color:'+rowColor+';">Week '+s.week+(isPast ? ' ✓' : '')+'</span>'
+      + '<span style="font-family:var(--fd);font-size:12px;color:var(--pk);">-'+s.eliminate+' eliminated</span>'
       + '<span style="font-family:var(--fd);font-size:12px;color:var(--ink3);">'+s.remaining+' survive</span>'
       + '</div>';
   }).join('');
