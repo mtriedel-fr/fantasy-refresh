@@ -3696,7 +3696,11 @@ function renderAll(){
 
   // Stats
   var allScores = weeks.reduce(function(acc, w){
-    return acc.concat(seasonData[w].map(function(e){ return e.score; }));
+    var wkEntries = seasonData[w] || [];
+    var realWkEntries = realActiveMemberUids
+      ? wkEntries.filter(function(e){ return e.uid && realActiveMemberUids[e.uid]; })
+      : wkEntries;
+    return acc.concat(realWkEntries.map(function(e){ return e.score; }));
   }, []);
   var avg = allScores.length ? allScores.reduce(function(a,b){ return a+b; }, 0) / allScores.length : 0;
 
@@ -4175,6 +4179,19 @@ function renderSeasonWrap(){
 
   var totalWeeks = WEEKS; // 18
 
+  // Real, active-member-filtered entries for a given week — used
+  // throughout this function instead of raw seasonData access, since
+  // orphaned/stale entries (leftover test accounts, the
+  // ownership/ownershipMeta collision) would otherwise inflate team
+  // counts and could even win a "highest score" or "most consistent"
+  // callout that should only ever go to a real, active member.
+  function realWeekEntries(w){
+    var raw = seasonData[String(w)] || [];
+    return realActiveMemberUids
+      ? raw.filter(function(e){ return e.uid && realActiveMemberUids[e.uid]; })
+      : raw;
+  }
+
   // Show locked state until all weeks complete
   if(weeks.length < totalWeeks){
     el.innerHTML = '<div class="sw-locked">'
@@ -4194,7 +4211,7 @@ function renderSeasonWrap(){
   var allScores = []; // {week, name, score}
 
   weeks.forEach(function(w){
-    var entries = seasonData[String(w)] || [];
+    var entries = realWeekEntries(w);
     var wkSorted = entries.slice().sort(function(a,b){ return b.score-a.score; });
     if(wkSorted.length){
       weeklyHighs.push({week:w, name:wkSorted[0].name, score:wkSorted[0].score});
@@ -4226,7 +4243,7 @@ function renderSeasonWrap(){
 
   // Highest league total week (sum all scores that week)
   var wkTotals = weeks.map(function(w){
-    var sum = (seasonData[String(w)]||[]).reduce(function(s,e){ return s+e.score; },0);
+    var sum = realWeekEntries(w).reduce(function(s,e){ return s+e.score; },0);
     return {week:w, total:sum};
   });
   var highestLeagueWk = wkTotals.reduce(function(a,b){ return b.total > a.total ? b : a; });
@@ -4235,7 +4252,7 @@ function renderSeasonWrap(){
   // Most games above average
   var aboveAvgCounts = {};
   weeks.forEach(function(w){
-    var entries = seasonData[String(w)]||[];
+    var entries = realWeekEntries(w);
     var avg = entries.reduce(function(s,e){ return s+e.score; },0)/(entries.length||1);
     entries.forEach(function(e){ if(e.score >= avg) aboveAvgCounts[e.name] = (aboveAvgCounts[e.name]||0)+1; });
   });
@@ -4246,8 +4263,8 @@ function renderSeasonWrap(){
   weeks.forEach(function(w, wi){
     if(wi === 0) return;
     var prev = weeks[wi-1];
-    (seasonData[String(w)]||[]).forEach(function(e){
-      var prevEntry = (seasonData[String(prev)]||[]).find(function(p){ return p.name===e.name; });
+    realWeekEntries(w).forEach(function(e){
+      var prevEntry = realWeekEntries(prev).find(function(p){ return p.name===e.name; });
       if(prevEntry){
         var diff = e.score - prevEntry.score;
         if(diff > biggestJumpAmt){ biggestJumpAmt = diff; biggestJump = {name:e.name, week:w, diff:diff}; }
@@ -4290,12 +4307,12 @@ function renderSeasonWrap(){
   var posOrder = ['QB','RB','WR','TE','DST'];
   var posEmoji = {QB:'🏈',RB:'🏃',WR:'⚡',TE:'🎯',DST:'🛡️'};
 
-  var totalStarts = weeks.length * ((seasonData[String(weeks[0])]||[]).length||1);
+  var totalStarts = weeks.length * (realWeekEntries(weeks[0]).length||1);
 
   // Week every team scored their best
   var teamBestWeek = {};
   weeks.forEach(function(w){
-    (seasonData[String(w)]||[]).forEach(function(e){
+    realWeekEntries(w).forEach(function(e){
       if(!teamBestWeek[e.name] || e.score > teamBestWeek[e.name].score){
         teamBestWeek[e.name] = {week:w, score:e.score};
       }
@@ -4328,9 +4345,9 @@ function renderSeasonWrap(){
   // Tier podium ranking — use playoff bracket finish
   // Top 3 within each tier ranked by: how many rounds they won, then final round score
   function getTierPodium(tierTeams){
-    var wk15 = seasonData['15'] || [];
-    var wk16 = seasonData['16'] || [];
-    var wk17 = seasonData['17'] || [];
+    var wk15 = realWeekEntries(15);
+    var wk16 = realWeekEntries(16);
+    var wk17 = realWeekEntries(17);
     var r1 = applyPlayoffRound(tierTeams, wk15);
     var r2 = applyPlayoffRound(r1.advanced, wk16);
     var r3 = applyPlayoffRound(r2.advanced, wk17);
@@ -4372,7 +4389,7 @@ function renderSeasonWrap(){
     if(!r) return '—';
     var wk = r.rounds === 3 ? 18 : r.rounds === 2 ? 17 : r.rounds === 1 ? 16 : null;
     if(!wk) return fmtTotal(teamTotals[name]);
-    var e = (seasonData[String(wk)]||[]).find(function(e){ return teamMatch(e.name, name); });
+    var e = realWeekEntries(wk).find(function(e){ return teamMatch(e.name, name); });
     return e ? fmtScore(e.score) : fmtTotal(teamTotals[name]);
   }
 
@@ -4688,6 +4705,7 @@ function getCumulativeTotals(upToWeek){
   Object.keys(seasonData).forEach(function(w){
     if(Number(w) > upToWeek) return;
     (seasonData[w] || []).forEach(function(e){
+      if(realActiveMemberUids && (!e.uid || !realActiveMemberUids[e.uid])) return;
       totals[e.name] = (totals[e.name] || 0) + e.score;
     });
   });
@@ -5867,7 +5885,12 @@ function renderCompare(){
     var best = scores.length ? Math.max.apply(null,scores) : 0;
     var worst = scores.length ? Math.min.apply(null,scores) : 0;
     var allTotals = {};
-    weeks.forEach(function(w){ (seasonData[String(w)]||[]).forEach(function(e){ allTotals[e.name]=(allTotals[e.name]||0)+e.score; }); });
+    weeks.forEach(function(w){
+      (seasonData[String(w)]||[]).forEach(function(e){
+        if(realActiveMemberUids && (!e.uid || !realActiveMemberUids[e.uid])) return;
+        allTotals[e.name]=(allTotals[e.name]||0)+e.score;
+      });
+    });
     var curWeekData = weeklyData[weeklyData.length-1];
     var sznRank = (curWeekData && getCorrectedRank(curWeekData.uid)) || Object.keys(allTotals).sort(function(a,b){ return allTotals[b]-allTotals[a]; }).indexOf(name)+1;
     var h2h = {};
@@ -6170,7 +6193,12 @@ function buildCompareRankChart(teamStats, weeks){
 
   var allNames = Object.keys((function(){
     var t={};
-    weeks.forEach(function(w){ (seasonData[String(w)]||[]).forEach(function(e){ t[e.name]=1; }); });
+    weeks.forEach(function(w){
+      (seasonData[String(w)]||[]).forEach(function(e){
+        if(realActiveMemberUids && (!e.uid || !realActiveMemberUids[e.uid])) return;
+        t[e.name]=1;
+      });
+    });
     return t;
   })());
 
@@ -6197,7 +6225,10 @@ function buildCompareRankChart(teamStats, weeks){
   var lines = teamStats.map(function(t){
     var cumTotals = {};
     var points = weeks.map(function(w,wi){
-      (seasonData[String(w)]||[]).forEach(function(e){ cumTotals[e.name]=(cumTotals[e.name]||0)+e.score; });
+      (seasonData[String(w)]||[]).forEach(function(e){
+        if(realActiveMemberUids && (!e.uid || !realActiveMemberUids[e.uid])) return;
+        cumTotals[e.name]=(cumTotals[e.name]||0)+e.score;
+      });
       var sorted = Object.keys(cumTotals).sort(function(a,b){ return cumTotals[b]-cumTotals[a]; });
       var rank = sorted.indexOf(t.name)+1;
       return rank > 0 ? rank : null;
@@ -6441,7 +6472,10 @@ function resetAll(){
 function getAllTeams(){
   var seen = {};
   Object.keys(seasonData).forEach(function(w){
-    (seasonData[w]||[]).forEach(function(e){ seen[e.name] = true; });
+    (seasonData[w]||[]).forEach(function(e){
+      if(realActiveMemberUids && (!e.uid || !realActiveMemberUids[e.uid])) return;
+      seen[e.name] = true;
+    });
   });
   return Object.keys(seen).sort();
 }
@@ -6450,6 +6484,7 @@ function getTeamRank(name){
   var totals = {};
   Object.keys(seasonData).forEach(function(w){
     (seasonData[w]||[]).forEach(function(e){
+      if(realActiveMemberUids && (!e.uid || !realActiveMemberUids[e.uid])) return;
       totals[e.name] = (totals[e.name]||0) + e.score;
     });
   });
@@ -7260,7 +7295,11 @@ function getStreak(name){
   var results = recent.map(function(w){
     var entry = (seasonData[String(w)]||[]).find(function(e){ return teamMatch(e.name, name); });
     if(!entry) return null;
-    var avg = (seasonData[String(w)]||[]).reduce(function(s,e){ return s+e.score; },0) / (seasonData[String(w)]||[]).length;
+    var wkEntriesRaw = seasonData[String(w)]||[];
+    var wkEntries = realActiveMemberUids
+      ? wkEntriesRaw.filter(function(e){ return e.uid && realActiveMemberUids[e.uid]; })
+      : wkEntriesRaw;
+    var avg = wkEntries.reduce(function(s,e){ return s+e.score; },0) / (wkEntries.length||1);
     return entry.score >= avg ? 'hot' : 'cold';
   });
   if(results.some(function(r){ return r === null; })) return null;
@@ -7487,21 +7526,27 @@ function updateSeasonStats(){
     return !isNaN(Number(k)) && seasonData[k] && seasonData[k].length > 0;
   }).map(Number);
   if(!weeks.length) return;
+  function realEntries(w){
+    var raw = seasonData[String(w)] || [];
+    return realActiveMemberUids
+      ? raw.filter(function(e){ return e.uid && realActiveMemberUids[e.uid]; })
+      : raw;
+  }
   // Season leader
   var totals = {};
   weeks.forEach(function(w){
-    (seasonData[String(w)]||[]).forEach(function(e){ totals[e.name]=(totals[e.name]||0)+e.score; });
+    realEntries(w).forEach(function(e){ totals[e.name]=(totals[e.name]||0)+e.score; });
   });
   var sorted = Object.keys(totals).sort(function(a,b){ return totals[b]-totals[a]; });
   var leader = sorted[0];
   // Season avg (avg of all weekly avgs)
   var allScores = [];
-  weeks.forEach(function(w){ (seasonData[String(w)]||[]).forEach(function(e){ allScores.push(e.score); }); });
+  weeks.forEach(function(w){ realEntries(w).forEach(function(e){ allScores.push(e.score); }); });
   var sznAvg = allScores.reduce(function(a,b){ return a+b; },0) / (allScores.length||1);
   // Most consistent (most weeks above avg)
   var aboveCounts = {};
   weeks.forEach(function(w){
-    var entries = seasonData[String(w)]||[];
+    var entries = realEntries(w);
     var avg = entries.reduce(function(s,e){ return s+e.score; },0)/(entries.length||1);
     entries.forEach(function(e){ if(e.score >= avg) aboveCounts[e.name]=(aboveCounts[e.name]||0)+1; });
   });
@@ -7533,13 +7578,21 @@ function openShareCard(){
     return !isNaN(Number(k)) && seasonData[k] && seasonData[k].length > 0;
   }).map(Number).sort(function(a,b){ return a-b; });
   if(!weeks.length){ showToast('No data yet', true); return; }
-  var curEntries = seasonData[String(currentWeek)] || [];
+  var curEntriesRaw = seasonData[String(currentWeek)] || [];
+  var curEntries = realActiveMemberUids
+    ? curEntriesRaw.filter(function(e){ return e.uid && realActiveMemberUids[e.uid]; })
+    : curEntriesRaw;
   var myEntry = curEntries.find(function(e){ return teamMatch(e.name, myTeam); });
   if(!myEntry){ showToast('No data for your team this week', true); return; }
   var sorted = curEntries.slice().sort(function(a,b){ return b.score-a.score; });
   var wkRank = sorted.findIndex(function(e){ return e.name === myEntry.name; }) + 1;
   var totals = {};
-  weeks.forEach(function(w){ (seasonData[String(w)]||[]).forEach(function(e){ totals[e.name]=(totals[e.name]||0)+e.score; }); });
+  weeks.forEach(function(w){
+    (seasonData[String(w)]||[]).forEach(function(e){
+      if(realActiveMemberUids && (!e.uid || !realActiveMemberUids[e.uid])) return;
+      totals[e.name]=(totals[e.name]||0)+e.score;
+    });
+  });
   var sznRank = getCorrectedRank(myEntry.uid) || Object.keys(totals).sort(function(a,b){ return totals[b]-totals[a]; }).indexOf(myEntry.name) + 1;
   var medals = ['🥇','🥈','🥉'];
 
