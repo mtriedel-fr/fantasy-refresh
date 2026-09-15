@@ -6497,14 +6497,25 @@ function getPlayerWeekData(name){
   return weeks.map(function(w){
     var entry = (seasonData[String(w)]||[]).find(function(e){ return teamMatch(e.name, name); });
     if(!entry) return null;
-    var wkData = seasonData[String(w)] || [];
+    var wkDataRaw = seasonData[String(w)] || [];
+    // Filtered against the real, active member list — confirmed
+    // directly as the cause of "out of 80-something" showing here
+    // instead of the real team count, same underlying gap as the
+    // other spots fixed earlier tonight (orphaned/stale entries
+    // inflating counts and rank denominators).
+    var wkData = realActiveMemberUids
+      ? wkDataRaw.filter(function(e){ return e.uid && realActiveMemberUids[e.uid]; })
+      : wkDataRaw;
     var avg = wkData.reduce(function(s,e){ return s+e.score; },0) / (wkData.length||1);
     var sorted = wkData.slice().sort(function(a,b){ return b.score-a.score; });
     var rank = sorted.findIndex(function(e){ return teamMatch(e.name, name); }) + 1;
     // Cumulative standing up to this week
     var cumTotals = {};
     weeks.filter(function(ww){ return ww <= w; }).forEach(function(ww){
-      (seasonData[String(ww)]||[]).forEach(function(e){ cumTotals[e.name] = (cumTotals[e.name]||0) + e.score; });
+      (seasonData[String(ww)]||[]).forEach(function(e){
+        if(realActiveMemberUids && (!e.uid || !realActiveMemberUids[e.uid])) return;
+        cumTotals[e.name] = (cumTotals[e.name]||0) + e.score;
+      });
     });
     var cumSorted = Object.keys(cumTotals).sort(function(a,b){ return cumTotals[b]-cumTotals[a]; });
     var cumStanding = cumSorted.indexOf(name) + 1;
