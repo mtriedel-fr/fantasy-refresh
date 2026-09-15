@@ -1,0 +1,75 @@
+name: URGENT Diagnostic — Check If Scores Are Actually Updating
+
+# ONE-TIME USE — delete this file after running it once.
+# Checks whether real scores are actually still updating on the
+# backend right now - the most recently updated entry's real
+# timestamp, how stale it is relative to now, and whether any games
+# are currently live per the real data itself. Read-only.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check real score freshness
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB_URL = process.env.FIREBASE_DB_URL;
+          const FB_TOKEN = process.env.FIREBASE_AUTH_TOKEN;
+          const LEAGUE_ID = 'fr_refresh26';
+          const SEASON = 2026;
+          const WEEK = 1;
+
+          function fbAuth(path) {
+            const sep = path.includes('?') ? '&' : '?';
+            return FB_TOKEN ? `${path}${sep}auth=${FB_TOKEN}` : path;
+          }
+          function fetchJson(path) {
+            return new Promise((resolve, reject) => {
+              https.get(fbAuth(`${FB_URL}${path}`), res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+
+          async function main() {
+            console.log('Current real time:', new Date().toISOString());
+
+            const rawScores = await fetchJson(`/leagues/${LEAGUE_ID}/season/${SEASON}/${WEEK}.json`).catch(() => null);
+            if (!rawScores) { console.log('No score data found at all.'); return; }
+
+            const entries = Object.entries(rawScores).filter(([k]) => k !== 'ownership' && k !== 'ownershipMeta');
+            const withTimestamp = entries.filter(([,e]) => e && e.updatedAt).sort((a,b) => b[1].updatedAt - a[1].updatedAt);
+
+            if (!withTimestamp.length) { console.log('No entries have a real updatedAt timestamp.'); return; }
+
+            const [mostRecentUid, mostRecent] = withTimestamp[0];
+            const ageMin = Math.round((Date.now() - mostRecent.updatedAt) / 60000);
+            console.log(`Most recently updated entry: team="${mostRecent.team}" updatedAt=${new Date(mostRecent.updatedAt).toISOString()} (${ageMin} min ago)`);
+            console.log(`Real status on that entry: "${mostRecent.status}"`);
+
+            const liveCount = entries.filter(([,e]) => e && e.status === 'live').length;
+            const finalCount = entries.filter(([,e]) => e && e.status === 'final').length;
+            console.log(`Real status breakdown: ${liveCount} live, ${finalCount} final, ${entries.length - liveCount - finalCount} other/unset`);
+
+            // Spread of timestamps - if everything updated at once a long
+            // time ago, that points to auto-scoring.yml not running
+            // recently at all, not just one team being stuck.
+            const timestamps = withTimestamp.map(([,e]) => e.updatedAt);
+            const oldest = Math.min(...timestamps);
+            const newest = Math.max(...timestamps);
+            console.log(`Oldest real timestamp: ${new Date(oldest).toISOString()}`);
+            console.log(`Newest real timestamp: ${new Date(newest).toISOString()}`);
+            console.log(`Spread: ${Math.round((newest - oldest) / 1000)}s between oldest and newest real update`);
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
