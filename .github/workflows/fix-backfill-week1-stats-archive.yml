@@ -1,0 +1,254 @@
+name: One-Time Fix — Backfill Week 1 Thursday/Sunday Stats Archive
+
+# ONE-TIME USE — delete this file after it runs successfully once.
+#
+# Restores Week 1's real, complete stats archive. Confirmed directly:
+# archiveWeekStats() only ever ran with that day's games (never the
+# full week at once), and used a plain replace instead of a merge -
+# so when Monday Night Football's game archived, it silently wiped
+# out everything already archived from Thursday and Sunday. That
+# merge bug is now fixed going forward in auto-scoring.yml, but this
+# backfill is needed to actually recover the specific data already
+# lost for Week 1.
+#
+# Dynamically determines Week 1's real Thursday/Sunday dates from the
+# real, cached NFL schedule rather than hardcoding them - re-fetches
+# real box scores for each, computes real fantasy points using the
+# exact same scoring formula as production, and merges the result
+# into the existing archive (which already has Monday's real data
+# correctly present) rather than replacing it.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type YES to backfill the Week 1 stats archive'
+        required: true
+        default: 'NO'
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Backfill Week 1 Thursday/Sunday stats
+        if: ${{ github.event.inputs.confirm == 'YES' }}
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+          TANK01_KEY: ${{ secrets.TANK01_KEY }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB_URL = process.env.FIREBASE_DB_URL;
+          const FB_TOKEN = process.env.FIREBASE_AUTH_TOKEN;
+          const T01_KEY = process.env.TANK01_KEY;
+          const T01_HOST = 'tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com';
+          const SEASON = 2026;
+          const WEEK = 1;
+          const SEASON_TYPE = 'Regular';
+
+          function fbAuth(path) {
+            const sep = path.includes('?') ? '&' : '?';
+            return FB_TOKEN ? `${path}${sep}auth=${FB_TOKEN}` : path;
+          }
+          function firebaseGet(path) {
+            return new Promise((resolve, reject) => {
+              https.get(fbAuth(`${FB_URL}${path}`), res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+          function firebasePut(path, payload) {
+            return new Promise((resolve, reject) => {
+              const body = JSON.stringify(payload);
+              const url = new URL(fbAuth(`${FB_URL}${path}`));
+              const req = https.request({
+                hostname: url.hostname, path: url.pathname + url.search, method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+              }, res => {
+                let d = '';
+                res.on('data', c => d += c);
+                res.on('end', () => {
+                  if (res.statusCode < 200 || res.statusCode >= 300) reject(new Error(`Write failed: HTTP ${res.statusCode} — ${d}`));
+                  else resolve(d);
+                });
+              });
+              req.on('error', reject);
+              req.write(body);
+              req.end();
+            });
+          }
+          function t01(path) {
+            return new Promise((resolve, reject) => {
+              https.get({
+                hostname: T01_HOST, path, headers: { 'X-RapidAPI-Key': T01_KEY, 'X-RapidAPI-Host': T01_HOST }
+              }, res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+
+          function sanitizeFirebaseKey(name) {
+            return (name || '').replace(/[.$#\[\]\/]/g, '');
+          }
+          function stripNameSuffix(name) {
+            return (name || '').replace(/\s+(jr|sr|ii|iii|iv|v)\.?$/i, '').trim();
+          }
+
+          // Exact same scoring formula as production (calcDKPoints in
+          // auto-scoring.yml) — copied verbatim so Perfect Roster and
+          // everything else reading this archive gets numbers computed
+          // identically to every other week.
+          function calcDKPoints(p, pos) {
+            if (!p) return { pts: 0 };
+            const pass = p.Passing || {};
+            const rush = p.Rushing || {};
+            const recv = p.Receiving || {};
+            const def  = p.Defense || {};
+            let pts = 0;
+            function add(statValue, multiplier) {
+              const val = parseFloat(statValue) || 0;
+              if (val) pts += Math.round(val * multiplier * 100) / 100;
+            }
+            add(pass.passYds, 0.04); add(pass.passTD, 4); add(pass.int, -2); add(p.pass300, 3);
+            add(rush.rushYds, 0.1); add(rush.rushTD, 6); add(p.rush100, 3);
+            add(recv.receptions, 1); add(recv.recYds, 0.1); add(recv.recTD, 6); add(p.rec100, 3);
+            add(def.fumblesLost, -2); add(p.twoPt, 2);
+            if (pos === 'DEF') {
+              add(p.sacks, 1); add(p.defInt, 2); add(p.fumbRec, 2); add(p.defTD, 6); add(p.safety, 2); add(p.blkKick, 2);
+              const rawPa = p.ptsAllowed != null ? p.ptsAllowed : p.pointsAllowed;
+              const pa = rawPa != null ? parseFloat(rawPa) : null;
+              if (pa !== null) {
+                if (pa === 0) pts += 10; else if (pa <= 6) pts += 7; else if (pa <= 13) pts += 4;
+                else if (pa <= 20) pts += 1; else if (pa <= 27) pts += 0; else if (pa <= 34) pts -= 1; else pts -= 4;
+              }
+            }
+            return { pts: Math.round(pts * 100) / 100 };
+          }
+
+          async function getPlayerPosLookup() {
+            const lookup = {};
+            try {
+              const pool = await firebaseGet(`/playerPool/${SEASON}/players.json`);
+              Object.values(pool || {}).forEach(p => { if (p && p.name) lookup[p.name.toLowerCase()] = p.pos || ''; });
+            } catch(e) { console.log('Could not load player pool for position lookup:', e.message); }
+            return lookup;
+          }
+
+          async function fetchDayPlayerStats(etDate, posLookup) {
+            console.log(`\n--- Fetching real games for ${etDate} ---`);
+            const gamesData = await t01(`/getNFLScoresOnly?gameDate=${etDate}`).catch(() => null);
+            const games = Object.values((gamesData && gamesData.body) || {});
+            const finalGames = games.filter(g => {
+              const s = (g.gameStatus || g.status || '').toLowerCase();
+              return s.includes('final') || s.includes('completed');
+            });
+            console.log(`Found ${games.length} game(s), ${finalGames.length} final.`);
+
+            const playerStats = {};
+            for (const game of finalGames) {
+              const gameId = game.gameID || game.gameId || '';
+              if (!gameId) continue;
+              const bs = await t01(`/getNFLBoxScore?gameID=${gameId}&fantasyPoints=true&PPRScoring=true`).catch(() => null);
+              if (!bs || !bs.body) { console.log(`  Failed box score for ${gameId}`); continue; }
+
+              Object.values(bs.body.playerStats || {}).forEach(stats => {
+                const name = (stats.longName || stats.playerName || '').toLowerCase();
+                if (!name) return;
+                playerStats[name] = stats;
+              });
+
+              const sides = ['home', 'away'];
+              sides.forEach((side, i) => {
+                const d = bs.body.DST && bs.body.DST[side];
+                if (!d || !d.teamAbv) return;
+                const opp = bs.body.DST && bs.body.DST[sides[1 - i]];
+                const oppDefTDs = opp ? (parseFloat(opp.defTD) || 0) : 0;
+                const rawPtsAllowed = parseFloat(d.ptsAllowed) || 0;
+                const adjustedPtsAllowed = Math.max(0, rawPtsAllowed - oppDefTDs * 7);
+                playerStats[d.teamAbv] = {
+                  sacks: d.sacks, defInt: d.defensiveInterceptions, fumbRec: d.fumblesRecovered,
+                  defTD: d.defTD, safety: d.safeties, ptsAllowed: adjustedPtsAllowed,
+                  longName: d.teamAbv, team: d.teamAbv
+                };
+              });
+              console.log(`  ✓ ${gameId}: ${Object.keys(bs.body.playerStats || {}).length} player stat(s)`);
+            }
+
+            const gameList = finalGames.map(g => ({
+              gameId: g.gameID || g.gameId || '', home: g.home || g.homeTeamAbbr || g.homeTeam || '', away: g.away || g.awayTeamAbbr || g.awayTeam || ''
+            })).filter(g => g.home && g.away);
+
+            return { playerStats, gameList };
+          }
+
+          function buildArchivePlayers(playerStats, posLookup) {
+            const players = {};
+            Object.values(playerStats).forEach(stats => {
+              const displayName = stats.longName || stats.playerName || '';
+              const name = displayName.toLowerCase();
+              if (!name || players[sanitizeFirebaseKey(name)]) return;
+              const pass = stats.Passing || {}, rush = stats.Rushing || {}, recv = stats.Receiving || {};
+              const posForScoring = (stats.ptsAllowed !== undefined) ? 'DEF' : (posLookup[name] || '');
+              players[sanitizeFirebaseKey(name)] = {
+                name: displayName, team: stats.team || stats.teamAbv || '', pos: posForScoring,
+                pts: calcDKPoints(stats, posForScoring).pts,
+                passYds: parseFloat(pass.passYds || 0), passTD: parseFloat(pass.passTD || 0),
+                rushYds: parseFloat(rush.rushYds || 0), rushTD: parseFloat(rush.rushTD || 0),
+                recYds: parseFloat(recv.recYds || 0), recTD: parseFloat(recv.recTD || 0), rec: parseFloat(recv.receptions || 0)
+              };
+            });
+            return players;
+          }
+
+          async function main() {
+            const cachedSeason = await firebaseGet(`/nflSchedule/${SEASON}/Regular.json`).catch(() => null);
+            const weekGames = cachedSeason && cachedSeason.weeks && cachedSeason.weeks.week1;
+            if (!Array.isArray(weekGames) || !weekGames.length) { console.log('No cached Week 1 schedule found.'); return; }
+
+            const dateSet = new Set();
+            weekGames.forEach(g => {
+              if (!g || !g.time) return;
+              const etDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(g.time)).replace(/-/g, '');
+              dateSet.add(etDate);
+            });
+            const allDates = [...dateSet].sort();
+            console.log('Real Week 1 game dates:', allDates);
+
+            const existingArchive = await firebaseGet(`/nflStatsArchive/${SEASON}/${SEASON_TYPE}_wk${WEEK}.json`).catch(() => null);
+            const existingPlayers = (existingArchive && existingArchive.players) || {};
+            const existingGames = (existingArchive && existingArchive.games) || [];
+            const alreadyArchivedKeys = new Set(Object.keys(existingPlayers));
+            console.log(`Currently archived: ${alreadyArchivedKeys.size} player(s).`);
+
+            const posLookup = await getPlayerPosLookup();
+            let mergedPlayers = { ...existingPlayers };
+            const mergedGamesById = {};
+            existingGames.forEach(g => { if (g && g.gameId) mergedGamesById[g.gameId] = g; });
+
+            for (const etDate of allDates) {
+              const { playerStats, gameList } = await fetchDayPlayerStats(etDate, posLookup);
+              const newPlayers = buildArchivePlayers(playerStats, posLookup);
+              mergedPlayers = { ...mergedPlayers, ...newPlayers };
+              gameList.forEach(g => { if (g.gameId) mergedGamesById[g.gameId] = g; });
+              console.log(`${etDate}: ${Object.keys(newPlayers).length} player(s) processed.`);
+            }
+
+            await firebasePut(`/nflStatsArchive/${SEASON}/${SEASON_TYPE}_wk${WEEK}.json`, {
+              games: Object.values(mergedGamesById),
+              players: mergedPlayers,
+              archivedAt: Date.now()
+            });
+            console.log(`\n✅ Done. Archive now has ${Object.keys(mergedPlayers).length} total player(s) (was ${alreadyArchivedKeys.size}).`);
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
+
+      - name: Skipped - confirmation not provided
+        if: ${{ github.event.inputs.confirm != 'YES' }}
+        run: echo "Skipped — re-run with confirm=YES to actually backfill the archive."
