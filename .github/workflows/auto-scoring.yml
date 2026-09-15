@@ -1453,12 +1453,18 @@ jobs:
           // recomputed per view. Cumulative-format leagues only for now.
 
           async function computeCumulativeStandingsThrough(leagueId, throughWeek) {
+            const members = await firebaseGet(`/leagues/${leagueId}/members.json`).catch(() => ({})) || {};
+            const realActiveUids = new Set(
+              Object.entries(members).filter(([, m]) => m && m.teamName && m.active !== false).map(([uid]) => uid)
+            );
+
             const totals = {}; // uid -> {uid, team, total}
             for (let w = 1; w <= throughWeek; w++) {
               const weekScores = await firebaseGet(`/leagues/${leagueId}/season/${SEASON}/${w}.json`).catch(() => null);
               if (!weekScores || weekScores.error) continue;
               Object.values(weekScores).forEach(entry => {
                 if (!entry || !entry.uid) return;
+                if (!realActiveUids.has(entry.uid)) return; // orphaned/stale entry — not a real, active member
                 if (!totals[entry.uid]) totals[entry.uid] = { uid: entry.uid, team: entry.team || entry.uid, total: 0 };
                 totals[entry.uid].total += parseFloat(entry.score || 0);
                 totals[entry.uid].team = entry.team || totals[entry.uid].team;
@@ -1621,11 +1627,22 @@ jobs:
           // week in isolation, since who's still "in" depends on every
           // prior week's eliminations.
           async function computeGuillotineElimination(leagueId, week) {
+            const members = await firebaseGet(`/leagues/${leagueId}/members.json`).catch(() => ({})) || {};
+            const realActiveUids = new Set(
+              Object.entries(members).filter(([, m]) => m && m.teamName && m.active !== false).map(([uid]) => uid)
+            );
+
             const weekScoresByWeek = {};
             for (let w = 1; w <= week; w++) {
               const wk = await firebaseGet(`/leagues/${leagueId}/season/${SEASON}/${w}.json`).catch(() => null);
               if (wk && !wk.error && Object.keys(wk).length) {
-                weekScoresByWeek[w] = Object.values(wk).filter(e => e && e.team);
+                // Filtered against the real, active member list — confirmed
+                // directly that raw score data can contain orphaned/stale
+                // entries (leftover test accounts) that inflate the real
+                // team count above the actual number of league members.
+                weekScoresByWeek[w] = Object.entries(wk)
+                  .filter(([uid, e]) => e && e.team && realActiveUids.has(uid))
+                  .map(([, e]) => e);
               }
             }
             const weeks = Object.keys(weekScoresByWeek).map(Number).sort((a, b) => a - b);
