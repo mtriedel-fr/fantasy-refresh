@@ -1721,10 +1721,10 @@ jobs:
               if (guillotine) {
                 const teamStatus = {};
                 (guillotine.alive || []).forEach(team => {
-                  teamStatus[team] = { status: 'alive' };
+                  teamStatus[sanitizeFirebaseKey(team)] = { team, status: 'alive' };
                 });
                 Object.entries(guillotine.eliminatedWhen || {}).forEach(([team, info]) => {
-                  teamStatus[team] = { status: 'eliminated', eliminatedWeek: info.week, score: info.score, noShow: info.noShow };
+                  teamStatus[sanitizeFirebaseKey(team)] = { team, status: 'eliminated', eliminatedWeek: info.week, score: info.score, noShow: info.noShow };
                 });
                 await firebasePut(`/leagues/${leagueId}/guillotineStatus/${SEASON}.json`, {
                   teams: teamStatus,
