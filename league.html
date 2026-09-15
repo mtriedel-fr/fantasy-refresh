@@ -7597,13 +7597,31 @@ function openRecap(week){
   document.getElementById('recap-body').innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--ink3);font-size:13px;">Loading…</div>';
   document.getElementById('recap-overlay').classList.add('open');
 
-  FR.fb.get('/leagues/' + leagueId + '/recaps/' + season + '/week' + w)
-    .then(function(data){
+  Promise.all([
+    FR.fb.get('/leagues/' + leagueId + '/recaps/' + season + '/week' + w),
+    FR.fb.get('/leagues/' + leagueId + '/season/' + season + '/' + w + '/ownership').catch(function(){ return null; }),
+    FR.fb.get(FR.paths.weekSalaries(w)).catch(function(){ return null; })
+  ])
+    .then(function(results){
+      var data = results[0], ownership = results[1] || {}, salaryData = results[2];
       if(!data || data.error){
         document.getElementById('recap-body').innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--ink3);font-size:13px;">No recap available for this week yet — check back once the week is finalized.</div>';
         return;
       }
-      renderRecapBody(data);
+      // Name → ownership%, built the same way the All Players modal
+      // already does it — salary data is the only place a real id and a
+      // matchable name exist together, and ownership itself is id-keyed.
+      var ownershipByName = {};
+      if(salaryData && salaryData.players){
+        Object.keys(salaryData.players).forEach(function(pid){
+          var sp = salaryData.players[pid];
+          var realId = sp && sp.id ? sp.id : pid;
+          if(sp && sp.name && typeof ownership[realId] === 'number'){
+            ownershipByName[normalizeNameForFbs(sp.name)] = ownership[realId];
+          }
+        });
+      }
+      renderRecapBody(data, ownershipByName);
     })
     .catch(function(){
       document.getElementById('recap-body').innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--ink3);font-size:13px;">Couldn\'t load this week\'s recap.</div>';
@@ -7854,7 +7872,7 @@ function renderFbsBody(){
   document.getElementById('fbs-body').innerHTML = html;
 }
 
-function renderRecapBody(r){
+function renderRecapBody(r, ownershipByName){
   var html = '';
 
   if(r.leagueLeader){
@@ -7924,12 +7942,18 @@ function renderRecapBody(r){
 
   if(r.perfectRoster && r.perfectRoster.picks){
     var slotOrder = { QB: 0, RB: 1, WR: 2, TE: 3, FLEX: 4, DEF: 5 };
-    var sortedPicks = r.perfectRoster.picks.slice().sort(function(a,b){ return (slotOrder[a.slot]||9) - (slotOrder[b.slot]||9); });
+    var sortedPicks = r.perfectRoster.picks.slice().sort(function(a,b){
+      var aSlot = (a.slot || '').toUpperCase().trim();
+      var bSlot = (b.slot || '').toUpperCase().trim();
+      return (slotOrder[aSlot]!=null ? slotOrder[aSlot] : 9) - (slotOrder[bSlot]!=null ? slotOrder[bSlot] : 9);
+    });
     html += '<div class="recap-section">'
       + '<div class="recap-section-label">🏆 The Perfect Roster</div>'
       + '<div class="recap-section-sub" style="margin-bottom:8px;">Best possible lineup this week, across every eligible player — ' + fmtScore(r.perfectRoster.points) + ' pts, $' + r.perfectRoster.salaryUsed.toLocaleString() + ' of $60,000</div>'
       + sortedPicks.map(function(p){
-          return '<div class="recap-roster-row"><span style="color:var(--ink3);width:38px;flex-shrink:0;">' + p.slot + '</span><span style="flex:1;color:var(--ink);">' + escapeHtmlFR(p.name) + '</span><span style="color:var(--ink2);">' + (p.pts||0) + ' pts</span></div>';
+          var own = ownershipByName ? ownershipByName[normalizeNameForFbs(p.name)] : null;
+          var ownText = (typeof own === 'number') ? own.toFixed(1) + '%' : '—';
+          return '<div class="recap-roster-row"><span style="color:var(--ink3);width:38px;flex-shrink:0;">' + p.slot + '</span><span style="flex:1;color:var(--ink);">' + escapeHtmlFR(p.name) + '</span><span style="color:var(--ink2);margin-right:10px;">' + (p.pts||0) + ' pts</span><span style="color:var(--ink3);width:48px;text-align:right;flex-shrink:0;">' + ownText + '</span></div>';
         }).join('')
       + '</div>';
   }
