@@ -1341,6 +1341,20 @@ jobs:
 
           async function archiveWeekStats(games, playerStats, seasonType, week) {
             const archiveKey = `${seasonType}_wk${week}`;
+            // Merge with whatever's already archived — this only ever runs
+            // with TODAY's (and yesterday's leftover) games, never the
+            // full week at once, so a real week's worth of archiving
+            // happens across several separate calls as each game day
+            // finishes (Thursday, then Sunday, then Monday). A plain
+            // replace here would wipe out every earlier day's players the
+            // moment a later day's games go final — confirmed directly as
+            // the cause of Perfect Roster only showing Monday Night
+            // Football players once that game archived, since Thursday
+            // and Sunday's real players had already been silently erased.
+            const existingArchive = await firebaseGet(`/nflStatsArchive/${SEASON}/${archiveKey}.json`).catch(() => null);
+            const existingPlayers = (existingArchive && existingArchive.players) || {};
+            const existingGames = (existingArchive && existingArchive.games) || [];
+
             const gameList = games.map(g => ({
               gameId: g.gameID || g.gameId || '',
               home:   g.home || g.homeTeamAbbr || g.homeTeam || '',
@@ -1439,12 +1453,18 @@ jobs:
               return;
             }
 
+            const mergedPlayers = { ...existingPlayers, ...players };
+            const mergedGamesById = {};
+            existingGames.forEach(g => { if (g && g.gameId) mergedGamesById[g.gameId] = g; });
+            gameList.forEach(g => { if (g && g.gameId) mergedGamesById[g.gameId] = g; });
+            const mergedGames = Object.values(mergedGamesById);
+
             await firebasePut(`/nflStatsArchive/${SEASON}/${archiveKey}.json`, {
-              games: gameList,
-              players,
+              games: mergedGames,
+              players: mergedPlayers,
               archivedAt: Date.now()
             });
-            console.log(`  📦 Archived ${Object.keys(players).length} player stat lines for ${archiveKey}`);
+            console.log(`  📦 Archived ${Object.keys(players).length} new player stat line(s) for ${archiveKey} (${Object.keys(mergedPlayers).length} total across the week so far)`);
           }
 
           // ── WEEKLY RECAP ("Weekly Review") ────────────────────────────
