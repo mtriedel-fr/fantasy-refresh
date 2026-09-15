@@ -6979,12 +6979,18 @@ function renderNumbers(curEntries){
         var p = realLineup.slots[slotId];
         if(!p || !p.name) return;
         var hasStarted = !!(p.team && weekLocks[normTeam(p.team)]);
-        if(!slotCounts[si][p.name]) slotCounts[si][p.name] = { count: 0, hasStarted: hasStarted, pts: undefined };
-        slotCounts[si][p.name].count++;
+        // Normalized key so the same real player never splits into
+        // multiple entries just because their name was saved with
+        // slightly different formatting (whitespace, punctuation,
+        // casing) across different teams' lineups. The real, original
+        // display name is kept separately and never altered.
+        var key = normalizeNameForFbs(p.name);
+        if(!slotCounts[si][key]) slotCounts[si][key] = { count: 0, hasStarted: hasStarted, pts: undefined, displayName: p.name };
+        slotCounts[si][key].count++;
         // A player's own score is the same no matter which team's entry
         // we happen to read it from — capture it whenever available.
         if(hasStarted && entry.slotPts && typeof entry.slotPts[slotId] === 'number'){
-          slotCounts[si][p.name].pts = entry.slotPts[slotId];
+          slotCounts[si][key].pts = entry.slotPts[slotId];
         }
       });
     });
@@ -6995,7 +7001,7 @@ function renderNumbers(curEntries){
       var top = players.reduce(function(a,b){ return counts[a].count>=counts[b].count?a:b; });
       // Same privacy gate as the roster columns — hide identity until
       // that player's game has actually started, only reveal the count.
-      return { player: counts[top].hasStarted ? top : null, count: counts[top].count, total: entries.length, pts: counts[top].pts };
+      return { player: counts[top].hasStarted ? counts[top].displayName : null, count: counts[top].count, total: entries.length, pts: counts[top].pts };
     });
   }
 
