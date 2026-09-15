@@ -308,20 +308,25 @@ function enterLeague(leagueId) {
 
 // Weekly Review / Draft Now button on each card — sets up the same
 // real league context enterLeague() does, then goes straight to the
-// draft board if that's what's actually open, or into the league's
-// main page otherwise (where Weekly Review is one tap away, rather
-// than risking a deep link into the recap that isn't a confirmed,
-// stable entry point).
-function goToWeeklyAction(leagueId, draftOpen) {
+// draft board, or deep-links into the league's real recap modal (the
+// same Weekly Review — best team, worst team, etc — that lives on
+// the league page itself) for the specific week being reviewed.
+function goToWeeklyAction(leagueId, action, week) {
   fetch(FB_DB_URL + '/leagues/' + leagueId + '/settings.json')
     .then(function(r) { return r.json(); })
     .then(function(s) {
       if (s && !s.error) {
         FRAuth.enterLeague(leagueId, s, user ? user.teamName : '');
       }
-      window.location.href = draftOpen ? '/draft.html' : '/league.html';
+      go();
     })
-    .catch(function() { window.location.href = draftOpen ? '/draft.html' : '/league.html'; });
+    .catch(function() { go(); });
+
+  function go(){
+    if (action === 'draft') window.location.href = '/draft.html';
+    else if (action === 'recap' && week) window.location.href = '/league.html?openRecap=' + week;
+    else window.location.href = '/league.html';
+  }
 }
 
 // ── COMMISSIONER SETTINGS ────────────────────────────────────────
@@ -543,9 +548,13 @@ function buildCard(l) {
       + '</div>'
     : '';
 
-  var weeklyActionBtn = nextWeekDraftOpen
-    ? '<button onclick="event.stopPropagation();goToWeeklyAction(\'' + l.leagueId + '\',true);" style="width:100%;margin-top:8px;padding:10px;border-radius:10px;border:none;background:var(--pk,#FF5FA0);color:#fff;font-family:var(--fd);font-size:13px;font-weight:800;letter-spacing:.3px;cursor:pointer;">🏈 DRAFT NOW</button>'
-    : '<button onclick="event.stopPropagation();goToWeeklyAction(\'' + l.leagueId + '\',false);" style="width:100%;margin-top:8px;padding:10px;border-radius:10px;border:1px solid var(--bdr);background:transparent;color:var(--ink2);font-family:var(--fd);font-size:13px;font-weight:800;letter-spacing:.3px;cursor:pointer;">📰 WEEKLY REVIEW</button>';
+  var weekComplete = typeof l.currentWeekFinalizedAt === 'number';
+  var weeklyActionBtn = '';
+  if (nextWeekDraftOpen) {
+    weeklyActionBtn = '<button onclick="event.stopPropagation();goToWeeklyAction(\'' + l.leagueId + '\',\'draft\');" style="width:100%;margin-top:8px;padding:10px;border-radius:10px;border:none;background:var(--pk,#FF5FA0);color:#fff;font-family:var(--fd);font-size:13px;font-weight:800;letter-spacing:.3px;cursor:pointer;">🏈 DRAFT NOW</button>';
+  } else if (weekComplete) {
+    weeklyActionBtn = '<button onclick="event.stopPropagation();goToWeeklyAction(\'' + l.leagueId + '\',\'recap\',' + latest + ');" style="width:100%;margin-top:8px;padding:10px;border-radius:10px;border:1px solid var(--bdr);background:transparent;color:var(--ink2);font-family:var(--fd);font-size:13px;font-weight:800;letter-spacing:.3px;cursor:pointer;">📰 WEEKLY REVIEW</button>';
+  }
 
   var cardId = 'card-msg-' + l.leagueId;
   var card = '<div class="league-card" onclick="enterLeague(\'' + l.leagueId + '\')">'
@@ -786,6 +795,15 @@ function renderCards(leagueIds, uid) {
             var nextWeek = (meta && typeof meta.week === 'number') ? meta.week + 1 : null;
             if (!nextWeek) return null;
             return fetch(FB_DB_URL + '/leagues/' + leagueId + '/salaries/' + seasonKey + '/week' + nextWeek + '/meta.json').then(function(r) { return r.json(); });
+          }).catch(function() { return null; }),
+          // Real signal for whether the current (latest) week is
+          // actually finalized yet — Weekly Review should only show in
+          // the real window between a week genuinely completing and the
+          // next draft opening, not while a week is still live.
+          fetch(FB_DB_URL + '/leagues/' + leagueId + '/season/' + seasonKey + '/meta.json').then(function(r) { return r.json(); }).then(function(meta) {
+            var wk = (meta && typeof meta.week === 'number') ? meta.week : null;
+            if (!wk) return null;
+            return fetch(FB_DB_URL + '/leagues/' + leagueId + '/season/' + seasonKey + '/' + wk + '/finalizedAt.json').then(function(r) { return r.json(); });
           }).catch(function() { return null; })
         ]);
       })
@@ -800,7 +818,8 @@ function renderCards(leagueIds, uid) {
           seasonData: res[3],
           guillotineStatus: res[4],
           seasonMeta: res[5],
-          nextWeekSalaryMeta: res[6]
+          nextWeekSalaryMeta: res[6],
+          currentWeekFinalizedAt: res[7]
         };
       }).catch(function() { return null; });
   }))

@@ -1800,6 +1800,22 @@ function checkCommParam(){
   }catch(e){}
 }
 
+// Same real pattern as checkCommParam — lets home.html's card button
+// deep-link straight into a specific week's real recap modal (the
+// same "best team, worst team" Weekly Review shown here), rather than
+// just dropping someone on the league's main page to go find it
+// themselves.
+function checkRecapParam(){
+  try{
+    var params = new URLSearchParams(window.location.search);
+    var wk = params.get('openRecap');
+    if(wk){
+      window.history.replaceState({}, '', '/league.html');
+      setTimeout(function(){ openRecap(parseInt(wk)); }, 1000);
+    }
+  }catch(e){}
+}
+
 // ── CONSTANTS ──────────────────────────────────────────────────
 var WEEKS = (function(){
   try{
@@ -2562,6 +2578,7 @@ function boot(){
   applyArchiveVisibility();
   renderAll();
   checkCommParam();
+  checkRecapParam();
 
   // Once a week is genuinely, fully finalized, the default view
   // advances to the next week immediately — not after a 24-hour delay
@@ -3920,6 +3937,38 @@ function renderGuillotine(){
   }
   var gsTeams = guillotineStatusCache[gsKey].teams || {};
 
+  // Embedded Weekly Review — same real data/logic as the modal (openRecap),
+  // just rendered inline here instead of requiring a separate popup. Shows
+  // the most recently completed week's recap, fetched once and cached.
+  var recapWeek = weeks[weeks.length - 1];
+  var recapCacheKey = gsKey + ':' + recapWeek;
+  var recapEmbedHTML = '';
+  if(guillRecapEmbedCache[recapCacheKey] !== undefined){
+    recapEmbedHTML = guillRecapEmbedCache[recapCacheKey];
+  } else {
+    var season = gsKey;
+    Promise.all([
+      FR.fb.get('/leagues/' + leagueId2 + '/recaps/' + season + '/week' + recapWeek).catch(function(){ return null; }),
+      FR.fb.get('/leagues/' + leagueId2 + '/season/' + season + '/' + recapWeek + '/ownership').catch(function(){ return null; }),
+      FR.fb.get(FR.paths.weekSalaries(recapWeek)).catch(function(){ return null; })
+    ]).then(function(results){
+      var data = results[0], ownership = results[1] || {}, salaryData = results[2];
+      var ownershipByName = {};
+      if(salaryData && salaryData.players){
+        Object.keys(salaryData.players).forEach(function(pid){
+          var sp = salaryData.players[pid];
+          var realId = sp && sp.id ? sp.id : pid;
+          if(sp && sp.name && typeof ownership[realId] === 'number'){
+            ownershipByName[normalizeNameForFbs(sp.name)] = ownership[realId];
+          }
+        });
+      }
+      guillRecapEmbedCache[recapCacheKey] = (data && !data.error) ? renderRecapBody(data, ownershipByName) : '';
+      renderGuillotine();
+    });
+    guillRecapEmbedCache[recapCacheKey] = null; // in-flight marker — avoids firing a duplicate fetch on the next render before this one resolves
+  }
+
   // Get all teams from week 1 — filtered against the real, active
   // member list before counting. Confirmed directly: raw seasonData can
   // contain orphaned/stale entries (leftover test accounts, the
@@ -4160,6 +4209,7 @@ function renderGuillotine(){
     + fullScheduleHTML
     + (winnersHTML || '')
     + survivorsHTML
+    + (recapEmbedHTML ? '<div class="guill-section"><div class="guill-section-hdr">📰 Week ' + recapWeek + ' Review</div>' + recapEmbedHTML + '</div>' : '')
     + '</div>';
 }
 
@@ -6938,6 +6988,7 @@ function ensureWeekScores(week){
 }
 
 var guillotineStatusCache = {}; // seasonKey -> {teams: {name: {status, eliminatedWeek, score, noShow}}} — real, persisted elimination status, fetched separately since it's computed once on the backend rather than replayed client-side
+var guillRecapEmbedCache = {}; // "season:week" -> rendered recap HTML string, for the embedded Weekly Review on the Last One Standing page
 var weekLineupsCache = {}; // week -> {uid: {slots: {...}}, ...} — real lineup data, fetched separately since score entries never actually carry a lineup field (see below)
 var weekScoresCache = {}; // week -> {uid: {score, slotPts: {slotId: points}, ...}, ...} — real, per-slot scoring data, fetched separately from lineups since the lineup itself only has player identity, not points
 var weekLocksCache = {}; // week -> {team: true, ...} — which teams have locked (kicked off), used to gate player identity in Roster/Most Started until their game has actually started
@@ -7692,7 +7743,7 @@ function openRecap(week){
           }
         });
       }
-      renderRecapBody(data, ownershipByName);
+      document.getElementById('recap-body').innerHTML = renderRecapBody(data, ownershipByName);
     })
     .catch(function(){
       document.getElementById('recap-body').innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--ink3);font-size:13px;">Couldn\'t load this week\'s recap.</div>';
@@ -8033,7 +8084,7 @@ function renderRecapBody(r, ownershipByName){
     html = '<div style="text-align:center;padding:40px 0;color:var(--ink3);font-size:13px;">Not enough data yet for a full recap this week.</div>';
   }
 
-  document.getElementById('recap-body').innerHTML = html;
+  return html;
 }
 
 // ── EMOJI REACTIONS ────────────────────────────────────────────
