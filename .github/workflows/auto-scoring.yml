@@ -1688,15 +1688,19 @@ jobs:
           }
 
           async function generateWeeklyRecap(leagueId, week, seasonType, settings) {
-            const [thisWeekScores, lineups, salaryData] = await Promise.all([
+            const [thisWeekScores, lineups, salaryData, members] = await Promise.all([
               firebaseGet(`/leagues/${leagueId}/season/${SEASON}/${week}.json`).catch(() => null),
               firebaseGet(`/leagues/${leagueId}/lineups/${SEASON}/week${week}.json`).catch(() => null),
-              firebaseGet(`/leagues/${leagueId}/salaries/${SEASON}/week${week}.json`).catch(() => null)
+              firebaseGet(`/leagues/${leagueId}/salaries/${SEASON}/week${week}.json`).catch(() => null),
+              firebaseGet(`/leagues/${leagueId}/members.json`).catch(() => ({}))
             ]);
             if (!thisWeekScores || thisWeekScores.error || !Object.keys(thisWeekScores).length) {
               console.log(`  Recap: no scores yet for ${leagueId} week ${week} — skipping`);
               return;
             }
+            const realActiveUids = new Set(
+              Object.entries(members || {}).filter(([, m]) => m && m.teamName && m.active !== false).map(([uid]) => uid)
+            );
 
             // Guillotine toggle can run alongside cumulative — computed
             // separately from the cumulative recap fields below, since
@@ -1734,7 +1738,7 @@ jobs:
               }
             }
 
-            const teamScores = Object.values(thisWeekScores).filter(e => e && e.uid);
+            const teamScores = Object.values(thisWeekScores).filter(e => e && e.uid && realActiveUids.has(e.uid));
 
             // ── Top / low score this week ──
             const sortedByScore = [...teamScores].sort((a, b) => b.score - a.score);
@@ -1782,8 +1786,9 @@ jobs:
                 if (p && p.name) salaryByName[p.name.toLowerCase()] = p;
               });
 
-              Object.values(lineups).forEach(lineup => {
+              Object.entries(lineups).forEach(([lineupUid, lineup]) => {
                 if (!lineup || !lineup.slots) return;
+                if (!realActiveUids.has(lineupUid)) return; // orphaned/stale entry — not a real, active member
                 Object.values(lineup.slots).forEach(player => {
                   if (!player || !player.name) return;
                   const scoreEntry = thisWeekScores[lineup.uid || ''] || Object.values(thisWeekScores).find(e => e.uid === (lineup.uid || ''));
@@ -1817,6 +1822,20 @@ jobs:
               const archiveKey = `${seasonType}_wk${week}`;
               const statsArchive = await firebaseGet(`/nflStatsArchive/${SEASON}/${archiveKey}.json`).catch(() => null);
               if (statsArchive && statsArchive.players) {
+                // Normalized, suffix-stripped lookup index — an exact key
+                // match alone silently fails whenever the salary pool's
+                // name for a player has a different suffix presence than
+                // the archive's own key (e.g. "Michael Pittman" vs
+                // "Michael Pittman Jr."), treating a real, scoring player
+                // as 0 points and undershooting the true best-possible
+                // lineup by however many such players were missed.
+                const normalizedArchive = {};
+                Object.values(statsArchive.players).forEach(stats => {
+                  if (!stats || !stats.name) return;
+                  const key = sanitizeFirebaseKey(stripNameSuffix(stats.name).toLowerCase());
+                  normalizedArchive[key] = stats;
+                });
+
                 const pool = Object.values(salaryData.players)
                   .filter(p => p && p.name && p.salary && ['QB','RB','WR','TE','DEF'].includes(p.pos))
                   .map(p => {
@@ -1827,8 +1846,8 @@ jobs:
                     // rather than a name-based lookup that wouldn't match.
                     const statKey = p.pos === 'DEF'
                       ? sanitizeFirebaseKey((p.team || p.id || p.name || '').toLowerCase())
-                      : sanitizeFirebaseKey(p.name.toLowerCase());
-                    const stats = statsArchive.players[statKey];
+                      : sanitizeFirebaseKey(stripNameSuffix(p.name).toLowerCase());
+                    const stats = p.pos === 'DEF' ? statsArchive.players[statKey] : normalizedArchive[statKey];
                     return { name: p.name, pos: p.pos, salary: p.salary, pts: stats ? parseFloat(stats.pts || 0) : 0 };
                   });
                 const cap = 60000; // standard cap — see league-setup.html, roster/cap is fixed while honing in on the core three formats
