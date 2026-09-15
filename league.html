@@ -6995,10 +6995,12 @@ function renderNumbers(curEntries){
       });
     });
 
+    var usedPlayers = {}; // normalized key -> true, once shown in an earlier slot
     return slotCounts.map(function(counts){
-      var players = Object.keys(counts);
+      var players = Object.keys(counts).filter(function(key){ return !usedPlayers[key]; });
       if(!players.length) return null;
       var top = players.reduce(function(a,b){ return counts[a].count>=counts[b].count?a:b; });
+      usedPlayers[top] = true;
       // Same privacy gate as the roster columns — hide identity until
       // that player's game has actually started, only reveal the count.
       return { player: counts[top].hasStarted ? counts[top].displayName : null, count: counts[top].count, total: entries.length, pts: counts[top].pts };
