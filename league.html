@@ -3178,23 +3178,31 @@ function renderCumHome(){
 }
 
 var realActiveMemberUids = null; // uid -> true, for every real, active member — null until first loaded
-var realActiveMemberUidsLoading = false;
+var realActiveMemberUidsPromise = null; // the real, in-flight fetch promise, shared by every concurrent caller
 function loadRealActiveMemberUids(){
   if(realActiveMemberUids) return Promise.resolve(realActiveMemberUids);
-  if(realActiveMemberUidsLoading) return Promise.resolve(null);
-  realActiveMemberUidsLoading = true;
+  // Confirmed as a real, critical bug: returning Promise.resolve(null)
+  // here for a concurrent caller (instead of the real, still-pending
+  // promise) let any caller that reacts to that premature "not ready"
+  // result call this function again immediately — creating a tight,
+  // self-sustaining microtask loop that ran forever at 100% CPU,
+  // since it never gave the original, real network request a chance
+  // to actually finish and break the cycle. Every concurrent caller
+  // now shares and awaits the exact same real promise instead.
+  if(realActiveMemberUidsPromise) return realActiveMemberUidsPromise;
   var ctx = FRAuth.getLeagueCtx();
   var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
-  return FR.fb.get('/leagues/' + leagueId + '/members').then(function(members){
+  realActiveMemberUidsPromise = FR.fb.get('/leagues/' + leagueId + '/members').then(function(members){
     var set = {};
     Object.entries(members || {}).forEach(function(entry){
       var uid = entry[0], m = entry[1];
       if(m && m.teamName && m.active !== false) set[uid] = true;
     });
     realActiveMemberUids = set;
-    realActiveMemberUidsLoading = false;
+    realActiveMemberUidsPromise = null;
     return set;
-  }).catch(function(){ realActiveMemberUidsLoading = false; return null; });
+  }).catch(function(){ realActiveMemberUidsPromise = null; return null; });
+  return realActiveMemberUidsPromise;
 }
 
 var fullStandingsCache = {}; // week -> full merged list (every real member, not just ones with a score entry)
