@@ -176,11 +176,6 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
     <div class="greeting-name" id="greeting-name">—<span>'s Leagues</span></div>
   </div>
 
-  <div class="week-pill" id="week-pill">
-    <div class="week-dot"></div>
-    <span class="week-text" id="week-pill-text">Preseason · Season starts Sep 4</span>
-  </div>
-
   <div id="leagues-wrap">
     <div class="loading-wrap">
       <div class="spinner"></div>
@@ -309,6 +304,24 @@ function enterLeague(leagueId) {
       window.location.href = '/league.html';
     })
     .catch(function() { window.location.href = '/league.html'; });
+}
+
+// Weekly Review / Draft Now button on each card — sets up the same
+// real league context enterLeague() does, then goes straight to the
+// draft board if that's what's actually open, or into the league's
+// main page otherwise (where Weekly Review is one tap away, rather
+// than risking a deep link into the recap that isn't a confirmed,
+// stable entry point).
+function goToWeeklyAction(leagueId, draftOpen) {
+  fetch(FB_DB_URL + '/leagues/' + leagueId + '/settings.json')
+    .then(function(r) { return r.json(); })
+    .then(function(s) {
+      if (s && !s.error) {
+        FRAuth.enterLeague(leagueId, s, user ? user.teamName : '');
+      }
+      window.location.href = draftOpen ? '/draft.html' : '/league.html';
+    })
+    .catch(function() { window.location.href = draftOpen ? '/draft.html' : '/league.html'; });
 }
 
 // ── COMMISSIONER SETTINGS ────────────────────────────────────────
@@ -462,7 +475,8 @@ function buildCard(l) {
       // entire gap between one week finishing and the next one's real
       // games actually starting. Falls back to the old "highest week
       // with any data at all" approach only if no meta exists yet.
-      var latest = (l.seasonMeta && typeof l.seasonMeta.week === 'number')
+      var nextWeekDraftOpen = !!(l.nextWeekSalaryMeta && l.nextWeekSalaryMeta.count > 0);
+      var latest = (l.seasonMeta && typeof l.seasonMeta.week === 'number' && nextWeekDraftOpen)
         ? l.seasonMeta.week + 1
         : Math.max.apply(null, weeks);
       var weekEntries = l.seasonData[String(latest)] || {};
@@ -529,6 +543,10 @@ function buildCard(l) {
       + '</div>'
     : '';
 
+  var weeklyActionBtn = nextWeekDraftOpen
+    ? '<button onclick="event.stopPropagation();goToWeeklyAction(\'' + l.leagueId + '\',true);" style="width:100%;margin-top:8px;padding:10px;border-radius:10px;border:none;background:var(--pk,#FF5FA0);color:#fff;font-family:var(--fd);font-size:13px;font-weight:800;letter-spacing:.3px;cursor:pointer;">🏈 DRAFT NOW</button>'
+    : '<button onclick="event.stopPropagation();goToWeeklyAction(\'' + l.leagueId + '\',false);" style="width:100%;margin-top:8px;padding:10px;border-radius:10px;border:1px solid var(--bdr);background:transparent;color:var(--ink2);font-family:var(--fd);font-size:13px;font-weight:800;letter-spacing:.3px;cursor:pointer;">📰 WEEKLY REVIEW</button>';
+
   var cardId = 'card-msg-' + l.leagueId;
   var card = '<div class="league-card" onclick="enterLeague(\'' + l.leagueId + '\')">'
     + '<div class="card-top-bar ' + bar + '"></div>'
@@ -548,6 +566,7 @@ function buildCard(l) {
     + toggleRow
     + weekStatsBlock
     + seasonStatsBlock
+    + weeklyActionBtn
     + '<div id="' + cardId + '" style="font-size:13px;color:var(--ink2);font-style:italic;padding:10px 0 2px;min-height:0;line-height:1.4;"></div>'
     + '</div>'
     + '</div>';
@@ -756,7 +775,18 @@ function renderCards(leagueIds, uid) {
           // happens to have the most recent real data (which stays on
           // last week's numbers for the entire gap between one week
           // finishing and the next one's games actually starting).
-          fetch(FB_DB_URL + '/leagues/' + leagueId + '/season/' + seasonKey + '/meta.json').then(function(r) { return r.json(); }).catch(function() { return null; })
+          fetch(FB_DB_URL + '/leagues/' + leagueId + '/season/' + seasonKey + '/meta.json').then(function(r) { return r.json(); }).catch(function() { return null; }),
+          // Real signal for whether the NEXT week's draft has actually
+          // opened yet — same real check league.html itself uses before
+          // ever letting someone into a week's draft board. Needed so
+          // the card doesn't clear to dashes the instant a week finishes
+          // scoring, well before there's anything real to show for the
+          // week after it.
+          fetch(FB_DB_URL + '/leagues/' + leagueId + '/season/' + seasonKey + '/meta.json').then(function(r) { return r.json(); }).then(function(meta) {
+            var nextWeek = (meta && typeof meta.week === 'number') ? meta.week + 1 : null;
+            if (!nextWeek) return null;
+            return fetch(FB_DB_URL + '/leagues/' + leagueId + '/salaries/' + seasonKey + '/week' + nextWeek + '/meta.json').then(function(r) { return r.json(); });
+          }).catch(function() { return null; })
         ]);
       })
       .then(function(res) {
@@ -769,7 +799,8 @@ function renderCards(leagueIds, uid) {
           isComm:     res[2] === true || isCreator,
           seasonData: res[3],
           guillotineStatus: res[4],
-          seasonMeta: res[5]
+          seasonMeta: res[5],
+          nextWeekSalaryMeta: res[6]
         };
       }).catch(function() { return null; });
   }))
@@ -815,21 +846,8 @@ function goToLeague() {
   }
 }
 
-function updateWeekPill() {
-  // Will update dynamically once season data is available
-  var pill = document.getElementById('week-pill-text');
-  if (!pill) return;
-  var now = new Date();
-  var seasonStart = new Date('2026-09-03');
-  if (now < seasonStart) {
-    var days = Math.ceil((seasonStart - now) / (1000 * 60 * 60 * 24));
-    pill.textContent = 'Season starts in ' + days + ' days';
-  }
-}
-
 // ── BOOT ─────────────────────────────────────────────────────────
 loadLeagues();
-updateWeekPill();
 </script>
 
 <script>
