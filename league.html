@@ -2579,19 +2579,23 @@ function boot(){
     FR.fb.get('/leagues/' + leagueId + '/season/' + season + '/' + currentWeek + '/finalizedAt')
       .then(function(finalizedAt){
         if(typeof finalizedAt === 'number'){
-          currentWeek = currentWeek + 1;
-          buildWeekBar();
-          renderAll();
-          // Same fix as setWeekFromSelect() — renderAll() alone doesn't
-          // refresh an already-open My Team dropdown, since it only
-          // fetches when it's opened, not when currentWeek changes
-          // programmatically. Without this, the auto-advance correctly
-          // updates the header/standings while My Team stays stuck
-          // showing the just-finished week's roster.
+          var nextWk = currentWeek + 1;
+          checkNextWeekSalariesReady(nextWk).then(function(ready){
+            if(!ready) return; // week is finalized, but nothing real to show for the next one yet — stay put
+            currentWeek = nextWk;
+            buildWeekBar();
+            renderAll();
+            // Same fix as setWeekFromSelect() — renderAll() alone doesn't
+            // refresh an already-open My Team dropdown, since it only
+            // fetches when it's opened, not when currentWeek changes
+            // programmatically. Without this, the auto-advance correctly
+            // updates the header/standings while My Team stays stuck
+            // showing the just-finished week's roster.
           var myTeamDrop = document.getElementById('myteam-drop');
           if(myTeamDrop && !myTeamDrop.classList.contains('hidden')){
             loadMyTeamLineup(myTeamDrop);
           }
+          });
         }
       })
       .catch(function(){});
