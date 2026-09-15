@@ -48,6 +48,7 @@ jobs:
           LOCK_SCORES: ${{ inputs.lock_scores }}
           MANUAL_LEAGUE: ${{ inputs.league_id }}
           MANUAL_GAME_DATE: ${{ inputs.game_date }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
         run: |
           node << 'SCRIPT'
           const https = require('https');
@@ -84,7 +85,7 @@ jobs:
           const BASE_SEASON = SEASON;
           const T01_HOST    = 'tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com';
           const IS_LOCK_RUN = process.env.LOCK_SCORES === 'true' ||
-                              new Date().getUTCDay() === 2; // Tuesday
+                              (process.env.GITHUB_EVENT_NAME === 'schedule' && new Date().getUTCDay() === 2); // Tuesday, but only for GitHub's own real schedule trigger — a manual run or the external cron-job.org service (both arrive as workflow_dispatch) must never silently skip live scoring just because today happens to be Tuesday.
 
           // ── DraftKings Scoring ─────────────────────────────────
           function calcDKPoints(p, pos) {
