@@ -2583,6 +2583,7 @@ function boot(){
   }
 
   determineRealCurrentWeek().then(function(){
+    weekDetermined = true;
     buildWeekBar();
     buildWeekSelect();
     // Previously forced tab-yourweek (This Week — a full-screen overlay tab)
@@ -3499,6 +3500,15 @@ function renderCumStandingsPage(page){
 // format-specific here. Moves the single #myteam-drop panel to right
 // after whichever toggle button was clicked, rather than duplicating it.
 var myTeamAutoOpened = false; // ensures the landing-page auto-open only happens once, respecting later manual open/close choices
+// Real flag for whether currentWeek has actually been determined yet
+// by boot()'s own careful logic. Confirmed directly as needed:
+// loadTeamName() calls applyTeamName() synchronously on page load,
+// BEFORE loadFromCloud()/boot() ever run — which calls renderAll()
+// with currentWeek still at its raw default. Since autoOpenMyTeamOnce()
+// only ever fires once, that premature call was locking in the wrong
+// week's roster data permanently, even after boot() later determined
+// and rendered the real, correct week.
+var weekDetermined = false;
 
 // Auto-opens the My Team dropdown on first landing-page render. hasPlayers
 // is passed in from the caller's own real data check (not re-derived from
@@ -3508,6 +3518,13 @@ var myTeamAutoOpened = false; // ensures the landing-page auto-open only happens
 // just stays as the plain "📝 Draft Team" button, nothing shown.
 function autoOpenMyTeamOnce(context, hasPlayers){
   if(myTeamAutoOpened) return;
+  // Refuse to fire — and critically, refuse to consume the one-time
+  // latch — until the real week is actually known. Confirmed directly:
+  // without this, a premature call (from loadTeamName()'s synchronous
+  // applyTeamName(), which runs before boot() ever determines the real
+  // week) would permanently lock in the wrong week's roster data, with
+  // no way to recover since this only ever fires once.
+  if(!weekDetermined) return;
   myTeamAutoOpened = true;
   if(!hasPlayers) return;
 
