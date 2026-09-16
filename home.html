@@ -388,11 +388,19 @@ function barClass(s) {
 // ── SEASON-LONG STATS ────────────────────────────────────────────
 // Pulls real entries out of a week's raw Firebase object (keyed by
 // team uid, with an "ownership" sibling key that isn't a real team).
-function weekEntries(seasonData, wk) {
+// realActiveMemberUids, when given, filters out orphaned/stale
+// entries (leftover test accounts) that aren't real, active members
+// — confirmed directly as the cause of an inflated team count and a
+// wrong rank (e.g. "#80" shown in a 76-team league).
+function weekEntries(seasonData, wk, realActiveMemberUids) {
   var raw = (seasonData && seasonData[String(wk)]) || {};
   return Object.keys(raw)
-    .filter(function(k) { return k !== 'ownership' && raw[k] && raw[k].team; })
-    .map(function(k) { return raw[k]; });
+    .filter(function(k) {
+      if (k === 'ownership' || !raw[k] || !raw[k].team) return false;
+      if (realActiveMemberUids && !realActiveMemberUids[k]) return false;
+      return true;
+    })
+    .map(function(k) { var e = raw[k]; e.uid = e.uid || k; return e; });
 }
 
 // Same elimination-schedule formula already proven correct twice
@@ -421,7 +429,7 @@ function computeSeasonStats(l, teamName) {
 
   var totals = {}; // team name (lowercase) -> {team, total}
   weeks.forEach(function(w) {
-    weekEntries(l.seasonData, w).forEach(function(e) {
+    weekEntries(l.seasonData, w, l.realActiveMemberUids).forEach(function(e) {
       var key = e.team.toLowerCase();
       if (!totals[key]) totals[key] = { team: e.team, total: 0 };
       totals[key].total += (typeof e.score === 'number' ? e.score : 0);
@@ -484,10 +492,14 @@ function buildCard(l) {
       var latest = (l.seasonMeta && typeof l.seasonMeta.week === 'number' && nextWeekDraftOpen)
         ? l.seasonMeta.week + 1
         : Math.max.apply(null, weeks);
-      var weekEntries = l.seasonData[String(latest)] || {};
-      var entries     = Object.keys(weekEntries)
-        .filter(function(k) { return k !== 'ownership' && weekEntries[k] && weekEntries[k].team; })
-        .map(function(k) { return weekEntries[k]; });
+      var weekEntriesRaw = l.seasonData[String(latest)] || {};
+      var entries     = Object.keys(weekEntriesRaw)
+        .filter(function(k) {
+          if (k === 'ownership' || !weekEntriesRaw[k] || !weekEntriesRaw[k].team) return false;
+          if (l.realActiveMemberUids && !l.realActiveMemberUids[k]) return false;
+          return true;
+        })
+        .map(function(k) { var e = weekEntriesRaw[k]; e.uid = e.uid || k; return e; });
       var mine = entries.find(function(e) {
         return e.team && teamName && e.team.toLowerCase() === teamName.toLowerCase();
       });
@@ -804,12 +816,27 @@ function renderCards(leagueIds, uid) {
             var wk = (meta && typeof meta.week === 'number') ? meta.week : null;
             if (!wk) return null;
             return fetch(FB_DB_URL + '/leagues/' + leagueId + '/season/' + seasonKey + '/' + wk + '/finalizedAt.json').then(function(r) { return r.json(); });
-          }).catch(function() { return null; })
+          }).catch(function() { return null; }),
+          // Real, active member list for this league — confirmed
+          // directly as the fix for standings/rank showing an inflated
+          // team count and a wrong rank (e.g. "#80" in a 76-team
+          // league). Raw seasonData can contain orphaned/stale entries
+          // (leftover test accounts) that both views were previously
+          // counting as real teams.
+          fetch(FB_DB_URL + '/leagues/' + leagueId + '/members.json').then(function(r) { return r.json(); }).catch(function() { return null; })
         ]);
       })
       .then(function(res) {
         var settings = res[0];
         var isCreator = !!(settings && settings.createdBy === uid);
+        var realActiveMemberUids = null;
+        if (res[8]) {
+          realActiveMemberUids = {};
+          Object.keys(res[8]).forEach(function(memberUid) {
+            var m = res[8][memberUid];
+            if (m && m.teamName && m.active !== false) realActiveMemberUids[memberUid] = true;
+          });
+        }
         return {
           leagueId:   leagueId,
           settings:   settings,
@@ -819,7 +846,8 @@ function renderCards(leagueIds, uid) {
           guillotineStatus: res[4],
           seasonMeta: res[5],
           nextWeekSalaryMeta: res[6],
-          currentWeekFinalizedAt: res[7]
+          currentWeekFinalizedAt: res[7],
+          realActiveMemberUids: realActiveMemberUids
         };
       }).catch(function() { return null; });
   }))
