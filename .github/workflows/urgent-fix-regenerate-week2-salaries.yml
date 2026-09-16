@@ -1,0 +1,208 @@
+name: URGENT One-Time Fix — Regenerate Week 2 Salaries Correctly
+
+# ONE-TIME USE — delete this file after it runs successfully once.
+#
+# Confirmed directly: Week 2's real player salaries were overwritten
+# with the old, deprecated formula (Josh Allen at exactly $9,400 -
+# the old QB ceiling; CeeDee Lamb at $10,600, above the real, current
+# $9,100 max) - even though meta.generated wasn't updated to reflect
+# this write, which is itself a separate bug worth investigating
+# once the draft is unblocked. Confirmed safe to overwrite: no real
+# Week 2 lineups exist yet. This regenerates using the exact,
+# verified-correct per-position formula, including the Tank01
+# active-player cross-reference for backup QBs.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type YES to regenerate Week 2 salaries with the correct formula'
+        required: true
+        default: 'NO'
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Regenerate Week 2 salaries correctly
+        if: ${{ github.event.inputs.confirm == 'YES' }}
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+          TANK01_KEY: ${{ secrets.TANK01_KEY }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB_URL = process.env.FIREBASE_DB_URL;
+          const FB_TOKEN = process.env.FIREBASE_AUTH_TOKEN;
+          const T01_KEY = process.env.TANK01_KEY;
+          const T01_HOST = 'tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com';
+          const WORKER = 'https://fantasy-refresh-news.mtriedel.workers.dev';
+          const LEAGUE_ID = 'fr_refresh26';
+          const SEASON = 2026;
+          const WEEK = 2;
+
+          function fbAuth(path) {
+            const sep = path.includes('?') ? '&' : '?';
+            return FB_TOKEN ? `${path}${sep}auth=${FB_TOKEN}` : path;
+          }
+          function fetchJson(url) {
+            return new Promise((resolve, reject) => {
+              https.get(url, res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+          function firebaseGet(path) {
+            return new Promise((resolve, reject) => {
+              https.get(fbAuth(`${FB_URL}${path}`), res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+          function firebasePut(path, value) {
+            return new Promise((resolve, reject) => {
+              const url = new URL(fbAuth(`${FB_URL}${path}`));
+              const body = JSON.stringify(value);
+              const req = https.request({
+                hostname: url.hostname, path: url.pathname + url.search, method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+              }, res => {
+                let d = '';
+                res.on('data', c => d += c);
+                res.on('end', () => {
+                  if (res.statusCode < 200 || res.statusCode >= 300) reject(new Error(`Write failed: HTTP ${res.statusCode} — ${d}`));
+                  else resolve(d);
+                });
+              });
+              req.on('error', reject);
+              req.write(body);
+              req.end();
+            });
+          }
+          function t01(path) {
+            return new Promise((resolve, reject) => {
+              https.get({
+                hostname: T01_HOST, path, headers: { 'X-RapidAPI-Key': T01_KEY, 'X-RapidAPI-Host': T01_HOST }
+              }, res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve({ status: res.statusCode, body: JSON.parse(data) }); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+
+          const TOP_ANCHOR_EXP = 0.6, SHARED_CAP = 8600, RB_WR_MAX = 9100, MIN_SANITY = 100;
+          const POSITIONS = {
+            QB:  { exp: 1.3,  premium: 1.0,   clamp: SHARED_CAP },
+            RB:  { exp: 0.55, premium: 1.058, clamp: RB_WR_MAX },
+            WR:  { exp: 0.55, premium: 1.12,  clamp: RB_WR_MAX },
+            TE:  { exp: 0.7,  premium: 1.21,  clamp: SHARED_CAP },
+            DEF: { exp: 0.6,  premium: 0.97,  clamp: SHARED_CAP }
+          };
+          const BACKUP_QB_SALARY = 3800;
+
+          function normalizeNameForMatch(name) {
+            return (name || '').toLowerCase().replace(/[.,']/g, '').replace(/\s+(jr|sr|ii|iii|iv|v)$/i, '').trim();
+          }
+
+          async function getRealProjections(week, season) {
+            const data = await fetchJson(`${WORKER}/projections?week=${week}&season=${season}`).catch(() => null);
+            return (data && data.players) || [];
+          }
+
+          async function getActivePlayerIds() {
+            try {
+              const res = await t01('/getNFLPlayerList');
+              const list = (res.body && res.body.body) || [];
+              const ids = new Set();
+              list.forEach(p => { if (p && p.playerID && p.isFreeAgent === 'False') ids.add(String(p.playerID)); });
+              console.log(`Real, active player list: ${ids.size} of ${list.length} total Tank01 entries.`);
+              return ids;
+            } catch (e) {
+              console.log('Could not fetch Tank01 active-player list — falling back to team-field heuristic.');
+              return null;
+            }
+          }
+
+          async function main() {
+            const projPlayers = await getRealProjections(WEEK, SEASON);
+            console.log(`Real projections: ${projPlayers.length} players`);
+            if (!projPlayers.length) { console.log('No real projections available — stopping.'); return; }
+
+            const pool = await firebaseGet(`/playerPool/${SEASON}/players.json`).catch(() => null);
+            const nameMap = {};
+            if (pool) Object.values(pool).forEach(p => { if (p && p.name) nameMap[normalizeNameForMatch(p.name)] = p; });
+
+            const activePlayerIds = await getActivePlayerIds();
+
+            const maxProjByPos = {};
+            ['QB','RB','WR','TE','DEF'].forEach(pos => {
+              const atPos = projPlayers.filter(p => p.pos === pos && p.proj > 0);
+              maxProjByPos[pos] = atPos.length ? Math.max(...atPos.map(p => p.proj)) : 0;
+            });
+            const globalMaxProj = Math.max(...Object.values(maxProjByPos).filter(v => v > 0), 1);
+            const baseRate = SHARED_CAP / Math.pow(globalMaxProj, TOP_ANCHOR_EXP);
+
+            const multByPos = {};
+            Object.entries(POSITIONS).forEach(([pos, conf]) => {
+              if (!maxProjByPos[pos]) return;
+              let topAnchor = Math.pow(maxProjByPos[pos], TOP_ANCHOR_EXP) * baseRate * conf.premium;
+              topAnchor = Math.min(topAnchor, conf.clamp);
+              multByPos[pos] = topAnchor / Math.pow(maxProjByPos[pos], conf.exp);
+            });
+
+            const salaries = {};
+            let count = 0;
+            projPlayers.forEach(p => {
+              if (!p.proj || p.proj <= 0) return;
+              if (!POSITIONS[p.pos]) return;
+              const poolP = nameMap[normalizeNameForMatch(p.name)];
+              const pid = poolP ? poolP.id : ('t01_' + p.id);
+              const inj = poolP ? (poolP.status || p.status || null) : (p.status || null);
+              if (inj === 'O' || inj === 'IR') return;
+              const conf = POSITIONS[p.pos];
+              const mult = multByPos[p.pos] || 0;
+              let sal = Math.ceil((Math.pow(p.proj, conf.exp) * mult) / 100) * 100;
+              sal = Math.max(MIN_SANITY, Math.min(conf.clamp, sal));
+              salaries[pid] = { id: pid, name: p.name, pos: p.pos, team: p.team, proj: Math.round(p.proj * 10) / 10, salary: sal, status: inj, tank01PlayerID: poolP ? poolP.tank01PlayerID : null, headshot: poolP ? poolP.headshot : null };
+              count++;
+            });
+
+            Object.values(pool || {}).forEach(poolP => {
+              if (!poolP || poolP.pos !== 'QB') return;
+              if (activePlayerIds) {
+                if (!poolP.tank01PlayerID || !activePlayerIds.has(String(poolP.tank01PlayerID))) return;
+              } else if (!poolP.team) {
+                return;
+              }
+              if (salaries[poolP.id]) return;
+              const inj = poolP.status || null;
+              if (inj === 'O' || inj === 'IR') return;
+              salaries[poolP.id] = { id: poolP.id, name: poolP.name, pos: 'QB', team: poolP.team, proj: 0, salary: BACKUP_QB_SALARY, status: inj, tank01PlayerID: poolP.tank01PlayerID || null, headshot: poolP.headshot || null };
+              count++;
+            });
+
+            await firebasePut(`/leagues/${LEAGUE_ID}/salaries/${SEASON}/week${WEEK}.json`, {
+              players: salaries,
+              meta: { cap: 60000, count, flat: false, generated: Date.now(), locked: false, week: WEEK }
+            });
+
+            const qbs = Object.values(salaries).filter(p => p.pos === 'QB').sort((a,b) => b.salary - a.salary);
+            const backupQbs = qbs.filter(p => p.proj === 0);
+            console.log(`✅ Regenerated ${count} real players.`);
+            console.log(`Real top QB: ${qbs[0].name} $${qbs[0].salary}`);
+            console.log(`Real backup QBs included: ${backupQbs.length}`);
+            console.log(`Highest real salary overall: $${Math.max(...Object.values(salaries).map(p => p.salary))}`);
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
+
+      - name: Skipped - confirmation not provided
+        if: ${{ github.event.inputs.confirm != 'YES' }}
+        run: echo "Skipped — re-run with confirm=YES to actually regenerate."
