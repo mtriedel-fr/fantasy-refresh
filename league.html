@@ -2555,68 +2555,59 @@ function boot(){
   }).map(Number);
   if(loadedWks.length) currentWeek = Math.max.apply(null, loadedWks);
   console.log('🔎 boot(): loadedWks=' + JSON.stringify(loadedWks) + ' → currentWeek=' + currentWeek);
-  buildWeekBar();
-  buildWeekSelect();
-  // Previously forced tab-yourweek (This Week — a full-screen overlay tab)
-  // to be the default visible content here, unconditionally, every time
-  // boot() ran. That's what was actually causing the full-screen takeover
-  // on landing — it silently undid the "start hidden" markup fix the
-  // instant the page booted. Nothing here forces a specific full-screen
-  // tab open anymore; the real landing content (my-team-bar/stats/cum-home)
-  // is what naturally shows once renderAll() below runs, since none of the
-  // .content tabs (League/Playoffs/Guillotine/Season/This Week) claim the
-  // screen unless a user explicitly navigates to one.
-  document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); });
-  ['weeklystanding','numbers','myseason','standings','movement'].forEach(function(n){
-    var el = document.getElementById('sub-' + n);
-    if(el) el.classList.add('hidden');
-  });
-  var mylineup = document.getElementById('sub-mylineup');
-  if(mylineup) mylineup.classList.remove('hidden');
-  document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); });
-  initMyTeamInput();
-  applyArchiveVisibility();
-  renderAll();
-  checkCommParam();
-  checkRecapParam();
 
-  // Once a week is genuinely, fully finalized, the default view
-  // advances to the next week immediately — not after a 24-hour delay
-  // like before. Teams need to see their blank roster for the upcoming
-  // week right away so they can draft; reviewing a just-finished week
-  // is still fully available by hand via the week dropdown, it's just
-  // no longer what shows by DEFAULT. Runs after the initial render
-  // (using the naive "highest week with data" value) so the page shows
-  // something immediately, then corrects and re-renders only if the
-  // week is actually confirmed final.
-  if(currentWeek > 0 && currentWeek < WEEKS){
+  // Real week — genuinely determined, including the async
+  // finalized/next-week-ready check — BEFORE any rendering happens at
+  // all. Previously rendered once immediately with this naive
+  // "highest week with data" guess, then corrected and re-rendered a
+  // moment later if a week turned out to be finalized with its
+  // successor ready — which is exactly what produced a visible flash
+  // from the wrong week to the right one on every single page load.
+  // Trades a touch more time before the first paint for exactly one,
+  // correct render.
+  function determineRealCurrentWeek(){
+    if(!(currentWeek > 0 && currentWeek < WEEKS)) return Promise.resolve();
     var ctx = FRAuth.getLeagueCtx();
     var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
     var season = FR.seasonKey();
-    FR.fb.get('/leagues/' + leagueId + '/season/' + season + '/' + currentWeek + '/finalizedAt')
+    return FR.fb.get('/leagues/' + leagueId + '/season/' + season + '/' + currentWeek + '/finalizedAt')
       .then(function(finalizedAt){
-        if(typeof finalizedAt === 'number'){
-          var nextWk = currentWeek + 1;
-          checkNextWeekSalariesReady(nextWk).then(function(ready){
-            if(!ready) return; // week is finalized, but nothing real to show for the next one yet — stay put
-            currentWeek = nextWk;
-            buildWeekBar();
-            renderAll();
-            // Same fix as setWeekFromSelect() — renderAll() alone doesn't
-            // refresh an already-open My Team dropdown, since it only
-            // fetches when it's opened, not when currentWeek changes
-            // programmatically. Without this, the auto-advance correctly
-            // updates the header/standings while My Team stays stuck
-            // showing the just-finished week's roster.
-          var myTeamDrop = document.getElementById('myteam-drop');
-          if(myTeamDrop && !myTeamDrop.classList.contains('hidden')){
-            loadMyTeamLineup(myTeamDrop);
-          }
-          });
-        }
+        if(typeof finalizedAt !== 'number') return;
+        var nextWk = currentWeek + 1;
+        return checkNextWeekSalariesReady(nextWk).then(function(ready){
+          if(!ready) return; // week is finalized, but nothing real to show for the next one yet — stay put
+          currentWeek = nextWk;
+        });
       })
-      .catch(function(){});
+      .catch(function(){}); // any failure here just keeps the naive guess — never blocks boot entirely
   }
+
+  determineRealCurrentWeek().then(function(){
+    buildWeekBar();
+    buildWeekSelect();
+    // Previously forced tab-yourweek (This Week — a full-screen overlay tab)
+    // to be the default visible content here, unconditionally, every time
+    // boot() ran. That's what was actually causing the full-screen takeover
+    // on landing — it silently undid the "start hidden" markup fix the
+    // instant the page booted. Nothing here forces a specific full-screen
+    // tab open anymore; the real landing content (my-team-bar/stats/cum-home)
+    // is what naturally shows once renderAll() below runs, since none of the
+    // .content tabs (League/Playoffs/Guillotine/Season/This Week) claim the
+    // screen unless a user explicitly navigates to one.
+    document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); });
+    ['weeklystanding','numbers','myseason','standings','movement'].forEach(function(n){
+      var el = document.getElementById('sub-' + n);
+      if(el) el.classList.add('hidden');
+    });
+    var mylineup = document.getElementById('sub-mylineup');
+    if(mylineup) mylineup.classList.remove('hidden');
+    document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); });
+    initMyTeamInput();
+    applyArchiveVisibility();
+    renderAll();
+    checkCommParam();
+    checkRecapParam();
+  });
 
   showWelcomeTourIfNeeded(WELCOME_TOUR_KEY, WELCOME_TOUR_TITLE, WELCOME_TOUR_ITEMS);
 }
