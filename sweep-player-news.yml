@@ -1,0 +1,240 @@
+name: Sweep Player News
+
+# ── SCHEDULED — every 30 minutes, plus manual trigger for testing ──────
+# Rewritten to pull from FantasyPros' bulk /nfl/news endpoint instead of
+# Tank01's per-player getNFLNews — confirmed via a real, direct test call
+# that FantasyPros returns genuinely fantasy-relevant content (real
+# injury/practice-status items, not general NFL or personal-life news)
+# with a real, genuine publish timestamp, in ONE bulk call covering many
+# players at once, rather than needing one call per player. That's what
+# makes 30-minute intervals affordable at all — the old Tank01 approach
+# needed 446 calls per run (one per salary-eligible player); this needs
+# exactly 1.
+#
+# Real, confirmed math against the free tier's 50 requests/day: 48 runs
+# a day (every 30 min) x 1 call/run = 48/50 — technically within budget,
+# but only just. That's a genuinely thin margin: a manual test run, a
+# retry, or slight timing drift could push it over and get the key
+# rate-limited for the rest of the day. Worth knowing before relying on
+# this cadence during anything time-sensitive.
+#
+# Matches each real returned item against the real, current
+# salary-eligible player list (same list already populating the draft
+# picker) by checking whether the item's title starts with a known
+# player's name — confirmed directly via real test data that FantasyPros
+# titles consistently lead with the player's full name ("Jalen Coker
+# (ankle) works on side..."), same pattern Tank01 used, just against
+# much more precisely relevant source content.
+#
+# Dedupes using FantasyPros' own real, stable numeric `id` field — a
+# genuine improvement over the old sanitized-title-hash approach, which
+# only existed because Tank01 never provided a stable ID at all.
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'  # every 30 minutes
+  workflow_dispatch:
+    inputs:
+      test_only:
+        description: 'Test mode — write nothing, just report what would happen'
+        required: true
+        default: 'true'
+        type: choice
+        options: ['true', 'false']
+
+jobs:
+  sweep-news:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sweep real fantasy news from FantasyPros
+        env:
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+          FANTASYPROS_API_KEY: ${{ secrets.FANTASYPROS_API_KEY }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+
+          const FB_URL    = 'https://fantasy-refresh-default-rtdb.firebaseio.com';
+          const FB_TOKEN   = process.env.FIREBASE_AUTH_TOKEN;
+          const FP_KEY     = process.env.FANTASYPROS_API_KEY;
+          const SEASON     = process.env.FR_SEASON || '2026';
+          const TEST_ONLY  = '${{ inputs.test_only }}' === 'true' || !('${{ inputs.test_only }}');
+
+          function fetchJson(url, headers) {
+            return new Promise((resolve, reject) => {
+              https.get(url, { headers: headers || {} }, res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => {
+                  try { resolve(JSON.parse(data)); } catch(e) { reject(e); }
+                });
+              }).on('error', reject);
+            });
+          }
+
+          function firebaseGet(path) { return fetchJson(FB_URL + path); }
+
+          function firebasePut(path, payload) {
+            return new Promise((resolve, reject) => {
+              const url = new URL(FB_URL + path + '?auth=' + FB_TOKEN);
+              const body = JSON.stringify(payload);
+              const req = https.request(url, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+              }, res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => {
+                  if (res.statusCode < 200 || res.statusCode >= 300) {
+                    reject(new Error(`Firebase PUT ${path} failed: ${res.statusCode} ${data}`));
+                  } else {
+                    resolve(JSON.parse(data || '{}'));
+                  }
+                });
+              });
+              req.on('error', reject);
+              req.write(body);
+              req.end();
+            });
+          }
+
+          // Firebase RTDB keys can't contain . $ # [ ] /
+          function sanitizeFirebaseKey(s) {
+            return (s || '').replace(/[.$#\[\]\/]/g, '');
+          }
+
+          async function getSalaryEligiblePlayers(week) {
+            const players = new Map(); // name (lowercase) -> {name, team}
+            try {
+              const salaryData = await firebaseGet(`/leagues/fr_refresh26/salaries/${SEASON}/week${week}.json`);
+              if (!salaryData || salaryData.error || !salaryData.players) return players;
+              Object.values(salaryData.players).forEach(p => {
+                if (!p || !p.name) return;
+                players.set(p.name.toLowerCase(), { name: p.name, team: p.team || '' });
+              });
+            } catch(e) { console.error('  Could not read salary-eligible player list:', e.message); }
+            return players;
+          }
+
+          async function getCurrentWeek() {
+            try {
+              const meta = await firebaseGet(`/leagues/fr_refresh26/season/${SEASON}/meta.json`);
+              return (meta && meta.week) || 1;
+            } catch(e) { return 1; }
+          }
+
+          // FantasyPros' real "created" field looks like "2026-09-17
+          // 18:05:27" — confirmed via a real test call — no timezone
+          // marker, but created_formated on the same real item confirmed
+          // this is UTC ("Thu, Sep 17th 6:05pm UTC" matching "18:05:27").
+          function parseCreatedUtc(created) {
+            if (!created) return Date.now();
+            const iso = created.replace(' ', 'T') + 'Z';
+            const ms = Date.parse(iso);
+            return isNaN(ms) ? Date.now() : ms;
+          }
+
+          async function fetchFantasyProsNews() {
+            const data = await fetchJson('https://api.fantasypros.com/public/v2/json/nfl/news', {
+              'x-api-key': FP_KEY
+            });
+            return (data && data.items) || [];
+          }
+
+          (async () => {
+            if (!FP_KEY) {
+              console.error('❌ FANTASYPROS_API_KEY secret is missing.');
+              process.exit(1);
+            }
+            if (!TEST_ONLY && !FB_TOKEN) {
+              console.error('❌ FIREBASE_AUTH_TOKEN secret is missing — required for a real (non-test) sweep.');
+              process.exit(1);
+            }
+
+            const week = await getCurrentWeek();
+            console.log(`=== News sweep (FantasyPros) | week ${week} | mode: ${TEST_ONLY ? 'TEST (no writes)' : 'REAL'} ===`);
+
+            const eligiblePlayers = await getSalaryEligiblePlayers(week);
+            console.log(`Real salary-eligible player list: ${eligiblePlayers.size} players.`);
+
+            const items = await fetchFantasyProsNews();
+            console.log(`Real items returned from FantasyPros: ${items.length}`);
+
+            // Best-effort name extraction for a player NOT in the known
+            // salary-eligible list — confirmed via real sample titles
+            // that they consistently lead with capitalized name words
+            // ("Jalen Coker", "A.J. Terrell Jr.") followed by either an
+            // opening paren or a lowercase verb. Used so real news about
+            // a practice-squad player or a rookie isn't silently thrown
+            // away just because they aren't priced this week — that
+            // history can matter the moment they do become relevant.
+            function extractLeadingName(title) {
+              const words = title.trim().split(/\s+/);
+              const nameWords = [];
+              for (const w of words) {
+                if (w.startsWith('(')) break;
+                const clean = w.replace(/[.,']/g, '');
+                if (!clean.length) break;
+                if (/^[A-Z]/.test(clean)) nameWords.push(w);
+                else break;
+              }
+              return nameWords.join(' ');
+            }
+
+            let matched = 0, extracted = 0, added = 0, skippedExisting = 0, skippedNoName = 0;
+            for (const item of items) {
+              const title = (item.title || '').trim();
+              const titleLower = title.toLowerCase();
+
+              // Confirmed via real test data: titles consistently lead
+              // with the player's full name. Checking every known
+              // player as a prefix candidate — cheap even at ~450
+              // players x 25 items, since it's a plain string check.
+              let matchedPlayer = null;
+              for (const p of eligiblePlayers.values()) {
+                if (titleLower.startsWith(p.name.toLowerCase())) { matchedPlayer = p; break; }
+              }
+
+              var playerName, playerTeam, isConfirmed;
+              if (matchedPlayer) {
+                playerName = matchedPlayer.name; playerTeam = matchedPlayer.team; isConfirmed = true;
+                matched++;
+              } else {
+                var extractedName = extractLeadingName(title);
+                if (!extractedName) { skippedNoName++; continue; } // genuinely couldn't find a name — nothing sensible to key this under
+                playerName = extractedName; playerTeam = item.team_id || ''; isConfirmed = false;
+                extracted++;
+              }
+
+              const playerKey = sanitizeFirebaseKey(playerName.toLowerCase());
+              const itemKey = 'fp_' + (item.id || sanitizeFirebaseKey(titleLower).replace(/\s+/g, '_').slice(0, 100));
+
+              let existing = null;
+              try {
+                existing = await firebaseGet(`/nflNewsArchive/${playerKey}/${itemKey}.json`);
+              } catch(e) { /* not archived yet */ }
+              if (existing) { skippedExisting++; continue; }
+
+              const publishedAt = parseCreatedUtc(item.created);
+              if (TEST_ONLY) {
+                console.log(`  [TEST] would add: "${title}" (${playerName}${isConfirmed ? '' : ', extracted — not a confirmed salary-eligible match'}, published ${new Date(publishedAt).toISOString()})`);
+                added++;
+                continue;
+              }
+              try {
+                await firebasePut(`/nflNewsArchive/${playerKey}/${itemKey}.json`, {
+                  title, link: item.link || '', image: item.image || '',
+                  source: 'fantasypros.com', categories: item.categories || [],
+                  playerName: playerName, team: playerTeam,
+                  confirmedMatch: isConfirmed, // false = best-effort extracted name, not verified against the known player list
+                  archivedAt: publishedAt // real published time, not just when this job happened to run
+                });
+                added++;
+              } catch(e) {
+                console.error(`    Failed to archive item for ${playerName}:`, e.message);
+              }
+            }
+
+            console.log(`\n✓ Sweep complete — ${items.length} item(s) checked, ${matched} matched a known salary-eligible player, ${extracted} archived under a best-effort extracted name, ${skippedNoName} skipped (no name could be extracted), ${skippedExisting} already archived, ${TEST_ONLY ? 'would add' : 'added'} ${added} new item(s).`);
+          })();
+          SCRIPT
