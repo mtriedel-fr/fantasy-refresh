@@ -1,36 +1,42 @@
 name: Sweep Player News
 
-# ── SCHEDULED — every 4 hours, plus manual trigger for testing ──────────
-# Keeps a permanent, growing news archive fresh for every player someone
-# could realistically draft, without depending on anyone happening to
-# open that specific player's card first. Tank01 only ever hands back a
-# handful of the most recent items per player (maxItems=6) — anything
-# older just falls off and is gone forever unless captured here. This
-# job checks what's current each run and adds only genuinely NEW items
-# to /nflNewsArchive, skipping anything already saved, so the archive
-# accumulates real history over time instead of only ever showing
-# "today's top few."
+# ── SCHEDULED — every 30 minutes, plus manual trigger for testing ──────
+# Rewritten to pull from FantasyPros' bulk /nfl/news endpoint instead of
+# Tank01's per-player getNFLNews — confirmed via a real, direct test call
+# that FantasyPros returns genuinely fantasy-relevant content (real
+# injury/practice-status items, not general NFL or personal-life news)
+# with a real, genuine publish timestamp, in ONE bulk call covering many
+# players at once, rather than needing one call per player. That's what
+# makes 30-minute intervals affordable at all — the old Tank01 approach
+# needed 446 calls per run (one per salary-eligible player); this needs
+# exactly 1.
 #
-# Scoped to the salary-eligible pool (~500-600 players — the exact same
-# list already populating the draft picker), not the full player pool
-# (~3,200) and not just already-rostered players — news matters most
-# exactly when someone's deciding whether to DRAFT a player, which is
-# before they're rostered, so "rostered only" was missing the actual
-# highest-value moment. The full pool would run ~19,000+ calls/day on
-# this schedule, well over the daily cap — this scope keeps it a small
-# fraction of that while still covering everyone actually draftable.
-# Reuses the Worker's own /news endpoint rather than calling Tank01
-# directly, so once the field-name mapping there is fixed (it's
-# currently unverified — see the _debug output added to /news), this
-# sweep automatically benefits with no separate fix needed here.
+# Real, confirmed math against the free tier's 50 requests/day: 48 runs
+# a day (every 30 min) x 1 call/run = 48/50 — technically within budget,
+# but only just. That's a genuinely thin margin: a manual test run, a
+# retry, or slight timing drift could push it over and get the key
+# rate-limited for the rest of the day. Worth knowing before relying on
+# this cadence during anything time-sensitive.
+#
+# Matches each real returned item against the real, current
+# salary-eligible player list (same list already populating the draft
+# picker) by checking whether the item's title starts with a known
+# player's name — confirmed directly via real test data that FantasyPros
+# titles consistently lead with the player's full name ("Jalen Coker
+# (ankle) works on side..."), same pattern Tank01 used, just against
+# much more precisely relevant source content.
+#
+# Dedupes using FantasyPros' own real, stable numeric `id` field — a
+# genuine improvement over the old sanitized-title-hash approach, which
+# only existed because Tank01 never provided a stable ID at all.
 
 on:
   schedule:
-    - cron: '17 */4 * * *'  # every 4 hours, offset from the hour so it doesn't pile up with other scheduled jobs
+    - cron: '*/30 * * * *'  # every 30 minutes
   workflow_dispatch:
     inputs:
       test_only:
-        description: 'Test mode — sweep one league only, write nothing'
+        description: 'Test mode — write nothing, just report what would happen'
         required: true
         default: 'true'
         type: choice
@@ -40,24 +46,23 @@ jobs:
   sweep-news:
     runs-on: ubuntu-latest
     steps:
-      - name: Sweep rostered player news
+      - name: Sweep real fantasy news from FantasyPros
         env:
           FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+          FANTASYPROS_API_KEY: ${{ secrets.FANTASYPROS_API_KEY }}
         run: |
           node << 'SCRIPT'
           const https = require('https');
 
-          const FB_URL   = 'https://fantasy-refresh-default-rtdb.firebaseio.com';
-          const FB_TOKEN  = process.env.FIREBASE_AUTH_TOKEN;
-          const WORKER    = 'https://fantasy-refresh-news.mtriedel.workers.dev';
-          const SEASON    = process.env.FR_SEASON || '2026';
-          const TEST_ONLY = '${{ inputs.test_only }}' === 'true' || !('${{ inputs.test_only }}');
+          const FB_URL    = 'https://fantasy-refresh-default-rtdb.firebaseio.com';
+          const FB_TOKEN   = process.env.FIREBASE_AUTH_TOKEN;
+          const FP_KEY     = process.env.FANTASYPROS_API_KEY;
+          const SEASON     = process.env.FR_SEASON || '2026';
+          const TEST_ONLY  = '${{ inputs.test_only }}' === 'true' || !('${{ inputs.test_only }}');
 
-          function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
-
-          function fetchJson(url) {
+          function fetchJson(url, headers) {
             return new Promise((resolve, reject) => {
-              https.get(url, res => {
+              https.get(url, { headers: headers || {} }, res => {
                 let data = '';
                 res.on('data', c => data += c);
                 res.on('end', () => {
@@ -99,20 +104,13 @@ jobs:
           }
 
           async function getSalaryEligiblePlayers(week) {
-            // Same list already used to populate the draft picker itself —
-            // sourced from the salary data weekly-prep.yml already
-            // generates, not a separate lookup. fr_refresh26 used as the
-            // canonical source (same default used throughout this app
-            // whenever a single source of truth is needed), since the
-            // eligible player SET is broadly the same regardless of which
-            // league happens to be asking.
-            const players = new Map(); // name (lowercase) -> {name, team, tank01PlayerID}
+            const players = new Map(); // name (lowercase) -> {name, team}
             try {
               const salaryData = await firebaseGet(`/leagues/fr_refresh26/salaries/${SEASON}/week${week}.json`);
               if (!salaryData || salaryData.error || !salaryData.players) return players;
               Object.values(salaryData.players).forEach(p => {
                 if (!p || !p.name) return;
-                players.set(p.name.toLowerCase(), { name: p.name, team: p.team || '', tank01PlayerID: p.tank01PlayerID || null });
+                players.set(p.name.toLowerCase(), { name: p.name, team: p.team || '' });
               });
             } catch(e) { console.error('  Could not read salary-eligible player list:', e.message); }
             return players;
@@ -125,82 +123,87 @@ jobs:
             } catch(e) { return 1; }
           }
 
-          // A news item has no stable ID from Tank01, and — confirmed via
-          // a real sample — no date field either, just title and link.
-          // Dedupe using a sanitized version of the title alone, which is
-          // deterministic (the same real item always produces the same
-          // key) and specific enough on its own, since Tank01's titles
-          // here are full sentences, not short generic headlines.
-          function itemKey(item) {
-            const raw = (item.title || '').toLowerCase();
-            return sanitizeFirebaseKey(raw).replace(/\s+/g, '_').slice(0, 120) || ('item_' + Date.now());
+          // FantasyPros' real "created" field looks like "2026-09-17
+          // 18:05:27" — confirmed via a real test call — no timezone
+          // marker, but created_formated on the same real item confirmed
+          // this is UTC ("Thu, Sep 17th 6:05pm UTC" matching "18:05:27").
+          function parseCreatedUtc(created) {
+            if (!created) return Date.now();
+            const iso = created.replace(' ', 'T') + 'Z';
+            const ms = Date.parse(iso);
+            return isNaN(ms) ? Date.now() : ms;
           }
 
-          async function sweepPlayer(name, team, tank01PlayerID) {
-            let data;
-            try {
-              var newsUrl = `${WORKER}/news?name=${encodeURIComponent(name)}`;
-              if (tank01PlayerID) newsUrl += `&playerID=${encodeURIComponent(tank01PlayerID)}`;
-              data = await fetchJson(newsUrl);
-            } catch(e) {
-              console.error(`  ${name}: news fetch failed —`, e.message);
-              return { added: 0 };
-            }
-            const items = data.items || [];
-            if (!items.length) return { added: 0 };
-
-            const playerKey = sanitizeFirebaseKey(name.toLowerCase());
-            let existing = {};
-            try {
-              existing = await firebaseGet(`/nflNewsArchive/${playerKey}.json`) || {};
-              if (existing.error) existing = {};
-            } catch(e) { /* nothing archived yet for this player */ }
-
-            let added = 0;
-            for (const item of items) {
-              const key = itemKey(item);
-              if (existing[key]) continue; // already archived — genuinely new items only
-              if (TEST_ONLY) { added++; continue; }
-              try {
-                await firebasePut(`/nflNewsArchive/${playerKey}/${key}.json`, {
-                  ...item, playerName: name, team, archivedAt: Date.now()
-                });
-                added++;
-              } catch(e) {
-                console.error(`    Failed to archive item for ${name}:`, e.message);
-              }
-            }
-            return { added, totalSeen: items.length };
+          async function fetchFantasyProsNews() {
+            const data = await fetchJson('https://api.fantasypros.com/public/v2/json/nfl/news', {
+              'x-api-key': FP_KEY
+            });
+            return (data && data.items) || [];
           }
 
           (async () => {
+            if (!FP_KEY) {
+              console.error('❌ FANTASYPROS_API_KEY secret is missing.');
+              process.exit(1);
+            }
             if (!TEST_ONLY && !FB_TOKEN) {
               console.error('❌ FIREBASE_AUTH_TOKEN secret is missing — required for a real (non-test) sweep.');
               process.exit(1);
             }
 
             const week = await getCurrentWeek();
-            console.log(`=== News sweep | week ${week} | mode: ${TEST_ONLY ? 'TEST (10 players, no writes)' : 'REAL'} | scope: salary-eligible pool ===`);
+            console.log(`=== News sweep (FantasyPros) | week ${week} | mode: ${TEST_ONLY ? 'TEST (no writes)' : 'REAL'} ===`);
 
-            const allPlayers = await getSalaryEligiblePlayers(week);
+            const eligiblePlayers = await getSalaryEligiblePlayers(week);
+            console.log(`Real salary-eligible player list: ${eligiblePlayers.size} players.`);
 
-            console.log(`Found ${allPlayers.size} unique rostered player(s) to check.`);
+            const items = await fetchFantasyProsNews();
+            console.log(`Real items returned from FantasyPros: ${items.length}`);
 
-            let totalAdded = 0, checked = 0;
-            for (const { name, team, tank01PlayerID } of allPlayers.values()) {
-              const result = await sweepPlayer(name, team, tank01PlayerID);
-              if (result.added > 0) {
-                console.log(`  ${TEST_ONLY ? '[TEST] would add' : '✓ added'} ${result.added} new item(s) for ${name}`);
-                totalAdded += result.added;
+            let matched = 0, added = 0, skippedExisting = 0;
+            for (const item of items) {
+              const title = (item.title || '').trim();
+              const titleLower = title.toLowerCase();
+
+              // Confirmed via real test data: titles consistently lead
+              // with the player's full name. Checking every known
+              // player as a prefix candidate — cheap even at ~450
+              // players x 25 items, since it's a plain string check.
+              let matchedPlayer = null;
+              for (const p of eligiblePlayers.values()) {
+                if (titleLower.startsWith(p.name.toLowerCase())) { matchedPlayer = p; break; }
               }
-              checked++;
-              await sleep(500); // pacing — spread calls out, don't burst
-              if (TEST_ONLY && checked >= 10) {
-                console.log('  [TEST MODE] Stopping after 10 players — enough to confirm this works.');
-                break;
+              if (!matchedPlayer) continue;
+              matched++;
+
+              const playerKey = sanitizeFirebaseKey(matchedPlayer.name.toLowerCase());
+              const itemKey = 'fp_' + (item.id || sanitizeFirebaseKey(titleLower).replace(/\s+/g, '_').slice(0, 100));
+
+              let existing = null;
+              try {
+                existing = await firebaseGet(`/nflNewsArchive/${playerKey}/${itemKey}.json`);
+              } catch(e) { /* not archived yet */ }
+              if (existing) { skippedExisting++; continue; }
+
+              const publishedAt = parseCreatedUtc(item.created);
+              if (TEST_ONLY) {
+                console.log(`  [TEST] would add: "${title}" (${matchedPlayer.name}, published ${new Date(publishedAt).toISOString()})`);
+                added++;
+                continue;
+              }
+              try {
+                await firebasePut(`/nflNewsArchive/${playerKey}/${itemKey}.json`, {
+                  title, link: item.link || '', image: item.image || '',
+                  source: 'fantasypros.com', categories: item.categories || [],
+                  playerName: matchedPlayer.name, team: matchedPlayer.team,
+                  archivedAt: publishedAt // real published time, not just when this job happened to run
+                });
+                added++;
+              } catch(e) {
+                console.error(`    Failed to archive item for ${matchedPlayer.name}:`, e.message);
               }
             }
 
-            console.log(`\n✓ Sweep complete — checked ${checked} player(s), ${TEST_ONLY ? 'would add' : 'added'} ${totalAdded} new news item(s).`);
+            console.log(`\n✓ Sweep complete — ${items.length} item(s) checked, ${matched} matched a rostered/salary-eligible player, ${skippedExisting} already archived, ${TEST_ONLY ? 'would add' : 'added'} ${added} new item(s).`);
           })();
           SCRIPT
