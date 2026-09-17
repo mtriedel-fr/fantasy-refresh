@@ -1,0 +1,130 @@
+name: One-Time Fix — Backfill DVP Ranks For Current Week 2 Draft
+
+# ONE-TIME USE — delete this file after it runs successfully once.
+#
+# Computes and stores real defense-vs-position ranks right now, using
+# real games completed through Week 1 (the only real data that exists
+# so far) - lets the already-open Week 2 draft show real matchup
+# badges immediately, rather than waiting until next week's
+# weekly-auto-open.yml run writes this for the first time. Uses the
+# exact same computation logic now embedded in that workflow.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type YES to compute and store DVP ranks now'
+        required: true
+        default: 'NO'
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Compute and store DVP ranks
+        if: ${{ github.event.inputs.confirm == 'YES' }}
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB_URL = process.env.FIREBASE_DB_URL;
+          const FB_TOKEN = process.env.FIREBASE_AUTH_TOKEN;
+          const LEAGUE_ID = 'fr_refresh26';
+          const SEASON = 2026;
+          const UP_TO_WEEK = 1; // real games completed so far
+
+          function fbAuth(path) {
+            const sep = path.includes('?') ? '&' : '?';
+            return FB_TOKEN ? `${path}${sep}auth=${FB_TOKEN}` : path;
+          }
+          function firebaseGet(path) {
+            return new Promise((resolve, reject) => {
+              https.get(fbAuth(`${FB_URL}${path}`), res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+          function firebasePut(path, value) {
+            return new Promise((resolve, reject) => {
+              const url = new URL(fbAuth(`${FB_URL}${path}`));
+              const body = JSON.stringify(value);
+              const req = https.request({
+                hostname: url.hostname, path: url.pathname + url.search, method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+              }, res => {
+                let d = '';
+                res.on('data', c => d += c);
+                res.on('end', () => {
+                  if (res.statusCode < 200 || res.statusCode >= 300) reject(new Error(`Write failed: HTTP ${res.statusCode} — ${d}`));
+                  else resolve(d);
+                });
+              });
+              req.on('error', reject);
+              req.write(body);
+              req.end();
+            });
+          }
+
+          async function main() {
+            const weekNums = [];
+            for (let w = 1; w <= UP_TO_WEEK; w++) weekNums.push(w);
+
+            const archives = await Promise.all(
+              weekNums.map(w => firebaseGet(`/nflStatsArchive/${SEASON}/Regular_wk${w}.json`).catch(() => null))
+            );
+
+            function opponentMapForWeek(games) {
+              const map = {};
+              (games || []).forEach(g => {
+                if (!g || !g.home || !g.away) return;
+                map[g.home] = g.away;
+                map[g.away] = g.home;
+              });
+              return map;
+            }
+
+            const allowed = {};
+            archives.forEach(archive => {
+              if (!archive || !archive.players) return;
+              const oppMap = opponentMapForWeek(archive.games);
+              Object.values(archive.players).forEach(p => {
+                if (!p || !p.team || !p.pos || typeof p.pts !== 'number') return;
+                if (!['QB','RB','WR','TE'].includes(p.pos)) return;
+                const opp = oppMap[p.team];
+                if (!opp) return;
+                if (!allowed[opp]) allowed[opp] = { QB: 0, RB: 0, WR: 0, TE: 0 };
+                allowed[opp][p.pos] += p.pts;
+              });
+            });
+
+            const ranks = {};
+            ['QB','RB','WR','TE'].forEach(pos => {
+              const teams = Object.keys(allowed).sort((a, b) => allowed[b][pos] - allowed[a][pos]);
+              teams.forEach((team, idx) => {
+                if (!ranks[team]) ranks[team] = {};
+                ranks[team][pos] = idx + 1;
+              });
+            });
+
+            if (!Object.keys(ranks).length) {
+              console.log('No real archive data found for week(s) ' + weekNums.join(',') + ' — nothing to compute yet.');
+              return;
+            }
+
+            await firebasePut(`/leagues/${LEAGUE_ID}/defVsPosRanks/${SEASON}.json`, {
+              ranks, computedThroughWeek: UP_TO_WEEK, generated: Date.now()
+            });
+            console.log(`✅ Computed and stored real DVP ranks through week ${UP_TO_WEEK} (${Object.keys(ranks).length} teams).`);
+            console.log('Sample (RB ranks):', JSON.stringify(Object.fromEntries(Object.entries(ranks).map(([t,r]) => [t, r.RB]).slice(0,5))));
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
+
+      - name: Skipped - confirmation not provided
+        if: ${{ github.event.inputs.confirm != 'YES' }}
+        run: echo "Skipped — re-run with confirm=YES to actually compute and store."
