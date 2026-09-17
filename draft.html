@@ -141,6 +141,22 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
 .inj-D,.inj-O{background:rgba(255,95,160,.2);color:var(--pk);}
 .p-proj{font-family:var(--fd);font-size:11px;color:var(--ink3);text-align:right;min-width:36px;}
 .p-sal{font-family:var(--fd);font-size:17px;font-weight:800;color:var(--ink2);text-align:right;min-width:68px;}
+.p-mcol{flex-shrink:0;width:38px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:2px;}
+.p-mcol-dot{width:8px;height:8px;border-radius:50%;}
+.p-mcol-rank{font-family:var(--fd);font-size:10px;font-weight:800;}
+
+/* ── PICKER LIST HEADER — labels the matchup column, since the list
+   itself has no other header row and a bare dot+rank would otherwise
+   be unexplained the first time anyone sees it. ── */
+.picker-list-hdr{display:flex;align-items:center;gap:10px;padding:6px 16px;border-bottom:1px solid var(--bdr);background:var(--bg3);flex-shrink:0;}
+.picker-list-hdr-sp{flex:1;}
+.picker-list-hdr-mcol{flex-shrink:0;width:38px;text-align:center;position:relative;}
+.picker-list-hdr-sal{flex-shrink:0;min-width:68px;text-align:right;}
+.picker-list-hdr-label{font-family:var(--fd);font-size:10px;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;}
+.mcol-info-dot{display:inline-flex;align-items:center;justify-content:center;width:13px;height:13px;border-radius:50%;background:var(--bg4);color:var(--ink3);font-size:9px;font-weight:800;margin-left:3px;cursor:pointer;vertical-align:1px;border:none;padding:0;}
+.mcol-info-pop{display:none;position:absolute;top:22px;right:-8px;width:190px;background:var(--bg4);border:1px solid var(--bdr2);border-radius:8px;padding:10px 12px;font-size:11.5px;line-height:1.5;color:var(--ink2);text-align:left;text-transform:none;letter-spacing:normal;font-family:var(--fb);z-index:5;box-shadow:0 6px 20px rgba(0,0,0,.4);}
+.mcol-info-pop.open{display:block;}
+.mcol-info-pop b{color:var(--ink);}
 
 /* ── NO SLOT SELECTED ── */
 .pick-prompt{flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;padding:40px;text-align:center;}
@@ -334,6 +350,14 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
       <svg class="picker-search-ico" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
       <input type="text" class="picker-search" id="picker-search" placeholder="Search players…" oninput="renderPicker()">
     </div>
+    <div class="picker-list-hdr hidden" id="picker-list-hdr" style="display:none;">
+      <div class="picker-list-hdr-sp"></div>
+      <div class="picker-list-hdr-mcol">
+        <span class="picker-list-hdr-label">Matchup</span><button type="button" class="mcol-info-dot" onclick="event.stopPropagation();toggleMcolInfo();">?</button>
+        <div class="mcol-info-pop" id="mcol-info-pop"><b>Defense vs position.</b> Ranks the opponent's real defense 1–32 by fantasy points allowed to this position so far this season. <b style="color:var(--or);">Teal</b> = weak defense, good matchup. <b style="color:var(--pk);">Pink</b> = tough defense.</div>
+      </div>
+      <div class="picker-list-hdr-sal"><span class="picker-list-hdr-label">Salary</span></div>
+    </div>
     <div class="picker-list" id="picker-list">
       <div class="pick-prompt">
         <div class="pick-prompt-icon">👆</div>
@@ -493,7 +517,61 @@ var schedule     = [];   // [{home,away,time,teams:[],international}]
 var liveGameStatus = {}; // team abbr -> {liveStatusCode, quarter, clock, myScore, oppScore} — written by auto-scoring.yml, refetched alongside the schedule itself
 var currentUser  = null;
 
-// ── PER-TEAM GAME LOOKUP (opponent, home/away, international) ──────
+// ── DEFENSE VS POSITION RANKING ─────────────────────────────────────
+// Ranks all 32 real defenses by total fantasy points allowed to each
+// position group (QB/RB/WR/TE) so far this season. Precomputed once,
+// server-side, at the moment each new draft week opens (by
+// weekly-auto-open.yml / weekly-prep.yml) — rather than recomputed
+// live on every single page load by every user, which would mean
+// redundantly re-fetching and re-aggregating a growing number of
+// archive weeks as the season progresses. Rank 1 = allows the MOST
+// points to that position (favorable matchup); rank 32 = allows the
+// fewest (tough matchup). Cached once per page load.
+var defVsPosRanks = null; // { team: { QB: rank, RB: rank, WR: rank, TE: rank } }
+var defVsPosLoading = null;
+
+function loadDefVsPosRanks(){
+  if(defVsPosRanks) return Promise.resolve(defVsPosRanks);
+  if(defVsPosLoading) return defVsPosLoading;
+
+  var ctx = FRAuth.getLeagueCtx();
+  var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+  var season = FR.seasonKey();
+
+  defVsPosLoading = FR.fb.get('/leagues/' + leagueId + '/defVsPosRanks/' + season)
+    .then(function(data){
+      defVsPosRanks = (data && data.ranks) || {};
+      defVsPosLoading = null;
+      return defVsPosRanks;
+    })
+    .catch(function(){ defVsPosRanks = {}; defVsPosLoading = null; return {}; });
+
+  return defVsPosLoading;
+}
+
+// Dot + rank for a player's real opponent this week, given their
+// position — green/favorable when the opponent has allowed a lot to
+// that position (top third), pink/tough when they've allowed little
+// (bottom third), neutral for the middle. Returns '' if no rank is
+// available yet (e.g. Week 1, before any archive exists) — the
+// dedicated column is simply omitted for that row.
+function defVsPosMatchupCol(opponentTeam, pos){
+  if(!defVsPosRanks || !opponentTeam || ['QB','RB','WR','TE'].indexOf(pos) === -1) return '';
+  var teamRanks = defVsPosRanks[opponentTeam];
+  if(!teamRanks || !teamRanks[pos]) return '';
+  var rank = teamRanks[pos];
+  var totalTeams = Object.keys(defVsPosRanks).length || 32;
+  var color;
+  if(rank <= Math.ceil(totalTeams / 3)) color = 'var(--or)';
+  else if(rank > totalTeams - Math.ceil(totalTeams / 3)) color = 'var(--pk,#FF5FA0)';
+  else color = 'var(--ink3)';
+  return '<div class="p-mcol">'
+    + '<div class="p-mcol-dot" style="background:'+color+';box-shadow:0 0 8px '+color+'99;"></div>'
+    + '<div class="p-mcol-rank" style="color:'+color+';">#'+rank+'</div>'
+    + '</div>';
+}
+
+
 // Rebuilt from `schedule` on demand — schedule is small (16 games max),
 // cheap enough to rebuild each render rather than cache-invalidate.
 function buildDraftTeamGameMap(){
@@ -669,6 +747,7 @@ function finishPreseasonLoad(){
   loadSchedule();
   loadSubmitted();
   loadLocks();
+  loadDefVsPosRanks().then(function(){ renderPicker(); });
 }
 
 // ── LOAD ──────────────────────────────────────────────────────
@@ -756,6 +835,7 @@ function loadWeekAndData(){
     loadSchedule();
     loadSubmitted();
     loadLocks();
+    loadDefVsPosRanks().then(function(){ renderPicker(); });
   }
 }
 
@@ -1897,6 +1977,7 @@ function renderPicker(){
       var kickoff = fmtKickoff(game.time);
       gameMeta = (kickoff ? kickoff + ' · ' : '') + vsAt + ' ' + game.opp + (venueIcon ? ' ' + venueIcon : '');
     }
+    var mcolHtml = game ? defVsPosMatchupCol(game.opp, p.pos) : '';
 
     html += '<div class="'+rowCls+'"'+rowIdAttr+'>'
       + playerPhotoOrBadge(p)
@@ -1904,12 +1985,29 @@ function renderPicker(){
       +   '<div class="p-name">'+p.name+(p.pos?' · '+p.pos:'')+(p.team&&p.pos!=='DEF'?' · '+p.team:'')+injBadge+(isElsewhere?' <span style="font-size:10px;color:var(--ink3)">(in lineup)</span>':'')+'</div>'
       +   '<div class="p-meta">'+gameMeta+(p.proj?(gameMeta?' · ':'')+p.proj+' proj':'')+'</div>'
       + '</div>'
+      + mcolHtml
       + '<div class="p-sal">$'+(p.salary||0).toLocaleString()+'</div>'
       + '<button class="'+draftCls+'" onclick="pickPlayer(\''+p.id+'\')">' + draftLabel + '</button>'
       + '</div>';
   });
   document.getElementById('picker-list').innerHTML = html;
+  // Header only earns its place once there's real matchup data to label —
+  // no point labeling an empty column (e.g. Week 1, before any archive
+  // exists to rank defenses from).
+  var hdr = document.getElementById('picker-list-hdr');
+  if(hdr){
+    var hasDvp = !!(defVsPosRanks && Object.keys(defVsPosRanks).length);
+    hdr.style.display = hasDvp ? 'flex' : 'none';
+  }
   resetPickerScrollIfContextChanged();
+}
+
+// Toggles the one-time explainer for the matchup column — what the
+// dot color and rank number actually mean, since neither is
+// self-evident from the header label "Matchup" alone.
+function toggleMcolInfo(){
+  var pop = document.getElementById('mcol-info-pop');
+  if(pop) pop.classList.toggle('open');
 }
 
 // ── PICK PLAYER ────────────────────────────────────────────────
