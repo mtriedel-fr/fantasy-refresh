@@ -2693,27 +2693,25 @@ function buildWeekBarRange(sel, lastWeek){
   var nextWeekReady = nextWeekSalariesReadyCache[FR.seasonKey() + ':' + nextWeek];
   if(nextWeekReady === undefined){
     // Not yet confirmed — check now, then rebuild this same dropdown once
-    // we actually know. Defaults to NOT selectable below in the
-    // meantime, since showing a week that turns out not to be ready is
-    // worse than a brief delay before it becomes available.
+    // we actually know. Defaults to NOT included below in the meantime,
+    // since showing a week that turns out not to be ready is worse than
+    // a brief delay before it becomes available.
     checkNextWeekSalariesReady(nextWeek).then(function(){ buildWeekBar(); });
   }
-  for(var i = 1; i <= safeLastWeek; i++){
+  // Only weeks that have actually happened (current or complete) belong
+  // in this dropdown at all — plus the one legitimate exception, the
+  // immediate next week, but only once its real draft is genuinely open.
+  // Confirmed directly as the requested fix: previously every week
+  // through the season's real end was added as an option and merely
+  // disabled/greyed if it hadn't happened yet, which still let people
+  // scroll past a wall of future weeks with nothing real behind them.
+  var visibleLastWeek = Math.min(safeLastWeek, nextWeekReady ? nextWeek : effectiveCurrentWeek);
+  for(var i = 1; i <= visibleLastWeek; i++){
     var k = String(i);
     var hasData = seasonData[k] && seasonData[k].length > 0;
     var o = document.createElement('option');
     o.value = i;
     o.textContent = 'Week ' + i + (hasData ? ' ✓' : '');
-    // Weeks beyond the current week haven't happened yet — disable them
-    // rather than letting someone pick a week with no real data. The
-    // immediate NEXT week is the intended exception (the active draft
-    // week) — but only once its real salaries actually exist. Confirmed
-    // directly: the dropdown was making next week selectable the moment
-    // it became "next" numerically, regardless of whether
-    // weekly-auto-open.yml (or a manual generation) had actually run
-    // yet, sending people into a draft room with nothing real to draft.
-    if(i > nextWeek) o.disabled = true;
-    else if(i === nextWeek) o.disabled = !nextWeekReady;
     if(i === effectiveCurrentWeek) o.selected = true;
     sel.appendChild(o);
   }
