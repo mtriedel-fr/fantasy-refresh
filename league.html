@@ -589,6 +589,22 @@ body{padding-bottom:calc(76px + env(safe-area-inset-bottom));}
 .myteam-toggle-btn.tm-open .myteam-label{color:var(--or);}
 .myteam-toggle-btn span:first-child{font-family:var(--fd);font-size:13px;font-weight:800;color:#050808;text-transform:uppercase;letter-spacing:.5px;}
 .myteam-caret{font-size:15px;font-weight:800;color:#050808;transition:color .15s;}
+
+/* ── MY TEAM NEWS — third pill in the toggle row, next to My Team / caret.
+   Injected dynamically into every .myteam-toggle-row via JS rather than
+   duplicated 7 times in markup, since that row itself is repeated across
+   every tab (home, h2hhome, yourweek, yourseason, guillotine, league,
+   playoffs). ── */
+.myteam-news-btn{background:var(--bg4);border:1.5px solid var(--bdr2);border-radius:0 10px 10px 0;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;padding:11px 16px;position:relative;flex-shrink:0;}
+.myteam-news-btn span{font-family:var(--fd);font-size:12px;font-weight:800;color:var(--ink2);text-transform:uppercase;letter-spacing:.3px;}
+.myteam-news-dot{position:absolute;top:6px;right:6px;width:8px;height:8px;border-radius:50%;background:var(--pk);box-shadow:0 0 0 2px var(--bg3),0 0 8px 1px rgba(255,95,160,.7);display:none;}
+.myteam-news-dot.show{display:block;}
+.myteam-news-item{display:flex;gap:10px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--bdr);}
+.myteam-news-item:last-child{border-bottom:none;}
+.myteam-news-item img{width:40px;height:40px;border-radius:8px;object-fit:cover;flex-shrink:0;background:var(--bg2);}
+.myteam-news-player{display:inline-flex;align-items:center;gap:5px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:6px;padding:2px 7px;margin-bottom:6px;font-family:var(--fd);font-size:10px;font-weight:800;color:var(--or);text-transform:uppercase;letter-spacing:.3px;}
+.myteam-news-title{font-family:var(--fd);font-size:13.5px;font-weight:700;color:var(--ink);line-height:1.4;margin-bottom:4px;}
+.myteam-news-meta{font-family:var(--fd);font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;}
 .myteam-caret-btn.tm-open .myteam-caret{color:var(--or);}
 .myteam-drop{margin-top:12px;}
 .tab-overlay-close-bar.hidden{display:none !important;}
@@ -2608,6 +2624,8 @@ function boot(){
     renderAll();
     checkCommParam();
     checkRecapParam();
+    injectNewsButtons();
+    updateMyTeamNewsDot();
   });
 
   showWelcomeTourIfNeeded(WELCOME_TOUR_KEY, WELCOME_TOUR_TITLE, WELCOME_TOUR_ITEMS);
@@ -2730,6 +2748,7 @@ function setWeekFromSelect(val){
   if(myTeamDrop && !myTeamDrop.classList.contains('hidden')){
     loadMyTeamLineup(myTeamDrop);
   }
+  updateMyTeamNewsDot();
 }
 
 function buildWeekSelect(){
@@ -7723,6 +7742,120 @@ function closeShare(){
 }
 
 // ── WEEKLY REVIEW ──────────────────────────────────────────────
+// ── MY TEAM NEWS ─────────────────────────────────────────────────
+// Injects the News pill button into every .myteam-toggle-row on the
+// page (that row is duplicated across 7 different tabs — home,
+// h2hhome, yourweek, yourseason, guillotine, league, playoffs — so
+// this runs once and covers all of them, rather than 7 separate
+// copies of the same markup).
+function injectNewsButtons(){
+  document.querySelectorAll('.myteam-toggle-row').forEach(function(row){
+    if(row.querySelector('.myteam-news-btn')) return; // already injected
+    var btn = document.createElement('button');
+    btn.className = 'myteam-news-btn';
+    btn.onclick = openMyTeamNews;
+    btn.innerHTML = '📰<span>News</span><span class="myteam-news-dot"></span>';
+    row.appendChild(btn);
+  });
+}
+
+var myTeamNewsCache = null; // {items: [...], newestAt: number} — cached per week, cleared on week change
+var myTeamNewsCacheWeek = null;
+
+function getMyTeamNewsSeenKey(){
+  var ctx = FRAuth.getLeagueCtx();
+  var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+  return 'fr_myteam_news_seen_' + leagueId;
+}
+
+// Real, current roster for this week (same lineup source loadMyTeamLineup
+// already uses), then one real archive read per rostered player, merged
+// and sorted by the real archivedAt timestamp sweep-player-news.yml
+// writes — the direct fix for the combined feed not having any genuine
+// date field to sort by if it went straight to the live Tank01-backed
+// /news endpoint instead.
+function loadMyTeamNewsData(){
+  if(myTeamNewsCache && myTeamNewsCacheWeek === currentWeek) return Promise.resolve(myTeamNewsCache);
+
+  var user = (typeof FRAuth !== 'undefined' && FRAuth.getUser) ? FRAuth.getUser() : null;
+  if(!user || !user.uid) return Promise.resolve({ items: [], newestAt: 0 });
+  var ctx = FRAuth.getLeagueCtx();
+  var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+  var season = FR.seasonKey();
+
+  return FR.fb.get('/leagues/' + leagueId + '/lineups/' + season + '/week' + currentWeek + '/' + user.uid)
+    .then(function(lineup){
+      var slots = (lineup && lineup.slots) || {};
+      var players = Object.values(slots).filter(function(p){ return p && p.name; });
+      if(!players.length) return { items: [], newestAt: 0 };
+
+      return Promise.all(players.map(function(p){
+        var key = p.name.toLowerCase().replace(/[.$#\[\]\/]/g, '');
+        return FR.fb.get('/nflNewsArchive/' + key)
+          .then(function(archive){
+            if(!archive || archive.error) return [];
+            return Object.values(archive).map(function(item){
+              return { title: item.title, link: item.link, image: item.image || p.headshot, source: item.source, playerName: p.name, archivedAt: item.archivedAt || 0 };
+            });
+          })
+          .catch(function(){ return []; });
+      })).then(function(perPlayer){
+        var allItems = [].concat.apply([], perPlayer).sort(function(a,b){ return b.archivedAt - a.archivedAt; });
+        var newestAt = allItems.length ? allItems[0].archivedAt : 0;
+        myTeamNewsCache = { items: allItems, newestAt: newestAt };
+        myTeamNewsCacheWeek = currentWeek;
+        return myTeamNewsCache;
+      });
+    })
+    .catch(function(){ return { items: [], newestAt: 0 }; });
+}
+
+// Checked on boot/render, not just when the overlay opens — the whole
+// point of a glow dot is catching the eye before someone thinks to tap
+// in, not just confirming what they already decided to check.
+function updateMyTeamNewsDot(){
+  loadMyTeamNewsData().then(function(data){
+    var seenKey = getMyTeamNewsSeenKey();
+    var lastSeen = 0;
+    try{ lastSeen = parseInt(localStorage.getItem(seenKey) || '0'); }catch(e){}
+    var hasNew = data.newestAt > lastSeen;
+    document.querySelectorAll('.myteam-news-dot').forEach(function(dot){
+      dot.classList.toggle('show', hasNew);
+    });
+  });
+}
+
+function openMyTeamNews(){
+  document.getElementById('myteam-news-overlay').classList.add('open');
+  document.getElementById('myteam-news-body').innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--ink3);font-size:13px;">Loading…</div>';
+
+  loadMyTeamNewsData().then(function(data){
+    if(!data.items.length){
+      document.getElementById('myteam-news-body').innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--ink3);font-size:13px;">No recent news for your rostered players yet.</div>';
+      return;
+    }
+    document.getElementById('myteam-news-body').innerHTML = data.items.map(function(item){
+      return '<div class="myteam-news-item">'
+        + (item.image ? '<img src="'+item.image+'" alt="" onerror="this.style.display=\'none\';">' : '')
+        + '<div style="flex:1;min-width:0;">'
+        +   '<div class="myteam-news-player">'+item.playerName+'</div>'
+        +   '<div class="myteam-news-title">'+item.title+'</div>'
+        +   '<div class="myteam-news-meta">'+(item.source||'')+'</div>'
+        + '</div></div>';
+    }).join('');
+
+    // Opening the feed IS "checking it" — mark seen now and clear every
+    // dot on the page immediately, rather than waiting for the next
+    // scheduled check to notice the person already looked.
+    try{ localStorage.setItem(getMyTeamNewsSeenKey(), String(data.newestAt)); }catch(e){}
+    document.querySelectorAll('.myteam-news-dot').forEach(function(dot){ dot.classList.remove('show'); });
+  });
+}
+
+function closeMyTeamNews(){
+  document.getElementById('myteam-news-overlay').classList.remove('open');
+}
+
 function openRecap(week){
   var ctx      = FRAuth.getLeagueCtx();
   var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
@@ -10292,6 +10425,19 @@ function removeCommissioner(uid){
     </div>
     <div id="fbs-pos-filter" style="display:flex;gap:6px;flex-wrap:wrap;padding:0 20px 12px;"></div>
     <div class="recap-body" id="fbs-body"></div>
+  </div>
+</div>
+
+<div class="recap-overlay" id="myteam-news-overlay" onclick="if(event.target===this)closeMyTeamNews()">
+  <div class="recap-box">
+    <div class="recap-hdr">
+      <div>
+        <div style="font-family:var(--fd);font-size:16px;font-weight:900;color:var(--ink2);text-transform:uppercase;letter-spacing:.5px;">My Team News</div>
+        <div style="font-family:var(--fd);font-size:10.5px;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-top:2px;">Latest across your roster</div>
+      </div>
+      <button class="recap-close-btn" onclick="closeMyTeamNews()">✕</button>
+    </div>
+    <div class="recap-body" id="myteam-news-body"></div>
   </div>
 </div>
 </div>
