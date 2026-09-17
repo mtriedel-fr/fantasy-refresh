@@ -455,6 +455,60 @@ jobs:
             return { salaries, count };
           }
 
+          // Ranks all 32 real defenses by total fantasy points allowed
+          // to each position group (QB/RB/WR/TE) so far this season,
+          // computed once here instead of live on every draft.html page
+          // load by every user. Regular season only — preseason has no
+          // meaningful defense-vs-position signal and uses a different
+          // season-key structure (SEASON+'P').
+          async function computeAndStoreDefVsPosRanks(leagueId, season, upToWeek) {
+            if (upToWeek < 1) return;
+            const weekNums = [];
+            for (let w = 1; w <= upToWeek; w++) weekNums.push(w);
+
+            const archives = await Promise.all(
+              weekNums.map(w => firebaseGet(`/nflStatsArchive/${season}/Regular_wk${w}.json`).catch(() => null))
+            );
+
+            function opponentMapForWeek(games) {
+              const map = {};
+              (games || []).forEach(g => {
+                if (!g || !g.home || !g.away) return;
+                map[g.home] = g.away;
+                map[g.away] = g.home;
+              });
+              return map;
+            }
+
+            const allowed = {};
+            archives.forEach(archive => {
+              if (!archive || !archive.players) return;
+              const oppMap = opponentMapForWeek(archive.games);
+              Object.values(archive.players).forEach(p => {
+                if (!p || !p.team || !p.pos || typeof p.pts !== 'number') return;
+                if (!['QB','RB','WR','TE'].includes(p.pos)) return;
+                const opp = oppMap[p.team];
+                if (!opp) return;
+                if (!allowed[opp]) allowed[opp] = { QB: 0, RB: 0, WR: 0, TE: 0 };
+                allowed[opp][p.pos] += p.pts;
+              });
+            });
+
+            const ranks = {};
+            ['QB','RB','WR','TE'].forEach(pos => {
+              const teams = Object.keys(allowed).sort((a, b) => allowed[b][pos] - allowed[a][pos]);
+              teams.forEach((team, idx) => {
+                if (!ranks[team]) ranks[team] = {};
+                ranks[team][pos] = idx + 1;
+              });
+            });
+
+            await firebasePut(`/leagues/${leagueId}/defVsPosRanks/${season}.json`, {
+              ranks, computedThroughWeek: upToWeek, generated: Date.now()
+            });
+            console.log(`  ${leagueId}: computed defense-vs-position ranks through week ${upToWeek} (${Object.keys(ranks).length} teams).`);
+          }
+
           async function generateSalariesForLeague(leagueId, settings, poolPlayers) {
             const week = await getTargetWeek(leagueId, settings);
             if (week > 18) { console.log(`  ${leagueId}: week ${week} is past the season — skipping`); return; }
@@ -524,6 +578,12 @@ jobs:
               meta: { week, count: result.count, generated: Date.now(), locked: false, cap, automated: true, flat: usedFlat }
             });
             console.log(`✓ ${leagueId}: ${result.count} salaries generated for week ${week}${usedFlat ? ' (flat)' : ''}`);
+
+            // Real games completed through week-1 (not this target week,
+            // whose games haven't been played yet) — regular season only.
+            if (!usedFlat && !(settings && settings.isPreseason) && week > 1) {
+              await computeAndStoreDefVsPosRanks(leagueId, salarySeason, week - 1).catch(e => console.log(`  ${leagueId}: DVP rank computation failed (non-fatal):`, e.message));
+            }
           }
 
           // Cache the full season's schedule — this barely ever changes

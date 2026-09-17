@@ -142,10 +142,35 @@ jobs:
           // just fixed in the real "Generate Salaries" button, so an
           // automatically-generated week prices identically to a
           // manually-generated one.
-          const TARGET_CEILING = { QB: 9400, RB: 10700, WR: 11300, TE: 7400, DEF: 5000 };
-          const SALARY_EXPONENT = 0.85;
-          const SAL_MIN = 4500, SAL_MAX = 11300;
-          function salRound(n) { return Math.ceil(Math.max(SAL_MIN, Math.min(SAL_MAX, n)) / 100) * 100; }
+          const TOP_ANCHOR_EXP = 0.6; // shared cross-position rate, calibrated off whichever position has the single highest real projection this week
+          const SHARED_CAP = 8600;   // QB, TE, DEF clamp
+          const RB_WR_MAX = 9100;    // RB, WR get their own, higher clamp — confirmed needed for real separation from TE specifically
+          const MIN_SANITY = 100;
+          const POSITIONS = {
+            QB:  { exp: 1.3,  premium: 1.0,   clamp: SHARED_CAP },
+            RB:  { exp: 0.55, premium: 1.058, clamp: RB_WR_MAX },
+            WR:  { exp: 0.55, premium: 1.12,  clamp: RB_WR_MAX },
+            TE:  { exp: 0.7,  premium: 1.21,  clamp: SHARED_CAP },
+            DEF: { exp: 0.6,  premium: 0.97,  clamp: SHARED_CAP }
+          };
+          const SAL_MIN_DEFAULT = 100;
+          const SAL_MAX_DEFAULT = 9100;
+          const SAL_ROUND = 100;
+          const BACKUP_QB_SALARY = 3800; // floor for a QB with no real projection yet
+
+          // Suffix/punctuation-safe name match — confirmed directly:
+          // Tank01's projections source and the real player pool
+          // sometimes disagree on "Jr."/"II" formatting, and a raw
+          // lowercase compare silently fails the match for any
+          // suffixed player, losing their real pool id/headshot even
+          // though nothing about the underlying data was wrong.
+          function normalizeNameForMatch(name) {
+            return (name || '')
+              .toLowerCase()
+              .replace(/[.,']/g, '')
+              .replace(/\s+(jr|sr|ii|iii|iv|v)$/i, '')
+              .trim();
+          }
 
           async function getRealProjections(week, season) {
             const scoring = [
@@ -189,38 +214,55 @@ jobs:
 
             const pool = await firebaseGet(`/playerPool/${season}/players.json`).catch(() => null);
             const nameMap = {};
-            if (pool) Object.values(pool).forEach(p => { if (p && p.name) nameMap[p.name.toLowerCase()] = p; });
+            if (pool) Object.values(pool).forEach(p => { if (p && p.name) nameMap[normalizeNameForMatch(p.name)] = p; });
 
-            // Same real, two-pass, self-calibrating formula as the
-            // manual button - first pass finds each position's real
-            // top projection this week, second pass calibrates against it.
-            const validPlayers = [];
-            const maxProj = {};
-            projPlayers.forEach(p => {
-              if (!p.proj || p.proj <= 0) return;
-              if (!['QB','RB','WR','TE','DEF'].includes(p.pos)) return;
-              const poolP = nameMap[p.name.toLowerCase()];
-              const inj = poolP ? (poolP.status || p.status || null) : (p.status || null);
-              if (inj === 'O' || inj === 'IR') return;
-              validPlayers.push(p);
-              if (!maxProj[p.pos] || p.proj > maxProj[p.pos]) maxProj[p.pos] = p.proj;
+            // Real, current max projection PER POSITION this week —
+            // anchors each position's own top price.
+            const maxProjByPos = {};
+            ['QB','RB','WR','TE','DEF'].forEach(pos => {
+              const atPos = projPlayers.filter(p => p.pos === pos && p.proj > 0);
+              maxProjByPos[pos] = atPos.length ? Math.max(...atPos.map(p => p.proj)) : 0;
             });
+            const globalMaxProj = Math.max(...Object.values(maxProjByPos).filter(v => v > 0), 1);
+            const baseRate = SHARED_CAP / Math.pow(globalMaxProj, TOP_ANCHOR_EXP);
 
-            const effectiveMult = {};
-            Object.keys(TARGET_CEILING).forEach(pos => {
-              if (maxProj[pos]) effectiveMult[pos] = TARGET_CEILING[pos] / Math.pow(maxProj[pos], SALARY_EXPONENT);
+            const multByPos = {};
+            Object.entries(POSITIONS).forEach(([pos, conf]) => {
+              if (!maxProjByPos[pos]) return;
+              let topAnchor = Math.pow(maxProjByPos[pos], TOP_ANCHOR_EXP) * baseRate * conf.premium;
+              topAnchor = Math.min(topAnchor, conf.clamp);
+              multByPos[pos] = topAnchor / Math.pow(maxProjByPos[pos], conf.exp);
             });
 
             const salaries = {};
             let count = 0;
-            validPlayers.forEach(p => {
-              const poolP = nameMap[p.name.toLowerCase()];
+            projPlayers.forEach(p => {
+              if (!p.proj || p.proj <= 0) return;
+              if (!POSITIONS[p.pos]) return;
+              const poolP = nameMap[normalizeNameForMatch(p.name)];
               const pid = poolP ? poolP.id : ('t01_' + p.id);
               const inj = poolP ? (poolP.status || p.status || null) : (p.status || null);
-              const mult = effectiveMult[p.pos] || effectiveMult.WR;
-              let sal = salRound(Math.pow(p.proj, SALARY_EXPONENT) * mult);
-              sal = Math.max(SAL_MIN, Math.min(SAL_MAX, sal));
-              salaries[pid] = { id: pid, name: p.name, pos: p.pos, team: p.team, proj: Math.round(p.proj * 10) / 10, salary: sal, status: inj };
+              if (inj === 'O' || inj === 'IR') return;
+              const conf = POSITIONS[p.pos];
+              const mult = multByPos[p.pos] || 0;
+              let sal = Math.ceil((Math.pow(p.proj, conf.exp) * mult) / SAL_ROUND) * SAL_ROUND;
+              sal = Math.max(MIN_SANITY, Math.min(conf.clamp, sal));
+              sal = Math.max(SAL_MIN_DEFAULT, Math.min(SAL_MAX_DEFAULT, sal));
+              salaries[pid] = { id: pid, name: p.name, pos: p.pos, team: p.team, proj: Math.round(p.proj * 10) / 10, salary: sal, status: inj, tank01PlayerID: poolP ? poolP.tank01PlayerID : null, headshot: poolP ? poolP.headshot : null };
+              count++;
+            });
+
+            // Backup QBs — a player with no meaningful role isn't
+            // returned by the projections source at all, not even with
+            // proj:0, so this second pass checks the real, full player
+            // pool (which does include every real QB) for anyone still
+            // missing from salaries after the main loop above.
+            Object.values(pool || {}).forEach(poolP => {
+              if (!poolP || poolP.pos !== 'QB') return;
+              if (salaries[poolP.id]) return;
+              const inj = poolP.status || null;
+              if (inj === 'O' || inj === 'IR') return;
+              salaries[poolP.id] = { id: poolP.id, name: poolP.name, pos: 'QB', team: poolP.team, proj: 0, salary: BACKUP_QB_SALARY, status: inj, tank01PlayerID: poolP.tank01PlayerID || null, headshot: poolP.headshot || null };
               count++;
             });
 
@@ -230,6 +272,60 @@ jobs:
             });
             console.log(`  Generated real salaries for week ${week} (${count} players).`);
             return true;
+          }
+
+          // Ranks all 32 real defenses by total fantasy points allowed
+          // to each position group (QB/RB/WR/TE) so far this season,
+          // computed once here instead of live on every draft.html page
+          // load by every user — which would otherwise mean redundantly
+          // re-fetching and re-aggregating a growing number of weeks'
+          // archives, for every single visit, as the season progresses.
+          async function computeAndStoreDefVsPosRanks(season, upToWeek) {
+            if (upToWeek < 1) return;
+            const weekNums = [];
+            for (let w = 1; w <= upToWeek; w++) weekNums.push(w);
+
+            const archives = await Promise.all(
+              weekNums.map(w => firebaseGet(`/nflStatsArchive/${season}/Regular_wk${w}.json`).catch(() => null))
+            );
+
+            function opponentMapForWeek(games) {
+              const map = {};
+              (games || []).forEach(g => {
+                if (!g || !g.home || !g.away) return;
+                map[g.home] = g.away;
+                map[g.away] = g.home;
+              });
+              return map;
+            }
+
+            const allowed = {};
+            archives.forEach(archive => {
+              if (!archive || !archive.players) return;
+              const oppMap = opponentMapForWeek(archive.games);
+              Object.values(archive.players).forEach(p => {
+                if (!p || !p.team || !p.pos || typeof p.pts !== 'number') return;
+                if (!['QB','RB','WR','TE'].includes(p.pos)) return;
+                const opp = oppMap[p.team];
+                if (!opp) return;
+                if (!allowed[opp]) allowed[opp] = { QB: 0, RB: 0, WR: 0, TE: 0 };
+                allowed[opp][p.pos] += p.pts;
+              });
+            });
+
+            const ranks = {};
+            ['QB','RB','WR','TE'].forEach(pos => {
+              const teams = Object.keys(allowed).sort((a, b) => allowed[b][pos] - allowed[a][pos]);
+              teams.forEach((team, idx) => {
+                if (!ranks[team]) ranks[team] = {};
+                ranks[team][pos] = idx + 1;
+              });
+            });
+
+            await firebasePut(`/leagues/${LEAGUE_ID}/defVsPosRanks/${season}.json`, {
+              ranks, computedThroughWeek: upToWeek, generated: Date.now()
+            });
+            console.log(`  Computed and stored defense-vs-position ranks through week ${upToWeek} (${Object.keys(ranks).length} teams).`);
           }
 
           async function main() {
@@ -274,6 +370,11 @@ jobs:
             if (generated) {
               await firebasePut(`/leagues/${LEAGUE_ID}/settings/draftLockedUntil.json`, Date.now());
               console.log(`Draft unlocked immediately for week ${nextWeek}.`);
+              // Real games completed through currentWeek (not nextWeek,
+              // whose games haven't been played yet) — computed once
+              // here, at the moment the new draft week opens, rather
+              // than live on every page load all week.
+              await computeAndStoreDefVsPosRanks(season, currentWeek).catch(e => console.log('DVP rank computation failed (non-fatal):', e.message));
             }
           }
 
