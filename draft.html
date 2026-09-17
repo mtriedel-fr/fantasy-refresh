@@ -153,7 +153,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
 .picker-list-hdr-mcol{flex-shrink:0;width:38px;text-align:center;position:relative;}
 .picker-list-hdr-sal{flex-shrink:0;min-width:68px;text-align:right;}
 .picker-list-hdr-label{font-family:var(--fd);font-size:10px;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;}
-.mcol-info-dot{display:inline-flex;align-items:center;justify-content:center;width:13px;height:13px;border-radius:50%;background:var(--bg4);color:var(--ink3);font-size:9px;font-weight:800;margin-left:3px;cursor:pointer;vertical-align:1px;border:none;padding:0;}
+.mcol-info-dot{position:absolute;top:-10px;right:-14px;display:inline-flex;align-items:center;justify-content:center;width:13px;height:13px;border-radius:50%;background:var(--bg4);color:var(--ink3);font-size:9px;font-weight:800;cursor:pointer;border:none;padding:0;}
 .mcol-info-pop{display:none;position:absolute;top:22px;right:-8px;width:190px;background:var(--bg4);border:1px solid var(--bdr2);border-radius:8px;padding:10px 26px 10px 12px;font-size:11.5px;line-height:1.5;color:var(--ink2);text-align:left;text-transform:none;letter-spacing:normal;font-family:var(--fb);z-index:5;box-shadow:0 6px 20px rgba(0,0,0,.4);}
 .mcol-info-pop.open{display:block;}
 .mcol-info-pop b{color:var(--ink);}
@@ -356,13 +356,14 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
       <div style="width:38px;flex-shrink:0;"></div>
       <div class="picker-list-hdr-sp"></div>
       <div class="picker-list-hdr-mcol">
-        <span class="picker-list-hdr-label">Matchup</span><button type="button" class="mcol-info-dot" onclick="event.stopPropagation();toggleMcolInfo();">?</button>
+        <span class="picker-list-hdr-label">Matchup</span>
+        <button type="button" class="mcol-info-dot" onclick="event.stopPropagation();toggleMcolInfo();">?</button>
         <div class="mcol-info-pop" id="mcol-info-pop">
           <button type="button" class="mcol-info-close" onclick="event.stopPropagation();toggleMcolInfo();">×</button>
           <b>Defense vs position.</b> Ranks the opponent's real defense 1–32 by fantasy points allowed to this position so far this season. <b style="color:var(--or);">Teal</b> = weak defense, good matchup. <b style="color:var(--pk);">Pink</b> = tough defense.
         </div>
       </div>
-      <div class="picker-list-hdr-sal"><span class="picker-list-hdr-label">Salary</span></div>
+      <div class="picker-list-hdr-sal"></div>
     </div>
     <div class="picker-list" id="picker-list">
       <div class="pick-prompt">
@@ -1428,12 +1429,18 @@ function renderGamePreviewPickable(game){
       rowIdAttr = ' id="first-affordable-row"';
     }
 
+    // Opponent is directly known here (this row is already scoped to
+    // one specific game) — whichever of the two real teams isn't p's own.
+    var opp2 = normTeam(p.team) === normTeam(game.home) ? game.away : game.home;
+    var mcolHtml2 = defVsPosMatchupCol(opp2, p.pos);
+
     return '<div class="'+cls+'"'+rowIdAttr+'>'
       + playerPhotoOrBadge(p)
       + '<div class="p-info" onclick="openNews(\''+p.id+'\',event)" style="cursor:pointer;">'
       +   '<div class="p-name">'+p.name+(p.pos?' · '+p.pos:'')+(p.team&&p.pos!=='DEF'?' · '+p.team:'')+injBadge+'</div>'
       +   '<div class="p-meta">'+(p.proj?p.proj+' proj':'')+'</div>'
       + '</div>'
+      + mcolHtml2
       + '<div class="p-sal">$'+(p.salary||0).toLocaleString()+'</div>'
       + '<button class="'+draftCls2+'" onclick="pickFromPreview(\''+p.id+'\')">' + draftLbl2 + '</button>'
       + '</div>';
@@ -1460,9 +1467,15 @@ function renderGamePreviewPickable(game){
   }
 
   document.getElementById('picker-list').innerHTML = html;
+  var hdr2 = document.getElementById('picker-list-hdr');
+  if(hdr2){
+    var hasDvp2 = !!(defVsPosRanks && Object.keys(defVsPosRanks).length);
+    hdr2.style.display = hasDvp2 ? 'flex' : 'none';
+  }
   resetPickerScrollIfContextChanged();
 }
-
+// fixed header area above the scrolling list — not inside #picker-list —
+// so it stays visible while the player list underneath scrolls.
 // Persistent team-filter row (Both Teams / Away / Home), rendered into the
 // fixed header area above the scrolling list — not inside #picker-list —
 // so it stays visible while the player list underneath scrolls.
