@@ -1,0 +1,117 @@
+name: URGENT Fix — Write Real Week 2 Locks For Already-Started Games
+
+# ONE-TIME USE — delete this file after it runs successfully once.
+#
+# Confirmed directly: season/meta/week is still 1 despite the real
+# season being well into Week 2 - this is almost certainly why a live
+# Week 2 game isn't locking, since whatever writes lock data is very
+# likely keying off this same stuck value and still operating as if
+# it's Week 1. This writes the real, correct lock data directly from
+# the real, cached Week 2 schedule for any game that has actually
+# kicked off already, bypassing the stuck value entirely - the
+# immediate, urgent fix. The actual root cause (why meta.week never
+# advanced) still needs separate investigation once this is resolved.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type YES to write real Week 2 lock data now'
+        required: true
+        default: 'NO'
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Write real Week 2 locks for started games
+        if: ${{ github.event.inputs.confirm == 'YES' }}
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB_URL = process.env.FIREBASE_DB_URL;
+          const FB_TOKEN = process.env.FIREBASE_AUTH_TOKEN;
+          const LEAGUE_ID = 'fr_refresh26';
+          const SEASON = 2026;
+          const WEEK = 2; // real, actual current week - NOT read from the stuck meta.week
+
+          function fbAuth(path) {
+            const sep = path.includes('?') ? '&' : '?';
+            return FB_TOKEN ? `${path}${sep}auth=${FB_TOKEN}` : path;
+          }
+          function fetchJson(path) {
+            return new Promise((resolve, reject) => {
+              https.get(fbAuth(`${FB_URL}${path}`), res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+          function firebasePatch(path, payload) {
+            return new Promise((resolve, reject) => {
+              const url = new URL(fbAuth(`${FB_URL}${path}`));
+              const body = JSON.stringify(payload);
+              const req = https.request(url, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+              }, res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => {
+                  if (res.statusCode < 200 || res.statusCode >= 300) reject(new Error(`Write failed: HTTP ${res.statusCode} — ${data}`));
+                  else resolve(data);
+                });
+              });
+              req.on('error', reject);
+              req.write(body);
+              req.end();
+            });
+          }
+
+          async function main() {
+            const cachedSeason = await fetchJson(`/nflSchedule/${SEASON}/Regular.json`).catch(() => null);
+            const weekGames = cachedSeason && cachedSeason.weeks && cachedSeason.weeks[`week${WEEK}`];
+            if (!Array.isArray(weekGames) || !weekGames.length) {
+              console.log(`No real, cached schedule found for week ${WEEK} — cannot proceed.`);
+              return;
+            }
+
+            const now = Date.now();
+            const startedGames = weekGames.filter(g => g && g.home && g.away && g.time && new Date(g.time).getTime() <= now);
+            console.log(`Real games in week ${WEEK} that have actually kicked off by now: ${startedGames.length}`);
+
+            const existingLocks = await fetchJson(`/leagues/${LEAGUE_ID}/locks/${SEASON}/week${WEEK}.json`).catch(() => null) || {};
+
+            const updates = {};
+            startedGames.forEach(g => {
+              const gameId = `${new Date(g.time).toISOString().slice(0,10).replace(/-/g,'')}_${g.away}@${g.home}`;
+              [g.home, g.away].forEach(team => {
+                if (existingLocks[team]) return; // already correctly locked — don't touch
+                const opponent = team === g.home ? g.away : g.home;
+                updates[team] = { gameId, lockedAt: new Date(g.time).getTime(), opponent };
+              });
+            });
+
+            const teamsToWrite = Object.keys(updates);
+            if (!teamsToWrite.length) {
+              console.log('Nothing to write — every started team already has correct real Week 2 lock data.');
+              return;
+            }
+
+            console.log(`Writing real lock data for: ${teamsToWrite.join(', ')}`);
+            const patchBody = {};
+            teamsToWrite.forEach(t => { patchBody[t] = updates[t]; });
+            await firebasePatch(`/leagues/${LEAGUE_ID}/locks/${SEASON}/week${WEEK}.json`, patchBody);
+            console.log(`✅ Wrote real lock data for ${teamsToWrite.length} team(s) — their rosters should now correctly lock.`);
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
+
+      - name: Skipped - confirmation not provided
+        if: ${{ github.event.inputs.confirm != 'YES' }}
+        run: echo "Skipped — re-run with confirm=YES to actually write the lock data."
