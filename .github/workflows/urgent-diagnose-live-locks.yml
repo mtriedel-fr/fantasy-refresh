@@ -1,0 +1,84 @@
+name: URGENT Diagnostic — Check Real Live Lock Data Right Now
+
+# ONE-TIME USE — delete this file after running it once.
+# A game reportedly kicked off ~15 min ago and isn't locking. Checks
+# the real, live lock data right now against the real, current
+# schedule, to see exactly what's wrong - team missing entirely,
+# present with wrong timing, or something else. Read-only.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check real live lock state
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB_URL = process.env.FIREBASE_DB_URL;
+          const FB_TOKEN = process.env.FIREBASE_AUTH_TOKEN;
+          const LEAGUE_ID = 'fr_refresh26';
+          const SEASON = 2026;
+
+          function fbAuth(path) {
+            const sep = path.includes('?') ? '&' : '?';
+            return FB_TOKEN ? `${path}${sep}auth=${FB_TOKEN}` : path;
+          }
+          function fetchJson(path) {
+            return new Promise((resolve, reject) => {
+              https.get(fbAuth(`${FB_URL}${path}`), res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+
+          async function main() {
+            console.log('Current real time:', new Date().toISOString());
+
+            const seasonMeta = await fetchJson(`/leagues/${LEAGUE_ID}/season/${SEASON}/meta.json`).catch(() => null);
+            const week = (seasonMeta && seasonMeta.week) || 1;
+            console.log('Real current week (per season meta):', week);
+            console.log('');
+
+            const locks = await fetchJson(`/leagues/${LEAGUE_ID}/locks/${SEASON}/week${week}.json`).catch(() => null);
+            console.log(`=== Real lock data at /leagues/${LEAGUE_ID}/locks/${SEASON}/week${week} ===`);
+            if (!locks) {
+              console.log('NOTHING FOUND AT ALL — this path is completely empty.');
+            } else {
+              const teams = Object.keys(locks);
+              console.log(`Real teams present: ${teams.length}`);
+              teams.forEach(t => {
+                const entry = locks[t];
+                const lockedAtReal = entry && entry.lockedAt ? new Date(entry.lockedAt).toISOString() : 'MISSING lockedAt';
+                console.log(`  ${t}: gameId=${entry ? entry.gameId : 'MISSING'}, lockedAt=${lockedAtReal}`);
+              });
+            }
+            console.log('');
+
+            const cachedSeason = await fetchJson(`/nflSchedule/${SEASON}/Regular.json`).catch(() => null);
+            const weekGames = cachedSeason && cachedSeason.weeks && cachedSeason.weeks[`week${week}`];
+            console.log(`=== Real, current cached schedule for week ${week} ===`);
+            if (!Array.isArray(weekGames) || !weekGames.length) {
+              console.log('NO cached schedule found for this week at all.');
+            } else {
+              weekGames.forEach(g => {
+                const kickoff = g.time ? new Date(g.time) : null;
+                const hasKickedOff = kickoff ? (Date.now() >= kickoff.getTime()) : 'unknown';
+                console.log(`  ${g.away}@${g.home}: real kickoff=${kickoff ? kickoff.toISOString() : 'MISSING'}, has real kickoff passed=${hasKickedOff}`);
+              });
+            }
+
+            console.log('');
+            console.log('=== kickoff-locks workflow — check separately whether it has run recently and succeeded ===');
+            console.log('(Check Actions tab directly for "kickoff-locks" or similarly-named workflow run history.)');
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
