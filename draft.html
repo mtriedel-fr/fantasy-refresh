@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LAST FIX: Sep 18 2026 ~22:30 UTC — .draft-btn now a fixed 84px width for all four states (Draft/Drafted/Locked/Over Cap), so the row no longer reflows per player; "Can't Afford" shortened to "Over Cap" (new .overcap style) to fit. The "?" info dot moved off as its own flex item (which pushed it out into empty space via a margin/transform hack) and nested inside .picker-list-hdr-mcol as a real position:absolute badge, centered horizontally over the "Def Rank" text and pulled in close above it. Header trailing spacer simplified to a plain 84px match for .draft-btn's width (no more magic-number compensation) now that the dot isn't a flex sibling anymore. All verified via rendered screenshot comparison. -->
+<!-- LAST FIX: Sep 18 2026 ~22:35 UTC — .draft-btn now a fixed 84px width for all four states (Draft/Drafted/Locked/Over Cap), so the row no longer reflows per player; "Can't Afford" shortened to "Over Cap" (new .overcap style) to fit. The "?" info dot moved off as its own flex item (which pushed it out into empty space via a margin/transform hack) and nested inside .picker-list-hdr-mcol as a real position:absolute badge, sitting to the right of "Def Rank", vertically centered on it, with a small ~4px gap. Header trailing spacer simplified to a plain 84px match for .draft-btn's width (no more magic-number compensation) now that the dot isn't a flex sibling anymore. All verified via rendered screenshot comparison. -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -154,7 +154,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
 .picker-list-hdr-mcol{position:relative;flex-shrink:0;width:38px;text-align:center;font-family:var(--fd);font-size:10px;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;}
 .picker-list-hdr-sal{flex-shrink:0;min-width:68px;text-align:right;}
 .picker-list-hdr-label{font-family:var(--fd);font-size:10px;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;}
-.mcol-info-dot{position:absolute;top:-11px;left:50%;transform:translateX(-50%);width:13px;height:13px;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;background:var(--bg4);color:var(--ink3);font-size:9px;font-weight:800;cursor:pointer;border:none;padding:0;z-index:2;}
+.mcol-info-dot{position:absolute;top:50%;right:-17px;transform:translateY(-50%);width:13px;height:13px;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;background:var(--bg4);color:var(--ink3);font-size:9px;font-weight:800;cursor:pointer;border:none;padding:0;z-index:2;}
 .mcol-info-pop{display:none;position:absolute;top:18px;right:-8px;width:190px;background:var(--bg4);border:1px solid var(--bdr2);border-radius:8px;padding:10px 26px 10px 12px;font-size:11.5px;line-height:1.5;color:var(--ink2);text-align:left;text-transform:none;letter-spacing:normal;font-family:var(--fb);z-index:5;box-shadow:0 6px 20px rgba(0,0,0,.4);}
 .mcol-info-pop.open{display:block;}
 .mcol-info-pop b{color:var(--ink);}
