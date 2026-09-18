@@ -1,9 +1,9 @@
 name: Sweep Player News
 
 # ── SCHEDULED — every 30 minutes, plus manual trigger for testing ──────
-# Rewritten to pull from FantasyPros' bulk /nfl/news endpoint instead of
-# Tank01's per-player getNFLNews — confirmed via a real, direct test call
-# that FantasyPros returns genuinely fantasy-relevant content (real
+# Pulls from FantasyPros' bulk /nfl/news endpoint instead of Tank01's
+# per-player getNFLNews — confirmed via a real, direct test call that
+# FantasyPros returns genuinely fantasy-relevant content (real
 # injury/practice-status items, not general NFL or personal-life news)
 # with a real, genuine publish timestamp, in ONE bulk call covering many
 # players at once, rather than needing one call per player. That's what
@@ -25,6 +25,15 @@ name: Sweep Player News
 # titles consistently lead with the player's full name ("Jalen Coker
 # (ankle) works on side..."), same pattern Tank01 used, just against
 # much more precisely relevant source content.
+#
+# Players NOT in the salary-eligible pool are still archived — a
+# best-effort name is extracted straight off the front of the title
+# (everything before the first "(" or non-capitalized word) and the
+# item is tagged confirmedMatch:false, so the archive still captures
+# news about players who aren't rostered/draftable yet (rookies not
+# in the pool, practice-squad signings, etc.) without silently
+# dropping it. draft.html and any other reader can choose whether to
+# surface unconfirmed items differently.
 #
 # Dedupes using FantasyPros' own real, stable numeric `id` field — a
 # genuine improvement over the old sanitized-title-hash approach, which
@@ -141,6 +150,26 @@ jobs:
             return (data && data.items) || [];
           }
 
+          // Best-effort name extraction for players NOT in the
+          // salary-eligible pool — FantasyPros titles consistently lead
+          // with the player's full name, then either an "(injury)"
+          // parenthetical or a lowercase word starts the sentence body.
+          // Confirmed against real sample titles like:
+          //   "EJ WIlliams signs with Panthers' practice squad"
+          //   "A.J. Terrell Jr. (shoulder) practices Thursday"
+          function extractLeadingName(title) {
+            const words = title.trim().split(/\s+/);
+            const nameWords = [];
+            for (const w of words) {
+              if (w.startsWith('(')) break;
+              const clean = w.replace(/[.,']/g, '');
+              if (!clean.length) break;
+              if (/^[A-Z]/.test(clean)) nameWords.push(w);
+              else break;
+            }
+            return nameWords.join(' ');
+          }
+
           (async () => {
             if (!FP_KEY) {
               console.error('❌ FANTASYPROS_API_KEY secret is missing.');
@@ -160,27 +189,6 @@ jobs:
             const items = await fetchFantasyProsNews();
             console.log(`Real items returned from FantasyPros: ${items.length}`);
 
-            // Best-effort name extraction for a player NOT in the known
-            // salary-eligible list — confirmed via real sample titles
-            // that they consistently lead with capitalized name words
-            // ("Jalen Coker", "A.J. Terrell Jr.") followed by either an
-            // opening paren or a lowercase verb. Used so real news about
-            // a practice-squad player or a rookie isn't silently thrown
-            // away just because they aren't priced this week — that
-            // history can matter the moment they do become relevant.
-            function extractLeadingName(title) {
-              const words = title.trim().split(/\s+/);
-              const nameWords = [];
-              for (const w of words) {
-                if (w.startsWith('(')) break;
-                const clean = w.replace(/[.,']/g, '');
-                if (!clean.length) break;
-                if (/^[A-Z]/.test(clean)) nameWords.push(w);
-                else break;
-              }
-              return nameWords.join(' ');
-            }
-
             let matched = 0, extracted = 0, added = 0, skippedExisting = 0, skippedNoName = 0;
             for (const item of items) {
               const title = (item.title || '').trim();
@@ -195,14 +203,20 @@ jobs:
                 if (titleLower.startsWith(p.name.toLowerCase())) { matchedPlayer = p; break; }
               }
 
-              var playerName, playerTeam, isConfirmed;
+              let playerName, playerTeam, isConfirmed;
               if (matchedPlayer) {
-                playerName = matchedPlayer.name; playerTeam = matchedPlayer.team; isConfirmed = true;
+                playerName = matchedPlayer.name;
+                playerTeam = matchedPlayer.team;
+                isConfirmed = true;
                 matched++;
               } else {
-                var extractedName = extractLeadingName(title);
+                // Not in the salary-eligible pool — still archive it,
+                // under a best-effort extracted name, tagged unconfirmed.
+                const extractedName = extractLeadingName(title);
                 if (!extractedName) { skippedNoName++; continue; }
-                playerName = extractedName; playerTeam = item.team_id || ''; isConfirmed = false;
+                playerName = extractedName;
+                playerTeam = item.team_id || '';
+                isConfirmed = false;
                 extracted++;
               }
 
@@ -217,7 +231,7 @@ jobs:
 
               const publishedAt = parseCreatedUtc(item.created);
               if (TEST_ONLY) {
-                console.log(`  [TEST] would add: "${title}" (${playerName}${isConfirmed ? '' : ', extracted — not a confirmed salary-eligible match'}, published ${new Date(publishedAt).toISOString()})`);
+                console.log(`  [TEST] would add: "${title}" (${playerName}${isConfirmed ? '' : ', unconfirmed'}, published ${new Date(publishedAt).toISOString()})`);
                 added++;
                 continue;
               }
@@ -227,7 +241,7 @@ jobs:
                   source: 'fantasypros.com', categories: item.categories || [],
                   playerName: playerName, team: playerTeam,
                   confirmedMatch: isConfirmed,
-                  archivedAt: publishedAt
+                  archivedAt: publishedAt // real published time, not just when this job happened to run
                 });
                 added++;
               } catch(e) {
@@ -235,6 +249,6 @@ jobs:
               }
             }
 
-            console.log(`\n✓ Sweep complete — ${items.length} item(s) checked, ${matched} matched a known salary-eligible player, ${extracted} archived under a best-effort extracted name, ${skippedNoName} skipped (no name could be extracted), ${skippedExisting} already archived, ${TEST_ONLY ? 'would add' : 'added'} ${added} new item(s).`);
+            console.log(`\n✓ Sweep complete — ${items.length} item(s) checked, ${matched} matched a rostered/salary-eligible player, ${extracted} archived under a best-effort unconfirmed name, ${skippedExisting} already archived, ${skippedNoName} skipped (no extractable name), ${TEST_ONLY ? 'would add' : 'added'} ${added} new item(s).`);
           })();
           SCRIPT
