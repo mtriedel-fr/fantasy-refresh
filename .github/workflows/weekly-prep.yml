@@ -304,14 +304,30 @@ jobs:
               return week;
             }
 
-            // Regular season — real Tank01 current-week value. During
-            // this same August window this correctly reports week 1 (or
-            // similar), since the real regular season hasn't started
-            // yet — never the preseason calendar's week number, which
-            // means something entirely different.
+            // Regular season — confirmed directly, live, via a real test
+            // call tonight: Tank01's /getNFLCurrentWeek endpoint returns
+            // a genuine 404, not a real, documented endpoint at all. This
+            // fallback (only reached for a league with no real meta yet)
+            // had been silently failing and hardcoding week 1 every time
+            // it fired — same confirmed root cause fixed in
+            // auto-scoring.yml and kickoff-locks.yml tonight. Replaced
+            // with the same fix: computing the real current week from
+            // the real, already-cached schedule instead.
             try {
-              const d = await t01('/getNFLCurrentWeek');
-              globalCurrentWeekCache[cacheKey] = d.body ? parseInt(d.body.week) : 1;
+              const cachedSeason = await firebaseGet(`/nflSchedule/${SEASON}/Regular.json`);
+              const weeksObj = cachedSeason && cachedSeason.weeks;
+              let bestWeek = 1;
+              if (weeksObj) {
+                for (let w = 1; w <= 18; w++) {
+                  const games = weeksObj[`week${w}`];
+                  if (!Array.isArray(games) || !games.length) continue;
+                  const kickoffs = games.filter(g => g && g.time).map(g => new Date(g.time).getTime());
+                  if (!kickoffs.length) continue;
+                  const firstKickoff = Math.min(...kickoffs);
+                  if (firstKickoff <= Date.now()) bestWeek = w;
+                }
+              }
+              globalCurrentWeekCache[cacheKey] = bestWeek;
             } catch (e) { globalCurrentWeekCache[cacheKey] = 1; }
             return globalCurrentWeekCache[cacheKey];
           }

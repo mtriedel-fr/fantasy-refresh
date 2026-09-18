@@ -174,15 +174,39 @@ jobs:
           // reports week 1 (or similar), since the regular season
           // itself hasn't started yet — never the preseason calendar's
           // week number, which means something different entirely.
+          // Confirmed directly, live, via a real test call tonight:
+          // Tank01's /getNFLCurrentWeek endpoint returns a genuine 404 -
+          // "Endpoint '/getNFLCurrentWeek' does not exist" - it isn't a
+          // real, documented Tank01 endpoint at all. This function had
+          // been silently failing and hardcoding week 1 for the regular
+          // season on every single run since this file was written -
+          // the same confirmed root cause found and fixed in
+          // auto-scoring.yml tonight, duplicated here independently.
+          // Replaced with the same fix: computing the real current week
+          // directly from the real, already-cached schedule data this
+          // codebase already maintains, instead of depending on Tank01
+          // for this at all.
           async function getRegularSeasonWeek() {
             try {
-              const data = await fetchJson(
-                `https://${T01_HOST}/getNFLCurrentWeek`,
-                { 'X-RapidAPI-Key': T01_KEY, 'X-RapidAPI-Host': T01_HOST }
-              );
-              return data.body ? parseInt(data.body.week) : 1;
+              const cachedSeason = await firebaseGet(`/nflSchedule/${SEASON}/Regular.json`);
+              const weeksObj = cachedSeason && cachedSeason.weeks;
+              if (weeksObj) {
+                let bestWeek = 1;
+                for (let w = 1; w <= 18; w++) {
+                  const games = weeksObj[`week${w}`];
+                  if (!Array.isArray(games) || !games.length) continue;
+                  const kickoffs = games.filter(g => g && g.time).map(g => new Date(g.time).getTime());
+                  if (!kickoffs.length) continue;
+                  const firstKickoff = Math.min(...kickoffs);
+                  if (firstKickoff <= Date.now()) bestWeek = w;
+                }
+                console.log(`  Computed real current week from cached schedule: ${bestWeek}`);
+                return bestWeek;
+              }
+              console.log('  No real, cached schedule found — falling back to week 1.');
+              return 1;
             } catch(e) {
-              console.error('Could not get current week:', e.message);
+              console.error('Could not compute current week from cached schedule:', e.message);
               return 1;
             }
           }
