@@ -322,16 +322,40 @@ jobs:
               return { week: psWeek, seasonType: 'Preseason' };
             }
 
+            // Confirmed directly, live, via a real test call: Tank01's
+            // /getNFLCurrentWeek endpoint returns a genuine 404 - "Endpoint
+            // '/getNFLCurrentWeek' does not exist" - it isn't a real,
+            // documented Tank01 endpoint at all, and this whole
+            // auto-detection path had been silently failing and falling
+            // through to the hardcoded week:1 fallback below on every
+            // single run since this file was written. That's why the
+            // season appeared stuck on Week 1 well into Week 2's own
+            // games. Replaced with a computation from the real,
+            // already-cached schedule this codebase already maintains
+            // (/nflSchedule/{season}/Regular) instead of depending on
+            // Tank01 for this at all — the current week is simply the
+            // highest-numbered week whose real first game has already
+            // kicked off, a clean, monotonic rule with no way to get
+            // stuck the way an unbounded date comparison could.
             try {
-              const d = await t01('/getNFLCurrentWeek');
-              if (d.body && d.body.week) {
-                const week = parseInt(d.body.week);
-                const seasonType = d.body.seasonType || 'Regular';
-                console.log(`Tank01 current week: ${week} (${seasonType})`);
-                return { week, seasonType };
+              const cachedSeason = await firebaseGet(`/nflSchedule/${SEASON}/Regular.json`);
+              const weeksObj = cachedSeason && cachedSeason.weeks;
+              if (weeksObj) {
+                let bestWeek = 1;
+                for (let w = 1; w <= 18; w++) {
+                  const games = weeksObj[`week${w}`];
+                  if (!Array.isArray(games) || !games.length) continue;
+                  const kickoffs = games.filter(g => g && g.time).map(g => new Date(g.time).getTime());
+                  if (!kickoffs.length) continue;
+                  const firstKickoff = Math.min(...kickoffs);
+                  if (firstKickoff <= Date.now()) bestWeek = w;
+                }
+                console.log(`Computed current week from real, cached schedule: ${bestWeek}`);
+                return { week: bestWeek, seasonType: 'Regular' };
               }
+              console.log('No real, cached schedule found — falling back to week 1.');
             } catch(e) {
-              console.log('Could not detect current week:', e.message);
+              console.log('Could not compute current week from cached schedule:', e.message);
             }
 
             return { week: 1, seasonType: 'Regular' };
