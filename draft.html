@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LAST FIX: Sep 18 2026 ~01:30 UTC — Def Rank header now centers correctly above the dot/rank (restructured to eliminate position:absolute fragility), plus 4-shade quartile color indicator (green 1-8 / yellow 9-16 / orange 17-24 / red 25-32) on defVsPosMatchupCol(). -->
+<!-- LAST FIX: Sep 18 2026 ~22:15 UTC — .draft-btn now a fixed 84px width for all four states (Draft/Drafted/Locked/Over Cap), so the row no longer reflows per player; "Can't Afford" shortened to "Over Cap" (new .overcap style) to fit. Def Rank header spacer corrected (74px, accounting for the zero-width mcol-info-dot's extra flex gap) so the header now genuinely lines up over the dot/rank column at all container widths, verified via a rendered screenshot comparison across all four button states. -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -223,7 +223,9 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
 .news-item-body{font-size:13px;color:var(--ink2);line-height:1.6;}
 .news-item-meta{font-family:var(--fd);font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-top:6px;}
 .news-loading{padding:40px 20px;text-align:center;color:var(--ink3);font-family:var(--fd);font-size:14px;}
-.draft-btn{flex-shrink:0;background:rgba(0,229,212,.12);border:1px solid rgba(0,229,212,.3);color:var(--or);font-family:var(--fd);font-size:12px;font-weight:800;padding:5px 12px;border-radius:8px;cursor:pointer;text-transform:uppercase;letter-spacing:.3px;transition:all .15s;white-space:nowrap;}
+.draft-btn{flex-shrink:0;width:84px;box-sizing:border-box;background:rgba(0,229,212,.12);border:1px solid rgba(0,229,212,.3);color:var(--or);font-family:var(--fd);font-size:12px;font-weight:800;padding:5px 4px;border-radius:8px;cursor:pointer;text-transform:uppercase;letter-spacing:.3px;transition:all .15s;white-space:nowrap;text-align:center;overflow:hidden;text-overflow:ellipsis;}
+.draft-btn.overcap{background:rgba(140,150,160,.12);border-color:rgba(140,150,160,.3);color:var(--ink3);}
+[data-theme="light"] .draft-btn.overcap{background:rgba(120,130,140,.12);border-color:rgba(120,130,140,.3);color:var(--ink3);}
 /* Hover styles scoped to real hover-capable pointers (mouse/trackpad) only.
    On touch devices, :hover has no real meaning but browsers still apply it
    after a tap and don't clear it until the next tap elsewhere — so without
@@ -369,6 +371,17 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
         </div>
       </div>
       <div class="picker-list-hdr-sal"></div>
+      <!-- Matches .draft-btn's fixed 84px width, minus 10px: the
+           mcol-info-dot button above renders at zero net width (a
+           negative margin cancels its own box), but it still forces
+           one extra 10px flex `gap` into this row that the player rows
+           below don't have (they go straight from mcol to sal with a
+           single gap, no dot in between). This spacer's width has to
+           net out to (button width - that one extra gap) or the
+           "Def Rank" label above drifts right of the dot/rank column
+           it's supposed to sit above. If .draft-btn's width ever
+           changes, this must change by the same amount. -->
+      <div style="width:74px;flex-shrink:0;"></div>
     </div>
     <div class="picker-list" id="picker-list">
       <div class="pick-prompt">
@@ -1426,8 +1439,8 @@ function renderGamePreviewPickable(game){
     var disabled2 = isOut || locked2 || wouldOvr2;
     var injBadge = (p.status && p.status !== 'Active')
       ? '<span class="p-inj inj-'+p.status+'">'+p.status+'</span>' : '';
-    var draftLbl2 = isIn2 ? '✓ Drafted' : locked2 ? '🔒 Locked' : wouldOvr2 ? '💰 Can\'t Afford' : '+ Draft';
-    var draftCls2 = 'draft-btn' + (isIn2 || locked2 || wouldOvr2 ? ' drafted' : '');
+    var draftLbl2 = isIn2 ? '✓ Drafted' : locked2 ? '🔒 Locked' : wouldOvr2 ? 'Over Cap' : '+ Draft';
+    var draftCls2 = 'draft-btn' + (isIn2 || locked2 ? ' drafted' : '') + (wouldOvr2 ? ' overcap' : '');
     var cls = 'player-row'+(isIn2?' selected':'')+(disabled2?' disabled':'');
 
     var rowIdAttr = '';
@@ -1974,8 +1987,8 @@ function renderPicker(){
     var disabled   = isOut || locked || (wouldOvr && !isSelected);
     var injBadge   = (p.status && p.status !== 'Active')
       ? '<span class="p-inj inj-'+p.status+'">'+p.status+'</span>' : '';
-    var draftLabel = isSelected ? '✓ Drafted' : locked ? '🔒 Locked' : wouldOvr ? '💰 Can\'t Afford' : '+ Draft';
-    var draftCls   = 'draft-btn' + (isSelected || locked || wouldOvr ? ' drafted' : '');
+    var draftLabel = isSelected ? '✓ Drafted' : locked ? '🔒 Locked' : wouldOvr ? 'Over Cap' : '+ Draft';
+    var draftCls   = 'draft-btn' + (isSelected || locked ? ' drafted' : '') + (wouldOvr ? ' overcap' : '');
     var rowCls     = 'player-row'+(isSelected?' selected':'')+(disabled?' disabled':'');
 
     // Mark the first genuinely pickable player (affordable, available,
