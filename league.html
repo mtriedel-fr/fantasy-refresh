@@ -61,6 +61,31 @@ html{overflow-x:hidden;}
 .wk-select:focus{border-color:var(--or);}
 #wk-select{min-width:112px;}
 .wk-select option{background:#091414;color:#E8F8F8;}
+/* WEEK PICKER — custom Option B dropdown */
+.wk-picker{position:relative;display:inline-flex;}
+.wk-cur{display:inline-flex;align-items:center;gap:8px;min-width:120px;background:#060E0E;border:1px solid #0A3A3A;color:#E8F8F8;font-family:var(--fd);font-size:13px;font-weight:700;letter-spacing:.5px;padding:6px 12px;border-radius:8px;cursor:pointer;outline:none;transition:border-color .15s;}
+.wk-cur:hover,.wk-cur:focus-visible{border-color:var(--or);}
+.wk-cur-label{flex:1;text-align:left;}
+.wk-cur-mark{display:inline-flex;align-items:center;}
+.wk-cur-mark:empty{display:none;}
+.wk-cur-caret{flex-shrink:0;transition:transform .15s;}
+.wk-picker.open .wk-cur-caret{transform:rotate(180deg);}
+.wk-menu{position:fixed;z-index:9999;background:#091414;border:1px solid #0A3A3A;border-radius:10px;padding:5px;box-shadow:0 14px 44px rgba(0,0,0,.6);max-height:60vh;overflow-y:auto;}
+.wk-menu[hidden]{display:none;}
+.wk-opt{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:7px;cursor:pointer;font-family:var(--fd);font-size:13px;font-weight:700;letter-spacing:.4px;color:#E8F8F8;border-left:3px solid transparent;outline:none;white-space:nowrap;}
+.wk-opt:hover,.wk-opt.focus{background:#0E2020;}
+.wk-opt .wk-mk{width:15px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;}
+.wk-opt .wk-name{flex:1;}
+.wk-opt .wk-stat{font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;}
+.wk-dot{width:8px;height:8px;border-radius:50%;display:inline-block;}
+.wk-dot.live{background:var(--grn);}
+.wk-dot.up{background:transparent;border:1.5px solid #2C5C5C;box-sizing:border-box;}
+.wk-mk .fin{color:#4FB0A4;display:inline-flex;}
+.wk-stat.live{color:var(--grn);}
+.wk-stat.fin{color:#4FB0A4;}
+.wk-stat.up{color:#5E8686;}
+.wk-opt.viewing{border-left-color:#FF2D78;background:rgba(255,45,120,.10);color:#FFFFFF;}
+.wk-chip{font-size:9px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:#FF5FA0;background:rgba(255,45,120,.14);border:1px solid rgba(255,45,120,.4);border-radius:10px;padding:1px 7px;}
 
 /* STATS */
 .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--bdr2);margin:0 16px 14px;border-radius:0 0 14px 14px;overflow:hidden;border:1px solid var(--bdr);border-top:none;}
@@ -962,7 +987,11 @@ setTimeout(function(){
   <div class="wk-bar-league" style="position:relative;">
     <span class="wk-bar-league-name" id="wk-bar-season">OG King/Queen of Fantasy '26</span>
     <div class="wk-bar-controls" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:0;">
-      <select class="wk-select" id="wk-select" onchange="setWeekFromSelect(this.value)"></select>
+      <div class="wk-picker" id="wk-picker">
+        <select class="wk-select" id="wk-select" onchange="setWeekFromSelect(this.value)" style="display:none" aria-hidden="true" tabindex="-1"></select>
+        <button type="button" class="wk-cur" id="wk-cur" aria-haspopup="listbox" aria-expanded="false" aria-label="Select week" onclick="wkPickerToggle(event)" onkeydown="wkPickerButtonKey(event)"><span class="wk-cur-mark" id="wk-cur-mark" aria-hidden="true"></span><span class="wk-cur-label" id="wk-cur-label">Week 1</span><svg class="wk-cur-caret" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FF1A6E" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></button>
+        <div class="wk-menu" id="wk-menu" role="listbox" aria-label="Select week" hidden></div>
+      </div>
       <select class="season-select" id="season-select" onchange="switchSeason(this.value)" title="Switch season">
         <option value="2026" selected>2026</option>
         <option value="2025" id="season-opt-2025">2025</option>
@@ -2733,6 +2762,7 @@ function buildWeekBarRange(sel, lastWeek){
     if(i === effectiveCurrentWeek) o.selected = true;
     sel.appendChild(o);
   }
+  wkPickerRender(effectiveCurrentWeek, visibleLastWeek);
 }
 
 function setWeekFromSelect(val){
@@ -2749,6 +2779,131 @@ function setWeekFromSelect(val){
     loadMyTeamLineup(myTeamDrop);
   }
   updateMyTeamNewsDot();
+}
+
+// ── Week picker (custom dropdown) ──────────────────────────
+// A week's status comes straight from its score entries, the same
+// signal the standings header uses: any entry still 'live' => Live,
+// otherwise Final. A week with no data yet (only the next week can
+// appear here, once its draft is open) => Upcoming. The ✓ now means
+// Final ONLY — the live week you're viewing never carries one, so
+// "finished" and "currently viewing" are visually distinct.
+function wkStatusFor(week){
+  var arr = seasonData[String(week)];
+  if(arr && arr.length){
+    for(var i=0;i<arr.length;i++){ if(arr[i] && arr[i].status === 'live') return 'live'; }
+    return 'final';
+  }
+  return 'upcoming';
+}
+function wkMarkHtml(status){
+  if(status === 'final') return '<span class="wk-mk"><span class="fin"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span></span>';
+  if(status === 'live') return '<span class="wk-mk"><span class="wk-dot live"></span></span>';
+  return '<span class="wk-mk"><span class="wk-dot up"></span></span>';
+}
+function wkStatWord(status){ return status === 'live' ? 'Live' : (status === 'final' ? 'Final' : 'Upcoming'); }
+function wkStatClass(status){ return status === 'live' ? 'live' : (status === 'final' ? 'fin' : 'up'); }
+function wkPickerRender(currentWk, visibleLastWeek){
+  var menu = document.getElementById('wk-menu'); if(!menu) return;
+  var html = '';
+  for(var i=1;i<=visibleLastWeek;i++){
+    var st = wkStatusFor(i);
+    var viewing = (i === currentWk);
+    html += '<div class="wk-opt'+(viewing?' viewing':'')+'" role="option" data-week="'+i+'" tabindex="-1" aria-selected="'+(viewing?'true':'false')+'" onclick="wkPickerPick('+i+')">'
+      + wkMarkHtml(st)
+      + '<span class="wk-name">Week '+i+'</span>'
+      + (viewing ? '<span class="wk-chip">Viewing</span>' : '')
+      + '<span class="wk-stat '+wkStatClass(st)+'">'+wkStatWord(st)+'</span>'
+      + '</div>';
+  }
+  menu.innerHTML = html;
+  var label = document.getElementById('wk-cur-label'); if(label) label.textContent = 'Week ' + currentWk;
+  var mark = document.getElementById('wk-cur-mark'); if(mark) mark.innerHTML = wkMarkHtml(wkStatusFor(currentWk));
+}
+// Cheap DOM-only resync used by the standings/H2H renderers that set
+// the (now hidden) native select's value — keeps the visible button and
+// menu highlight in step without an async rebuild.
+function syncWeekBar(){
+  var menu = document.getElementById('wk-menu'); if(!menu) return;
+  var opts = menu.querySelectorAll('.wk-opt'); var last = 0;
+  for(var i=0;i<opts.length;i++){ var w = parseInt(opts[i].getAttribute('data-week'))||0; if(w>last) last=w; }
+  if(last){ wkPickerRender(currentWeek, last); }
+  else { var label=document.getElementById('wk-cur-label'); if(label) label.textContent='Week '+currentWeek; }
+}
+function wkFocusOpt(opt){
+  var menu = document.getElementById('wk-menu'); if(!menu) return;
+  var all = menu.querySelectorAll('.wk-opt');
+  for(var i=0;i<all.length;i++) all[i].classList.remove('focus');
+  if(opt){ opt.classList.add('focus'); opt.focus(); }
+}
+function wkPickerPosition(){
+  var btn = document.getElementById('wk-cur'); var menu = document.getElementById('wk-menu');
+  if(!btn || !menu || menu.hidden) return;
+  var r = btn.getBoundingClientRect();
+  menu.style.minWidth = r.width + 'px';
+  menu.style.left = r.left + 'px';
+  menu.style.top = (r.bottom + 6) + 'px';
+  var mh = menu.offsetHeight;
+  if(r.bottom + 6 + mh > window.innerHeight && r.top - 6 - mh > 0){ menu.style.top = (r.top - 6 - mh) + 'px'; }
+  var mw = menu.offsetWidth;
+  if(r.left + mw > window.innerWidth - 8){ menu.style.left = Math.max(8, window.innerWidth - 8 - mw) + 'px'; }
+}
+function wkPickerOutside(ev){
+  var picker = document.getElementById('wk-picker');
+  if(picker && !picker.contains(ev.target)) wkPickerClose();
+}
+function wkPickerOpen(){
+  var picker = document.getElementById('wk-picker'); var btn = document.getElementById('wk-cur'); var menu = document.getElementById('wk-menu');
+  if(!picker || !btn || !menu) return;
+  menu.hidden = false; picker.classList.add('open'); btn.setAttribute('aria-expanded','true');
+  wkPickerPosition();
+  document.addEventListener('click', wkPickerOutside, true);
+  document.addEventListener('keydown', wkPickerKeydown, true);
+  window.addEventListener('resize', wkPickerPosition);
+  window.addEventListener('scroll', wkPickerPosition, true);
+  var cur = menu.querySelector('.wk-opt.viewing') || menu.querySelector('.wk-opt');
+  if(cur) wkFocusOpt(cur);
+}
+function wkPickerClose(){
+  var picker = document.getElementById('wk-picker'); var btn = document.getElementById('wk-cur'); var menu = document.getElementById('wk-menu');
+  if(menu) menu.hidden = true;
+  if(picker) picker.classList.remove('open');
+  if(btn) btn.setAttribute('aria-expanded','false');
+  document.removeEventListener('click', wkPickerOutside, true);
+  document.removeEventListener('keydown', wkPickerKeydown, true);
+  window.removeEventListener('resize', wkPickerPosition);
+  window.removeEventListener('scroll', wkPickerPosition, true);
+}
+function wkPickerToggle(ev){
+  if(ev){ ev.stopPropagation(); }
+  var picker = document.getElementById('wk-picker');
+  if(picker && picker.classList.contains('open')) wkPickerClose(); else wkPickerOpen();
+}
+function wkPickerButtonKey(ev){
+  if(ev.key === 'ArrowDown' || ev.key === 'Enter' || ev.key === ' '){
+    ev.preventDefault();
+    var picker = document.getElementById('wk-picker');
+    if(!(picker && picker.classList.contains('open'))) wkPickerOpen();
+  }
+}
+function wkPickerKeydown(ev){
+  var menu = document.getElementById('wk-menu'); if(!menu || menu.hidden) return;
+  var opts = menu.querySelectorAll('.wk-opt'); var idx = -1;
+  for(var i=0;i<opts.length;i++){ if(opts[i].classList.contains('focus')){ idx = i; break; } }
+  if(ev.key === 'Escape'){ ev.preventDefault(); wkPickerClose(); var b = document.getElementById('wk-cur'); if(b) b.focus(); }
+  else if(ev.key === 'ArrowDown'){ ev.preventDefault(); wkFocusOpt(opts[idx+1] || opts[opts.length-1]); }
+  else if(ev.key === 'ArrowUp'){ ev.preventDefault(); wkFocusOpt(opts[idx-1] || opts[0]); }
+  else if(ev.key === 'Home'){ ev.preventDefault(); wkFocusOpt(opts[0]); }
+  else if(ev.key === 'End'){ ev.preventDefault(); wkFocusOpt(opts[opts.length-1]); }
+  else if(ev.key === 'Enter' || ev.key === ' '){ ev.preventDefault(); if(idx>=0) wkPickerPick(parseInt(opts[idx].getAttribute('data-week'))); }
+  else if(ev.key === 'Tab'){ wkPickerClose(); }
+}
+function wkPickerPick(week){
+  var sel = document.getElementById('wk-select');
+  if(sel) sel.value = week;
+  wkPickerClose();
+  setWeekFromSelect(week);
+  var btn = document.getElementById('wk-cur'); if(btn) btn.focus();
 }
 
 function buildWeekSelect(){
@@ -2790,6 +2945,7 @@ function renderAllH2H(){
   applyH2HChrome();
   var sel = document.getElementById('wk-select');
   if(sel) sel.value = currentWeek;
+  syncWeekBar();
 
   var user = (typeof FRAuth !== 'undefined' && FRAuth.getUser) ? FRAuth.getUser() : null;
   var myUid = user ? user.uid : null;
@@ -3670,6 +3826,7 @@ function renderAll(){
   // Sync dropdown to currentWeek
   var sel = document.getElementById('wk-select');
   if(sel) sel.value = currentWeek;
+  syncWeekBar();
 
   var weeks = Object.keys(seasonData).filter(function(k){ return !isNaN(Number(k)) && seasonData[k] && seasonData[k].length > 0; });
 
