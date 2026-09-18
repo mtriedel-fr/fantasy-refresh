@@ -1,0 +1,64 @@
+name: URGENT Diagnostic — Test Real Tank01 getNFLCurrentWeek Call
+
+# ONE-TIME USE — delete this file after running it once.
+# Makes the exact same real call auto-scoring.yml makes to Tank01's
+# getNFLCurrentWeek endpoint, to see the real, live response and
+# understand precisely why it's silently failing/falling through to
+# the hardcoded week:1 fallback every single run. Read-only.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test real Tank01 getNFLCurrentWeek call
+        env:
+          TANK01_KEY: ${{ secrets.TANK01_KEY }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const T01_KEY = process.env.TANK01_KEY;
+          const T01_HOST = 'tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com';
+
+          function fetchRaw(path) {
+            return new Promise((resolve, reject) => {
+              https.get({
+                hostname: T01_HOST, path, headers: {
+                  'X-RapidAPI-Key': T01_KEY, 'X-RapidAPI-Host': T01_HOST
+                }
+              }, res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => resolve({ status: res.statusCode, raw: data }));
+              }).on('error', reject);
+            });
+          }
+
+          async function main() {
+            console.log('Current real time:', new Date().toISOString());
+            console.log('');
+
+            const result = await fetchRaw('/getNFLCurrentWeek');
+            console.log('Real HTTP status:', result.status);
+            console.log('Real, raw response body:');
+            console.log(result.raw);
+            console.log('');
+
+            try {
+              const parsed = JSON.parse(result.raw);
+              console.log('Parsed successfully. Real top-level keys:', Object.keys(parsed).join(', '));
+              if (parsed.body) {
+                console.log('Real body keys:', typeof parsed.body === 'object' ? Object.keys(parsed.body).join(', ') : typeof parsed.body);
+                console.log('Real body.week value:', JSON.stringify(parsed.body.week));
+              } else {
+                console.log('No "body" key at all in the real response — this is likely why d.body.week fails.');
+              }
+            } catch(e) {
+              console.log('Response was not valid JSON at all:', e.message);
+            }
+          }
+
+          main().catch(e => { console.error('Failed:', e); process.exit(1); });
+          SCRIPT
