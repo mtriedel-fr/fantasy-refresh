@@ -2850,12 +2850,14 @@ function wkPickerPosition(){
 }
 function wkPickerOutside(ev){
   var picker = document.getElementById('wk-picker');
-  if(picker && !picker.contains(ev.target)) wkPickerClose();
+  var menu = document.getElementById('wk-menu');
+  if(picker && !picker.contains(ev.target) && !(menu && menu.contains(ev.target))) wkPickerClose();
 }
 function wkPickerOpen(){
   var picker = document.getElementById('wk-picker'); var btn = document.getElementById('wk-cur'); var menu = document.getElementById('wk-menu');
   if(!picker || !btn || !menu) return;
   menu.hidden = false; picker.classList.add('open'); btn.setAttribute('aria-expanded','true');
+  if(menu.parentNode !== document.body) document.body.appendChild(menu);
   wkPickerPosition();
   document.addEventListener('click', wkPickerOutside, true);
   document.addEventListener('keydown', wkPickerKeydown, true);
@@ -2866,7 +2868,7 @@ function wkPickerOpen(){
 }
 function wkPickerClose(){
   var picker = document.getElementById('wk-picker'); var btn = document.getElementById('wk-cur'); var menu = document.getElementById('wk-menu');
-  if(menu) menu.hidden = true;
+  if(menu){ menu.hidden = true; if(picker && menu.parentNode !== picker){ picker.appendChild(menu); } }
   if(picker) picker.classList.remove('open');
   if(btn) btn.setAttribute('aria-expanded','false');
   document.removeEventListener('click', wkPickerOutside, true);
