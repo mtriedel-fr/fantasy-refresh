@@ -1675,6 +1675,15 @@ jobs:
             const realActiveUids = new Set(
               Object.entries(members).filter(([, m]) => m && m.teamName && m.active !== false).map(([uid]) => uid)
             );
+            // uid -> current team name, for display only. Identity/tracking
+            // below is ALWAYS the uid — never the team name — so a member
+            // who renames mid-season keeps their real score and is never
+            // scored 0 (and wrongly eliminated) just because their name
+            // changed. This was a live fairness bug: the replay matched
+            // survivors to weekly scores by name, so a rename produced a
+            // phantom 0 the rename week.
+            const memberName = {};
+            Object.entries(members).forEach(([uid, m]) => { if (m && m.teamName) memberName[uid] = m.teamName; });
 
             const weekScoresByWeek = {};
             for (let w = 1; w <= week; w++) {
@@ -1686,7 +1695,7 @@ jobs:
                 // team count above the actual number of league members.
                 weekScoresByWeek[w] = Object.entries(wk)
                   .filter(([uid, e]) => e && e.team && realActiveUids.has(uid))
-                  .map(([, e]) => e);
+                  .map(([uid, e]) => ({ uid: e.uid || uid, team: e.team, score: e.score })); // keep the uid — it, not the name, is the identity used to track survivors across weeks
               }
             }
             const weeks = Object.keys(weekScoresByWeek).map(Number).sort((a, b) => a - b);
@@ -1697,18 +1706,24 @@ jobs:
             const totalWeeks = 18;
             const schedule = buildElimSchedule(totalTeams, totalWeeks);
 
-            let stillIn = week1.map(e => e.team);
+            let stillIn = week1.map(e => e.uid); // survivors tracked by uid (stable identity), never by the mutable team name
             let eliminatedThisTargetWeek = [];
-            const eliminatedWhen = {}; // team -> {week, score, noShow}, for persisting a full status below
+            const eliminatedWhen = {}; // uid -> {week, score, noShow}, for persisting a full status below
 
             weeks.forEach(w => {
               const sched = schedule.find(s => s.week === w);
               const isFinale = sched && w === 17;
               const wkData = weekScoresByWeek[w];
+              const byUid = {};
+              wkData.forEach(e => { byUid[e.uid] = e; });
 
-              const entries = stillIn.map(team => {
-                const found = wkData.find(e => teamMatch(e.team, team));
-                return found ? found : { team, score: 0, noShow: true };
+              // This week's score for each still-alive team, matched by uid.
+              // A renamed team keeps its real score here instead of being
+              // treated as a no-show 0 (which was what wrongly eliminated it).
+              const entries = stillIn.map(uid => {
+                const found = byUid[uid];
+                return found ? { uid, score: found.score, noShow: false }
+                             : { uid, score: 0, noShow: true };
               });
 
               if (isFinale) return; // no eliminations in the finale week
@@ -1718,13 +1733,13 @@ jobs:
               const elimThisWeek = sorted.slice(0, elimCount);
 
               elimThisWeek.forEach(e => {
-                const idx = stillIn.indexOf(e.team);
+                const idx = stillIn.indexOf(e.uid);
                 if (idx >= 0) stillIn.splice(idx, 1);
-                eliminatedWhen[e.team] = { week: w, score: Math.round((e.score || 0) * 100) / 100, noShow: !!e.noShow };
+                eliminatedWhen[e.uid] = { week: w, score: Math.round((e.score || 0) * 100) / 100, noShow: !!e.noShow };
               });
 
               if (w === week) {
-                eliminatedThisTargetWeek = elimThisWeek.map(e => ({ team: e.team, score: Math.round((e.score || 0) * 100) / 100, noShow: !!e.noShow }));
+                eliminatedThisTargetWeek = elimThisWeek.map(e => ({ uid: e.uid, team: memberName[e.uid] || e.uid, score: Math.round((e.score || 0) * 100) / 100, noShow: !!e.noShow }));
               }
             });
 
@@ -1767,12 +1782,18 @@ jobs:
               // go final — and every client just reads the answer,
               // the same way scores/locks/salaries already work.
               if (guillotine) {
+                // Keyed by uid (stable identity). `team` carries the CURRENT
+                // name for display — uids are already Firebase-safe keys, so
+                // no name sanitization is needed. Clients read this status and
+                // resolve the display name by uid, so a rename shows the new
+                // name everywhere without ever splitting or mis-eliminating.
+                const mName = uid => (members[uid] && members[uid].teamName) || uid;
                 const teamStatus = {};
-                (guillotine.alive || []).forEach(team => {
-                  teamStatus[sanitizeFirebaseKey(team)] = { team, status: 'alive' };
+                (guillotine.alive || []).forEach(uid => {
+                  teamStatus[uid] = { uid, team: mName(uid), status: 'alive' };
                 });
-                Object.entries(guillotine.eliminatedWhen || {}).forEach(([team, info]) => {
-                  teamStatus[sanitizeFirebaseKey(team)] = { team, status: 'eliminated', eliminatedWeek: info.week, score: info.score, noShow: info.noShow };
+                Object.entries(guillotine.eliminatedWhen || {}).forEach(([uid, info]) => {
+                  teamStatus[uid] = { uid, team: mName(uid), status: 'eliminated', eliminatedWeek: info.week, score: info.score, noShow: info.noShow };
                 });
                 await firebasePut(`/leagues/${leagueId}/guillotineStatus/${SEASON}.json`, {
                   teams: teamStatus,
