@@ -1923,6 +1923,7 @@ function loadFromCloud(){
   .then(function(data){
     if(data && typeof data === 'object' && !data.error){
       seasonData = normalizeSeasonData(data);
+      canonicalizeSeasonTeamNames(); // no-op if members not loaded yet; loadRealActiveMemberUids() re-stamps once they are
       setLoading(false);
       boot();
     } else if(data === null){
@@ -1998,6 +1999,7 @@ function startLivePolling(week){
         });
         if(changed){
           seasonData[week] = entries;
+          canonicalizeSeasonTeamNames(); // freshly fetched entries carry per-week name snapshots — restamp to current names by uid
           refreshCumStandings(String(week)); // stale-while-revalidate — old data stays visible until the new fetch actually resolves, never a blank gap
           boot(); // re-render standings
           showToast('Scores updated 📡');
@@ -3346,6 +3348,34 @@ function renderCumHome(){
 
 var realActiveMemberUids = null; // uid -> true, for every real, active member — null until first loaded
 var realActiveMemberUidsPromise = null; // the real, in-flight fetch promise, shared by every concurrent caller
+// uid -> CURRENT teamName, from the same /members read below. This is the
+// single source of truth for a team's display name: identity is the uid
+// (never changes), the name is whatever the member currently calls their
+// team. Keying anything on the name instead of the uid is what let a
+// renamed team show up as two separate teams — same person, two names
+// across different weeks — inflating standings/counts and splitting their
+// season total. Everything now groups by uid and labels from this map, so
+// a rename unifies the member's whole season (all prior weeks included)
+// under their current name.
+var memberNameByUid = {};
+
+// Rewrites every loaded score entry's display name to the member's CURRENT
+// team name (by uid). Idempotent and cheap: a no-op until members are
+// known, and safe to run on every (re)load — setting a name to the current
+// name again changes nothing. Entries with no uid (legacy manual imports)
+// keep their stored name. This is what makes prior weeks retroactively show
+// the current name, and what collapses a renamed team back into one row.
+function canonicalizeSeasonTeamNames(){
+  if(!memberNameByUid || !Object.keys(memberNameByUid).length) return;
+  if(!seasonData || typeof seasonData !== 'object') return;
+  Object.keys(seasonData).forEach(function(wk){
+    var arr = seasonData[wk];
+    if(!Array.isArray(arr)) return;
+    arr.forEach(function(e){
+      if(e && e.uid && memberNameByUid[e.uid]) e.name = memberNameByUid[e.uid];
+    });
+  });
+}
 function loadRealActiveMemberUids(){
   if(realActiveMemberUids) return Promise.resolve(realActiveMemberUids);
   // Confirmed as a real, critical bug: returning Promise.resolve(null)
@@ -3361,11 +3391,22 @@ function loadRealActiveMemberUids(){
   var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
   realActiveMemberUidsPromise = FR.fb.get('/leagues/' + leagueId + '/members').then(function(members){
     var set = {};
+    var nameMap = {};
     Object.entries(members || {}).forEach(function(entry){
       var uid = entry[0], m = entry[1];
       if(m && m.teamName && m.active !== false) set[uid] = true;
+      // Build the uid -> current-name map from every member with a name
+      // (not only active ones), so an entry always resolves to a real
+      // current name even in an edge case where active filtering differs.
+      if(m && m.teamName) nameMap[uid] = m.teamName;
     });
     realActiveMemberUids = set;
+    memberNameByUid = nameMap;
+    // Members are now known — stamp the already-loaded season data with
+    // current names so the very next render (this file already re-calls
+    // renderAll() once members resolve) groups and labels by uid/current
+    // name instead of the stale per-week snapshot.
+    canonicalizeSeasonTeamNames();
     realActiveMemberUidsPromise = null;
     return set;
   }).catch(function(){ realActiveMemberUidsPromise = null; return null; });
@@ -3489,12 +3530,14 @@ function refreshCumStandings(weekKey){
               return (b.score||0) - (a.score||0);
             });
             snapshotEntries.forEach(function(e,i){ e.rank = i+1; });
+            snapshotEntries.forEach(function(e){ if(e.uid && memberNameByUid[e.uid]) e.name = memberNameByUid[e.uid]; }); // show current team name by uid, not the snapshot's stale name
             fullStandingsCache[weekKey] = snapshotEntries;
             fireStandingsReady(weekKey);
             renderStandingsAndHeader(weekKey);
           }
         });
 
+        snapshotEntries.forEach(function(e){ if(e.uid && memberNameByUid[e.uid]) e.name = memberNameByUid[e.uid]; }); // show current team name by uid, not the snapshot's stale name
         fullStandingsCache[weekKey] = snapshotEntries;
         delete fullStandingsFetchInFlight[weekKey];
         fireStandingsReady(weekKey);
@@ -3851,22 +3894,27 @@ function renderAll(){
   // ownership/ownershipMeta collision) inflate team counts and, since
   // this sums by NAME not uid, can even merge into a real team's total
   // if names happen to collide.
+  // Group by uid (the stable identity), not by name — a member who renamed
+  // has one uid but a different name snapshot per week, so name-keying split
+  // them into two teams. Each group's display name is the member's CURRENT
+  // name. Legacy entries with no uid fall back to a name-based key.
   var totals = {};
   weeks.forEach(function(w){
     seasonData[w].forEach(function(entry){
       if(realActiveMemberUids && (!entry.uid || !realActiveMemberUids[entry.uid])) return;
-      if(!totals[entry.name]) totals[entry.name] = {total:0, cnt:0};
-      totals[entry.name].total += entry.score;
-      totals[entry.name].cnt++;
+      var key = entry.uid || ('nm:' + entry.name);
+      if(!totals[key]) totals[key] = {name: (entry.uid && memberNameByUid[entry.uid]) || entry.name, uid: entry.uid || '', total:0, cnt:0};
+      totals[key].total += entry.score;
+      totals[key].cnt++;
     });
   });
   if(!realActiveMemberUids){
     loadRealActiveMemberUids().then(function(){ if(typeof renderAll === 'function') renderAll(); });
   }
 
-  var sorted = Object.keys(totals).map(function(name){
-    var d = totals[name];
-    return {name: name, total: d.total, cnt: d.cnt, avg: d.total / d.cnt};
+  var sorted = Object.keys(totals).map(function(key){
+    var d = totals[key];
+    return {name: d.name, uid: d.uid, total: d.total, cnt: d.cnt, avg: d.total / d.cnt};
   }).sort(function(a,b){ return b.total - a.total; });
 
   // Prev rank
@@ -3876,12 +3924,16 @@ function renderAll(){
   prevWeeks.forEach(function(w){
     seasonData[w].forEach(function(entry){
       if(realActiveMemberUids && (!entry.uid || !realActiveMemberUids[entry.uid])) return;
-      prevTotals[entry.name] = (prevTotals[entry.name] || 0) + entry.score;
+      var key = entry.uid || ('nm:' + entry.name);
+      if(!prevTotals[key]) prevTotals[key] = {name: (entry.uid && memberNameByUid[entry.uid]) || entry.name, total:0};
+      prevTotals[key].total += entry.score;
     });
   });
-  var prevSorted = Object.keys(prevTotals).sort(function(a,b){ return prevTotals[b] - prevTotals[a]; });
+  // prevRank is looked up by (canonical) name downstream, so key it by the
+  // display name — one per uid — after grouping by uid above.
+  var prevSorted = Object.keys(prevTotals).sort(function(a,b){ return prevTotals[b].total - prevTotals[a].total; });
   var prevRank = {};
-  prevSorted.forEach(function(name, i){ prevRank[name] = i + 1; });
+  prevSorted.forEach(function(key, i){ prevRank[prevTotals[key].name] = i + 1; });
 
   // Current week — filtered against the real, active member list before
   // anything downstream (wkHighName, curMap, the dot plot, the This Week
@@ -4181,7 +4233,7 @@ function renderGuillotine(){
   var stillIn = [];
   Object.keys(gsTeams).forEach(function(key){
     var t = gsTeams[key];
-    var team = t.team || key; // real, original name if present — falls back to the key for any older, pre-fix entry that never had it
+    var team = memberNameByUid[key] || t.team || key; // CURRENT team name by uid (gsTeams key is the uid); falls back to the stored snapshot, then the key
     if(t.status === 'alive') stillIn.push(team);
     else if(t.status === 'eliminated') eliminated[team] = {week: t.eliminatedWeek, score: t.score, noShow: !!t.noShow};
   });
@@ -4202,7 +4254,7 @@ function renderGuillotine(){
     var inAtStart = Object.keys(gsTeams).filter(function(key){
       var t = gsTeams[key];
       return t.status === 'alive' || t.eliminatedWeek >= w;
-    }).map(function(key){ return gsTeams[key].team || key; });
+    }).map(function(key){ return memberNameByUid[key] || gsTeams[key].team || key; });
     var entries = inAtStart.map(function(team){
       var found = wkData.find(function(e){ return teamMatch(e.name, team); });
       return found ? {name: found.name, score: found.score} : {name: team, score: 0, noShow: true};
@@ -4216,14 +4268,14 @@ function renderGuillotine(){
     }
 
     var elimThisWeek = Object.keys(gsTeams).filter(function(key){ return gsTeams[key].eliminatedWeek === w; })
-      .map(function(key){ var t = gsTeams[key]; return {name: t.team || key, score: t.score, noShow: !!t.noShow}; });
+      .map(function(key){ var t = gsTeams[key]; return {name: memberNameByUid[key] || t.team || key, score: t.score, noShow: !!t.noShow}; });
 
     weekResults.push({
       week: w,
       scores: entries,
       eliminatedThisWeek: elimThisWeek,
       survivors: inAtStart.filter(function(team){
-        var key = Object.keys(gsTeams).find(function(k){ return (gsTeams[k].team || k) === team; });
+        var key = Object.keys(gsTeams).find(function(k){ return (memberNameByUid[k] || gsTeams[k].team || k) === team; });
         var t = key ? gsTeams[key] : null;
         return t && (t.status === 'alive' || t.eliminatedWeek > w);
       }),
