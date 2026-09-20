@@ -1,0 +1,155 @@
+name: Reset Polluted Week (recovery)
+
+# One-click recovery for a week whose scores got polluted by a scoring run
+# that used the WRONG week's data (e.g. a re-score with a game_date from a
+# different week while the week auto-detected to the current one). It:
+#   1. BACKS UP the week's score node to /backups (so nothing is truly lost)
+#   2. DELETES the polluted score node  /leagues/<league>/season/<season>/<week>
+#   3. Removes a stray game that bled into  /liveGameStatus/<season>/Regular_wk<week>
+#   4. Triggers a clean re-score of the real games already played that week
+#
+# Defaults are set for the Sept 2026 incident (Week 2 polluted by the
+# Sept-14 DEN@KC Week-1 game; real games so far = Thursday DET@BUF 20260917).
+#
+# SAFETY: requires typing the confirm phrase, and backs up before deleting.
+
+concurrency:
+  group: reset-week
+  cancel-in-progress: false
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type EXACTLY: RESET WEEK 2   (guard against accidental runs)'
+        required: true
+        default: ''
+      league_id:
+        description: 'League ID'
+        required: true
+        default: 'fr_refresh26'
+      season:
+        description: 'Season key'
+        required: true
+        default: '2026'
+      week:
+        description: 'Week number to reset'
+        required: true
+        default: '2'
+      stray_game_id:
+        description: 'Stray game to remove from that week''s liveGameStatus (blank to skip)'
+        required: false
+        default: '20260914_DEN@KC'
+      rescore_date:
+        description: 'Date (YYYYMMDD) of the real games already played this week, to re-score cleanly after the wipe'
+        required: false
+        default: '20260917'
+      scoring_workflow_file:
+        description: 'Filename of the Auto Scoring workflow to trigger for the clean re-score'
+        required: false
+        default: 'auto-scoring.yml'
+
+permissions:
+  contents: read
+  actions: write   # needed to trigger the Auto Scoring workflow at the end
+
+jobs:
+  reset:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Backup and wipe the polluted week
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+          CONFIRM: ${{ inputs.confirm }}
+          LEAGUE_ID: ${{ inputs.league_id }}
+          SEASON: ${{ inputs.season }}
+          WEEK: ${{ inputs.week }}
+          STRAY_GAME_ID: ${{ inputs.stray_game_id }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+
+          const FB_URL  = process.env.FIREBASE_DB_URL;
+          const FB_TOKEN = process.env.FIREBASE_AUTH_TOKEN;
+          const LEAGUE  = (process.env.LEAGUE_ID || 'fr_refresh26').trim();
+          const SEASON  = (process.env.SEASON || '2026').trim();
+          const WEEK    = (process.env.WEEK || '2').trim();
+          const STRAY   = (process.env.STRAY_GAME_ID || '').trim();
+
+          if ((process.env.CONFIRM || '').trim() !== 'RESET WEEK 2') {
+            console.error('❌ Confirm phrase did not match "RESET WEEK 2" — aborting. Nothing was changed.');
+            process.exit(1);
+          }
+          if (!FB_URL) { console.error('Missing FIREBASE_DB_URL secret.'); process.exit(1); }
+          if (!FB_TOKEN) { console.error('Missing FIREBASE_AUTH_TOKEN secret — writes would be rejected. Aborting.'); process.exit(1); }
+
+          function authed(path) {
+            const sep = path.includes('?') ? '&' : '?';
+            return FB_URL + path + sep + 'auth=' + FB_TOKEN;
+          }
+          function req(method, path, body) {
+            return new Promise((resolve, reject) => {
+              const u = new URL(authed(path));
+              const opts = { hostname: u.hostname, path: u.pathname + u.search, method,
+                headers: { 'Content-Type': 'application/json' } };
+              const payload = body != null ? JSON.stringify(body) : null;
+              if (payload) opts.headers['Content-Length'] = Buffer.byteLength(payload);
+              const r = https.request(opts, res => {
+                let d = ''; res.on('data', c => d += c);
+                res.on('end', () => {
+                  if (res.statusCode >= 200 && res.statusCode < 300) resolve(d ? JSON.parse(d) : null);
+                  else reject(new Error(`HTTP ${res.statusCode} on ${method} ${path} — ${d.slice(0,200)}`));
+                });
+              });
+              r.on('error', reject);
+              if (payload) r.write(payload);
+              r.end();
+            });
+          }
+
+          (async () => {
+            const scorePath = `/leagues/${LEAGUE}/season/${SEASON}/${WEEK}.json`;
+            const ts = Date.now();
+            const backupPath = `/backups/reset_${LEAGUE}_${SEASON}_wk${WEEK}_${ts}.json`;
+
+            console.log(`Reading current scores at ${scorePath} …`);
+            const current = await req('GET', scorePath).catch(e => { console.log('  (read failed: ' + e.message + ')'); return null; });
+            const teamCount = current ? Object.keys(current).filter(k => k !== 'ownership' && k !== 'ownershipMeta').length : 0;
+            console.log(`  Found ${teamCount} team score entr(ies).`);
+
+            if (current) {
+              await req('PUT', backupPath, { savedAt: ts, note: 'pre-reset backup', data: current });
+              console.log(`  ✅ Backed up to ${backupPath}`);
+            } else {
+              console.log('  Nothing to back up (node empty or unreadable).');
+            }
+
+            await req('DELETE', scorePath);
+            console.log(`  ✅ Deleted polluted score node ${scorePath}`);
+
+            if (STRAY) {
+              const strayPath = `/liveGameStatus/${SEASON}/Regular_wk${WEEK}/games/${STRAY}.json`;
+              await req('DELETE', strayPath).catch(e => console.log('  (stray delete note: ' + e.message + ')'));
+              console.log(`  ✅ Removed stray game ${STRAY} from liveGameStatus/Regular_wk${WEEK}`);
+            }
+
+            console.log('\nWipe complete. The clean re-score step runs next to rebuild the real results.');
+          })().catch(e => { console.error('Reset failed:', e.message); process.exit(1); });
+          SCRIPT
+
+      - name: Trigger clean re-score of real games already played
+        if: ${{ inputs.rescore_date != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WF: ${{ inputs.scoring_workflow_file }}
+          WEEK: ${{ inputs.week }}
+          RESCORE_DATE: ${{ inputs.rescore_date }}
+        run: |
+          echo "Dispatching $WF with week=$WEEK, game_date=$RESCORE_DATE …"
+          if gh workflow run "$WF" --ref "${GITHUB_REF_NAME}" -f week="$WEEK" -f game_date="$RESCORE_DATE"; then
+            echo "✅ Clean re-score triggered. Watch the '$WF' run — it rebuilds Thursday's real scores, the standings snapshot, and overwrites liveGameStatus for the week."
+          else
+            echo "⚠️  Could not auto-trigger $WF (permissions or filename). The wipe already succeeded."
+            echo "    Finish manually: Actions → Auto Scoring → Run workflow with week=$WEEK, game_date=$RESCORE_DATE"
+          fi
