@@ -84,6 +84,24 @@ jobs:
           // league's real, correct value) can never equal 2026P.
           const BASE_SEASON = SEASON;
           const T01_HOST    = 'tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com';
+
+          // ── SAFETY GUARD ────────────────────────────────────────────
+          // Refuse a re-score that sets a game_date but NOT a week. That
+          // combination is the exact footgun that corrupted Week 2: with
+          // a past date but no explicit week, the week auto-detects to the
+          // CURRENT week, and the past date's games get scored into it —
+          // polluting live standings with wrong-week data. A deliberate
+          // re-score must always name BOTH the date AND the week it belongs
+          // to, so scores land in the correct week node. (Normal live runs
+          // and the cron trigger set neither, and are unaffected.)
+          if ((process.env.MANUAL_GAME_DATE || '').trim() && !(process.env.MANUAL_WEEK || '').trim()) {
+            console.error('❌ Refusing to run: game_date is set but week is blank.');
+            console.error('   A re-score with a date but no week auto-detects the CURRENT week and writes');
+            console.error('   that date\'s games into it — which corrupts the current week\'s standings.');
+            console.error(`   Re-run with BOTH set, e.g. week=<the week that date belongs to>, game_date=${(process.env.MANUAL_GAME_DATE||'').trim()}.`);
+            process.exit(1);
+          }
+
           const IS_LOCK_RUN = process.env.LOCK_SCORES === 'true' ||
                               (process.env.GITHUB_EVENT_NAME === 'schedule' && new Date().getUTCDay() === 2); // Tuesday, but only for GitHub's own real schedule trigger — a manual run or the external cron-job.org service (both arrive as workflow_dispatch) must never silently skip live scoring just because today happens to be Tuesday.
 
