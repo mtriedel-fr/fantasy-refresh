@@ -31,8 +31,11 @@ name: Weekly Auto-Open (Salaries + Draft Unlock)
 # league entirely.
 
 on:
-  schedule:
-    - cron: '*/30 * * * *'
+  # Triggered externally by cron-job.org (a POST to this workflow's
+  # workflow_dispatch), the same reliable cadence used for auto-scoring and
+  # kickoff-locks. GitHub's own schedule trigger was REMOVED in favor of that
+  # reliable external cadence — the draft opening on time depends on this job,
+  # so it shouldn't ride GitHub's flaky scheduler.
   workflow_dispatch:
 
 jobs:
