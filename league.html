@@ -4046,13 +4046,32 @@ function renderAll(){
     el('s-mymovement-sub').textContent = mySeasonRankNow ? 'season rank #' + mySeasonRankNow : '';
   }
   if(el('s-left')) el('s-left').textContent = WEEKS - weeks.length;
+
+  // Last One Standing filter — make sure the elimination status is loaded
+  // (fetched once, then cached; the re-render is a no-op loop-wise because
+  // the cache is set before it re-runs), then optionally drop eliminated
+  // teams from the standings so survivors see only who's still in.
+  var losGsKey = FR.seasonKey();
+  if(!guillotineStatusCache[losGsKey]){
+    var losCtx = (typeof FRAuth !== 'undefined' && FRAuth.getLeagueCtx) ? FRAuth.getLeagueCtx() : null;
+    var losLid = losCtx ? losCtx.leagueId : 'fr_refresh26';
+    FR.fb.get('/leagues/' + losLid + '/guillotineStatus/' + losGsKey)
+      .then(function(d){ guillotineStatusCache[losGsKey] = d || {teams:{}}; renderCumHome(); })
+      .catch(function(){ guillotineStatusCache[losGsKey] = {teams:{}}; });
+  }
+  var losElimSet = getEliminatedUidSet();
+  var losElimCount = Object.keys(losElimSet).length;
+  var stdSorted = (losFilterOn && losElimCount)
+    ? sorted.filter(function(t){ return !(t.uid && losElimSet[t.uid]); })
+    : sorted;
+
   if(el('hdr-sub')){
     var weekIsLive = curEntries.some(function(e){ return e.status === 'live'; });
     var weekStatusLabel = weekIsLive ? 'Live' : 'Final';
-    el('hdr-sub').textContent = 'Week ' + currentWeek + ' ' + weekStatusLabel + ' · ' + sorted.length + ' teams';
+    el('hdr-sub').textContent = 'Week ' + currentWeek + ' ' + weekStatusLabel + ' · ' + stdSorted.length + (losFilterOn && losElimCount ? ' surviving' : '') + ' teams';
   }
 
-  renderStandings(sorted, prevRank, curMap, wkHighName);
+  renderStandings(stdSorted, prevRank, curMap, wkHighName, { losFilterOn: losFilterOn && losElimCount > 0, losElimCount: losElimCount, losElimSet: losElimSet });
   // Start live polling if current week has live scores
   var hasLive = (seasonData[curKey]||[]).some(function(e){ return e.status==='live'; });
   if(hasLive) startLivePolling(curKey);
@@ -5898,7 +5917,8 @@ function tiersLocked(){
   return weeks.length > 0 && Math.max.apply(null, weeks) >= TIER_LOCK_WEEK;
 }
 
-function renderStandings(sorted, prevRank, curMap, wkHighName){
+function renderStandings(sorted, prevRank, curMap, wkHighName, opts){
+  opts = opts || {};
   var locked = tiersLocked();
   var tiers = getTiers(sorted);
   var tierLabels = {elite:'🏆 Elite', mid:'🥈 Mid', low:'🥉 Survivor'};
@@ -5909,7 +5929,10 @@ function renderStandings(sorted, prevRank, curMap, wkHighName){
     var tier = locked ? getTierForRank(r, tiers) : null;
     var prev = prevRank[t.name];
     var diff = (prev !== undefined) ? prev - r : null;
-    var mv = diff === null ? '<span class="fl">—</span>'
+    // Movement compares against last week's FULL-field rank, so it's
+    // meaningless once the field is filtered to survivors — suppress it then.
+    var mv = opts.losFilterOn ? '<span class="fl">—</span>'
+      : diff === null ? '<span class="fl">—</span>'
       : diff > 0 ? '<span class="up">' + AUP + diff + '</span>'
       : diff < 0 ? '<span class="dn">' + ADN + Math.abs(diff) + '</span>'
       : '<span class="fl">—</span>';
@@ -5932,6 +5955,11 @@ function renderStandings(sorted, prevRank, curMap, wkHighName){
     var tierClass = locked && tier ? ' tier-' + tier : '';
 
     var isMe = myTeam && t.name.toLowerCase() === myTeam.toLowerCase();
+    // Eliminated from Last One Standing (by uid). Only visually marked in the
+    // unfiltered view — when the survivors-only filter is on there are no
+    // eliminated rows to mark.
+    var isElim = !opts.losFilterOn && t.uid && opts.losElimSet && opts.losElimSet[t.uid];
+    var outBadge = isElim ? '<span style="font-family:var(--fd);font-size:9px;font-weight:800;color:var(--pk);background:rgba(232,51,122,.12);border:1px solid rgba(232,51,122,.35);padding:1px 6px;border-radius:8px;margin-left:4px;text-transform:uppercase;vertical-align:middle;" title="Eliminated from Last One Standing">☠️ Out</span>' : '';
     var streak = getStreak(t.name);
     var streakBadge = streak === 'hot' ? '<span class="streak-hot" title="Hot streak — above avg 3+ weeks">🔥</span>'
       : streak === 'cold' ? '<span class="streak-cold" title="Cold streak — below avg 3+ weeks">❄️</span>' : '';
@@ -5944,10 +5972,11 @@ function renderStandings(sorted, prevRank, curMap, wkHighName){
       ? '<button onclick="toggleStandingsRoster(\'' + t.name.replace(/'/g,"\\'") + '\',\'' + teamUid + '\',\'' + rosterId + '\')" style="background:none;border:none;cursor:pointer;color:var(--ink3);padding:2px 4px;vertical-align:middle;display:inline-flex;align-items:center;justify-content:center;" title="View roster"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></button>'
       : '';
 
-    return '<tr class="' + tierClass + divider + (isMe ? ' my-team' : '') + '">'
+    return '<tr class="' + tierClass + divider + (isMe ? ' my-team' : '') + '"' + (isElim ? ' style="opacity:.55"' : '') + '>'
       + '<td class="rk' + (r <= 3 ? ' g' : '') + '">' + (r <= 3 ? MED[r-1] : r) + '</td>'
       + '<td><div class="tn-wrap"><a class="season-name-link" href="player.html?team=' + encodeURIComponent(t.name) + '">' + t.name + '</a>'
       + (isMe ? '<span class="my-team-badge">You</span>' : '')
+      + outBadge
       + (isHigh ? '<span class="bdg">🔥 Wk High</span>' : '')
       + streakBadge
       + tierBadge
@@ -5999,7 +6028,16 @@ function renderStandings(sorted, prevRank, curMap, wkHighName){
   var tierNote = locked
     ? '<div style="padding:10px 16px 6px;font-family:var(--fd);font-size:11px;color:var(--ink3);letter-spacing:.5px;text-transform:uppercase;background:var(--bg2);border-bottom:1px solid var(--bdr)">Playoff tiers locked after Week ' + TIER_LOCK_WEEK + ' &middot; <a href="#" onclick="handleNav(String.fromCharCode(112,108,97,121,111,102,102,115))" style="color:var(--or);text-decoration:none;">View Playoff Bracket &rarr;</a></div>'
     : '<div style="padding:10px 16px 6px;font-family:var(--fd);font-size:11px;color:var(--ink3);letter-spacing:.5px;text-transform:uppercase;background:var(--bg2);border-bottom:1px solid var(--bdr)">Playoff tiers lock after Week ' + TIER_LOCK_WEEK + ' · ' + (TIER_LOCK_WEEK - Object.keys(seasonData).filter(function(k){ return seasonData[k]&&seasonData[k].length; }).length) + ' weeks remaining</div>';
-  document.getElementById('sw').innerHTML = tierNote + '<table><thead><tr>'
+  // Last One Standing toggle — only shown once teams have actually been
+  // eliminated (before that there's nothing to filter). Lets survivors hide
+  // eliminated teams and see just the field they're still competing against.
+  var losBar = (opts.losElimCount > 0)
+    ? '<div style="padding:10px 16px;background:var(--bg2);border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
+      + '<button onclick="toggleLosFilter()" style="font-family:var(--fd);font-size:11px;font-weight:800;padding:6px 12px;border-radius:20px;border:1.5px solid var(--pk);background:' + (opts.losFilterOn ? 'var(--pk)' : 'rgba(232,51,122,.1)') + ';color:' + (opts.losFilterOn ? '#fff' : 'var(--pk)') + ';cursor:pointer;text-transform:uppercase;letter-spacing:.5px;">☠️ ' + (opts.losFilterOn ? 'Survivors only ✓' : 'Last One Standing') + '</button>'
+      + '<span style="font-family:var(--fd);font-size:10px;color:var(--ink3);letter-spacing:.3px;">' + (opts.losFilterOn ? 'Showing surviving teams only' : opts.losElimCount + ' eliminated — tap to hide them') + '</span>'
+      + '</div>'
+    : '';
+  document.getElementById('sw').innerHTML = losBar + tierNote + '<table><thead><tr>'
     + '<th style="width:40px">#</th><th>Team</th>'
     + '<th style="text-align:right">Total</th>'
     + '<th style="text-align:right">Wk ' + currentWeek + '</th>'
@@ -7293,6 +7331,24 @@ function ensureWeekScores(week){
 
 var guillotineStatusCache = {}; // seasonKey -> {teams: {name: {status, eliminatedWeek, score, noShow}}} — real, persisted elimination status, fetched separately since it's computed once on the backend rather than replayed client-side
 var guillRecapEmbedCache = {}; // "season:week" -> rendered recap HTML string, for the embedded Weekly Review on the Last One Standing page
+
+// ── Last One Standing standings filter ─────────────────────────
+// Lets a surviving team see the standings with eliminated teams hidden,
+// so they can see exactly who they're trying to stay ahead of. Reads the
+// same persisted guillotine status the Last One Standing page uses.
+var losFilterOn = false;
+function getEliminatedUidSet(){
+  var set = {};
+  var gs = guillotineStatusCache[FR.seasonKey()];
+  if(gs && gs.teams){
+    Object.keys(gs.teams).forEach(function(k){
+      var t = gs.teams[k];
+      if(t && t.status === 'eliminated') set[t.uid || k] = true;
+    });
+  }
+  return set;
+}
+function toggleLosFilter(){ losFilterOn = !losFilterOn; renderCumHome(); }
 var weekLineupsCache = {}; // week -> {uid: {slots: {...}}, ...} — real lineup data, fetched separately since score entries never actually carry a lineup field (see below)
 var weekScoresCache = {}; // week -> {uid: {score, slotPts: {slotId: points}, ...}, ...} — real, per-slot scoring data, fetched separately from lineups since the lineup itself only has player identity, not points
 var weekLocksCache = {}; // week -> {team: true, ...} — which teams have locked (kicked off), used to gate player identity in Roster/Most Started until their game has actually started
