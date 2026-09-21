@@ -8691,6 +8691,12 @@ function renderChatFeed(data){
 // API — it's not a secret in the same sense as the Tank01 key.
 var GIPHY_API_KEY = 'ncSrnBt7EIj4J5gh4N1pXgoEuQlfofYC';
 
+// id -> real, full GIF URL from the search result. GIPHY URLs are NOT
+// reconstructable from the id alone (they live on sharded subdomains with
+// an encoded segment, e.g. media2.giphy.com/media/v1.<hash>/<id>/giphy.gif),
+// so we keep the authoritative URL the API returned and send THAT.
+var gifResultUrls = {};
+
 var gifSearchDebounceTimer = null;
 function debouncedGifSearch(){
   clearTimeout(gifSearchDebounceTimer);
@@ -8733,8 +8739,15 @@ function runGifSearch(){
         return;
       }
       results.innerHTML = gifs.map(function(g){
-        var thumb = g.images && g.images.fixed_height_small ? g.images.fixed_height_small.url : '';
+        var imgs = g.images || {};
+        var thumb = imgs.fixed_height_small ? imgs.fixed_height_small.url : '';
         if(!thumb) return '';
+        // Remember the real, sendable URL for this gif (200px-tall rendition
+        // fits the chat's 180px cap; fall back to original/downsized).
+        var full = (imgs.fixed_height && imgs.fixed_height.url)
+          || (imgs.original && imgs.original.url)
+          || (imgs.downsized && imgs.downsized.url) || thumb;
+        gifResultUrls[g.id] = full;
         return '<img src="' + thumb + '" onclick="sendGifMessage(\'' + g.id + '\')" loading="lazy" '
           + 'style="width:100%;border-radius:6px;cursor:pointer;aspect-ratio:1;object-fit:cover;" />';
       }).join('');
@@ -8752,9 +8765,12 @@ function sendGifMessage(gifId){
   var teamName = (ctx && ctx.teamName) || myTeam || user.email || 'Someone';
   var now = Date.now();
   var key = now + '_' + Math.random().toString(36).slice(2, 8);
-  // Full-size rendition URL, built from the ID rather than re-fetched —
-  // GIPHY's media CDN URLs are deterministic from the GIF ID.
-  var gifUrl = 'https://media.giphy.com/media/' + gifId + '/giphy.gif';
+  // Use the real URL captured from the search result. (The old code rebuilt
+  // https://media.giphy.com/media/<id>/giphy.gif, which no longer resolves —
+  // GIPHY serves from sharded subdomains with an encoded path segment — so
+  // every sent GIF showed as a broken image.)
+  var gifUrl = gifResultUrls[gifId];
+  if(!gifUrl){ showToast('Could not load that GIF — pick another', true); return; }
 
   closeGifSearch();
   FR.fb.put(FR.paths.chat() + '/' + key, { uid: user.uid, team: teamName, gifUrl: gifUrl, ts: now })
