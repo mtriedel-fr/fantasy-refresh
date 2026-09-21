@@ -153,7 +153,14 @@ jobs:
           async function fetchFantasyProsNews() {
             let data;
             try {
-              data = await fetchJson('https://api.fantasypros.com/public/v2/json/nfl/news', {
+              // Ask for more than the endpoint's small default page (~10), so a
+              // burst of news (Sunday inactives, a wave of practice reports)
+              // in one 30-min window isn't missed before the next sweep. Still
+              // ONE request, so the 48/50-per-day budget is unchanged. If
+              // FantasyPros ignores or caps the limit, it simply returns fewer
+              // — harmless. Watch the "Real items returned" log line to confirm
+              // it went above 10.
+              data = await fetchJson('https://api.fantasypros.com/public/v2/json/nfl/news?limit=100', {
                 'x-api-key': FP_KEY
               });
             } catch(e) {
