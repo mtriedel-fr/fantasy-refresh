@@ -3663,10 +3663,10 @@ function renderCumStandingsPage(page){
       .then(function(d){ guillotineStatusCache[losGsKey] = d || {teams:{}}; renderCumStandingsPage(page); })
       .catch(function(){ guillotineStatusCache[losGsKey] = {teams:{}}; });
   }
-  var losElimSet = getEliminatedUidSet();
-  var losElimCount = Object.keys(losElimSet).length;
+  var losMatch = getEliminatedMatcher();
+  var losElimCount = losMatch.count;
   var all = (losFilterOn && losElimCount)
-    ? allRaw.filter(function(t){ return !(t.uid && losElimSet[t.uid]); })
+    ? allRaw.filter(function(t){ return !losMatch.isElim(t); })
     : allRaw;
 
   var perPage = 10;
@@ -3684,7 +3684,7 @@ function renderCumStandingsPage(page){
     var isMe = myTeam && teamMatch(t.name, myTeam);
     // Eliminated from Last One Standing (by uid). Only marked in the
     // unfiltered view — when survivors-only is on, no eliminated rows remain.
-    var isElim = !losFilterOn && t.uid && losElimSet[t.uid];
+    var isElim = !losFilterOn && losMatch.isElim(t);
     var outBadge = isElim ? ' <span style="font-family:var(--fd);font-size:9px;font-weight:800;color:var(--pk);background:rgba(232,51,122,.12);border:1px solid rgba(232,51,122,.35);padding:1px 6px;border-radius:8px;text-transform:uppercase;vertical-align:middle;" title="Eliminated from Last One Standing">☠️ Out</span>' : '';
     var rosterId = 'cum-home-roster-' + page + '-' + i;
     var expandBtn = (t.uid && !t.notSubmitted)
@@ -7329,16 +7329,32 @@ var guillRecapEmbedCache = {}; // "season:week" -> rendered recap HTML string, f
 // so they can see exactly who they're trying to stay ahead of. Reads the
 // same persisted guillotine status the Last One Standing page uses.
 var losFilterOn = false;
-function getEliminatedUidSet(){
-  var set = {};
+// Build a matcher for eliminated teams that works with BOTH status formats:
+// the new uid-keyed one (from the recompute) and the older name-keyed one
+// (no uid field), so the marker/filter work now and after the status is
+// rewritten. Matches a standings row by uid first, then by normalized name.
+function getEliminatedMatcher(){
+  var byUid = {}, byName = {}, count = 0;
   var gs = guillotineStatusCache[FR.seasonKey()];
   if(gs && gs.teams){
     Object.keys(gs.teams).forEach(function(k){
       var t = gs.teams[k];
-      if(t && t.status === 'eliminated') set[t.uid || k] = true;
+      if(!t || t.status !== 'eliminated') return;
+      count++;
+      if(t.uid) byUid[t.uid] = true;
+      var nm = (t.team || k || '').toLowerCase().trim();
+      if(nm) byName[nm] = true;
     });
   }
-  return set;
+  return {
+    count: count,
+    isElim: function(row){
+      if(!row) return false;
+      if(row.uid && byUid[row.uid]) return true;
+      var nm = (row.name || '').toLowerCase().trim();
+      return !!(nm && byName[nm]);
+    }
+  };
 }
 function toggleLosFilter(){ losFilterOn = !losFilterOn; renderCumStandingsPage(0); }
 var weekLineupsCache = {}; // week -> {uid: {slots: {...}}, ...} — real lineup data, fetched separately since score entries never actually carry a lineup field (see below)
