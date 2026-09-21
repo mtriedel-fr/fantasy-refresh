@@ -32,6 +32,10 @@ on:
         description: 'Re-score a specific past date instead of today (format YYYYMMDD, e.g. 20260814) — use this to recover a day that was scored incorrectly due to a since-fixed bug, then let normal runs resume covering today going forward.'
         required: false
         default: ''
+      guillotine_recompute_week:
+        description: 'Recompute-only: rebuild the guillotine status (uid-based) through this week from existing scores, WITHOUT scoring anything. Use to heal an old name-based status (e.g. a renamed team showing a phantom 0). Leave blank for normal runs.'
+        required: false
+        default: ''
 
 jobs:
   score-lineups:
@@ -48,6 +52,7 @@ jobs:
           LOCK_SCORES: ${{ inputs.lock_scores }}
           MANUAL_LEAGUE: ${{ inputs.league_id }}
           MANUAL_GAME_DATE: ${{ inputs.game_date }}
+          GUILLOTINE_RECOMPUTE_WEEK: ${{ inputs.guillotine_recompute_week }}
           GITHUB_EVENT_NAME: ${{ github.event_name }}
         run: |
           node << 'SCRIPT'
@@ -877,6 +882,39 @@ jobs:
 
           // ── MAIN ───────────────────────────────────────────────
           async function main() {
+            // ── One-shot guillotine recompute (no scoring) ──────────────
+            // Rebuilds the persisted guillotineStatus using the current
+            // uid-based elimination logic, from the season scores already
+            // stored — so a status written by older name-based code (a
+            // renamed team showing a phantom 0 / stale name) heals without
+            // waiting for the next weekly finalization and without
+            // re-scoring anything. Reuses computeGuillotineElimination()
+            // directly, so there is no second copy of the logic to drift.
+            if ((process.env.GUILLOTINE_RECOMPUTE_WEEK || '').trim()) {
+              const gw = parseInt(process.env.GUILLOTINE_RECOMPUTE_WEEK, 10);
+              if (!(gw >= 1)) { console.error('❌ guillotine_recompute_week must be a positive week number.'); process.exit(1); }
+              const rcLeagues = process.env.MANUAL_LEAGUE ? [process.env.MANUAL_LEAGUE] : await getActiveLeagues();
+              console.log(`🔁 Guillotine recompute-only run for week ${gw} — leagues: ${rcLeagues.join(', ')} (no scores will be written)`);
+              for (const leagueId of rcLeagues) {
+                try {
+                  const settings = await firebaseGet(`/leagues/${leagueId}/settings.json`).catch(() => null);
+                  if (!(settings && settings.guillotine)) { console.log(`  ⊘ ${leagueId}: not a guillotine league — skipped`); continue; }
+                  const guillotine = await computeGuillotineElimination(leagueId, gw);
+                  if (!guillotine) { console.log(`  ⚠️  ${leagueId}: no data to compute guillotine for week ${gw}`); continue; }
+                  const members = await firebaseGet(`/leagues/${leagueId}/members.json`).catch(() => ({})) || {};
+                  const mName = uid => (members[uid] && members[uid].teamName) || uid;
+                  const teamStatus = {};
+                  (guillotine.alive || []).forEach(uid => { teamStatus[uid] = { uid, team: mName(uid), status: 'alive' }; });
+                  Object.entries(guillotine.eliminatedWhen || {}).forEach(([uid, info]) => { teamStatus[uid] = { uid, team: mName(uid), status: 'eliminated', eliminatedWeek: info.week, score: info.score, noShow: info.noShow }; });
+                  await firebasePut(`/leagues/${leagueId}/guillotineStatus/${SEASON}.json`, { teams: teamStatus, asOfWeek: gw, updatedAt: Date.now() });
+                  console.log(`  ✅ ${leagueId}: recomputed guillotineStatus (uid-keyed, current names) through week ${gw} — ${Object.keys(teamStatus).length} teams, ${(guillotine.alive||[]).length} alive`);
+                } catch (e) {
+                  console.error(`  Failed guillotine recompute for ${leagueId}:`, e.message);
+                }
+              }
+              return; // recompute-only run; skip all normal scoring
+            }
+
             const { week, seasonType } = await getCurrentWeekInfo();
             // Fixes a real, confirmed collision: preseason weeks 1-4 and
             // regular-season weeks 1-4 previously shared the exact same
