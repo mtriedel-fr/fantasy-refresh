@@ -3685,7 +3685,7 @@ function renderCumStandingsPage(page){
     // Eliminated from Last One Standing (by uid). Only marked in the
     // unfiltered view — when survivors-only is on, no eliminated rows remain.
     var isElim = !losFilterOn && losMatch.isElim(t);
-    var outBadge = isElim ? ' <span style="font-family:var(--fd);font-size:9px;font-weight:800;color:var(--pk);background:rgba(232,51,122,.12);border:1px solid rgba(232,51,122,.35);padding:1px 6px;border-radius:8px;text-transform:uppercase;vertical-align:middle;" title="Eliminated from Last One Standing">☠️ Out</span>' : '';
+    var outBadge = isElim ? ' <span style="vertical-align:middle;" title="Eliminated from Last One Standing">☠️</span>' : '';
     var rosterId = 'cum-home-roster-' + page + '-' + i;
     var expandBtn = (t.uid && !t.notSubmitted)
       ? '<button onclick="toggleStandingsRoster(\'' + t.name.replace(/'/g,"\\'") + '\',\'' + t.uid + '\',\'' + rosterId + '\')" style="background:none;border:none;cursor:pointer;color:var(--ink3);padding:2px 4px;vertical-align:middle;display:inline-flex;align-items:center;justify-content:center;" title="View roster"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></button>'
@@ -3698,7 +3698,7 @@ function renderCumStandingsPage(page){
       var pl = countPlayersLeft(lineupsData[t.uid], gameMapData);
       if(pl) leftCell = pl.left + '/' + pl.total;
     }
-    return '<tr' + (isMe ? ' class="my-team"' : '') + (isElim ? ' style="opacity:.55"' : '') + '>'
+    return '<tr' + (isMe ? ' class="my-team"' : '') + '>'
       + '<td class="rk">' + (page*perPage + i + 1) + '</td>'
       + '<td style="font-family:var(--fd);font-size:14px;font-weight:700;color:' + (isMe ? 'var(--or)' : 'var(--ink)') + ';">' + escapeHtmlFR(t.name) + outBadge + ' ' + expandBtn + '</td>'
       + '<td style="text-align:center;font-family:var(--fd);font-size:12px;color:var(--ink3);" title="Players left to play">' + leftCell + '</td>'
