@@ -1360,23 +1360,31 @@ jobs:
             }
 
             // ── PERMANENT WEEKLY STATS ARCHIVE ──────────────────────────
-            // Once a week's games are ALL confirmed final, that data never
-            // changes again — so instead of re-fetching it from Tank01 on
-            // every single player-detail click (up to 18 calls per click,
-            // forever), write it to Firebase ONCE here and let the client
-            // read the archive instead of hitting Tank01 for any week
-            // that's already archived. Global path (not per-league) since
+            // Completed-game data never changes again — so instead of
+            // re-fetching it from Tank01 on every single player-detail
+            // click (up to 18 calls per click, forever), write it to
+            // Firebase as games finish and let the client read the archive
+            // instead of hitting Tank01. Global path (not per-league) since
             // real NFL stats are the same regardless of which league is
             // asking — every league benefits from one shared archive.
             // Uses playerStats/games already fetched above for scoring —
             // zero additional Tank01 calls to build this.
-            if (allFinal) {
-              try {
-                await archiveWeekStats(games, playerStats, seasonType, week);
-              } catch(e) {
-                console.error('Failed to archive week stats:', e.message);
-              }
+            // Runs on EVERY scoring pass that has completed games — NOT
+            // gated on allFinal — so Thursday, Sunday and Monday each add
+            // their own players to the shared archive as their games
+            // finish. The merge inside archiveWeekStats ({...existing,
+            // ...new}) makes repeated calls safe and idempotent. This used
+            // to live inside `if (allFinal)` below, which is only ever true
+            // on the last game day (Monday night) with only that day's
+            // playerStats — the confirmed root cause of Perfect Roster /
+            // optimal-lineup only ever seeing Monday Night Football players.
+            try {
+              await archiveWeekStats(games, playerStats, seasonType, week);
+            } catch(e) {
+              console.error('Failed to archive week stats:', e.message);
+            }
 
+            if (allFinal) {
               // ── WEEKLY RECAP ──────────────────────────────────────────
               // Cumulative leagues only for now — H2H and Guillotine have
               // their own natural weekly story (who won, who got cut) that
