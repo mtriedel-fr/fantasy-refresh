@@ -554,6 +554,29 @@ jobs:
               return;
             }
 
+            // Hard fairness guard — mirrors weekly-auto-open.yml's own
+            // "never regenerate over an existing real sheet" safeguard.
+            // Once a week has REAL (non-flat) salaries — whether this
+            // workflow, the auto-open workflow, or a commissioner created
+            // them — the draft for that week is effectively open and
+            // people may already be drafting against those exact prices.
+            // Regenerating here (even with fresher projections) would
+            // reprice players out from under in-progress lineups, the
+            // exact repriceLineup unfairness both workflows exist to
+            // prevent. Confirmed timing risk: auto-open opens the week at
+            // 7am CT the day before kickoff, then this job's Wednesday
+            // 9am ET run would otherwise overwrite those same salaries an
+            // hour later. Only ever fill a week that has nothing real yet
+            // (missing, or flat-fallback only, which is safe to upgrade
+            // before real projections/drafting exist). The old guard below
+            // only caught the projection-FAILURE case; this catches the
+            // normal successful-fetch case, which is exactly when the
+            // clobber happened.
+            if (existingMeta && existingMeta.count > 0 && !existingMeta.flat) {
+              console.log(`  ${leagueId}: week ${week} already has real salaries — skipping (never repricing an open week).`);
+              return;
+            }
+
             const cap = (settings && settings.cap) || 60000;
             const min = (settings && settings.minSalary) || SAL_MIN_DEFAULT;
             const max = (settings && settings.maxSalary) || SAL_MAX_DEFAULT;

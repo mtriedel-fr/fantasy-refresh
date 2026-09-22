@@ -1,0 +1,112 @@
+name: Monitor Scoring Health
+
+# Watches for the "scoring silently stopped" failure (the 23-hour-outage
+# lesson). Logic: if any NFL game should be in progress right now (from the
+# cached schedule), the auto-scorer should be updating liveGameStatus every
+# couple of minutes. If that output is missing or stale during a live window,
+# something in the chain (cron-job.org → GitHub → auto-scoring) has stalled.
+#
+# Alerting is built-in and needs no extra secret/webhook: on a stall the run
+# EXITS NON-ZERO, and GitHub emails the repo owner on workflow failure. It also
+# writes /monitoring/2026/scoring so a commissioner view can surface it.
+#
+# Reliability note: this uses GitHub's own scheduler, which the locks/scoring
+# jobs deliberately moved OFF of (to cron-job.org) because it fires late/skips.
+# For a monitor that's acceptable — a missed check just delays detection — but
+# for the strongest guarantee, also point a cron-job.org job at this workflow's
+# workflow_dispatch every ~15 min.
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'   # every 15 minutes (GitHub scheduler; see note above)
+  workflow_dispatch:
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check scoring freshness during live game windows
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+          FR_SEASON: "2026"
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB_URL   = process.env.FIREBASE_DB_URL || 'https://fantasy-refresh-default-rtdb.firebaseio.com';
+          const FB_TOKEN = process.env.FIREBASE_AUTH_TOKEN;
+          const SEASON   = process.env.FR_SEASON || '2026';
+
+          // How long a game is treated as "in progress" after kickoff, and how
+          // stale liveGameStatus may get during a live window before we alarm.
+          const GAME_WINDOW_MS   = 3.5 * 60 * 60 * 1000; // ~3.5h per game
+          const GRACE_AFTER_KICK = 15 * 60 * 1000;       // don't alarm in the first 15 min after kickoff
+          const STALE_MS         = 15 * 60 * 1000;       // liveGameStatus older than this during a window = stalled
+
+          function fbGet(path){
+            const sep = path.includes('?') ? '&' : '?';
+            const url = FB_URL + path + (FB_TOKEN ? sep + 'auth=' + FB_TOKEN : '');
+            return new Promise((resolve) => {
+              https.get(url, res => {
+                let d = ''; res.on('data', c => d += c);
+                res.on('end', () => { try { resolve(d ? JSON.parse(d) : null); } catch(e){ resolve(null); } });
+              }).on('error', () => resolve(null));
+            });
+          }
+          function fbPut(path, payload){
+            return new Promise((resolve) => {
+              if (!FB_TOKEN) return resolve(false); // best-effort; can't write without auth
+              const sep = path.includes('?') ? '&' : '?';
+              const u = new URL(FB_URL + path + sep + 'auth=' + FB_TOKEN);
+              const body = JSON.stringify(payload);
+              const req = https.request({ hostname:u.hostname, path:u.pathname+u.search, method:'PUT',
+                headers:{'Content-Type':'application/json','Content-Length':Buffer.byteLength(body)} },
+                res => { res.on('data',()=>{}); res.on('end',()=>resolve(res.statusCode>=200&&res.statusCode<300)); });
+              req.on('error', ()=>resolve(false));
+              req.write(body); req.end();
+            });
+          }
+
+          (async () => {
+            const now = Date.now();
+
+            // 1) Any game in progress right now, and which week does it belong to?
+            const sched = await fbGet(`/nflSchedule/${SEASON}/Regular.json`);
+            const weeksObj = sched && sched.weeks;
+            if (!weeksObj) { console.log('No cached schedule — cannot evaluate; treating as healthy (no-op).'); return; }
+
+            let liveWeek = null, liveGame = null;
+            for (let w = 1; w <= 18; w++) {
+              const games = weeksObj[`week${w}`];
+              if (!Array.isArray(games)) continue;
+              for (const g of games) {
+                if (!g || !g.time) continue;
+                const kick = new Date(g.time).getTime();
+                if (now >= kick + GRACE_AFTER_KICK && now <= kick + GAME_WINDOW_MS) { liveWeek = w; liveGame = g; break; }
+              }
+              if (liveWeek) break;
+            }
+
+            if (!liveWeek) {
+              console.log('✅ No NFL game in progress right now — nothing to check.');
+              await fbPut(`/monitoring/${SEASON}/scoring.json`, { status:'idle', checkedAt: now });
+              return;
+            }
+
+            // 2) During a live window, liveGameStatus for that week should be fresh.
+            const lgs = await fbGet(`/liveGameStatus/${SEASON}/Regular_wk${liveWeek}.json`);
+            const updatedAt = lgs && lgs.updatedAt ? lgs.updatedAt : 0;
+            const ageMin = updatedAt ? Math.round((now - updatedAt)/60000) : null;
+            const sampleGame = (liveGame.away||'?') + '@' + (liveGame.home||'?');
+
+            if (!updatedAt || (now - updatedAt) > STALE_MS) {
+              const msg = `Scoring STALLED: week ${liveWeek} game window active (e.g. ${sampleGame}), but liveGameStatus is ${updatedAt ? ageMin + ' min stale' : 'missing'}. The auto-scorer (cron-job.org → Auto Scoring) may be down.`;
+              console.error('🚨 ' + msg);
+              await fbPut(`/monitoring/${SEASON}/scoring.json`, { status:'stalled', week:liveWeek, lastUpdatedAt:updatedAt||null, ageMinutes:ageMin, checkedAt:now, message:msg });
+              process.exit(1); // GitHub emails the repo owner on failure
+            }
+
+            console.log(`✅ Healthy — week ${liveWeek} live (${sampleGame}), liveGameStatus updated ${ageMin} min ago.`);
+            await fbPut(`/monitoring/${SEASON}/scoring.json`, { status:'healthy', week:liveWeek, ageMinutes:ageMin, checkedAt:now });
+          })().catch(e => { console.error('Monitor error:', e && e.message ? e.message : e); process.exit(1); });
+          SCRIPT
