@@ -2033,7 +2033,9 @@ function startLivePolling(week){
           showToast('Scores updated 📡');
         }
       }).catch(function(){});
-  }, 60000); // poll every 60 seconds
+  }, 90000); // poll every 90 seconds — scoring itself lags a little, so a
+             // slightly wider live-refresh interval is barely perceptible
+             // while cutting the full-week-scoreset download by a third.
 }
 
 function setLoading(on){
