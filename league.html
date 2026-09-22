@@ -1396,7 +1396,10 @@ setTimeout(function(){
             <span id="sal-lock-badge" class="salary-lock-badge unlocked">🔓 Unlocked</span>
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <button class="salary-btn" id="sal-gen-btn" onclick="generateSalaries()">⚡ Generate Salaries</button>
+            <!-- Manual "Generate Salaries" removed: salaries are generated automatically each week
+                 (weekly-auto-open / weekly-prep), using the single canonical per-position model.
+                 The old client-side generator used a divergent, higher-ceiling formula that would
+                 reprice a week inconsistently. To regenerate a week, re-run the Auto-Open workflow. -->
             <button class="salary-btn secondary" id="sal-lock-btn" onclick="toggleSalaryLock()">🔒 Lock Week</button>
           </div>
           <div class="salary-status" id="sal-status">Select a week to get started.</div>
@@ -10479,6 +10482,18 @@ function generateSalaries(){
   var btn    = document.getElementById('sal-gen-btn');
   if(!sel || !sel.value){ showToast('Select a week first', true); return; }
   var week = parseInt(sel.value);
+
+  // ── DISABLED ────────────────────────────────────────────────────────
+  // Salaries are generated automatically each week by weekly-auto-open /
+  // weekly-prep, using the single canonical per-position model. This
+  // client-side generator ran a divergent, higher-ceiling formula (its own
+  // TARGET_CEILING / SALARY_EXPONENT / $4,500 floor) that would reprice a
+  // week inconsistently with the live sheets — the exact footgun we're
+  // removing to keep one source of truth. To (re)generate a week, run the
+  // Auto-Open workflow. The legacy generator below is now unreachable.
+  if(status){ status.textContent = 'Salaries are generated automatically each week — run the Auto-Open workflow to regenerate.'; status.className = 'salary-status'; }
+  showToast('Salaries are generated automatically — use the Auto-Open workflow.', true);
+  return;
 
   // Check not locked
   fetch(FR.FB_DB_URL + FR.paths.salaries() + '/week' + week + '/meta.json')
