@@ -1927,13 +1927,27 @@ function save(){
   .catch(function(){ showToast('Cloud save failed', true); });
 }
 
-function loadFromCloud(){
-  setLoading(true);
-  fetch(FR.paths.url(FR.paths.season()))
-  .then(function(r){
+// Fetch the season JSON at most once per URL per page load. loadFromCloud()
+// (the boot path) and loadPlayoffsFromCloud() both need the full season and
+// used to fetch the identical node separately on every load — two of the
+// largest reads in the app, doubled. This shares a single in-flight request
+// keyed by URL, so the normal same-season case makes ONE network round-trip
+// while both callers still get the data; a genuinely different season
+// (e.g. an archive ?season=2025) still fetches on its own. Because both
+// callers now resolve off the same promise in registration order, boot()'s
+// normalized seasonData also deterministically wins over the raw copy.
+var _seasonFetchCache = {};
+function fetchSeasonOnce(url){
+  if(_seasonFetchCache[url]) return _seasonFetchCache[url];
+  _seasonFetchCache[url] = fetch(url).then(function(r){
     if(!r.ok){ throw new Error('HTTP ' + r.status + ' ' + r.statusText); }
     return r.json();
-  })
+  });
+  return _seasonFetchCache[url];
+}
+function loadFromCloud(){
+  setLoading(true);
+  fetchSeasonOnce(FR.paths.url(FR.paths.season()))
   .then(function(data){
     if(data && typeof data === 'object' && !data.error){
       seasonData = normalizeSeasonData(data);
@@ -5059,8 +5073,7 @@ function loadPlayoffsFromCloud(){
   // from before multi-league support. That path has no security rule at
   // all (only /season2025 exists, and even that is write-only false with
   // no read grant) — every request to it 401s. Scores live per-league now.
-  fetch(FB_DB_URL + '/leagues/' + pLeagueId + '/season/' + urlSeason + '.json')
-    .then(function(r){ return r.json(); })
+  fetchSeasonOnce(FB_DB_URL + '/leagues/' + pLeagueId + '/season/' + urlSeason + '.json')
     .then(function(data){
       console.log('playoffs data received, null?', data === null, 'keys:', data ? Object.keys(data).length : 0);
       if(data && typeof data === 'object' && !data.error){
@@ -8626,7 +8639,14 @@ function updateChatUnreadBadge(){
 var chatUnreadCount = 0;
 
 function loadChatMessages(){
-  fetch(FR.paths.url(FR.paths.chat()))
+  // Only pull the most recent messages, not the entire (ever-growing) feed.
+  // Chat keys are timestamp-prefixed, so native $key order is chronological
+  // and limitToLast returns the newest N. This turns a poll that used to
+  // re-download the whole chat history every 20s into a small bounded read,
+  // while renderChatFeed's sort + unread-count logic still work unchanged.
+  var url = FR.paths.url(FR.paths.chat());
+  url += (url.indexOf('?') >= 0 ? '&' : '?') + 'orderBy=' + encodeURIComponent('"$key"') + '&limitToLast=50';
+  fetch(url)
     .then(function(r){ return r.json(); })
     .then(function(data){ renderChatFeed(data || {}); })
     .catch(function(){});
