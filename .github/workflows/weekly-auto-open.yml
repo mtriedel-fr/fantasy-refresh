@@ -341,16 +341,6 @@ jobs:
             const nextWeek = currentWeek + 1;
             if (nextWeek > 18) { console.log('Season complete — nothing to open.'); return; }
 
-            // Hard fairness safeguard - confirmed real salaries already
-            // existing for this week means this has already been done
-            // (by this workflow or a commissioner manually). Never
-            // touch it again.
-            const existingMeta = await firebaseGet(`/leagues/${LEAGUE_ID}/salaries/${season}/week${nextWeek}/meta.json`).catch(() => null);
-            if (existingMeta && existingMeta.count > 0) {
-              console.log(`Week ${nextWeek} already has real salaries — skipping entirely, never regenerating.`);
-              return;
-            }
-
             const cachedSeason = await firebaseGet(`/nflSchedule/${season}/Regular.json`).catch(() => null);
             const weekGames = cachedSeason && cachedSeason.weeks && cachedSeason.weeks[`week${nextWeek}`];
             if (!Array.isArray(weekGames) || !weekGames.length) {
@@ -369,15 +359,44 @@ jobs:
               return;
             }
 
-            const generated = await generateRealSalaries(season, nextWeek);
-            if (generated) {
-              await firebasePut(`/leagues/${LEAGUE_ID}/settings/draftLockedUntil.json`, Date.now());
-              console.log(`Draft unlocked immediately for week ${nextWeek}.`);
+            // It's time to open. Ensure salaries exist — but NEVER
+            // regenerate over an existing sheet (fairness), and, crucially,
+            // decouple UNLOCKING the draft from whether WE were the one to
+            // generate the salaries. Another job (weekly-prep) or a
+            // commissioner may have already created this week's salaries;
+            // the draft must still open on time regardless. The previous
+            // version returned early the moment salaries existed — before
+            // ever reaching the unlock — so if anything generated this
+            // week's salaries first (e.g. weekly-prep's Wednesday run, or a
+            // manual test), the draft would silently never open.
+            const existingMeta = await firebaseGet(`/leagues/${LEAGUE_ID}/salaries/${season}/week${nextWeek}/meta.json`).catch(() => null);
+            let haveSalaries = !!(existingMeta && existingMeta.count > 0);
+            if (haveSalaries) {
+              console.log(`Week ${nextWeek} already has salaries (${existingMeta.count}, flat=${!!existingMeta.flat}) — not regenerating, proceeding to open.`);
+            } else {
+              haveSalaries = await generateRealSalaries(season, nextWeek);
+            }
+
+            if (!haveSalaries) {
+              console.log(`No salaries yet for week ${nextWeek} (no projections and none pre-existing) — leaving draft locked, will retry next run.`);
+              return;
+            }
+
+            // Idempotent unlock: only flip the lock (and only recompute DVP
+            // ranks) on the first run that actually opens the draft. Every
+            // later cron firing this week is a quiet no-op, so repeated
+            // triggers don't re-unlock or re-read a full season of archives.
+            const now = Date.now();
+            const currentLock = await firebaseGet(`/leagues/${LEAGUE_ID}/settings/draftLockedUntil.json`).catch(() => null);
+            if (typeof currentLock !== 'number' || currentLock > now) {
+              await firebasePut(`/leagues/${LEAGUE_ID}/settings/draftLockedUntil.json`, now);
+              console.log(`Draft unlocked for week ${nextWeek}.`);
               // Real games completed through currentWeek (not nextWeek,
-              // whose games haven't been played yet) — computed once
-              // here, at the moment the new draft week opens, rather
-              // than live on every page load all week.
+              // whose games haven't been played yet) — computed once here,
+              // at the moment the new draft week opens.
               await computeAndStoreDefVsPosRanks(season, currentWeek).catch(e => console.log('DVP rank computation failed (non-fatal):', e.message));
+            } else {
+              console.log(`Draft already open for week ${nextWeek} (draftLockedUntil ${currentLock}) — no change.`);
             }
           }
 
