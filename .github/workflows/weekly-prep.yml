@@ -73,8 +73,8 @@ jobs:
           // price is a consequence of their real projection, not a fixed
           // floor every deep-bench player alike gets pushed up to.
           const TOP_ANCHOR_EXP = 0.6; // shared cross-position rate, calibrated off whichever position has the single highest real projection this week
-          const SHARED_CAP = 8600;   // QB, TE, DEF clamp
-          const RB_WR_MAX = 9100;    // RB, WR get their own, higher clamp — confirmed needed for real separation from TE specifically
+          const SHARED_CAP = 8900;   // QB, TE, DEF clamp — raised +300 from 8600 (also the base-rate anchor, so this lifts the whole curve ~3.5%)
+          const RB_WR_MAX = 9400;    // RB, WR get their own, higher clamp — raised +300 from 9100 to keep RB/WR separation
           const MIN_SANITY = 100;
           const POSITIONS = {
             QB:  { exp: 1.3,  premium: 1.0,   clamp: SHARED_CAP },
@@ -84,7 +84,7 @@ jobs:
             DEF: { exp: 0.6,  premium: 0.97,  clamp: SHARED_CAP }
           };
           const SAL_MIN_DEFAULT = 100;   // matches MIN_SANITY — the old $4,500 default was the artificial floor this whole redesign specifically removed
-          const SAL_MAX_DEFAULT = 9100;  // matches the highest real position clamp (RB/WR) — each position's own clamp above is what actually governs pricing; this is just an outer safety bound
+          const SAL_MAX_DEFAULT = 9400;  // matches the highest real position clamp (RB/WR) — each position's own clamp above is what actually governs pricing; this is just an outer safety bound
           const SAL_ROUND = 100;
           const FLAT = { QB: 8500, RB: 6500, WR: 6000, TE: 5500, DEF: 5000 };
 
