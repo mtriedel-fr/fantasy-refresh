@@ -146,8 +146,8 @@ jobs:
           // automatically-generated week prices identically to a
           // manually-generated one.
           const TOP_ANCHOR_EXP = 0.6; // shared cross-position rate, calibrated off whichever position has the single highest real projection this week
-          const SHARED_CAP = 8600;   // QB, TE, DEF clamp
-          const RB_WR_MAX = 9100;    // RB, WR get their own, higher clamp — confirmed needed for real separation from TE specifically
+          const SHARED_CAP = 8900;   // QB, TE, DEF clamp — raised +300 from 8600 (also the base-rate anchor, so this lifts the whole curve ~3.5%)
+          const RB_WR_MAX = 9400;    // RB, WR get their own, higher clamp — raised +300 from 9100 to keep RB/WR separation
           const MIN_SANITY = 100;
           const POSITIONS = {
             QB:  { exp: 1.3,  premium: 1.0,   clamp: SHARED_CAP },
@@ -157,7 +157,7 @@ jobs:
             DEF: { exp: 0.6,  premium: 0.97,  clamp: SHARED_CAP }
           };
           const SAL_MIN_DEFAULT = 100;
-          const SAL_MAX_DEFAULT = 9100;
+          const SAL_MAX_DEFAULT = 9400;
           const SAL_ROUND = 100;
           const BACKUP_QB_SALARY = 3800; // floor for a QB with no real projection yet
 
