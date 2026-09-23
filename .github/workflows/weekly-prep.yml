@@ -365,6 +365,91 @@ jobs:
             return projCache[week];
           }
 
+          // Sleeper projections — the primary source. Confirmed complete for a
+          // real week: all 32 team DEFENSES with real projected stats, plus
+          // skill players, keyed by Sleeper player_id — the SAME id our player
+          // pool is keyed by, so matching is an exact id lookup (no fuzzy name
+          // matching, and Sleeper's projection rows carry no names anyway). This
+          // is what closes the Week-3 gap where Tank01 had no defenses. We price
+          // off Sleeper's PPR projection (pts_ppr), which the self-calibrating
+          // model re-anchors to each week, so the absolute scale doesn't matter.
+          const sleeperCache = {};
+          async function getSleeperProjections(week) {
+            if (sleeperCache[week]) return sleeperCache[week];
+            const url = `https://api.sleeper.com/projections/nfl/${SEASON}/${week}`
+              + `?season_type=regular&position[]=QB&position[]=RB&position[]=WR&position[]=TE&position[]=DEF&order_by=ppr`;
+            let arr = [];
+            try {
+              const res = await fetch(url, { headers: { 'User-Agent': 'fantasyrefresh' } });
+              if (res.ok) {
+                const data = await res.json();
+                if (Array.isArray(data)) {
+                  arr = data.map(e => ({
+                    id:   e.player_id,
+                    pos:  (e.position || '').toUpperCase(),
+                    team: e.team || '',
+                    proj: parseFloat((e.stats && e.stats.pts_ppr) || 0)
+                  })).filter(p => p.id && ['QB','RB','WR','TE','DEF'].includes(p.pos) && p.proj > 0);
+                }
+              } else {
+                console.log(`  Sleeper projections HTTP ${res.status} for week ${week}.`);
+              }
+            } catch (e) { console.log(`  Sleeper projections fetch failed: ${e.message}`); }
+            sleeperCache[week] = arr;
+            return arr;
+          }
+
+          // Same per-position, self-calibrating pricing as buildSalariesFromProjections,
+          // but matched to the pool by exact Sleeper id (Sleeper projection rows
+          // carry no usable name, and the pool is keyed by Sleeper id — DEF rows
+          // use the team abbreviation as the id on both sides).
+          function buildSalariesFromSleeper(projPlayers, poolPlayers, min, max) {
+            const maxProjByPos = {};
+            ['QB','RB','WR','TE','DEF'].forEach(pos => {
+              const atPos = projPlayers.filter(p => p.pos === pos && p.proj > 0);
+              maxProjByPos[pos] = atPos.length ? Math.max(...atPos.map(p => p.proj)) : 0;
+            });
+            const globalMaxProj = Math.max(...Object.values(maxProjByPos).filter(v => v > 0), 1);
+            const baseRate = SHARED_CAP / Math.pow(globalMaxProj, TOP_ANCHOR_EXP);
+            const multByPos = {};
+            Object.entries(POSITIONS).forEach(([pos, conf]) => {
+              if (!maxProjByPos[pos]) return;
+              let topAnchor = Math.pow(maxProjByPos[pos], TOP_ANCHOR_EXP) * baseRate * conf.premium;
+              topAnchor = Math.min(topAnchor, conf.clamp);
+              multByPos[pos] = topAnchor / Math.pow(maxProjByPos[pos], conf.exp);
+            });
+
+            const salaries = {};
+            let count = 0;
+            const BACKUP_QB_SALARY = 3800;
+            projPlayers.forEach(p => {
+              if (!POSITIONS[p.pos]) return;
+              const poolP = poolPlayers ? poolPlayers[p.id] : null; // exact id match
+              if (!poolP) return;                                   // must be a real pooled player
+              const inj = poolP.status || null;
+              if (inj === 'O' || inj === 'IR') return;
+              const conf = POSITIONS[p.pos];
+              const mult = multByPos[p.pos] || 0;
+              let sal = Math.ceil((Math.pow(p.proj, conf.exp) * mult) / SAL_ROUND) * SAL_ROUND;
+              sal = Math.max(MIN_SANITY, Math.min(conf.clamp, sal));
+              sal = Math.max(min, Math.min(max, sal));
+              salaries[p.id] = { id: p.id, name: poolP.name, pos: p.pos, team: poolP.team || p.team, proj: Math.round(p.proj * 10) / 10, salary: sal, status: inj, tank01PlayerID: poolP.tank01PlayerID || null, headshot: poolP.headshot || null };
+              count++;
+            });
+
+            // Backup QBs — every pooled QB not already priced gets the floor,
+            // so a suddenly-elevated backup is never unpriced. QB only.
+            Object.values(poolPlayers || {}).forEach(poolP => {
+              if (!poolP || poolP.pos !== 'QB') return;
+              if (salaries[poolP.id]) return;
+              const inj = poolP.status || null;
+              if (inj === 'O' || inj === 'IR') return;
+              salaries[poolP.id] = { id: poolP.id, name: poolP.name, pos: 'QB', team: poolP.team, proj: 0, salary: BACKUP_QB_SALARY, status: inj, tank01PlayerID: poolP.tank01PlayerID || null, headshot: poolP.headshot || null };
+              count++;
+            });
+            return { salaries, count };
+          }
+
           // Tank01 (projections) and Sleeper (the pool) don't necessarily
           // format suffixes the same way — "Michael Pittman Jr." on one
           // side, "Michael Pittman" on the other, for example. A plain
@@ -599,8 +684,29 @@ jobs:
             const min = (settings && settings.minSalary) || SAL_MIN_DEFAULT;
             const max = (settings && settings.maxSalary) || SAL_MAX_DEFAULT;
 
-            const projPlayers = await getProjections(week);
-            let result = projPlayers.length ? buildSalariesFromProjections(projPlayers, poolPlayers, min, max) : { salaries: {}, count: 0 };
+            // Sleeper is the primary projection source (complete, includes all
+            // 32 defenses, exact id match to the pool). The Worker/Tank01 feed
+            // is the fallback if Sleeper is unavailable. Preseason keeps the old
+            // path (Sleeper regular-season projections don't apply there).
+            const isPreseasonLeague = !!(settings && settings.isPreseason);
+            let result = { salaries: {}, count: 0 };
+            let projSource = 'none';
+            if (!isPreseasonLeague) {
+              const sleeperProj = await getSleeperProjections(week);
+              if (sleeperProj.length) {
+                result = buildSalariesFromSleeper(sleeperProj, poolPlayers, min, max);
+                projSource = 'sleeper';
+                console.log(`  ${leagueId}: using Sleeper projections (${sleeperProj.length} projected players).`);
+              }
+            }
+            if (result.count === 0) {
+              const projPlayers = await getProjections(week); // Worker/Tank01 fallback
+              if (projPlayers.length) {
+                result = buildSalariesFromProjections(projPlayers, poolPlayers, min, max);
+                projSource = 'worker';
+                console.log(`  ${leagueId}: Sleeper unavailable — fell back to Worker projections (${projPlayers.length}).`);
+              }
+            }
             let usedFlat = false;
 
             if (result.count === 0) {
