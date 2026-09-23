@@ -208,6 +208,27 @@ jobs:
             return [];
           }
 
+          // A salary sheet is "complete" only when REAL, projection-based
+          // prices exist for every position INCLUDING team defense, at counts
+          // consistent with a full NFL week. Backups priced at a floor
+          // (proj<=0) do NOT count. This is the gate that keeps the draft from
+          // opening on a half-built sheet — the Week-3 failure where the ~7am
+          // regeneration had no defenses and sparse skill players. No flat
+          // fallbacks: if it isn't genuinely complete, we don't write it and we
+          // don't open.
+          const SALARY_MIN_BY_POS = { QB: 24, RB: 50, WR: 70, TE: 24, DEF: 24 };
+          function salaryCompleteness(players) {
+            const real = { QB: 0, RB: 0, WR: 0, TE: 0, DEF: 0 };
+            Object.values(players || {}).forEach(p => {
+              if (!p || real[p.pos] === undefined) return;
+              if (parseFloat(p.proj || 0) > 0) real[p.pos]++;
+            });
+            const missing = Object.keys(SALARY_MIN_BY_POS).filter(pos => real[pos] < SALARY_MIN_BY_POS[pos]);
+            return { ok: missing.length === 0, real, missing };
+          }
+
+          // Returns true ONLY if it wrote a complete real sheet; false if
+          // projections aren't complete yet (nothing is written in that case).
           async function generateRealSalaries(season, week) {
             const projPlayers = await getRealProjections(week, season);
             if (!projPlayers.length) {

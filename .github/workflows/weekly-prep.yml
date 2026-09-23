@@ -458,6 +458,24 @@ jobs:
             return { salaries, count };
           }
 
+          // A salary sheet is "complete" only when REAL, projection-based prices
+          // exist for every position INCLUDING team defense, at counts consistent
+          // with a full NFL week. Backups priced at a floor (proj<=0) don't count.
+          // This is the gate that keeps the draft from opening on a half-built
+          // sheet — the exact Week-3 failure where early-morning projections had
+          // no defenses and sparse skill players. No flat-rate fallbacks: if a
+          // sheet isn't genuinely complete, we don't write it and we don't open.
+          const SALARY_MIN_BY_POS = { QB: 24, RB: 50, WR: 70, TE: 24, DEF: 24 };
+          function salaryCompleteness(players) {
+            const real = { QB: 0, RB: 0, WR: 0, TE: 0, DEF: 0 };
+            Object.values(players || {}).forEach(p => {
+              if (!p || real[p.pos] === undefined) return;
+              if (parseFloat(p.proj || 0) > 0) real[p.pos]++;
+            });
+            const missing = Object.keys(SALARY_MIN_BY_POS).filter(pos => real[pos] < SALARY_MIN_BY_POS[pos]);
+            return { ok: missing.length === 0, real, missing };
+          }
+
           function buildFlatSalaries(poolPlayers) {
             const salaries = {};
             let count = 0;
@@ -610,6 +628,22 @@ jobs:
               console.log(`  ${leagueId}: no usable projections for week ${week} (expected during preseason — Tank01 doesn't provide preseason projections) — using flat fallback`);
               result = buildFlatSalaries(poolPlayers);
               usedFlat = true;
+            }
+
+            // Completeness gate — for a real (regular-season, non-flat) sheet,
+            // only write it if it is genuinely complete: real projection-based
+            // prices for every position INCLUDING DEF at full-week counts.
+            // Otherwise leave the week un-generated so the draft can't open on a
+            // half-built sheet (the Week-3 no-defenses failure). Retries next run
+            // as projections fill in. Preseason/flat sheets are exempt.
+            const isRegularReal = !usedFlat && !(settings && settings.isPreseason);
+            if (isRegularReal) {
+              const chk = salaryCompleteness(result.salaries);
+              if (!chk.ok) {
+                console.log(`  ${leagueId}: week ${week} salaries INCOMPLETE (missing: ${chk.missing.join(', ')}; real counts ${JSON.stringify(chk.real)}) — NOT writing; the draft stays closed until a complete sheet is available. Will retry next run.`);
+                return;
+              }
+              console.log(`  ${leagueId}: week ${week} completeness OK ${JSON.stringify(chk.real)}.`);
             }
 
             await firebasePut(`/leagues/${leagueId}/salaries/${salarySeason}/week${week}.json`, {
