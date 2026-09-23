@@ -390,12 +390,18 @@ jobs:
                 if (res.ok) {
                   const data = await res.json();
                   if (Array.isArray(data)) {
-                    arr = data.map(e => ({
-                      id:   e.player_id,
-                      pos:  (e.position || '').toUpperCase(),
-                      team: e.team || '',
-                      proj: parseFloat((e.stats && e.stats.pts_ppr) || 0)
-                    })).filter(p => p.id && ['QB','RB','WR','TE','DEF'].includes(p.pos) && p.proj > 0);
+                    // Sleeper nests position/team under e.player — reading the
+                    // top-level e.position (undefined) filtered EVERYTHING out,
+                    // which is what actually made this fall back to the Worker.
+                    arr = data.map(e => {
+                      const pl = e.player || {};
+                      return {
+                        id:   e.player_id,
+                        pos:  (e.position || pl.position || '').toUpperCase(),
+                        team: e.team || pl.team || '',
+                        proj: parseFloat((e.stats && e.stats.pts_ppr) || 0)
+                      };
+                    }).filter(p => p.id && ['QB','RB','WR','TE','DEF'].includes(p.pos) && p.proj > 0);
                   } else { console.log(`  Sleeper attempt ${attempt}: response was not an array.`); }
                 } else { console.log(`  Sleeper attempt ${attempt}: HTTP ${res.status}.`); }
               } catch (e) { console.log(`  Sleeper attempt ${attempt} failed: ${e.message}`); }
