@@ -73,7 +73,11 @@ jobs:
             let data = null; try { data = JSON.parse(text); } catch(e){ console.log('  ❌ JSON parse failed. First 300 chars: ' + text.slice(0,300)); return []; }
             if (!Array.isArray(data)) { console.log('  ❌ response is not an array. typeof=' + typeof data + '; first 300: ' + text.slice(0,300)); return []; }
             console.log('  raw array length: ' + data.length);
-            const mapped = data.map(e => ({ id:e.player_id, pos:(e.position||'').toUpperCase(), team:e.team||'', proj:parseFloat((e.stats&&e.stats.pts_ppr)||0) }));
+            // Show the shape of a real projected row so the position/team path is visible.
+            const withProj = data.find(e => e.stats && parseFloat(e.stats.pts_ppr||0) > 0);
+            console.log('  sample RAW row with pts_ppr>0 (top-level keys): ' + (withProj ? JSON.stringify(Object.keys(withProj)) : 'none'));
+            if (withProj) console.log('  that row: player_id=' + withProj.player_id + ' e.position=' + withProj.position + ' e.player.position=' + (withProj.player && withProj.player.position) + ' e.team=' + withProj.team + ' pts_ppr=' + (withProj.stats && withProj.stats.pts_ppr));
+            const mapped = data.map(e => { const pl = e.player || {}; return { id:e.player_id, pos:(e.position||pl.position||'').toUpperCase(), team:e.team||pl.team||'', proj:parseFloat((e.stats&&e.stats.pts_ppr)||0) }; });
             const kept = mapped.filter(p => p.id && ['QB','RB','WR','TE','DEF'].includes(p.pos) && p.proj>0);
             console.log('  after filter (valid pos + pts_ppr>0): ' + kept.length);
             const byPos = {}; kept.forEach(p => byPos[p.pos]=(byPos[p.pos]||0)+1);
