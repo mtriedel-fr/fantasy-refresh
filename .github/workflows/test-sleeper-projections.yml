@@ -1,0 +1,104 @@
+name: Test Sleeper Projections (diagnostic)
+
+# Read-only probe: fetches Sleeper's weekly projections on the GitHub runner
+# (which can reach api.sleeper.com freely) and reports exactly what comes back —
+# how many players, the per-position breakdown, whether team DEFENSES are
+# included, and which projected-points fields exist. This tells us whether
+# Sleeper can be our projection source (it's keyed by the same Sleeper IDs our
+# player pool already uses, and — unlike Tank01 this morning — should include
+# defenses). Writes nothing.
+
+on:
+  workflow_dispatch:
+    inputs:
+      week:
+        description: 'NFL week to probe'
+        required: true
+        default: '3'
+      season:
+        description: 'Season'
+        required: true
+        default: '2026'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch and summarize Sleeper projections
+        env:
+          WK: ${{ inputs.week }}
+          SEASON: ${{ inputs.season }}
+        run: |
+          node << 'SCRIPT'
+          const WK = (process.env.WK || '3').trim();
+          const SEASON = (process.env.SEASON || '2026').trim();
+
+          // Sleeper projections. position[] repeated is how Sleeper filters positions.
+          const params = 'season_type=regular'
+            + '&position[]=QB&position[]=RB&position[]=WR&position[]=TE&position[]=DEF'
+            + '&order_by=ppr';
+          const urls = [
+            `https://api.sleeper.com/projections/nfl/${SEASON}/${WK}?${params}`,
+            // Fallback path shape some clients use:
+            `https://api.sleeper.app/projections/nfl/regular/${SEASON}/${WK}`
+          ];
+
+          async function tryFetch(url){
+            try {
+              const res = await fetch(url, { headers: { 'User-Agent': 'fantasyrefresh-diagnostic' } });
+              const text = await res.text();
+              let data = null; try { data = JSON.parse(text); } catch(e){}
+              return { url, status: res.status, ok: res.ok, data, raw: text.slice(0, 400) };
+            } catch(e){ return { url, error: e.message }; }
+          }
+
+          function summarize(arr){
+            const byPos = { QB:0, RB:0, WR:0, TE:0, DEF:0, OTHER:0 };
+            const statKeys = {};       // which stat keys appear, and how often
+            let withPtsPpr = 0, withAnyProj = 0, sampleDef = null, sampleSkill = null;
+            arr.forEach(e => {
+              const pos = (e.position || (e.player && e.player.position) || '').toUpperCase();
+              if (byPos[pos] === undefined) byPos.OTHER++; else byPos[pos]++;
+              const st = e.stats || {};
+              Object.keys(st).forEach(k => { statKeys[k] = (statKeys[k]||0) + 1; });
+              const ppr = parseFloat(st.pts_ppr || 0);
+              if (ppr > 0) withPtsPpr++;
+              // "any projection" = any non-adp numeric stat > 0
+              const anyReal = Object.keys(st).some(k => k !== 'adp_dd_ppr' && k.indexOf('adp') < 0 && parseFloat(st[k]||0) > 0);
+              if (anyReal) withAnyProj++;
+              if (pos === 'DEF' && !sampleDef) sampleDef = e;
+              if (['QB','RB','WR','TE'].includes(pos) && !sampleSkill) sampleSkill = e;
+            });
+            return { total: arr.length, byPos, statKeys, withPtsPpr, withAnyProj, sampleDef, sampleSkill };
+          }
+
+          (async () => {
+            for (const url of urls) {
+              console.log('\n=== ' + url + ' ===');
+              const r = await tryFetch(url);
+              if (r.error) { console.log('  fetch error: ' + r.error); continue; }
+              console.log('  HTTP ' + r.status);
+              if (!Array.isArray(r.data)) {
+                console.log('  Response was not a JSON array. First 400 chars:');
+                console.log('  ' + r.raw);
+                continue;
+              }
+              const s = summarize(r.data);
+              console.log('  total entries: ' + s.total);
+              console.log('  by position:  ' + JSON.stringify(s.byPos));
+              console.log('  DEF present:  ' + (s.byPos.DEF > 0 ? 'YES (' + s.byPos.DEF + ')' : 'NO'));
+              console.log('  entries with pts_ppr>0: ' + s.withPtsPpr);
+              console.log('  entries with any real projected stat: ' + s.withAnyProj);
+              const topStatKeys = Object.entries(s.statKeys).sort((a,b)=>b[1]-a[1]).slice(0,25);
+              console.log('  stat keys seen (key:count): ' + JSON.stringify(Object.fromEntries(topStatKeys)));
+              if (s.sampleSkill) console.log('  sample skill entry: ' + JSON.stringify({ id:s.sampleSkill.player_id, name:(s.sampleSkill.first_name||'')+' '+(s.sampleSkill.last_name||''), pos:s.sampleSkill.position, team:s.sampleSkill.team, stats:s.sampleSkill.stats }));
+              if (s.sampleDef)   console.log('  sample DEF entry:   ' + JSON.stringify({ id:s.sampleDef.player_id, name:(s.sampleDef.first_name||'')+' '+(s.sampleDef.last_name||''), pos:s.sampleDef.position, team:s.sampleDef.team, stats:s.sampleDef.stats }));
+
+              console.log('\n  VERDICT: ' + ((s.byPos.DEF > 0 && s.withPtsPpr > 50)
+                ? '✅ Looks usable — defenses present and real PPR projections exist. Sleeper can be the source.'
+                : (s.byPos.DEF > 0
+                    ? '⚠️  Defenses present but pts_ppr sparse — may need to compute points from raw stat keys above.'
+                    : '⚠️  No defenses in this response — check params/timing before relying on Sleeper for DEF.')));
+            }
+          })().catch(e => { console.error('Diagnostic failed:', e); process.exit(1); });
+          SCRIPT

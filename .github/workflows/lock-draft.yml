@@ -1,0 +1,96 @@
+name: Lock / Unlock Draft (manual)
+
+# One-click control over whether the draft is open, without touching Firebase.
+# The draft is OPEN when now > settings/draftLockedUntil, and CLOSED otherwise.
+#   - lock   → sets draftLockedUntil far in the future (draft closed)
+#   - unlock → sets draftLockedUntil to now (draft open)
+#
+# "lock" uses a far-future value on purpose: even if the auto-open cron is
+# paused, the draft stays closed until something explicitly opens it.
+#
+# SAFETY: requires typing the matching confirm phrase.
+
+concurrency:
+  group: lock-draft
+  cancel-in-progress: false
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'lock = close the draft, unlock = open it'
+        type: choice
+        options: [lock, unlock]
+        default: lock
+      confirm:
+        description: 'Type EXACTLY: LOCK DRAFT   (or UNLOCK DRAFT to open)'
+        required: true
+        default: ''
+      league_id:
+        description: 'League ID'
+        required: true
+        default: 'fr_refresh26'
+      season:
+        description: 'Season key'
+        required: true
+        default: '2026'
+
+permissions:
+  contents: read
+
+jobs:
+  set-lock:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set the draft lock
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+          ACTION: ${{ inputs.action }}
+          CONFIRM: ${{ inputs.confirm }}
+          LEAGUE_ID: ${{ inputs.league_id }}
+          SEASON: ${{ inputs.season }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB_URL   = process.env.FIREBASE_DB_URL;
+          const FB_TOKEN = process.env.FIREBASE_AUTH_TOKEN;
+          const ACTION   = (process.env.ACTION || 'lock').trim();
+          const LEAGUE   = (process.env.LEAGUE_ID || 'fr_refresh26').trim();
+          const SEASON   = (process.env.SEASON || '2026').trim();
+
+          const EXPECTED = ACTION === 'unlock' ? 'UNLOCK DRAFT' : 'LOCK DRAFT';
+          if ((process.env.CONFIRM || '').trim() !== EXPECTED) {
+            console.error(`❌ Confirm phrase must be exactly "${EXPECTED}" for action "${ACTION}". Nothing changed.`);
+            process.exit(1);
+          }
+          if (!FB_URL)   { console.error('Missing FIREBASE_DB_URL secret.'); process.exit(1); }
+          if (!FB_TOKEN) { console.error('Missing FIREBASE_AUTH_TOKEN secret — the write would be rejected. Aborting.'); process.exit(1); }
+
+          function authed(path){ const sep = path.includes('?') ? '&' : '?'; return FB_URL + path + sep + 'auth=' + FB_TOKEN; }
+          function req(method, path, body){
+            return new Promise((resolve, reject) => {
+              const u = new URL(authed(path));
+              const opts = { hostname:u.hostname, path:u.pathname+u.search, method, headers:{'Content-Type':'application/json'} };
+              const payload = body != null ? JSON.stringify(body) : null;
+              if (payload) opts.headers['Content-Length'] = Buffer.byteLength(payload);
+              const r = https.request(opts, res => { let d=''; res.on('data',c=>d+=c); res.on('end',()=> {
+                if (res.statusCode>=200 && res.statusCode<300) resolve(d ? JSON.parse(d) : null);
+                else reject(new Error(`HTTP ${res.statusCode} on ${method} ${path} — ${d.slice(0,200)}`));
+              }); });
+              r.on('error', reject); if (payload) r.write(payload); r.end();
+            });
+          }
+
+          (async () => {
+            const path = `/leagues/${LEAGUE}/settings/draftLockedUntil.json`;
+            const before = await req('GET', path).catch(() => null);
+            const now = Date.now();
+            const value = ACTION === 'unlock' ? now : (now + 30 * 24 * 60 * 60 * 1000); // unlock=now, lock=+30d
+            await req('PUT', path, value);
+            const openNow = value <= now;
+            console.log(`draftLockedUntil was ${before} → set to ${value} (${new Date(value).toISOString()}).`);
+            console.log(`✅ Draft is now ${openNow ? 'OPEN' : 'CLOSED'} for ${LEAGUE}.`);
+            if (ACTION === 'lock') console.log('   (Re-run with action=unlock, or let the gated auto-open open it once a complete salary sheet exists.)');
+          })().catch(e => { console.error('Failed:', e.message); process.exit(1); });
+          SCRIPT

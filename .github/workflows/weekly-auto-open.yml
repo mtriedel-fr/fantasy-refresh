@@ -290,11 +290,18 @@ jobs:
               count++;
             });
 
+            // Completeness gate — never persist (and therefore never let the
+            // draft open on) a half-built sheet. No flat fallback.
+            const chk = salaryCompleteness(salaries);
+            if (!chk.ok) {
+              console.log(`  Week ${week} projections still INCOMPLETE (missing: ${chk.missing.join(', ')}; real counts ${JSON.stringify(chk.real)}) — NOT writing a partial sheet. Will retry next run.`);
+              return false;
+            }
             await firebasePut(`/leagues/${LEAGUE_ID}/salaries/${season}/week${week}.json`, {
               players: salaries,
               meta: { cap: 60000, count, flat: false, generated: Date.now(), locked: false, week }
             });
-            console.log(`  Generated real salaries for week ${week} (${count} players).`);
+            console.log(`  Generated COMPLETE real salaries for week ${week} (${count} players; ${JSON.stringify(chk.real)}).`);
             return true;
           }
 
@@ -380,44 +387,60 @@ jobs:
               return;
             }
 
-            // It's time to open. Ensure salaries exist — but NEVER
-            // regenerate over an existing sheet (fairness), and, crucially,
-            // decouple UNLOCKING the draft from whether WE were the one to
-            // generate the salaries. Another job (weekly-prep) or a
-            // commissioner may have already created this week's salaries;
-            // the draft must still open on time regardless. The previous
-            // version returned early the moment salaries existed — before
-            // ever reaching the unlock — so if anything generated this
-            // week's salaries first (e.g. weekly-prep's Wednesday run, or a
-            // manual test), the draft would silently never open.
+            // It's time to open — but ONLY on a COMPLETE, real salary sheet.
+            // The Week-3 failure was opening ~7am against early projections that
+            // had no defenses and sparse skill players. Now we require real,
+            // projection-based prices for every position (incl. DEF) before the
+            // draft can open, and we hold it CLOSED until that's true. No flat
+            // fallbacks; an open draft with a complete sheet is never repriced.
+            const HOLD_MS = 30 * 24 * 60 * 60 * 1000; // far-future while holding, so a paused cron can't accidentally open it
+            const now = Date.now();
+
             const existingMeta = await firebaseGet(`/leagues/${LEAGUE_ID}/salaries/${season}/week${nextWeek}/meta.json`).catch(() => null);
-            let haveSalaries = !!(existingMeta && existingMeta.count > 0);
-            if (haveSalaries) {
-              console.log(`Week ${nextWeek} already has salaries (${existingMeta.count}, flat=${!!existingMeta.flat}) — not regenerating, proceeding to open.`);
-            } else {
-              haveSalaries = await generateRealSalaries(season, nextWeek);
+            const hasSheet = !!(existingMeta && existingMeta.count > 0);
+            const lock0 = await firebaseGet(`/leagues/${LEAGUE_ID}/settings/draftLockedUntil.json`).catch(() => null);
+            const draftOpen = (typeof lock0 === 'number' && lock0 <= now);
+
+            // Judge the existing sheet's completeness. If a sheet is recorded but
+            // its players can't be read (transient), don't gamble on repricing —
+            // treat as complete so a read glitch never disturbs a live draft.
+            let existingComplete = false;
+            if (hasSheet) {
+              const existingPlayers = await firebaseGet(`/leagues/${LEAGUE_ID}/salaries/${season}/week${nextWeek}/players.json`).catch(() => null);
+              existingComplete = existingPlayers ? salaryCompleteness(existingPlayers).ok : true;
             }
 
-            if (!haveSalaries) {
-              console.log(`No salaries yet for week ${nextWeek} (no projections and none pre-existing) — leaving draft locked, will retry next run.`);
+            // Already open with a complete sheet → freeze, never reprice.
+            if (draftOpen && existingComplete) {
+              console.log(`Draft already open for week ${nextWeek} with a complete sheet — no change.`);
+              return;
+            }
+            if (draftOpen && !existingComplete) {
+              console.log(`Draft is open for week ${nextWeek} but its sheet is INCOMPLETE — re-locking and rebuilding.`);
+            }
+
+            // Build/confirm a complete sheet. generateRealSalaries persists ONLY
+            // when the result is complete, so a complete flag here means a real,
+            // full sheet is in place.
+            let complete = existingComplete;
+            if (!complete) complete = await generateRealSalaries(season, nextWeek);
+
+            if (!complete) {
+              // Hold the draft CLOSED until projections are complete. Re-check
+              // every run; opens itself the moment a complete sheet exists.
+              await firebasePut(`/leagues/${LEAGUE_ID}/settings/draftLockedUntil.json`, now + HOLD_MS);
+              console.log(`Week ${nextWeek} salaries not yet complete — draft held CLOSED, will retry next run.`);
               return;
             }
 
-            // Idempotent unlock: only flip the lock (and only recompute DVP
-            // ranks) on the first run that actually opens the draft. Every
-            // later cron firing this week is a quiet no-op, so repeated
-            // triggers don't re-unlock or re-read a full season of archives.
-            const now = Date.now();
+            // Complete — open (idempotent) and compute DVP ranks once.
             const currentLock = await firebaseGet(`/leagues/${LEAGUE_ID}/settings/draftLockedUntil.json`).catch(() => null);
             if (typeof currentLock !== 'number' || currentLock > now) {
               await firebasePut(`/leagues/${LEAGUE_ID}/settings/draftLockedUntil.json`, now);
-              console.log(`Draft unlocked for week ${nextWeek}.`);
-              // Real games completed through currentWeek (not nextWeek,
-              // whose games haven't been played yet) — computed once here,
-              // at the moment the new draft week opens.
+              console.log(`Week ${nextWeek} sheet complete — draft unlocked.`);
               await computeAndStoreDefVsPosRanks(season, currentWeek).catch(e => console.log('DVP rank computation failed (non-fatal):', e.message));
             } else {
-              console.log(`Draft already open for week ${nextWeek} (draftLockedUntil ${currentLock}) — no change.`);
+              console.log(`Week ${nextWeek} complete and draft already open — no change.`);
             }
           }
 
