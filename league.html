@@ -1357,8 +1357,14 @@ setTimeout(function(){
         <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--bdr);">
           <div class="csect">League Join Code</div>
           <div style="font-size:12px;color:var(--ink2);margin-bottom:8px;">Share this with new players so they can create an account.</div>
-          <div class="comm-join-code" id="join-code-display">REFRESH26</div>
-          <div style="font-size:11px;color:var(--ink3);margin-top:6px;">Change by editing <code>FR_JOIN_CODE</code> in the file.</div>
+          <div class="comm-join-code" id="join-code-display">—</div>
+          <div id="join-code-closed-note" style="display:none;font-family:var(--fd);font-size:12px;font-weight:800;color:var(--pk);text-transform:uppercase;letter-spacing:.5px;margin-top:4px;">🔒 Closed to new members</div>
+          <div style="font-size:11px;color:var(--ink3);margin-top:6px;">Only commissioners can see or change this.</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">
+            <button class="salary-btn" id="join-code-new-btn" onclick="rotateJoinCode()">🔁 Generate New Code</button>
+            <button class="salary-btn secondary" id="join-code-close-btn" onclick="closeLeagueToNewMembers()">🔒 Close to New Members</button>
+          </div>
+          <div id="join-code-status" style="font-family:var(--fd);font-size:11px;color:var(--ink3);margin-top:8px;min-height:14px;text-transform:uppercase;letter-spacing:.3px;"></div>
         </div>
 
        <!-- MANAGE COMMISSIONERS -->
@@ -5231,7 +5237,11 @@ function renderDues(){
       html += '<div style="text-align:center;padding:40px;color:var(--ink3);font-family:var(--fd);">No members found.</div>';
     } else {
       list.forEach(function(m){
-        var subLine = [m.displayName, m.email].filter(Boolean).join(' · ');
+        // League-facing dues view: show the player's display name only.
+        // Email is intentionally NOT shown here — it's personal info and
+        // this page is visible to every member. Commissioners still see
+        // emails in Commissioner Tools → Dues (renderCommDues).
+        var subLine = m.displayName || '';
         html += '<div style="display:flex;align-items:center;justify-content:space-between;background:var(--bg2);border:1px solid var(--bdr);border-radius:10px;padding:12px 16px;margin-bottom:8px;">'
           + '<div>'
           + '<div style="font-family:var(--fd);font-size:14px;font-weight:800;color:var(--ink);">' + escapeHtmlFR(m.teamName) + '</div>'
@@ -6796,8 +6806,7 @@ function openCommPanel(){
       // This was hardcoded to a leftover placeholder ("REFRESH26") in the
       // static HTML and never actually updated — every league showed the
       // same wrong code regardless of its real join code in Firebase.
-      var joinCodeEl = document.getElementById('join-code-display');
-      if(joinCodeEl) joinCodeEl.textContent = (s && s.joinCode) ? s.joinCode : '—';
+      renderJoinCodeState(s);
     }).catch(function(){});
   }
   // Wire up drag and drop once
@@ -6847,6 +6856,88 @@ function toggleDuesPaid(uid, newValue){
     // somewhere in this same session.
     if(document.getElementById('tab-dues') && !document.getElementById('tab-dues').classList.contains('hidden')) renderDues();
   }).catch(function(){ showToast('Failed to update — try again', true); });
+}
+
+// ── JOIN CODE MANAGEMENT (commissioner only) ─────────────────────────
+// The join code lives in TWO places that must stay in sync:
+//   1. /joinCodes/{CODE} = leagueId   → what the signup flow validates
+//   2. /leagues/{id}/settings/joinCode → what this panel displays
+// Rotating mints a fresh code, points both at it, and deletes the old
+// mapping so the old code stops working immediately. Closing deletes the
+// code mapping entirely and clears settings.joinCode, so no code works
+// (and nothing is left readable in settings either) until reopened.
+var _currentJoinCode = null;
+
+// Human-friendly random code: 3 letters + 3 digits, no ambiguous chars
+// (no O/0, I/1) so it's easy to read aloud and type.
+function generateRandomCode(){
+  var letters = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  var digits  = '23456789';
+  var c = '';
+  for(var i=0;i<3;i++) c += letters[Math.floor(Math.random()*letters.length)];
+  for(var j=0;j<3;j++) c += digits[Math.floor(Math.random()*digits.length)];
+  return c;
+}
+
+function renderJoinCodeState(s){
+  var codeEl   = document.getElementById('join-code-display');
+  var closedEl = document.getElementById('join-code-closed-note');
+  var newBtn   = document.getElementById('join-code-new-btn');
+  var closeBtn = document.getElementById('join-code-close-btn');
+  var code = (s && s.joinCode) ? String(s.joinCode) : '';
+  var closed = !code || (s && s.registrationClosed === true);
+  _currentJoinCode = code || null;
+  if(codeEl)   codeEl.textContent = code || '—';
+  if(closedEl) closedEl.style.display = closed ? 'block' : 'none';
+  // When closed: hide "Close" (nothing to close), keep "Generate New Code"
+  // as the way to reopen. When open: show both.
+  if(closeBtn) closeBtn.style.display = closed ? 'none' : '';
+  if(newBtn)   newBtn.textContent = closed ? '🔓 Reopen with New Code' : '🔁 Generate New Code';
+}
+
+function setJoinCodeStatus(msg){
+  var st = document.getElementById('join-code-status');
+  if(st) st.textContent = msg || '';
+}
+
+function rotateJoinCode(){
+  var ctx = FRAuth.getLeagueCtx();
+  var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+  if(!confirm('Generate a NEW join code?\n\nThe current code will stop working immediately, so anyone you already gave it to will need the new one.')) return;
+  setJoinCodeStatus('Generating…');
+  var oldCode = _currentJoinCode;
+  var newCode = generateRandomCode();
+  // 1) point the new code at this league, 2) update settings for display,
+  // 3) remove the old mapping so it can't be used anymore.
+  FR.fb.put('/joinCodes/' + newCode, leagueId)
+    .then(function(){ return FR.fb.patch(FR.paths.settings(), { joinCode: newCode, registrationClosed: false }); })
+    .then(function(){
+      if(oldCode && oldCode !== newCode) return FR.fb.delete('/joinCodes/' + oldCode).catch(function(){});
+    })
+    .then(function(){
+      renderJoinCodeState({ joinCode: newCode, registrationClosed: false });
+      setJoinCodeStatus('New code active ✓');
+      showToast('New join code: ' + newCode);
+    })
+    .catch(function(){ setJoinCodeStatus(''); showToast('Could not update the join code — try again', true); });
+}
+
+function closeLeagueToNewMembers(){
+  var ctx = FRAuth.getLeagueCtx();
+  var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+  if(!confirm('Close this league to new members?\n\nThe current join code will stop working and no one new can join until you generate a new code. Current members are not affected.')) return;
+  setJoinCodeStatus('Closing…');
+  var oldCode = _currentJoinCode;
+  FR.fb.patch(FR.paths.settings(), { joinCode: '', registrationClosed: true })
+    .then(function(){
+      if(oldCode) return FR.fb.delete('/joinCodes/' + oldCode).catch(function(){});
+    })
+    .then(function(){
+      renderJoinCodeState({ joinCode: '', registrationClosed: true });
+      setJoinCodeStatus('League closed to new members ✓');
+      showToast('League closed — no new members can join');
+    })
+    .catch(function(){ setJoinCodeStatus(''); showToast('Could not close the league — try again', true); });
 }
 
 function deleteWeek(w){
@@ -7305,11 +7396,19 @@ function renderFinish(sorted, curEntries, prevRank){
     + '<th style="text-align:center">Season rank</th>'
     + '<th style="text-align:center">Move</th>'
     + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
-  // Load reactions
-  byScore.forEach(function(e){
-    var reactId = 'react_' + e.name.replace(/[^a-z0-9]/gi,'_').toLowerCase() + '_' + currentWeek;
-    renderReactions(reactId, e.name, currentWeek);
-  });
+  // Load reactions — ONE whole-week read shared across all teams (was one
+  // read per team, re-run on every standings render). Refetched each render
+  // so counts stay current; renderReactions then paints each team from the map.
+  fetch(FR.FB_DB_URL + FR.paths.weekReactions(currentWeek) + '.json')
+    .then(function(r){ return r.json(); })
+    .then(function(all){ weekReactionsCache[String(currentWeek)] = all || {}; })
+    .catch(function(){ if(!weekReactionsCache[String(currentWeek)]) weekReactionsCache[String(currentWeek)] = {}; })
+    .then(function(){
+      byScore.forEach(function(e){
+        var reactId = 'react_' + e.name.replace(/[^a-z0-9]/gi,'_').toLowerCase() + '_' + currentWeek;
+        renderReactions(reactId, e.name, currentWeek);
+      });
+    });
 }
 
 // ── WEEKLY NUMBERS VIEW ───────────────────────────────────────
@@ -8862,6 +8961,7 @@ function initChat(){
 }
 document.addEventListener('DOMContentLoaded', initChat);
 
+var weekReactionsCache = {}; // week -> { teamSlug: { emoji: count } } — one whole-week read shared by every team in a standings render (see the standings loop), instead of one read per team
 function renderReactions(containerId, teamName, week){
   var el = document.getElementById(containerId);
   if(!el) return;
@@ -8875,26 +8975,38 @@ function renderReactions(containerId, teamName, week){
         var cp = em.codePointAt(0);
         return '<button class="react-picker-btn" data-cp="'+cp+'" data-cid="'+containerId+'" data-name="'+encodeURIComponent(teamName)+'" data-week="'+week+'" onclick="handleReactBtn(this)">'+em+'</button>';
       }).join('')+'</div>';
-  fetch(FR.FB_DB_URL+FR.paths.weekReactions(week)+'/'+teamName.replace(/[^a-z0-9]/gi,'_').toLowerCase()+'.json')
-    .then(function(r){ return r.json(); })
-    .then(function(data){
-      el.querySelectorAll('.react-chip').forEach(function(ch){ ch.remove(); });
-      REACTIONS.forEach(function(em){
-        var count = (data && data[em]) ? data[em] : 0;
-        if(count > 0){
-          var col = CHIP_COLORS[em]||'var(--or)';
-          var chip = document.createElement('span');
-          chip.className = 'react-chip';
-          chip.style.cssText = 'border-color:'+col+';background:'+col+'18;color:'+col+';';
-          chip.innerHTML = em+' <span class="react-chip-count">'+count+'</span>';
-          var cp = em.codePointAt(0);
-          chip.addEventListener('click', function(ev){
-            toggleReaction(containerId, encodeURIComponent(teamName), week, cp, ev);
-          });
-          el.appendChild(chip);
-        }
-      });
-    }).catch(function(){});
+  var slug = teamName.replace(/[^a-z0-9]/gi,'_').toLowerCase();
+  function paintReactions(data){
+    el.querySelectorAll('.react-chip').forEach(function(ch){ ch.remove(); });
+    REACTIONS.forEach(function(em){
+      var count = (data && data[em]) ? data[em] : 0;
+      if(count > 0){
+        var col = CHIP_COLORS[em]||'var(--or)';
+        var chip = document.createElement('span');
+        chip.className = 'react-chip';
+        chip.style.cssText = 'border-color:'+col+';background:'+col+'18;color:'+col+';';
+        chip.innerHTML = em+' <span class="react-chip-count">'+count+'</span>';
+        var cp = em.codePointAt(0);
+        chip.addEventListener('click', function(ev){
+          toggleReaction(containerId, encodeURIComponent(teamName), week, cp, ev);
+        });
+        el.appendChild(chip);
+      }
+    });
+  }
+  // When the caller pre-fetched the whole week's reactions (the standings
+  // render does this once for all teams), paint this team's slice from that
+  // shared map — no per-team network read. Any standalone caller with no warm
+  // map falls back to a single-team fetch, exactly as before.
+  var wkCache = weekReactionsCache[String(week)];
+  if(wkCache){
+    paintReactions(wkCache[slug] || {});
+  } else {
+    fetch(FR.FB_DB_URL+FR.paths.weekReactions(week)+'/'+slug+'.json')
+      .then(function(r){ return r.json(); })
+      .then(function(data){ paintReactions(data || {}); })
+      .catch(function(){});
+  }
 }
 
 function handleReactBtn(btn){
@@ -8929,11 +9041,21 @@ function toggleReaction(containerId, encodedName, week, cp, ev){
   document.querySelectorAll('.react-picker.open').forEach(function(p){ p.classList.remove('open'); });
   var slug = teamName.replace(/[^a-z0-9]/gi,'_').toLowerCase();
   var path = FR.FB_DB_URL+FR.paths.weekReactions(week)+'/'+slug+'/'+encodeURIComponent(emoji)+'.json';
+  var newCount = 0;
   fetch(path).then(function(r){ return r.json(); }).then(function(cur){
-    var count = (cur||0)+(adding?1:-1);
-    if(count<0) count=0;
-    return fetch(path,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(count)});
-  }).then(function(){ renderReactions(containerId, teamName, week); }).catch(function(){});
+    newCount = (cur||0)+(adding?1:-1);
+    if(newCount<0) newCount=0;
+    return fetch(path,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(newCount)});
+  }).then(function(){
+    // Keep the shared week map in sync so the immediate re-render (which reads
+    // from it) reflects this change without another network read.
+    var wk = String(week);
+    if(weekReactionsCache[wk]){
+      if(!weekReactionsCache[wk][slug]) weekReactionsCache[wk][slug] = {};
+      weekReactionsCache[wk][slug][emoji] = newCount;
+    }
+    renderReactions(containerId, teamName, week);
+  }).catch(function(){});
 }
 
 // ── COMMISSIONER USER PANEL ───────────────────────────────────
