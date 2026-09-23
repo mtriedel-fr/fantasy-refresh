@@ -1,0 +1,114 @@
+name: Clear Week Locks (fix stale locks)
+
+# Removes a week's kickoff-lock node. Built for the case where STALE PRESEASON
+# locks (August game IDs) leaked into a regular-season week's locks node and
+# were never wiped — which makes the draft board hide every listed team's
+# players (the picker hides any player whose team is "locked"), even though
+# those teams' real games haven't kicked off yet.
+#
+# Safe when no real game that week has started yet: kickoff-locks rebuilds the
+# node correctly the moment a real game kicks off. Do NOT run it on a week whose
+# games are already underway (you'd briefly unlock in-progress teams until the
+# next kickoff-locks run re-locks them).
+#
+# It BACKS UP the node to /backups before deleting, and requires a confirm phrase.
+
+concurrency:
+  group: clear-week-locks
+  cancel-in-progress: false
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type EXACTLY: CLEAR WEEK 3 LOCKS'
+        required: true
+        default: ''
+      league_id:
+        description: 'League ID'
+        required: true
+        default: 'fr_refresh26'
+      season:
+        description: 'Season key'
+        required: true
+        default: '2026'
+      week:
+        description: 'Week number whose locks to clear'
+        required: true
+        default: '3'
+
+permissions:
+  contents: read
+
+jobs:
+  clear:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Backup and delete the week's locks
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+          CONFIRM: ${{ inputs.confirm }}
+          LEAGUE_ID: ${{ inputs.league_id }}
+          SEASON: ${{ inputs.season }}
+          WEEK: ${{ inputs.week }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB_URL   = process.env.FIREBASE_DB_URL;
+          const FB_TOKEN = process.env.FIREBASE_AUTH_TOKEN;
+          const LEAGUE   = (process.env.LEAGUE_ID || 'fr_refresh26').trim();
+          const SEASON   = (process.env.SEASON || '2026').trim();
+          const WEEK     = (process.env.WEEK || '3').trim();
+
+          const EXPECTED = `CLEAR WEEK ${WEEK} LOCKS`;
+          if ((process.env.CONFIRM || '').trim() !== EXPECTED) {
+            console.error(`❌ Confirm phrase must be exactly "${EXPECTED}". Nothing changed.`);
+            process.exit(1);
+          }
+          if (!FB_URL)   { console.error('Missing FIREBASE_DB_URL secret.'); process.exit(1); }
+          if (!FB_TOKEN) { console.error('Missing FIREBASE_AUTH_TOKEN secret — the write would be rejected. Aborting.'); process.exit(1); }
+
+          function authed(path){ const sep = path.includes('?') ? '&' : '?'; return FB_URL + path + sep + 'auth=' + FB_TOKEN; }
+          function req(method, path, body){
+            return new Promise((resolve, reject) => {
+              const u = new URL(authed(path));
+              const opts = { hostname:u.hostname, path:u.pathname+u.search, method, headers:{'Content-Type':'application/json'} };
+              const payload = body != null ? JSON.stringify(body) : null;
+              if (payload) opts.headers['Content-Length'] = Buffer.byteLength(payload);
+              const r = https.request(opts, res => { let d=''; res.on('data',c=>d+=c); res.on('end',()=> {
+                if (res.statusCode>=200 && res.statusCode<300) resolve(d ? JSON.parse(d) : null);
+                else reject(new Error(`HTTP ${res.statusCode} on ${method} ${path} — ${d.slice(0,200)}`));
+              }); });
+              r.on('error', reject); if (payload) r.write(payload); r.end();
+            });
+          }
+
+          (async () => {
+            const locksPath = `/leagues/${LEAGUE}/locks/${SEASON}/week${WEEK}.json`;
+            const ts = Date.now();
+            const backupPath = `/backups/locks_${LEAGUE}_${SEASON}_wk${WEEK}_${ts}.json`;
+
+            const current = await req('GET', locksPath).catch(() => null);
+            const teams = current ? Object.keys(current) : [];
+            console.log(`Current week ${WEEK} locks: ${teams.length ? teams.join(', ') : '(none)'}`);
+
+            // Safety: warn if any lock looks like it's from THIS week's real games
+            // rather than stale preseason data (gameId date vs an Aug preseason date).
+            const staleLooking = teams.filter(t => current[t] && /^2026(0[678])/.test((current[t].gameId||'')));
+            if (teams.length && staleLooking.length) {
+              console.log(`  ${staleLooking.length} of these have Jun–Aug (preseason) game IDs — the stale ones this is meant to clear.`);
+            }
+
+            if (current) {
+              await req('PUT', backupPath, { savedAt: ts, note: `pre-clear backup of week ${WEEK} locks`, data: current });
+              console.log(`  ✅ Backed up to ${backupPath}`);
+            } else {
+              console.log('  Nothing to back up (node already empty).');
+            }
+
+            await req('DELETE', locksPath);
+            console.log(`  ✅ Deleted ${locksPath} — all teams are now unlocked for week ${WEEK}.`);
+            console.log(`  kickoff-locks will rebuild real locks automatically as this week's games kick off.`);
+          })().catch(e => { console.error('Clear failed:', e.message); process.exit(1); });
+          SCRIPT
