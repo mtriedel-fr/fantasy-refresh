@@ -1,0 +1,133 @@
+name: Test Sleeper Salaries (diagnostic, read-only)
+
+# Proves the full Sleeper -> salaries path end to end WITHOUT writing anything:
+#   1. loads the live player pool from Firebase
+#   2. fetches Sleeper projections (verbose — shows exactly what comes back, so
+#      we can see why weekly-prep's Sleeper attempt returned empty)
+#   3. id-matches Sleeper projections to the pool and prices them with the real
+#      per-position model
+#   4. logs the resulting distribution, sample salaries (incl. defenses), and the
+#      completeness verdict
+# Writes nothing — safe to run anytime, including while a draft is open.
+
+on:
+  workflow_dispatch:
+    inputs:
+      week:
+        description: 'NFL week to price'
+        required: true
+        default: '3'
+      season:
+        description: 'Season'
+        required: true
+        default: '2026'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sleeper -> salaries dry run
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          WK: ${{ inputs.week }}
+          SEASON: ${{ inputs.season }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB_URL = process.env.FIREBASE_DB_URL || 'https://fantasy-refresh-default-rtdb.firebaseio.com';
+          const SEASON = (process.env.SEASON || '2026').trim();
+          const WK = (process.env.WK || '3').trim();
+
+          // ── same salary model as weekly-prep / weekly-auto-open ──
+          const TOP_ANCHOR_EXP = 0.6, SHARED_CAP = 8900, RB_WR_MAX = 9400, MIN_SANITY = 100, SAL_ROUND = 100;
+          const SAL_MIN_DEFAULT = 100, SAL_MAX_DEFAULT = 9400, BACKUP_QB_SALARY = 3800;
+          const POSITIONS = {
+            QB:{exp:1.3,premium:1.0,clamp:SHARED_CAP}, RB:{exp:0.55,premium:1.058,clamp:RB_WR_MAX},
+            WR:{exp:0.55,premium:1.12,clamp:RB_WR_MAX}, TE:{exp:0.7,premium:1.21,clamp:SHARED_CAP},
+            DEF:{exp:0.6,premium:0.97,clamp:SHARED_CAP}
+          };
+          const SALARY_MIN_BY_POS = { QB:24, RB:50, WR:70, TE:24, DEF:24 };
+          function salaryCompleteness(players){
+            const real = {QB:0,RB:0,WR:0,TE:0,DEF:0};
+            Object.values(players||{}).forEach(p => { if(p && real[p.pos]!==undefined && parseFloat(p.proj||0)>0) real[p.pos]++; });
+            const missing = Object.keys(SALARY_MIN_BY_POS).filter(pos => real[pos] < SALARY_MIN_BY_POS[pos]);
+            return { ok: missing.length===0, real, missing };
+          }
+
+          function fbGet(path){
+            return new Promise((resolve) => {
+              https.get(FB_URL + path, res => { let d=''; res.on('data',c=>d+=c); res.on('end',()=>{ try{resolve(JSON.parse(d));}catch(e){resolve(null);} }); }).on('error',()=>resolve(null));
+            });
+          }
+
+          async function getSleeperProjections(week){
+            const url = `https://api.sleeper.com/projections/nfl/${SEASON}/${week}`
+              + `?season_type=regular&position[]=QB&position[]=RB&position[]=WR&position[]=TE&position[]=DEF&order_by=ppr`;
+            console.log('  Sleeper URL: ' + url);
+            let res, text;
+            try {
+              res = await fetch(url, { headers: { 'User-Agent': 'fantasyrefresh' } });
+            } catch(e){ console.log('  ❌ fetch threw: ' + e.message); return []; }
+            console.log('  HTTP ' + res.status + ' (ok=' + res.ok + ')');
+            try { text = await res.text(); } catch(e){ console.log('  ❌ body read threw: ' + e.message); return []; }
+            let data = null; try { data = JSON.parse(text); } catch(e){ console.log('  ❌ JSON parse failed. First 300 chars: ' + text.slice(0,300)); return []; }
+            if (!Array.isArray(data)) { console.log('  ❌ response is not an array. typeof=' + typeof data + '; first 300: ' + text.slice(0,300)); return []; }
+            console.log('  raw array length: ' + data.length);
+            const mapped = data.map(e => ({ id:e.player_id, pos:(e.position||'').toUpperCase(), team:e.team||'', proj:parseFloat((e.stats&&e.stats.pts_ppr)||0) }));
+            const kept = mapped.filter(p => p.id && ['QB','RB','WR','TE','DEF'].includes(p.pos) && p.proj>0);
+            console.log('  after filter (valid pos + pts_ppr>0): ' + kept.length);
+            const byPos = {}; kept.forEach(p => byPos[p.pos]=(byPos[p.pos]||0)+1);
+            console.log('  Sleeper projected by pos: ' + JSON.stringify(byPos));
+            return kept;
+          }
+
+          function buildSalariesFromSleeper(projPlayers, poolPlayers, min, max){
+            const maxProjByPos = {};
+            ['QB','RB','WR','TE','DEF'].forEach(pos => { const a=projPlayers.filter(p=>p.pos===pos&&p.proj>0); maxProjByPos[pos]=a.length?Math.max(...a.map(p=>p.proj)):0; });
+            const globalMaxProj = Math.max(...Object.values(maxProjByPos).filter(v=>v>0),1);
+            const baseRate = SHARED_CAP / Math.pow(globalMaxProj, TOP_ANCHOR_EXP);
+            const multByPos = {};
+            Object.entries(POSITIONS).forEach(([pos,conf])=>{ if(!maxProjByPos[pos])return; let t=Math.pow(maxProjByPos[pos],TOP_ANCHOR_EXP)*baseRate*conf.premium; t=Math.min(t,conf.clamp); multByPos[pos]=t/Math.pow(maxProjByPos[pos],conf.exp); });
+            const salaries = {}; let count=0, matched=0, unmatched=0;
+            projPlayers.forEach(p => {
+              if(!POSITIONS[p.pos]) return;
+              const poolP = poolPlayers ? poolPlayers[p.id] : null;
+              if(!poolP){ unmatched++; return; }
+              matched++;
+              const inj = poolP.status || null; if(inj==='O'||inj==='IR') return;
+              const conf = POSITIONS[p.pos]; const mult = multByPos[p.pos]||0;
+              let sal = Math.ceil((Math.pow(p.proj,conf.exp)*mult)/SAL_ROUND)*SAL_ROUND;
+              sal = Math.max(MIN_SANITY, Math.min(conf.clamp, sal)); sal = Math.max(min, Math.min(max, sal));
+              salaries[p.id] = { id:p.id, name:poolP.name, pos:p.pos, team:poolP.team||p.team, proj:Math.round(p.proj*10)/10, salary:sal };
+              count++;
+            });
+            console.log(`  id-match to pool: matched ${matched}, unmatched ${unmatched}`);
+            Object.values(poolPlayers||{}).forEach(poolP => { if(!poolP||poolP.pos!=='QB')return; if(salaries[poolP.id])return; const inj=poolP.status||null; if(inj==='O'||inj==='IR')return; salaries[poolP.id]={id:poolP.id,name:poolP.name,pos:'QB',team:poolP.team,proj:0,salary:BACKUP_QB_SALARY}; count++; });
+            return { salaries, count };
+          }
+
+          (async () => {
+            console.log('Loading player pool…');
+            const pool = await fbGet(`/playerPool/${SEASON}/players.json`);
+            console.log('  pool players: ' + (pool ? Object.keys(pool).length : 'NULL'));
+            // how are defenses keyed in the pool?
+            const poolDef = pool ? Object.entries(pool).filter(([k,v])=>v&&v.pos==='DEF').slice(0,3).map(([k,v])=>({key:k,team:v.team,name:v.name})) : [];
+            console.log('  sample pool DEF keys: ' + JSON.stringify(poolDef));
+
+            console.log('\nFetching Sleeper projections…');
+            const proj = await getSleeperProjections(WK);
+            if(!proj.length){ console.log('\n⚠️  Sleeper returned nothing usable — see logs above for the reason.'); return; }
+
+            console.log('\nPricing from Sleeper…');
+            const { salaries, count } = buildSalariesFromSleeper(proj, pool, SAL_MIN_DEFAULT, SAL_MAX_DEFAULT);
+            const chk = salaryCompleteness(salaries);
+            console.log('  total priced: ' + count);
+            console.log('  completeness: ' + (chk.ok ? '✅ OK' : '⚠️  INCOMPLETE, missing ' + chk.missing.join(',')) + ' ' + JSON.stringify(chk.real));
+
+            // top per position + sample defenses
+            const byPos = {QB:[],RB:[],WR:[],TE:[],DEF:[]};
+            Object.values(salaries).forEach(s => { if(byPos[s.pos]) byPos[s.pos].push(s); });
+            ['QB','RB','WR','TE'].forEach(pos => { const top=byPos[pos].filter(s=>s.proj>0).sort((a,b)=>b.salary-a.salary)[0]; if(top) console.log(`  top ${pos}: ${top.name} $${top.salary} (proj ${top.proj})`); });
+            console.log('  sample DEF salaries: ' + JSON.stringify(byPos.DEF.slice(0,5).map(s=>({team:s.team,name:s.name,salary:s.salary,proj:s.proj}))));
+          })().catch(e => { console.error('Diagnostic failed:', e); process.exit(1); });
+          SCRIPT
