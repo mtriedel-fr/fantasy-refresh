@@ -379,22 +379,29 @@ jobs:
             const url = `https://api.sleeper.com/projections/nfl/${SEASON}/${week}`
               + `?season_type=regular&position[]=QB&position[]=RB&position[]=WR&position[]=TE&position[]=DEF&order_by=ppr`;
             let arr = [];
-            try {
-              const res = await fetch(url, { headers: { 'User-Agent': 'fantasyrefresh' } });
-              if (res.ok) {
-                const data = await res.json();
-                if (Array.isArray(data)) {
-                  arr = data.map(e => ({
-                    id:   e.player_id,
-                    pos:  (e.position || '').toUpperCase(),
-                    team: e.team || '',
-                    proj: parseFloat((e.stats && e.stats.pts_ppr) || 0)
-                  })).filter(p => p.id && ['QB','RB','WR','TE','DEF'].includes(p.pos) && p.proj > 0);
-                }
-              } else {
-                console.log(`  Sleeper projections HTTP ${res.status} for week ${week}.`);
-              }
-            } catch (e) { console.log(`  Sleeper projections fetch failed: ${e.message}`); }
+            // Retry with backoff. weekly-prep hits Sleeper's big /players/nfl
+            // pool endpoint just before this, and a single back-to-back call can
+            // transiently rate-limit or time out — which is exactly what made
+            // this fall back to the Worker once. Retries make Sleeper the
+            // reliable primary so pricing stays on ONE source week to week.
+            for (let attempt = 1; attempt <= 3 && !arr.length; attempt++) {
+              try {
+                const res = await fetch(url, { headers: { 'User-Agent': 'fantasyrefresh' } });
+                if (res.ok) {
+                  const data = await res.json();
+                  if (Array.isArray(data)) {
+                    arr = data.map(e => ({
+                      id:   e.player_id,
+                      pos:  (e.position || '').toUpperCase(),
+                      team: e.team || '',
+                      proj: parseFloat((e.stats && e.stats.pts_ppr) || 0)
+                    })).filter(p => p.id && ['QB','RB','WR','TE','DEF'].includes(p.pos) && p.proj > 0);
+                  } else { console.log(`  Sleeper attempt ${attempt}: response was not an array.`); }
+                } else { console.log(`  Sleeper attempt ${attempt}: HTTP ${res.status}.`); }
+              } catch (e) { console.log(`  Sleeper attempt ${attempt} failed: ${e.message}`); }
+              if (!arr.length && attempt < 3) await new Promise(r => setTimeout(r, 1500 * attempt));
+            }
+            if (arr.length) console.log(`  Sleeper projections: ${arr.length} projected players.`);
             sleeperCache[week] = arr;
             return arr;
           }
