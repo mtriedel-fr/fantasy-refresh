@@ -87,6 +87,7 @@ jobs:
           const PRUNE_AFTER_DAYS = 21;              // items older than this are removed on refresh
           const MAX_ITEMS_PER_PLAYER = 8;           // keep the newest N per player
           const SLEEPER_NEWS_LIMIT = 10;            // items to request per player from Sleeper
+          const SLEEPER_CONCURRENCY = 10;           // parallel per-player lookups (keeps a ~450-player run under a minute)
           const PRUNE_MS = PRUNE_AFTER_DAYS * 24 * 60 * 60 * 1000;
 
           // ── HTTP helpers ────────────────────────────────────────────────
@@ -250,28 +251,35 @@ jobs:
               console.log(`  Scope: ${elig.length ? elig.length + ' salary-eligible player(s) (week ' + week + ')' : 'FULL pool (no salaries found)'}.`);
             }
             console.log(`  Sleeper: querying news for ${targets.length} player(s)${opts.test ? ' (TEST sample of 3)' : ''}…`);
+
+            // Test mode: dump one raw response so the (undocumented) shape can
+            // be confirmed / field paths finalized.
+            if (opts.test && targets.length) {
+              const rawProbe = await postJson(SLEEPER_GRAPHQL, {
+                operationName: 'get_player_news',
+                query: SLEEPER_NEWS_QUERY,
+                variables: { sport: 'nfl', player_id: String(targets[0]), limit: SLEEPER_NEWS_LIMIT }
+              }, { 'User-Agent': 'fantasyrefresh' }).catch(e => ({ _error: e.message }));
+              console.log('  [TEST] raw Sleeper response for player ' + targets[0] + ' (' + (pool.byId[targets[0]] && pool.byId[targets[0]].name) + '):');
+              console.log('  ' + JSON.stringify(rawProbe).slice(0, 1200));
+            }
+
+            // Run the per-player lookups in parallel BATCHES rather than one at
+            // a time. Sequentially, ~450 requests at a few hundred ms each took
+            // minutes; batching cuts that to well under a minute while staying
+            // gentle on Sleeper.
             const out = [];
-            let ok = 0, empty = 0, failed = 0, dumped = false;
-            for (const id of targets) {
-              try {
-                const items = await sleeperNewsForPlayer(id);
-                if (opts.test && !dumped) {
-                  // First real payload we see — dump it so we can confirm the
-                  // (undocumented) response shape and finalize field paths.
-                  const rawProbe = await postJson(SLEEPER_GRAPHQL, {
-                    operationName: 'get_player_news',
-                    query: SLEEPER_NEWS_QUERY,
-                    variables: { sport: 'nfl', player_id: String(id), limit: SLEEPER_NEWS_LIMIT }
-                  }, { 'User-Agent': 'fantasyrefresh' }).catch(e => ({ _error: e.message }));
-                  console.log('  [TEST] raw Sleeper response for player ' + id + ' (' + (pool.byId[id] && pool.byId[id].name) + '):');
-                  console.log('  ' + JSON.stringify(rawProbe).slice(0, 1200));
-                  dumped = true;
-                }
-                if (items.length) { ok++; out.push(...items); } else { empty++; }
-              } catch(e) {
-                failed++;
-                if (failed <= 3) console.error('    Sleeper news failed for ' + id + ': ' + e.message);
-              }
+            let ok = 0, empty = 0, failed = 0;
+            for (let i = 0; i < targets.length; i += SLEEPER_CONCURRENCY) {
+              const chunk = targets.slice(i, i + SLEEPER_CONCURRENCY);
+              const results = await Promise.all(chunk.map(id =>
+                sleeperNewsForPlayer(id).then(items => ({ items })).catch(e => ({ err: e.message }))
+              ));
+              results.forEach(r => {
+                if (r.err) { failed++; if (failed <= 3) console.error('    Sleeper news failed: ' + r.err); }
+                else if (r.items.length) { ok++; out.push(...r.items); }
+                else empty++;
+              });
             }
             console.log(`  Sleeper: ${ok} player(s) with news, ${empty} with none, ${failed} errored; ${out.length} item(s) total.`);
             if (!out.length && failed > 0) {
@@ -399,19 +407,20 @@ jobs:
             const items = await fetchFn(pool, { test: TEST_ONLY });
             console.log(`Provider returned ${items.length} normalized item(s).`);
 
-            let added = 0, confirmed = 0, unconfirmed = 0, skippedExisting = 0, skippedNoPlayer = 0, pruned = 0;
-            const touched = new Set();
+            let added = 0, confirmed = 0, unconfirmed = 0, skippedNoPlayer = 0, pruned = 0;
             const now = Date.now();
 
+            // Group items by resolved player so each player is written in ONE
+            // merged PATCH instead of a GET+PUT per item. The same providerId
+            // always maps to the same item key, so a re-run overwrites the
+            // identical record (natural dedup) — no per-item existence check
+            // needed, which is what made a real run slow.
+            const byPlayer = {}; // key -> { name, updates: { itemKey: record } }
             for (const item of items) {
               const who = resolvePlayer(item, pool);
               if (!who || !who.key) { skippedNoPlayer++; continue; }
               who.confirmed ? confirmed++ : unconfirmed++;
               const itemKey = sanitizeKey(item.providerId).replace(/\s+/g, '_').slice(0, 120);
-
-              const existing = await firebaseGet(`/nflNewsArchive/${who.key}/${itemKey}.json`).catch(() => null);
-              if (existing) { skippedExisting++; touched.add(who.key); continue; }
-
               const record = {
                 title: item.title, analysis: item.analysis || '',
                 link: item.link || '', image: item.image || '',
@@ -420,20 +429,39 @@ jobs:
                 publishedAt: item.publishedMs,   // real publish time (canonical)
                 archivedAt: item.publishedMs      // kept equal for backward-compat with existing readers
               };
-              if (TEST_ONLY) {
-                console.log(`  [TEST] would add for ${who.name}${who.confirmed ? '' : ' (unconfirmed)'}: "${item.title}" — ${new Date(item.publishedMs).toISOString()}`);
-                added++; touched.add(who.key); continue;
-              }
-              try { await firebasePut(`/nflNewsArchive/${who.key}/${itemKey}.json`, record); added++; touched.add(who.key); }
-              catch(e) { console.error(`    Failed to write ${who.name}: ${e.message}`); }
+              if (!byPlayer[who.key]) byPlayer[who.key] = { name: who.name, updates: {} };
+              byPlayer[who.key].updates[itemKey] = record;
+              added++;
             }
 
-            // Prune every player we touched, so refreshed players never keep
-            // stale notes. (Untouched players are also protected on the read
-            // side by the draft card's recency filter.)
-            for (const key of touched) { pruned += await prunePlayer(key, now); }
+            const playerKeys = Object.keys(byPlayer);
+            if (TEST_ONLY) {
+              playerKeys.slice(0, 40).forEach(k => {
+                Object.values(byPlayer[k].updates).forEach(r => {
+                  console.log(`  [TEST] would add for ${r.playerName}${r.confirmedMatch ? '' : ' (unconfirmed)'}: "${r.title}" — ${new Date(r.publishedAt).toISOString()}`);
+                });
+              });
+            } else {
+              // One merged PATCH per player, in parallel batches.
+              for (let i = 0; i < playerKeys.length; i += SLEEPER_CONCURRENCY) {
+                const chunk = playerKeys.slice(i, i + SLEEPER_CONCURRENCY);
+                await Promise.all(chunk.map(k =>
+                  firebaseWrite('PATCH', `/nflNewsArchive/${k}.json`, byPlayer[k].updates)
+                    .catch(e => console.error(`    Failed to write ${byPlayer[k].name}: ${e.message}`))
+                ));
+              }
+            }
 
-            console.log(`\n✓ Sweep complete — provider ${PROVIDER}, ${items.length} item(s): ${added} ${TEST_ONLY ? 'would-add' : 'added'}, ${confirmed} confirmed / ${unconfirmed} unconfirmed matches, ${skippedExisting} already archived, ${skippedNoPlayer} unmatchable, ${pruned} stale item(s) ${TEST_ONLY ? 'would be' : ''} pruned.`);
+            // Prune every player we wrote to (parallel batches), so refreshed
+            // players never keep stale notes. Untouched players are also
+            // protected on the read side by the draft card's recency filter.
+            for (let i = 0; i < playerKeys.length; i += SLEEPER_CONCURRENCY) {
+              const chunk = playerKeys.slice(i, i + SLEEPER_CONCURRENCY);
+              const counts = await Promise.all(chunk.map(k => prunePlayer(k, now).catch(() => 0)));
+              counts.forEach(c => { pruned += c; });
+            }
+
+            console.log(`\n✓ Sweep complete — provider ${PROVIDER}, ${items.length} item(s): ${added} ${TEST_ONLY ? 'would-add' : 'written'} across ${playerKeys.length} player(s), ${confirmed} confirmed / ${unconfirmed} unconfirmed, ${skippedNoPlayer} unmatchable, ${pruned} stale ${TEST_ONLY ? 'would be ' : ''}pruned.`);
           })().catch(e => {
             console.error('❌ Sweep failed:', (e && e.message) ? e.message : e);
             process.exit(1);
