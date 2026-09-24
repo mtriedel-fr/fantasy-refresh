@@ -174,10 +174,13 @@ jobs:
           // Sleeper's known GraphQL pattern (POST { operationName, query,
           // variables } to /graphql). news items carry a `published` (ms) time.
           const SLEEPER_GRAPHQL = 'https://sleeper.com/graphql';
+          // Verified live against Sleeper: on type PlayerNews the fields
+          // player_id, published, source, source_key and metadata are valid;
+          // news_id and title are NOT (title/body live inside metadata).
           const SLEEPER_NEWS_QUERY =
             'query get_player_news($sport: String!, $player_id: String!, $limit: Int!) {' +
             '  get_player_news(sport: $sport, player_id: $player_id, limit: $limit) {' +
-            '    news_id player_id published source source_key title metadata' +
+            '    player_id published source source_key metadata' +
             '  }' +
             '}';
           async function sleeperNewsForPlayer(playerId) {
@@ -195,12 +198,12 @@ jobs:
               meta = meta || {};
               const publishedMs = Number(r.published) || Date.now();
               return {
-                providerId: 'sl_' + (r.news_id || (r.player_id + '_' + publishedMs)),
+                providerId: 'sl_' + (r.source_key || (r.player_id + '_' + publishedMs)),
                 playerId: r.player_id ? String(r.player_id) : null,
                 playerName: null,
                 team: '',
-                title: r.title || meta.title || '',
-                analysis: meta.description || meta.analysis || meta.news || '',
+                title: meta.title || meta.headline || '',
+                analysis: meta.description || meta.analysis || meta.news || meta.body || '',
                 link: meta.url || meta.link || '',
                 image: meta.image || '',
                 publishedMs,
@@ -210,7 +213,17 @@ jobs:
           }
           async function fetchSleeper(pool, opts) {
             const ids = Object.keys(pool.byId);
-            const targets = opts.test ? ids.slice(0, 3) : ids;
+            // In test mode, prefer a few players likely to actually HAVE notes,
+            // so the raw dump shows a populated metadata blob to confirm field
+            // paths against (a kicker with no news tells us nothing).
+            let targets;
+            if (opts.test) {
+              const wanted = ['patrick mahomes','justin jefferson','christian mccaffrey','ceedee lamb','tyreek hill'];
+              const picked = wanted.map(n => pool.byName[n]).filter(Boolean).map(r => r.id);
+              targets = (picked.length ? picked : ids.slice(0, 3)).slice(0, 3);
+            } else {
+              targets = ids;
+            }
             console.log(`  Sleeper: querying news for ${targets.length} player(s)${opts.test ? ' (TEST sample of 3)' : ''}…`);
             const out = [];
             let ok = 0, empty = 0, failed = 0, dumped = false;
