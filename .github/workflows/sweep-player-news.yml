@@ -1,268 +1,402 @@
-
 name: Sweep Player News
 
-# ── SCHEDULED — every 30 minutes, plus manual trigger for testing ──────
-# Pulls from FantasyPros' bulk /nfl/news endpoint instead of Tank01's
-# per-player getNFLNews — confirmed via a real, direct test call that
-# FantasyPros returns genuinely fantasy-relevant content (real
-# injury/practice-status items, not general NFL or personal-life news)
-# with a real, genuine publish timestamp, in ONE bulk call covering many
-# players at once, rather than needing one call per player. That's what
-# makes 30-minute intervals affordable at all — the old Tank01 approach
-# needed 446 calls per run (one per salary-eligible player); this needs
-# exactly 1.
+# ── SCHEDULED — pulls fantasy-relevant player NEWS NOTES into
+# /nflNewsArchive, one player at a time, keyed to the player pool. ────────
 #
-# Real, confirmed math against the free tier's 50 requests/day: 48 runs
-# a day (every 30 min) x 1 call/run = 48/50 — technically within budget,
-# but only just. That's a genuinely thin margin: a manual test run, a
-# retry, or slight timing drift could push it over and get the key
-# rate-limited for the rest of the day. Worth knowing before relying on
-# this cadence during anything time-sensitive.
+# PROVIDER-PLUGGABLE. The source of news is a single swappable "provider"
+# selected by the NEWS_PROVIDER env below. Everything else — matching news
+# to the player pool, storing it, showing how fresh it is, pruning stale
+# items — is provider-agnostic and identical no matter where the notes come
+# from. To change sources you change ONE value; you do not touch the core.
 #
-# Matches each real returned item against the real, current
-# salary-eligible player list (same list already populating the draft
-# picker) by checking whether the item's title starts with a known
-# player's name — confirmed directly via real test data that FantasyPros
-# titles consistently lead with the player's full name ("Jalen Coker
-# (ankle) works on side..."), same pattern Tank01 used, just against
-# much more precisely relevant source content.
+#   NEWS_PROVIDER = 'sleeper'      (default, free, no key)
+#                   'rotowire'     (paid feed — set ROTOWIRE_API_KEY secret)
+#                   'fantasypros'  (the previous source — kept as a fallback)
 #
-# Players NOT in the salary-eligible pool are still archived — a
-# best-effort name is extracted straight off the front of the title
-# (everything before the first "(" or non-capitalized word) and the
-# item is tagged confirmedMatch:false, so the archive still captures
-# news about players who aren't rostered/draftable yet (rookies not
-# in the pool, practice-squad signings, etc.) without silently
-# dropping it. draft.html and any other reader can choose whether to
-# surface unconfirmed items differently.
+# WHY SLEEPER IS THE DEFAULT
+#   • Content type: short fantasy-relevant notes (injuries, role/usage,
+#     "expected to start") — NOT long articles. Same kind of blurb Sleeper's
+#     own app shows (largely Rotowire-sourced).
+#   • Matching: Sleeper news carries the Sleeper player_id, and the player
+#     pool is ALREADY keyed by Sleeper player_id — so news joins to the pool
+#     by exact ID, with none of the name-suffix problems (Fannin Jr. etc.).
+#   • Freshness: each item has a real published timestamp, so the draft card
+#     can show "3d ago" and hide anything stale.
+#   • Cost: free, no punishing per-day request cap (unlike FantasyPros' 50/day).
 #
-# Dedupes using FantasyPros' own real, stable numeric `id` field — a
-# genuine improvement over the old sanitized-title-hash approach, which
-# only existed because Tank01 never provided a stable ID at all.
+# ROTOWIRE LATER (after growth)
+#   Rotowire is the paid, contractually-stable version of these same notes.
+#   To switch: get a Rotowire API key, add it as the ROTOWIRE_API_KEY repo
+#   secret, and set NEWS_PROVIDER to 'rotowire'. Nothing else changes — the
+#   rotowire provider below already normalizes to the same shape the core
+#   consumes. (The endpoint path is the documented api.rotowire.com pattern;
+#   confirm the exact field names against your account's docs on first run
+#   with test_only=true, same as we do for Sleeper.)
+#
+# STALENESS FIX (the "Matthew Golden showing May draft-prep news" bug)
+#   The old sweep only ever APPENDED — it never removed old items, so a
+#   player who stopped getting fresh news kept showing months-old notes
+#   forever. This version PRUNES: after refreshing a player, it deletes that
+#   player's items older than PRUNE_AFTER_DAYS. Combined with the draft
+#   card's own recency filter, stale notes can't surface.
 
 on:
-  # Triggered externally by cron-job.org (a POST to this workflow's
-  # workflow_dispatch), the same reliable cadence used for auto-scoring and
-  # kickoff-locks. GitHub's own schedule trigger was REMOVED so the two don't
-  # double-fire — double-firing here would also blow the FantasyPros
-  # 48/50-per-day budget. IMPORTANT: the cron-job.org request MUST send
-  # inputs.test_only="false"; a bare dispatch defaults to "true" (dry run) and
-  # writes nothing.
+  # Triggered externally by cron-job.org (POST to workflow_dispatch), same
+  # pattern as auto-scoring / kickoff-locks. A scheduled cron sends no input,
+  # so an empty test_only means REAL. Only an explicit test_only=true (the
+  # manual-dispatch default) is a dry run that writes nothing.
   workflow_dispatch:
     inputs:
       test_only:
-        description: 'Test mode — write nothing, just report what would happen'
+        description: 'Test mode — write nothing, dump what the provider returns'
         required: true
         default: 'true'
         type: choice
         options: ['true', 'false']
+      provider_override:
+        description: "Override the news provider for this run (blank = use default)"
+        required: false
+        default: ''
+        type: choice
+        options: ['', 'sleeper', 'rotowire', 'fantasypros']
 
 jobs:
   sweep-news:
     runs-on: ubuntu-latest
     steps:
-      - name: Sweep real fantasy news from FantasyPros
+      - name: Sweep fantasy player news
         env:
           FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
           FANTASYPROS_API_KEY: ${{ secrets.FANTASYPROS_API_KEY }}
+          ROTOWIRE_API_KEY: ${{ secrets.ROTOWIRE_API_KEY }}
           FR_SEASON: "2026"
+          # ── THE ONE SWITCH ──────────────────────────────────────────────
+          NEWS_PROVIDER: "sleeper"
           TEST_ONLY_INPUT: ${{ inputs.test_only }}
+          PROVIDER_OVERRIDE: ${{ inputs.provider_override }}
         run: |
           node << 'SCRIPT'
           const https = require('https');
-          const FB_URL    = 'https://fantasy-refresh-default-rtdb.firebaseio.com';
-          const FB_TOKEN   = process.env.FIREBASE_AUTH_TOKEN;
-          const FP_KEY     = process.env.FANTASYPROS_API_KEY;
-          const SEASON     = process.env.FR_SEASON || '2026';
-          // Scheduled (cron) runs send no input, so TEST_ONLY_INPUT is empty
-          // — those are the real production sweeps and MUST write. Only an
-          // explicit test_only=true (the manual-dispatch default) is a dry run.
-          // The previous logic (… || !input) evaluated to TRUE for the empty
-          // scheduled case, so EVERY 30-minute run silently ran in test mode
-          // and wrote nothing — the archive only ever updated on a manual real
-          // run. Reading the input from env avoids brittle template-in-JS
-          // interpolation too.
-          const TEST_ONLY  = (process.env.TEST_ONLY_INPUT || '').trim() === 'true';
-          function fetchJson(url, headers) {
+          const FB_URL   = 'https://fantasy-refresh-default-rtdb.firebaseio.com';
+          const FB_TOKEN = process.env.FIREBASE_AUTH_TOKEN;
+          const SEASON   = process.env.FR_SEASON || '2026';
+          const TEST_ONLY = (process.env.TEST_ONLY_INPUT || '').trim() === 'true';
+          const PROVIDER = ((process.env.PROVIDER_OVERRIDE || '').trim() || (process.env.NEWS_PROVIDER || 'sleeper').trim()).toLowerCase();
+
+          // ── Tunables ────────────────────────────────────────────────────
+          const PRUNE_AFTER_DAYS = 21;              // items older than this are removed on refresh
+          const MAX_ITEMS_PER_PLAYER = 8;           // keep the newest N per player
+          const SLEEPER_NEWS_LIMIT = 10;            // items to request per player from Sleeper
+          const PRUNE_MS = PRUNE_AFTER_DAYS * 24 * 60 * 60 * 1000;
+
+          // ── HTTP helpers ────────────────────────────────────────────────
+          function getJson(url, headers) {
             return new Promise((resolve, reject) => {
               https.get(url, { headers: headers || {} }, res => {
-                let data = '';
-                res.on('data', c => data += c);
-                res.on('end', () => {
-                  try { resolve(JSON.parse(data)); } catch(e) { reject(e); }
-                });
+                let d = ''; res.on('data', c => d += c);
+                res.on('end', () => { try { resolve(JSON.parse(d)); } catch(e) { reject(new Error('non-JSON from ' + url + ': ' + d.slice(0,160))); } });
               }).on('error', reject);
             });
           }
-          function firebaseGet(path) { return fetchJson(FB_URL + path); }
-          function firebasePut(path, payload) {
+          function postJson(url, bodyObj, headers) {
             return new Promise((resolve, reject) => {
-              const url = new URL(FB_URL + path + '?auth=' + FB_TOKEN);
-              const body = JSON.stringify(payload);
-              const req = https.request(url, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+              const u = new URL(url);
+              const body = JSON.stringify(bodyObj);
+              const req = https.request(u, {
+                method: 'POST',
+                headers: Object.assign({ 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }, headers || {})
               }, res => {
-                let data = '';
-                res.on('data', c => data += c);
-                res.on('end', () => {
-                  if (res.statusCode < 200 || res.statusCode >= 300) {
-                    reject(new Error(`Firebase PUT ${path} failed: ${res.statusCode} ${data}`));
-                  } else {
-                    resolve(JSON.parse(data || '{}'));
-                  }
-                });
+                let d = ''; res.on('data', c => d += c);
+                res.on('end', () => { try { resolve(JSON.parse(d)); } catch(e) { reject(new Error('non-JSON (HTTP ' + res.statusCode + ') from ' + url + ': ' + d.slice(0,200))); } });
               });
-              req.on('error', reject);
-              req.write(body);
-              req.end();
+              req.on('error', reject); req.write(body); req.end();
             });
           }
-          // Firebase RTDB keys can't contain . $ # [ ] /
-          function sanitizeFirebaseKey(s) {
-            return (s || '').replace(/[.$#\[\]\/]/g, '');
-          }
-          async function getSalaryEligiblePlayers(week) {
-            const players = new Map(); // name (lowercase) -> {name, team}
-            try {
-              const salaryData = await firebaseGet(`/leagues/fr_refresh26/salaries/${SEASON}/week${week}.json`);
-              if (!salaryData || salaryData.error || !salaryData.players) return players;
-              Object.values(salaryData.players).forEach(p => {
-                if (!p || !p.name) return;
-                players.set(p.name.toLowerCase(), { name: p.name, team: p.team || '' });
-              });
-            } catch(e) { console.error('  Could not read salary-eligible player list:', e.message); }
-            return players;
-          }
-          async function getCurrentWeek() {
-            try {
-              const meta = await firebaseGet(`/leagues/fr_refresh26/season/${SEASON}/meta.json`);
-              return (meta && meta.week) || 1;
-            } catch(e) { return 1; }
-          }
-          // FantasyPros' real "created" field looks like "2026-09-17
-          // 18:05:27" — confirmed via a real test call — no timezone
-          // marker, but created_formated on the same real item confirmed
-          // this is UTC ("Thu, Sep 17th 6:05pm UTC" matching "18:05:27").
-          function parseCreatedUtc(created) {
-            if (!created) return Date.now();
-            const iso = created.replace(' ', 'T') + 'Z';
-            const ms = Date.parse(iso);
-            return isNaN(ms) ? Date.now() : ms;
-          }
-          async function fetchFantasyProsNews() {
-            let data;
-            try {
-              // Ask for more than the endpoint's small default page (~10), so a
-              // burst of news (Sunday inactives, a wave of practice reports)
-              // in one 30-min window isn't missed before the next sweep. Still
-              // ONE request, so the 48/50-per-day budget is unchanged. If
-              // FantasyPros ignores or caps the limit, it simply returns fewer
-              // — harmless. Watch the "Real items returned" log line to confirm
-              // it went above 10.
-              data = await fetchJson('https://api.fantasypros.com/public/v2/json/nfl/news?limit=100', {
-                'x-api-key': FP_KEY
-              });
-            } catch(e) {
-              // A non-JSON body here almost always means the free-tier key was
-              // rate-limited (the 48/50-per-day margin is thin). Surface it
-              // clearly instead of failing with an opaque JSON parse error.
-              throw new Error('FantasyPros news fetch failed — likely rate-limited or a non-JSON response: ' + e.message);
-            }
-            return (data && data.items) || [];
-          }
-          // Best-effort name extraction for players NOT in the
-          // salary-eligible pool — FantasyPros titles consistently lead
-          // with the player's full name, then either an "(injury)"
-          // parenthetical or a lowercase word starts the sentence body.
-          // Confirmed against real sample titles like:
-          //   "EJ WIlliams signs with Panthers' practice squad"
-          //   "A.J. Terrell Jr. (shoulder) practices Thursday"
-          function extractLeadingName(title) {
-            const words = title.trim().split(/\s+/);
-            const nameWords = [];
-            for (const w of words) {
-              if (w.startsWith('(')) break;
-              const clean = w.replace(/[.,']/g, '');
-              if (!clean.length) break;
-              if (/^[A-Z]/.test(clean)) nameWords.push(w);
-              else break;
-            }
-            return nameWords.join(' ');
-          }
-          (async () => {
-            if (!FP_KEY) {
-              console.error('❌ FANTASYPROS_API_KEY secret is missing.');
-              process.exit(1);
-            }
-            if (!TEST_ONLY && !FB_TOKEN) {
-              console.error('❌ FIREBASE_AUTH_TOKEN secret is missing — required for a real (non-test) sweep.');
-              process.exit(1);
-            }
-            const week = await getCurrentWeek();
-            console.log(`=== News sweep (FantasyPros) | week ${week} | mode: ${TEST_ONLY ? 'TEST (no writes)' : 'REAL'} ===`);
-            const eligiblePlayers = await getSalaryEligiblePlayers(week);
-            console.log(`Real salary-eligible player list: ${eligiblePlayers.size} players.`);
-            const items = await fetchFantasyProsNews();
-            console.log(`Real items returned from FantasyPros: ${items.length}`);
-            let matched = 0, extracted = 0, added = 0, skippedExisting = 0, skippedNoName = 0;
-            for (const item of items) {
-              const title = (item.title || '').trim();
-              const titleLower = title.toLowerCase();
-              // Confirmed via real test data: titles consistently lead
-              // with the player's full name. Checking every known
-              // player as a prefix candidate — cheap even at ~450
-              // players x 25 items, since it's a plain string check.
-              let matchedPlayer = null;
-              for (const p of eligiblePlayers.values()) {
-                if (titleLower.startsWith(p.name.toLowerCase())) { matchedPlayer = p; break; }
-              }
-              let playerName, playerTeam, isConfirmed;
-              if (matchedPlayer) {
-                playerName = matchedPlayer.name;
-                playerTeam = matchedPlayer.team;
-                isConfirmed = true;
-                matched++;
-              } else {
-                // Not in the salary-eligible pool — still archive it,
-                // under a best-effort extracted name, tagged unconfirmed.
-                const extractedName = extractLeadingName(title);
-                if (!extractedName) { skippedNoName++; continue; }
-                playerName = extractedName;
-                playerTeam = item.team_id || '';
-                isConfirmed = false;
-                extracted++;
-              }
-              const playerKey = sanitizeFirebaseKey(playerName.toLowerCase());
-              const itemKey = 'fp_' + (item.id || sanitizeFirebaseKey(titleLower).replace(/\s+/g, '_').slice(0, 100));
-              let existing = null;
-              try {
-                existing = await firebaseGet(`/nflNewsArchive/${playerKey}/${itemKey}.json`);
-              } catch(e) { /* not archived yet */ }
-              if (existing) { skippedExisting++; continue; }
-              const publishedAt = parseCreatedUtc(item.created);
-              if (TEST_ONLY) {
-                console.log(`  [TEST] would add: "${title}" (${playerName}${isConfirmed ? '' : ', unconfirmed'}, published ${new Date(publishedAt).toISOString()})`);
-                added++;
-                continue;
-              }
-              try {
-                await firebasePut(`/nflNewsArchive/${playerKey}/${itemKey}.json`, {
-                  title, link: item.link || '', image: item.image || '',
-                  source: 'fantasypros.com', categories: item.categories || [],
-                  playerName: playerName, team: playerTeam,
-                  confirmedMatch: isConfirmed,
-                  archivedAt: publishedAt // real published time, not just when this job happened to run
+          function firebaseGet(path) { return getJson(FB_URL + path); }
+          function firebaseWrite(method, path, payload) {
+            return new Promise((resolve, reject) => {
+              const u = new URL(FB_URL + path + '?auth=' + FB_TOKEN);
+              const body = payload != null ? JSON.stringify(payload) : null;
+              const opts = { method, headers: { 'Content-Type': 'application/json' } };
+              if (body) opts.headers['Content-Length'] = Buffer.byteLength(body);
+              const req = https.request(u, opts, res => {
+                let d = ''; res.on('data', c => d += c);
+                res.on('end', () => {
+                  if (res.statusCode < 200 || res.statusCode >= 300) reject(new Error('Firebase ' + method + ' ' + path + ' failed: ' + res.statusCode + ' ' + d.slice(0,160)));
+                  else { try { resolve(d ? JSON.parse(d) : null); } catch(e) { resolve(null); } }
                 });
-                added++;
+              });
+              req.on('error', reject); if (body) req.write(body); req.end();
+            });
+          }
+          const firebasePut    = (p, v) => firebaseWrite('PUT', p, v);
+          const firebaseDelete = (p)    => firebaseWrite('DELETE', p, null);
+
+          // Firebase RTDB keys can't contain . $ # [ ] /
+          function sanitizeKey(s) { return (s || '').replace(/[.$#\[\]\/]/g, ''); }
+          // Canonical name for name-based matching (RotoWire/FantasyPros): drop
+          // punctuation and generational suffixes so spellings line up.
+          function normName(s) {
+            return (s || '').toLowerCase().replace(/[^a-z0-9\s]/g,'').replace(/\b(jr|sr|ii|iii|iv|v)\b/g,'').replace(/\s+/g,' ').trim();
+          }
+
+          // ── Player pool (the single source of truth for who exists) ──────
+          // Keyed by Sleeper player_id — the same id Sleeper news uses, so a
+          // Sleeper match is exact. Also indexed by normalized name for the
+          // name-based providers (RotoWire / FantasyPros).
+          async function loadPool() {
+            const byId = {}, byName = {};
+            try {
+              const pool = await firebaseGet(`/playerPool/${SEASON}/players.json`);
+              Object.entries(pool || {}).forEach(([id, p]) => {
+                if (!p || !p.name) return;
+                const rec = { id, name: p.name, team: p.team || '' };
+                byId[id] = rec;
+                byName[normName(p.name)] = rec;
+              });
+            } catch(e) { console.error('  Could not load player pool:', e.message); }
+            return { byId, byName };
+          }
+
+          // ── Normalized item shape every provider returns ─────────────────
+          //   { providerId, playerId, playerName, team, title, analysis,
+          //     link, image, publishedMs, source }
+          // playerId (Sleeper id) is preferred for matching; playerName is the
+          // fallback for name-based providers.
+
+          // ════════════════════════════════════════════════════════════════
+          //  PROVIDER: SLEEPER  (default) — undocumented GraphQL, free, id-keyed
+          // ════════════════════════════════════════════════════════════════
+          // Sleeper's app fetches player notes from its GraphQL API. The exact
+          // operation/field names are undocumented, so they're isolated here as
+          // constants — if a run in test mode shows the response shape differs,
+          // this is the ONLY block to adjust. The request format matches
+          // Sleeper's known GraphQL pattern (POST { operationName, query,
+          // variables } to /graphql). news items carry a `published` (ms) time.
+          const SLEEPER_GRAPHQL = 'https://sleeper.com/graphql';
+          const SLEEPER_NEWS_QUERY =
+            'query get_player_news($sport: String!, $player_id: String!, $limit: Int!) {' +
+            '  get_player_news(sport: $sport, player_id: $player_id, limit: $limit) {' +
+            '    news_id player_id published source source_key title metadata' +
+            '  }' +
+            '}';
+          async function sleeperNewsForPlayer(playerId) {
+            const resp = await postJson(SLEEPER_GRAPHQL, {
+              operationName: 'get_player_news',
+              query: SLEEPER_NEWS_QUERY,
+              variables: { sport: 'nfl', player_id: String(playerId), limit: SLEEPER_NEWS_LIMIT }
+            }, { 'User-Agent': 'fantasyrefresh' });
+            const rows = (resp && resp.data && resp.data.get_player_news) || [];
+            return rows.map(r => {
+              // metadata is a JSON blob on Sleeper items — pull the human note
+              // and any link/image out of it defensively.
+              let meta = r.metadata;
+              if (typeof meta === 'string') { try { meta = JSON.parse(meta); } catch(e) { meta = {}; } }
+              meta = meta || {};
+              const publishedMs = Number(r.published) || Date.now();
+              return {
+                providerId: 'sl_' + (r.news_id || (r.player_id + '_' + publishedMs)),
+                playerId: r.player_id ? String(r.player_id) : null,
+                playerName: null,
+                team: '',
+                title: r.title || meta.title || '',
+                analysis: meta.description || meta.analysis || meta.news || '',
+                link: meta.url || meta.link || '',
+                image: meta.image || '',
+                publishedMs,
+                source: r.source || 'sleeper'
+              };
+            });
+          }
+          async function fetchSleeper(pool, opts) {
+            const ids = Object.keys(pool.byId);
+            const targets = opts.test ? ids.slice(0, 3) : ids;
+            console.log(`  Sleeper: querying news for ${targets.length} player(s)${opts.test ? ' (TEST sample of 3)' : ''}…`);
+            const out = [];
+            let ok = 0, empty = 0, failed = 0, dumped = false;
+            for (const id of targets) {
+              try {
+                const items = await sleeperNewsForPlayer(id);
+                if (opts.test && !dumped) {
+                  // First real payload we see — dump it so we can confirm the
+                  // (undocumented) response shape and finalize field paths.
+                  const rawProbe = await postJson(SLEEPER_GRAPHQL, {
+                    operationName: 'get_player_news',
+                    query: SLEEPER_NEWS_QUERY,
+                    variables: { sport: 'nfl', player_id: String(id), limit: SLEEPER_NEWS_LIMIT }
+                  }, { 'User-Agent': 'fantasyrefresh' }).catch(e => ({ _error: e.message }));
+                  console.log('  [TEST] raw Sleeper response for player ' + id + ' (' + (pool.byId[id] && pool.byId[id].name) + '):');
+                  console.log('  ' + JSON.stringify(rawProbe).slice(0, 1200));
+                  dumped = true;
+                }
+                if (items.length) { ok++; out.push(...items); } else { empty++; }
               } catch(e) {
-                console.error(`    Failed to archive item for ${playerName}:`, e.message);
+                failed++;
+                if (failed <= 3) console.error('    Sleeper news failed for ' + id + ': ' + e.message);
               }
             }
-            console.log(`\n✓ Sweep complete — ${items.length} item(s) checked, ${matched} matched a rostered/salary-eligible player, ${extracted} archived under a best-effort unconfirmed name, ${skippedExisting} already archived, ${skippedNoName} skipped (no extractable name), ${TEST_ONLY ? 'would add' : 'added'} ${added} new item(s).`);
+            console.log(`  Sleeper: ${ok} player(s) with news, ${empty} with none, ${failed} errored; ${out.length} item(s) total.`);
+            if (!out.length && failed > 0) {
+              console.error('  ⚠️  Sleeper returned no usable items and errored — the undocumented query may need adjusting. Run with test_only=true and check the raw dump above, then update SLEEPER_NEWS_QUERY / field paths.');
+            }
+            return out;
+          }
+
+          // ════════════════════════════════════════════════════════════════
+          //  PROVIDER: ROTOWIRE  (drop-in for later — needs ROTOWIRE_API_KEY)
+          // ════════════════════════════════════════════════════════════════
+          // Documented pattern: https://api.rotowire.com/{sport}/news.php?key=...
+          // Confirm exact field names against your Rotowire account docs on the
+          // first test_only run; they're isolated in the mapping below.
+          async function fetchRotowire(pool, opts) {
+            const key = process.env.ROTOWIRE_API_KEY;
+            if (!key) {
+              console.error('  ⚠️  NEWS_PROVIDER=rotowire but ROTOWIRE_API_KEY secret is not set — nothing fetched.');
+              return [];
+            }
+            const url = `https://api.rotowire.com/Football/News.php?key=${encodeURIComponent(key)}&format=json`;
+            let data;
+            try { data = await getJson(url); }
+            catch(e) { console.error('  Rotowire fetch failed: ' + e.message); return []; }
+            if (opts.test) console.log('  [TEST] raw Rotowire response (first 1000 chars): ' + JSON.stringify(data).slice(0, 1000));
+            const rows = (data && (data.Updates || data.updates || data.items)) || [];
+            return rows.map(r => {
+              const publishedMs = Date.parse(r.Date || r.date || r.timestamp || '') || Date.now();
+              return {
+                providerId: 'rw_' + (r.ID || r.id || (r.Player + '_' + publishedMs)),
+                playerId: null,                                   // Rotowire is name-matched into the pool
+                playerName: r.Player || r.player || r.name || '',
+                team: r.Team || r.team || '',
+                title: r.Headline || r.headline || r.Notes || '',
+                analysis: r.Analysis || r.analysis || r.Notes || '',
+                link: r.URL || r.url || '',
+                image: '',
+                publishedMs,
+                source: 'rotowire'
+              };
+            });
+          }
+
+          // ════════════════════════════════════════════════════════════════
+          //  PROVIDER: FANTASYPROS  (previous source — retained fallback)
+          // ════════════════════════════════════════════════════════════════
+          async function fetchFantasyPros(pool, opts) {
+            const key = process.env.FANTASYPROS_API_KEY;
+            if (!key) { console.error('  ⚠️  NEWS_PROVIDER=fantasypros but FANTASYPROS_API_KEY is not set.'); return []; }
+            let data;
+            try { data = await getJson('https://api.fantasypros.com/public/v2/json/nfl/news?limit=100', { 'x-api-key': key }); }
+            catch(e) { console.error('  FantasyPros fetch failed (likely rate-limited): ' + e.message); return []; }
+            const rows = (data && data.items) || [];
+            if (opts.test) console.log('  [TEST] FantasyPros returned ' + rows.length + ' item(s).');
+            // Titles lead with the player's full name; the pool's normalized
+            // index resolves them. Name carried through for the name-match core.
+            return rows.map(r => {
+              const created = (r.created || '').replace(' ', 'T') + 'Z';
+              const publishedMs = Date.parse(created) || Date.now();
+              // best-effort leading name off the title front
+              const words = (r.title || '').trim().split(/\s+/);
+              const nameWords = [];
+              for (const w of words) { if (w.startsWith('(')) break; const c = w.replace(/[.,']/g,''); if (c && /^[A-Z]/.test(c)) nameWords.push(w); else break; }
+              return {
+                providerId: 'fp_' + (r.id || sanitizeKey((r.title||'').toLowerCase()).slice(0,80)),
+                playerId: null,
+                playerName: nameWords.join(' '),
+                team: r.team_id || '',
+                title: r.title || '',
+                analysis: r.content || r.analysis || '',
+                link: r.link || '',
+                image: r.image || '',
+                publishedMs,
+                source: 'fantasypros.com'
+              };
+            });
+          }
+
+          const PROVIDERS = { sleeper: fetchSleeper, rotowire: fetchRotowire, fantasypros: fetchFantasyPros };
+
+          // ── Resolve a normalized item to a pool player key ───────────────
+          // Prefer exact Sleeper id; else normalized name. Unresolved items are
+          // still archived under a best-effort name, tagged unconfirmed.
+          function resolvePlayer(item, pool) {
+            if (item.playerId && pool.byId[item.playerId]) {
+              const r = pool.byId[item.playerId];
+              return { key: sanitizeKey(r.name.toLowerCase()), name: r.name, team: r.team, confirmed: true };
+            }
+            if (item.playerName) {
+              const r = pool.byName[normName(item.playerName)];
+              if (r) return { key: sanitizeKey(r.name.toLowerCase()), name: r.name, team: r.team, confirmed: true };
+              return { key: sanitizeKey(item.playerName.toLowerCase()), name: item.playerName, team: item.team || '', confirmed: false };
+            }
+            return null;
+          }
+
+          // ── Prune a player's stale items (the anti-Golden fix) ───────────
+          async function prunePlayer(playerKey, now) {
+            const existing = await firebaseGet(`/nflNewsArchive/${playerKey}.json`).catch(() => null);
+            if (!existing) return 0;
+            const entries = Object.entries(existing);
+            // oldest-first list of keys to drop: past the window, or beyond the cap
+            const dated = entries.map(([k, v]) => ({ k, ms: (v && (v.publishedAt || v.archivedAt)) || 0 }))
+                                 .sort((a, b) => b.ms - a.ms);
+            const toDelete = [];
+            dated.forEach((e, i) => {
+              if (e.ms < now - PRUNE_MS) toDelete.push(e.k);       // too old
+              else if (i >= MAX_ITEMS_PER_PLAYER) toDelete.push(e.k); // beyond cap
+            });
+            if (TEST_ONLY) return toDelete.length;
+            for (const k of toDelete) { await firebaseDelete(`/nflNewsArchive/${playerKey}/${k}.json`).catch(() => {}); }
+            return toDelete.length;
+          }
+
+          // ── MAIN ─────────────────────────────────────────────────────────
+          (async () => {
+            if (!TEST_ONLY && !FB_TOKEN) { console.error('❌ FIREBASE_AUTH_TOKEN required for a real sweep.'); process.exit(1); }
+            const fetchFn = PROVIDERS[PROVIDER];
+            if (!fetchFn) { console.error(`❌ Unknown NEWS_PROVIDER "${PROVIDER}". Use sleeper | rotowire | fantasypros.`); process.exit(1); }
+
+            console.log(`=== News sweep | provider: ${PROVIDER} | mode: ${TEST_ONLY ? 'TEST (no writes)' : 'REAL'} ===`);
+            const pool = await loadPool();
+            console.log(`Player pool: ${Object.keys(pool.byId).length} players.`);
+
+            const items = await fetchFn(pool, { test: TEST_ONLY });
+            console.log(`Provider returned ${items.length} normalized item(s).`);
+
+            let added = 0, confirmed = 0, unconfirmed = 0, skippedExisting = 0, skippedNoPlayer = 0, pruned = 0;
+            const touched = new Set();
+            const now = Date.now();
+
+            for (const item of items) {
+              const who = resolvePlayer(item, pool);
+              if (!who || !who.key) { skippedNoPlayer++; continue; }
+              who.confirmed ? confirmed++ : unconfirmed++;
+              const itemKey = sanitizeKey(item.providerId).replace(/\s+/g, '_').slice(0, 120);
+
+              const existing = await firebaseGet(`/nflNewsArchive/${who.key}/${itemKey}.json`).catch(() => null);
+              if (existing) { skippedExisting++; touched.add(who.key); continue; }
+
+              const record = {
+                title: item.title, analysis: item.analysis || '',
+                link: item.link || '', image: item.image || '',
+                source: item.source, playerName: who.name, team: who.team,
+                confirmedMatch: who.confirmed,
+                publishedAt: item.publishedMs,   // real publish time (canonical)
+                archivedAt: item.publishedMs      // kept equal for backward-compat with existing readers
+              };
+              if (TEST_ONLY) {
+                console.log(`  [TEST] would add for ${who.name}${who.confirmed ? '' : ' (unconfirmed)'}: "${item.title}" — ${new Date(item.publishedMs).toISOString()}`);
+                added++; touched.add(who.key); continue;
+              }
+              try { await firebasePut(`/nflNewsArchive/${who.key}/${itemKey}.json`, record); added++; touched.add(who.key); }
+              catch(e) { console.error(`    Failed to write ${who.name}: ${e.message}`); }
+            }
+
+            // Prune every player we touched, so refreshed players never keep
+            // stale notes. (Untouched players are also protected on the read
+            // side by the draft card's recency filter.)
+            for (const key of touched) { pruned += await prunePlayer(key, now); }
+
+            console.log(`\n✓ Sweep complete — provider ${PROVIDER}, ${items.length} item(s): ${added} ${TEST_ONLY ? 'would-add' : 'added'}, ${confirmed} confirmed / ${unconfirmed} unconfirmed matches, ${skippedExisting} already archived, ${skippedNoPlayer} unmatchable, ${pruned} stale item(s) ${TEST_ONLY ? 'would be' : ''} pruned.`);
           })().catch(e => {
-            // Without this, a thrown error became a silent unhandled rejection
-            // and the run could look "green" while having done nothing.
             console.error('❌ Sweep failed:', (e && e.message) ? e.message : e);
             process.exit(1);
           });
