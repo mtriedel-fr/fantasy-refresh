@@ -2617,9 +2617,18 @@ function loadNewsTab(){
         return Math.floor(s/86400) + 'd ago';
       }
 
+      // Tidy the source label — raw feed values look like "fantasy_pros".
+      function prettySource(s){
+        if(!s) return '';
+        var map = { fantasy_pros:'FantasyPros', rotowire:'RotoWire', sleeper:'Sleeper', espn:'ESPN', 'fantasypros.com':'FantasyPros' };
+        var key = String(s).toLowerCase();
+        if(map[key]) return map[key];
+        return String(s).replace(/[_.]/g,' ').replace(/\b\w/g, function(c){ return c.toUpperCase(); });
+      }
       var html = items.map(function(item){
         var ago = timeAgo(newsTime(item));
-        var meta = (item.source||'') + (ago ? (item.source ? ' · ' : '') + ago : '');
+        var src = prettySource(item.source);
+        var meta = src + (ago ? (src ? ' · ' : '') + ago : '');
         return '<div class="news-item" style="display:flex;gap:10px;align-items:flex-start;">'
           +(item.image?'<img src="'+item.image+'" alt="" decoding="async" style="width:44px;height:44px;border-radius:8px;object-fit:cover;flex-shrink:0;background:var(--bg2);" onerror="this.style.display=\'none\';">':'')
           +'<div style="flex:1;min-width:0;">'
