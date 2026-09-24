@@ -1658,21 +1658,77 @@ function closeGamePreviewAfterPick(){
   renderPicker();
 }
 
+// ── BROWSER AUTOSAVE (in-progress lineup) ──────────────────────────
+// Persists the lineup being BUILT to this browser, so navigating away or
+// closing the tab mid-draft doesn't lose it. Restored on return, cleared
+// on submit. Per-browser only (no cross-device sync); never written to
+// Firebase, so it can't be mistaken for a submitted lineup.
+var autosaveReady = false; // true only AFTER the initial load+restore, so a
+                           // boot-time render never clobbers a saved draft
+function draftStorageKey(){
+  if(!currentUser) return null;
+  var ctx = FRAuth.getLeagueCtx();
+  var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+  return 'fr_draft_' + leagueId + '_' + FR.seasonKey() + '_wk' + currentWeek + '_' + currentUser.uid;
+}
+function autosaveDraft(){
+  if(!autosaveReady || !currentUser || isDraftLocked()) return;
+  var key = draftStorageKey(); if(!key) return;
+  var slots = {};
+  SLOT_DEFS.forEach(function(s){ if(lineup[s.id]) slots[s.id] = lineup[s.id]; });
+  try { localStorage.setItem(key, JSON.stringify({ slots: slots, savedAt: Date.now() })); } catch(e){}
+}
+function clearDraftLocal(){
+  var key = draftStorageKey(); if(!key) return;
+  try { localStorage.removeItem(key); } catch(e){}
+}
+// Fill any EMPTY roster slot from the saved in-progress draft. Never
+// overrides a slot already filled from the submitted lineup, and skips
+// players who are out or whose game has already kicked off. Returns count.
+function restoreDraftLocal(){
+  var key = draftStorageKey(); if(!key) return 0;
+  var raw; try { raw = localStorage.getItem(key); } catch(e){ return 0; }
+  if(!raw) return 0;
+  var obj; try { obj = JSON.parse(raw); } catch(e){ return 0; }
+  if(!obj || !obj.slots) return 0;
+  var restored = 0;
+  SLOT_DEFS.forEach(function(s){
+    if(lineup[s.id]) return;                       // keep any submitted pick
+    var p = obj.slots[s.id];
+    if(!p || !p.id) return;
+    if(p.status === 'O' || p.status === 'IR') return;
+    if(isPlayerLocked(p)) return;                  // their game already started
+    lineup[s.id] = p;
+    restored++;
+  });
+  return restored;
+}
+
 function loadSubmitted(){
   if(!currentUser) return;
   fetch(FR.paths.url(FR.paths.myLineup(currentWeek, currentUser.uid)))
     .then(function(r){ return r.json(); })
-    .then(function(data){
-      if(!data || !data.slots) return;
-      SLOT_DEFS.forEach(function(s){ if(data.slots[s.id]) lineup[s.id] = data.slots[s.id]; });
-      repriceLineup();   // sync snapshot salaries to the current week's sheet
-      renderRoster();
-      updateCap();
-      document.getElementById('submit-msg').textContent = '✓ Submitted — tap any slot to update';
-      document.getElementById('submit-msg').className = 'submit-msg ok';
-      document.getElementById('submit-btn').textContent = '↑ Update Lineup';
-    })
-    .catch(function(err){ console.error('[FR] Failed to load saved lineup:', err); });
+    .then(function(data){ finishLineupLoad(data); })
+    .catch(function(err){ console.error('[FR] Failed to load saved lineup:', err); finishLineupLoad(null); });
+}
+// Applies the submitted lineup (if any), then restores any in-progress
+// browser draft into still-empty slots, then turns autosave on.
+function finishLineupLoad(data){
+  var hasSubmitted = !!(data && data.slots);
+  if(hasSubmitted){
+    SLOT_DEFS.forEach(function(s){ if(data.slots[s.id]) lineup[s.id] = data.slots[s.id]; });
+  }
+  var restored = isDraftLocked() ? 0 : restoreDraftLocal();
+  repriceLineup();   // sync snapshot salaries to the current week's sheet
+  renderRoster();
+  updateCap();
+  if(hasSubmitted){
+    document.getElementById('submit-msg').textContent = '✓ Submitted — tap any slot to update';
+    document.getElementById('submit-msg').className = 'submit-msg ok';
+    document.getElementById('submit-btn').textContent = '↑ Update Lineup';
+  }
+  if(restored){ showToast('Restored your in-progress lineup ✓'); }
+  autosaveReady = true; // changes from here on are autosaved to this browser
 }
 
 // ── LINEUP RE-PRICING ──────────────────────────────────────────
@@ -2298,6 +2354,10 @@ function updateCap(){
   // realizing this button was their way back out to swap someone else.
   var closeBtn = document.getElementById('picker-close-btn');
   if(closeBtn) closeBtn.classList.toggle('way-out', remaining < 0);
+
+  // Autosave the in-progress lineup on every change (updateCap runs after
+  // every pick/swap/remove). No-op until the initial load+restore finishes.
+  autosaveDraft();
 }
 
 function updateSubmitBtn(){
@@ -2362,6 +2422,7 @@ function submitLineup(){
       msg.textContent='✓ Lineup submitted! Good luck.'; msg.className='submit-msg ok';
       btn.textContent='↑ Update Lineup'; btn.disabled=false;
       showToast('Lineup submitted! 🏈');
+      clearDraftLocal(); // it's safely in the cloud now — drop the local draft
       setTimeout(function(){ window.location.href = '/league.html'; }, 1200);
     }).catch(function(err){
       console.error('Lineup submit failed:', err);
