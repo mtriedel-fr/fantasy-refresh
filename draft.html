@@ -2670,7 +2670,7 @@ function loadScoresTab(){
 // on, and caching that the same way as immutable history would mean
 // serving a stale projection instead of an updated one.
 function loadLiveSeasonSchedule(p){
-  fetch(WORKER+'/playerhistory?name='+encodeURIComponent(p.name)+'&team='+encodeURIComponent(p.team)+'&season=2026&currentWeek='+currentWeek)
+  fetch(WORKER+'/playerhistory?name='+encodeURIComponent(p.name)+'&team='+encodeURIComponent(p.team)+'&pos='+encodeURIComponent(p.pos||'')+'&season=2026&currentWeek='+currentWeek)
     .then(function(r){ return r.json(); })
     .then(function(data){ renderHistoricalWeeks(data.weeks || [], '2026'); })
     .catch(function(){
@@ -2684,7 +2684,7 @@ function loadLiveSeasonSchedule(p){
 // handlePlayerHistory for how points get computed from the raw stored
 // stats). Cache is checked BEFORE calling the Worker at all, so a season
 // that's already been looked up by anyone costs nothing on repeat views.
-var HISTORY_CACHE_SCHEMA = 5; // bumped when the shape of cached data changes (2 = added rank + snapPct, 3 = bye/no-stat weeks now show as real rows instead of being silently omitted, 4 = added gameDate, future weeks now show real schedule info even without stats, 5 = postseason weeks now get real dates too, matching regular season) — older cached entries are treated as a miss and recomputed, not served incomplete
+var HISTORY_CACHE_SCHEMA = 6; // bumped when the shape of cached data changes (2 = added rank + snapPct, 3 = bye/no-stat weeks now show as real rows instead of being silently omitted, 4 = added gameDate, future weeks now show real schedule info even without stats, 5 = postseason weeks now get real dates too, matching regular season, 6 = defenses + suffix/punctuation-mismatched names now resolve — invalidates old caches that stored null-filled weeks for those players) — older cached entries are treated as a miss and recomputed, not served incomplete
 function loadHistoricalSeason(p, season){
   var cacheKey = '/computedFantasyHistory/standard/' + season + '/' + sanitizeKeyClient(p.name.toLowerCase());
 
@@ -2693,7 +2693,7 @@ function loadHistoricalSeason(p, season){
       renderHistoricalWeeks(cached.weeks, season);
       return;
     }
-    return fetch(WORKER+'/playerhistory?name='+encodeURIComponent(p.name)+'&team='+encodeURIComponent(p.team)+'&season='+season)
+    return fetch(WORKER+'/playerhistory?name='+encodeURIComponent(p.name)+'&team='+encodeURIComponent(p.team)+'&pos='+encodeURIComponent(p.pos||'')+'&season='+season)
       .then(function(r){ return r.json(); })
       .then(function(data){
         renderHistoricalWeeks(data.weeks || [], season);
