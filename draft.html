@@ -2592,15 +2592,40 @@ function loadNewsTab(){
   FR.fb.get('/nflNewsArchive/' + playerKey)
     .then(function(archive){
       if(!archive || archive.error){ showNewsLinks(p); return; }
-      var items = Object.values(archive).sort(function(a,b){ return (b.archivedAt||0) - (a.archivedAt||0); });
+      // The real publish time. Newer records store publishedAt; older ones
+      // only have archivedAt (which the sweep also sets to the publish time),
+      // so prefer publishedAt and fall back to archivedAt.
+      function newsTime(it){ return (it && (it.publishedAt || it.archivedAt)) || 0; }
+      var items = Object.values(archive).sort(function(a,b){ return newsTime(b) - newsTime(a); });
+      // Only show genuinely recent news. The archive can still hold stale
+      // offseason/draft-prep items published months ago that were never
+      // refreshed with in-season coverage (e.g. a May draft-trends note
+      // showing in Week 4) — displaying those is worse than showing none.
+      // Drop anything older than the window, and if nothing recent survives,
+      // fall back to the "check these sources" links.
+      var NEWS_MAX_AGE_MS = 21 * 24 * 60 * 60 * 1000; // 3 weeks
+      var newsCutoff = Date.now() - NEWS_MAX_AGE_MS;
+      items = items.filter(function(it){ return newsTime(it) >= newsCutoff; });
       if(!items.length){ showNewsLinks(p); return; }
 
+      // Compact relative "how stale" label from the real publish time.
+      function timeAgo(ms){
+        if(!ms) return '';
+        var s = Math.max(0, Math.floor((Date.now() - ms) / 1000));
+        if(s < 3600) return Math.max(1, Math.floor(s/60)) + 'm ago';
+        if(s < 86400) return Math.floor(s/3600) + 'h ago';
+        return Math.floor(s/86400) + 'd ago';
+      }
+
       var html = items.map(function(item){
+        var ago = timeAgo(newsTime(item));
+        var meta = (item.source||'') + (ago ? (item.source ? ' · ' : '') + ago : '');
         return '<div class="news-item" style="display:flex;gap:10px;align-items:flex-start;">'
           +(item.image?'<img src="'+item.image+'" alt="" decoding="async" style="width:44px;height:44px;border-radius:8px;object-fit:cover;flex-shrink:0;background:var(--bg2);" onerror="this.style.display=\'none\';">':'')
           +'<div style="flex:1;min-width:0;">'
           +(item.title?'<div class="news-item-title">'+item.title+'</div>':'')
-          +'<div class="news-item-meta">'+(item.source||'')+'</div>'
+          +(item.analysis?'<div class="news-item-analysis" style="font-size:12px;color:var(--ink2);line-height:1.45;margin-top:2px;">'+item.analysis+'</div>':'')
+          +'<div class="news-item-meta">'+meta+'</div>'
           +'</div></div>';
       }).join('');
       document.getElementById('news-body').innerHTML = html;
