@@ -3928,6 +3928,17 @@ function loadMyTeamLineupForWeek(drop, leagueId, season, seasonType, user, targe
 }
 
 function renderAll(){
+  // Don't paint any week-specific content until boot() has resolved the
+  // REAL current week. Several callers (the synchronous team-name render,
+  // and async member/standings-ready callbacks) can fire BEFORE boot
+  // finishes determining the week — that premature rendering is exactly
+  // what made the page visibly flash through Week 1/2 and a "season
+  // starting soon" state before landing on the real week. boot() sets
+  // weekDetermined=true and then calls renderAll() itself, so gating here
+  // simply defers the first paint until it's correct — one clean render,
+  // no flicker. Legitimate later re-renders all happen after this point.
+  if(!weekDetermined) return;
+
   // Head-to-head leagues use a completely separate render pipeline —
   // matchups + W-L standings instead of cumulative point totals.
   if(IS_H2H_LEAGUE){
