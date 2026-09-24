@@ -144,6 +144,22 @@ jobs:
           // Keyed by Sleeper player_id — the same id Sleeper news uses, so a
           // Sleeper match is exact. Also indexed by normalized name for the
           // name-based providers (RotoWire / FantasyPros).
+          async function getCurrentWeek() {
+            try { const m = await firebaseGet(`/leagues/fr_refresh26/season/${SEASON}/meta.json`); return (m && m.week) || 1; }
+            catch(e) { return 1; }
+          }
+          // The draftable set for the current week — the only players whose
+          // news the draft card ever shows. Scoping the sweep to these keeps it
+          // to a few hundred lookups instead of the whole 3,000+ pool.
+          async function salaryEligibleIds(week) {
+            const ids = [];
+            try {
+              const s = await firebaseGet(`/leagues/fr_refresh26/salaries/${SEASON}/week${week}.json`);
+              if (s && s.players) Object.values(s.players).forEach(p => { if (p && p.id) ids.push(String(p.id)); });
+            } catch(e) { /* no salaries yet */ }
+            return ids;
+          }
+
           async function loadPool() {
             const byId = {}, byName = {};
             try {
@@ -203,7 +219,10 @@ jobs:
                 playerName: null,
                 team: '',
                 title: meta.title || meta.headline || '',
-                analysis: meta.description || meta.analysis || meta.news || meta.body || '',
+                // Prefer the fantasy ANALYSIS (what it means for your lineup)
+                // over the dry factual description (the stat line). Confirmed
+                // live: Sleeper items carry both under metadata.
+                analysis: meta.analysis || meta.description || meta.news || meta.body || '',
                 link: meta.url || meta.link || '',
                 image: meta.image || '',
                 publishedMs,
@@ -222,7 +241,13 @@ jobs:
               const picked = wanted.map(n => pool.byName[n]).filter(Boolean).map(r => r.id);
               targets = (picked.length ? picked : ids.slice(0, 3)).slice(0, 3);
             } else {
-              targets = ids;
+              // Real run: only draftable players (this week's salary pool),
+              // intersected with the pool so we have valid Sleeper ids. Falls
+              // back to the whole pool only if no salaries exist yet.
+              const week = await getCurrentWeek();
+              const elig = (await salaryEligibleIds(week)).filter(id => pool.byId[id]);
+              targets = elig.length ? elig : ids;
+              console.log(`  Scope: ${elig.length ? elig.length + ' salary-eligible player(s) (week ' + week + ')' : 'FULL pool (no salaries found)'}.`);
             }
             console.log(`  Sleeper: querying news for ${targets.length} player(s)${opts.test ? ' (TEST sample of 3)' : ''}…`);
             const out = [];
