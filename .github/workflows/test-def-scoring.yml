@@ -1,0 +1,91 @@
+name: Test Defense Scoring (diagnostic, read-only)
+
+# Dumps the RAW Tank01 team-defense (DST) object for one team's game so we
+# can see exactly which field a special-teams return TD (punt/kick return)
+# lands in — the current scorer only reads `defTD`, and if Tank01 reports
+# ST return TDs under a different field, they're silently missed. Also
+# surfaces any blocked-kick field, and scans player lines for return TDs.
+# Writes NOTHING — safe to run anytime.
+
+on:
+  workflow_dispatch:
+    inputs:
+      week:
+        description: 'NFL week'
+        required: true
+        default: '3'
+      season:
+        description: 'Season'
+        required: true
+        default: '2026'
+      team:
+        description: 'Team abbreviation to inspect (the one that scored the return TD)'
+        required: true
+        default: 'MIN'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dump DST object for the team's game
+        env:
+          WK: ${{ inputs.week }}
+          SEASON: ${{ inputs.season }}
+          TEAM: ${{ inputs.team }}
+        run: |
+          node << 'SCRIPT'
+          const WORKER = 'https://fantasy-refresh-news.mtriedel.workers.dev';
+          const WK = (process.env.WK || '3').trim();
+          const SEASON = (process.env.SEASON || '2026').trim();
+          const TEAM = (process.env.TEAM || 'MIN').trim().toUpperCase();
+
+          async function getJson(url){
+            const r = await fetch(url, { headers: { 'User-Agent': 'fantasyrefresh' } });
+            const t = await r.text();
+            try { return JSON.parse(t); } catch(e){ throw new Error('non-JSON (HTTP '+r.status+'): ' + t.slice(0,200)); }
+          }
+
+          (async () => {
+            console.log(`=== Defense scoring probe | ${TEAM} | week ${WK} ${SEASON} ===`);
+
+            // 1) find the game id for TEAM this week
+            const scores = await getJson(`${WORKER}/scores?week=${WK}&season=${SEASON}`);
+            const games = (scores && scores.games) || [];
+            console.log(`Games this week: ${games.map(g => g.away+'@'+g.home).join(', ')}`);
+            const game = games.find(g => g.home === TEAM || g.away === TEAM);
+            if (!game) { console.log(`❌ No game found for ${TEAM} in week ${WK}. Try a different week.`); return; }
+            console.log(`Found game: ${game.away} @ ${game.home}  gameId=${game.gameId}`);
+
+            // 2) pull the box score
+            const bs = await getJson(`${WORKER}/score?gameId=${encodeURIComponent(game.gameId)}`);
+            const box = bs && bs.body ? bs.body : bs;
+
+            // 3) dump the DST object for both sides — this is what the scorer reads
+            const dst = box && box.DST;
+            if (!dst) { console.log('❌ No DST object on the box score. Top-level keys: ' + Object.keys(box||{}).join(', ')); }
+            else {
+              ['home','away'].forEach(side => {
+                const d = dst[side];
+                if (!d) { console.log(`  DST.${side}: (none)`); return; }
+                console.log(`\n── DST.${side} (${d.teamAbv || '?'}) — ALL FIELDS ──`);
+                Object.keys(d).sort().forEach(k => console.log(`    ${k} = ${JSON.stringify(d[k])}`));
+                // Highlight anything that looks like a touchdown or return field
+                const tdish = Object.keys(d).filter(k => /td|touchdown|return|kick|punt|block/i.test(k));
+                console.log(`  🔎 TD/return/block-looking fields: ${tdish.length ? tdish.join(', ') : '(none)'}`);
+                console.log(`  → scorer currently reads: defTD=${JSON.stringify(d.defTD)}, sacks=${JSON.stringify(d.sacks)}, blkKick=${JSON.stringify(d.blkKick)} (blkKick undefined = not provided under that name)`);
+              });
+            }
+
+            // 4) scan player stats for any return-TD fields, in case the ST TD
+            // is only recorded on the returner's own line, not the DST object.
+            const ps = (box && box.playerStats) || {};
+            const returners = [];
+            Object.values(ps).forEach(p => {
+              const hit = Object.keys(p).filter(k => /returntd|kickrettd|puntrettd|kr_td|pr_td|returntouchdown/i.test(k) && parseFloat(p[k])>0);
+              const teamMatch = (p.team === TEAM || p.teamAbv === TEAM);
+              if (hit.length && teamMatch) returners.push({ name: p.longName||p.playerName, fields: hit.map(k=>k+'='+p[k]) });
+            });
+            console.log(`\nPlayer-level return-TD fields for ${TEAM}: ${returners.length ? JSON.stringify(returners) : '(none found — likely only on the DST object)'}`);
+            console.log('\nDone. Paste the DST.'+ '(home/away) block for '+TEAM+' back so the mapping can be fixed exactly.');
+          })().catch(e => { console.error('Probe failed:', e.message); process.exit(1); });
+          SCRIPT
