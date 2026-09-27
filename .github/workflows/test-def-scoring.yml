@@ -76,16 +76,44 @@ jobs:
               });
             }
 
-            // 4) scan player stats for any return-TD fields, in case the ST TD
-            // is only recorded on the returner's own line, not the DST object.
-            const ps = (box && box.playerStats) || {};
-            const returners = [];
-            Object.values(ps).forEach(p => {
-              const hit = Object.keys(p).filter(k => /returntd|kickrettd|puntrettd|kr_td|pr_td|returntouchdown/i.test(k) && parseFloat(p[k])>0);
-              const teamMatch = (p.team === TEAM || p.teamAbv === TEAM);
-              if (hit.length && teamMatch) returners.push({ name: p.longName||p.playerName, fields: hit.map(k=>k+'='+p[k]) });
+            // 4) The DST object has no ST/return-TD field, so the punt-return
+            // TD must be recorded elsewhere. Dump the box score's structure to
+            // find it.
+            console.log('\n── BOX SCORE top-level keys ──');
+            console.log('  ' + Object.keys(box || {}).join(', '));
+
+            // 4a) scoring-plays list (most likely home of a punt-return TD)
+            const scoreKeys = Object.keys(box || {}).filter(k => /scor|play|touchdown|td/i.test(k));
+            console.log('\n── keys that look like scoring/plays ──');
+            console.log('  ' + (scoreKeys.length ? scoreKeys.join(', ') : '(none)'));
+            scoreKeys.forEach(k => {
+              const v = box[k];
+              const arr = Array.isArray(v) ? v : (v && typeof v === 'object' ? Object.values(v) : null);
+              if (!arr) { console.log(`\n  box.${k} = ${JSON.stringify(v).slice(0,300)}`); return; }
+              console.log(`\n── box.${k} — ${arr.length} entrie(s); showing keys of first + any TB/MIN or return/punt/kick items ──`);
+              if (arr[0]) console.log('    first entry keys: ' + Object.keys(arr[0]).join(', '));
+              arr.forEach(e => {
+                const s = JSON.stringify(e);
+                if (/td|touchdown|punt|kick|return/i.test(s)) console.log('    • ' + s.slice(0, 400));
+              });
             });
-            console.log(`\nPlayer-level return-TD fields for ${TEAM}: ${returners.length ? JSON.stringify(returners) : '(none found — likely only on the DST object)'}`);
-            console.log('\nDone. Paste the DST.'+ '(home/away) block for '+TEAM+' back so the mapping can be fixed exactly.');
+
+            // 4b) full key list of one MIN player line + any MIN player whose
+            // fields mention td/touchdown/return with a nonzero value
+            const ps = (box && box.playerStats) || {};
+            const minPlayers = Object.values(ps).filter(p => p.team === TEAM || p.teamAbv === TEAM);
+            if (minPlayers[0]) console.log(`\n── sample ${TEAM} player line keys ──\n    ` + Object.keys(minPlayers[0]).join(', '));
+            const tdHits = [];
+            minPlayers.forEach(p => {
+              Object.keys(p).forEach(k => {
+                if (/td|touchdown|return/i.test(k) && parseFloat(p[k]) > 0) tdHits.push((p.longName||p.playerName) + ': ' + k + '=' + p[k]);
+                // also nested objects (Kicking/Returning/Defense/etc.)
+                if (p[k] && typeof p[k] === 'object') {
+                  Object.keys(p[k]).forEach(kk => { if (/td|touchdown|return/i.test(kk) && parseFloat(p[k][kk]) > 0) tdHits.push((p.longName||p.playerName) + ': ' + k + '.' + kk + '=' + p[k][kk]); });
+                }
+              });
+            });
+            console.log(`\n── ${TEAM} player TD/return fields (nonzero) ──\n    ` + (tdHits.length ? tdHits.join('\n    ') : '(none)'));
+            console.log('\nDone. Paste this whole output back so the punt-return TD source can be mapped exactly.');
           })().catch(e => { console.error('Probe failed:', e.message); process.exit(1); });
           SCRIPT
