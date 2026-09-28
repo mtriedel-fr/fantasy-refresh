@@ -3738,21 +3738,45 @@ function renderCumCutLine(){
   var wrap = document.getElementById('cum-standings-wrap');
   if(!wrap) return;
   var key = FR.seasonKey();
+  var ctx = (typeof FRAuth !== 'undefined' && FRAuth.getLeagueCtx) ? FRAuth.getLeagueCtx() : null;
+  var lid = ctx ? ctx.leagueId : 'fr_refresh26';
+
+  // 1) Elimination status (who's still alive).
   if(!guillotineStatusCache[key]){
     wrap.innerHTML = '<div style="padding:20px;text-align:center;color:var(--ink3);font-family:var(--fd);font-size:12px;">Loading…</div>';
-    var ctx = (typeof FRAuth !== 'undefined' && FRAuth.getLeagueCtx) ? FRAuth.getLeagueCtx() : null;
-    var lid = ctx ? ctx.leagueId : 'fr_refresh26';
     FR.fb.get('/leagues/' + lid + '/guillotineStatus/' + key)
       .then(function(d){ guillotineStatusCache[key] = d || {teams:{}}; if(cumStandView === 'cutline') renderCumCutLine(); })
       .catch(function(){ guillotineStatusCache[key] = {teams:{}}; if(cumStandView === 'cutline') renderCumCutLine(); });
     return;
   }
+
+  // 2) Lineups + live game statuses for the current week — the same cache the
+  // standings "Left" column uses. This is what powers players-left and the
+  // "Elimination likely" (score-complete) flag; kick off the fetch if it
+  // isn't cached yet and re-render when it lands.
+  var wkKey = String(currentWeek);
+  if((!cumStandingsLineupsCache[wkKey] || !cumStandingsGameMapCache[wkKey]) && !cumStandingsPlayersLeftInFlight[wkKey]){
+    cumStandingsPlayersLeftInFlight[wkKey] = true;
+    Promise.all([
+      FR.fb.get('/leagues/' + lid + '/lineups/' + key + '/week' + wkKey).catch(function(){ return null; }),
+      fetchWeekSchedule(wkKey)
+    ]).then(function(res){
+      delete cumStandingsPlayersLeftInFlight[wkKey];
+      if(res[0]) cumStandingsLineupsCache[wkKey] = res[0];
+      if(res[1]) cumStandingsGameMapCache[wkKey] = res[1];
+      if(cumStandView === 'cutline') renderCumCutLine();
+    }).catch(function(){ delete cumStandingsPlayersLeftInFlight[wkKey]; });
+  }
+
   var gsTeams = (guillotineStatusCache[key] && guillotineStatusCache[key].teams) || {};
   var totalTeams = (seasonData['1'] || []).length || Object.keys(gsTeams).length;
   var schedule = buildElimSchedule(totalTeams, WEEKS);
   var survivors = Object.keys(gsTeams).filter(function(k){ return gsTeams[k] && gsTeams[k].status === 'alive'; })
     .map(function(k){ return memberNameByUid[k] || gsTeams[k].team || k; });
-  var html = buildCutLineSection(gsTeams, schedule, survivors, totalTeams);
+  var html = buildCutLineSection(gsTeams, schedule, survivors, {
+    lineups: cumStandingsLineupsCache[wkKey],
+    gameMap: cumStandingsGameMapCache[wkKey]
+  });
   wrap.innerHTML = html || '<div style="padding:24px;text-align:center;color:var(--ink3);font-family:var(--fd);font-size:13px;">The Cut Line isn’t available yet — it appears once eliminations begin.</div>';
 }
 
@@ -4293,7 +4317,7 @@ function pastSun3ET(){
     return wd==='Sun' && hr>=15;
   }catch(e){ return false; }
 }
-function buildCutLineSection(gsTeams, schedule, currentSurvivors, totalTeams){
+function buildCutLineSection(gsTeams, schedule, currentSurvivors, data){
   var wk = currentWeek;
   var sched = (schedule || []).find(function(s){ return s.week === wk; });
   if(!sched || sched.finale) return '';            // no cut line on the finale
@@ -4304,6 +4328,8 @@ function buildCutLineSection(gsTeams, schedule, currentSurvivors, totalTeams){
   var smallField = remaining <= 3 * cut;
 
   var wkEntries = seasonData[String(wk)] || [];
+  var lineups = (data && data.lineups) || null;
+  var gameMap = (data && data.gameMap) || null;
   var rows = [];
   Object.keys(gsTeams || {}).forEach(function(uid){
     var t = gsTeams[uid];
@@ -4311,9 +4337,14 @@ function buildCutLineSection(gsTeams, schedule, currentSurvivors, totalTeams){
     var name = memberNameByUid[uid] || t.team || uid;
     var e = wkEntries.find(function(x){ return (x.uid && x.uid === uid) || teamMatch(x.name, name); });
     var score = e ? (parseFloat(e.score) || 0) : 0;
-    var tr = e ? (e.timeRemaining || '') : '';
-    var live = !!(tr && tr !== '0' && tr !== '');
-    rows.push({ uid: uid, name: name, score: score, live: live, started: (score > 0 || live) });
+    // Real completion signal, same as the standings "Left" column: how many
+    // of the team's players still have a game left to finish. left === 0
+    // means the week is locked in — the only thing "Elimination likely"
+    // should trigger on.
+    var pl = lineups ? countPlayersLeft(lineups[uid], gameMap) : null; // {left,total} or null
+    var complete = !!(pl && pl.left === 0);
+    var started = (score > 0) || !!(pl && pl.left < pl.total);
+    rows.push({ uid: uid, name: name, score: score, pl: pl, complete: complete, started: started });
   });
   if(!rows.length) return '';
   rows.sort(function(a, b){ return a.score - b.score; });
@@ -4358,11 +4389,14 @@ function buildCutLineSection(gsTeams, schedule, currentSurvivors, totalTeams){
     var boardRows = list.map(function(r, i){
       var rank = i + 1;
       var inDanger = rank <= cut;
-      var status = r.live ? 'live' : (r.started ? 'final' : 'pre');
-      var doomed = inDanger && status === 'final';
+      var status = r.complete ? 'final' : (r.started ? 'live' : 'pre');
+      var doomed = inDanger && r.complete;
       var chip = status === 'final' ? '<span class="cl-chip final"><i class="cl-dot final"></i>Final</span>'
                : status === 'live' ? '<span class="cl-chip live"><i class="cl-dot live"></i>Live</span>'
                : '<span class="cl-chip pre"><i class="cl-dot pre"></i>Yet to play</span>';
+      // Players still to finish — the same X/Y the standings "Left" column
+      // shows. Only meaningful when we have the lineup data and some remain.
+      var leftChip = (r.pl && r.pl.left > 0) ? '<span class="cl-chip pre">⏳ ' + r.pl.left + '/' + r.pl.total + ' left</span>' : '';
       var doomBadge = doomed ? '<span class="cl-doombadge">💀 Elimination likely</span>' : '';
       var safetyHtml;
       if(doomed){ safetyHtml = '<div class="cl-safety need">💀 ' + Math.max(0, safeThresh - r.score).toFixed(1) + ' below · locked</div>'; }
@@ -4371,7 +4405,7 @@ function buildCutLineSection(gsTeams, schedule, currentSurvivors, totalTeams){
       var block = '<div class="cl-row ' + (inDanger ? 'danger' : 'safe') + (doomed ? ' doomed' : '') + '" id="clrow-' + r.uid + '">'
         + '<div class="cl-rowhead" onclick="guillCutToggleRow(this,\'' + r.uid + '\')">'
         + '<div class="cl-rank">' + rank + '</div>'
-        + '<div style="min-width:0"><div class="cl-name">' + escapeHtmlFR(r.name) + '</div><div class="cl-meta">' + chip + doomBadge + '</div></div>'
+        + '<div style="min-width:0"><div class="cl-name">' + escapeHtmlFR(r.name) + '</div><div class="cl-meta">' + chip + leftChip + doomBadge + '</div></div>'
         + '<div><div class="cl-pts">' + r.score.toFixed(1) + '</div>' + safetyHtml + '</div>'
         + '<div class="cl-chev">▸</div>'
         + '</div>'
