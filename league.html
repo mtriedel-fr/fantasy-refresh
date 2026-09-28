@@ -214,7 +214,8 @@ tr:hover td{background:var(--or4);}
 .lineup-card-status-col{flex-shrink:0;width:96px;text-align:center;}
 .lineup-card-footer{display:flex;align-items:center;gap:8px;flex-shrink:0;}
 .lineup-card-mid{flex:1;min-width:0;}
-.lineup-card-name{font-family:var(--fd);font-size:17px;font-weight:700;color:var(--ink);display:flex;align-items:center;gap:6px;}
+.lineup-card-name{font-family:var(--fd);font-size:17px;font-weight:700;color:var(--ink);display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.lineup-card-salary{font-family:var(--fd);font-size:11.5px;font-weight:800;color:var(--or);background:rgba(0,229,212,.1);border:1px solid rgba(0,229,212,.25);border-radius:5px;padding:0 6px;letter-spacing:.3px;line-height:1.5;}
 .lineup-card-game{font-size:12.5px;color:var(--ink3);margin-top:2px;}
 .lineup-card-game.live{display:inline-block;background:#5DCAA5;color:#04342C;font-weight:800;padding:2px 8px;border-radius:20px;}
 .lineup-card-game.final{display:inline-block;background:#FF1A6E;color:#4B1528;font-weight:800;padding:2px 8px;border-radius:20px;}
@@ -2544,6 +2545,13 @@ function buildLineupPlayerCard(p, pts, hasStarted, gameMap, showNotStartedTag, s
   // so appending it again would just repeat itself.
   var teamTag = (p.team && p.pos !== 'DEF') ? ' - ' + escapeHtmlFR(p.team) : '';
 
+  // Drafted salary — a fixed, non-hidden value stored on the lineup slot
+  // (same snapshot rosterColumn sums for the budget line). Shown as a small
+  // chip on the name line so people can see what each player cost.
+  var salaryTag = (p.salary && Number(p.salary) > 0)
+    ? '<span class="lineup-card-salary">$' + Number(p.salary).toLocaleString() + '</span>'
+    : '';
+
   // Status tag — only shown when it actually conveys something:
   //   Live (PMR)   → game in progress, shows quarter + clock
   //   Final        → game over
@@ -2603,7 +2611,7 @@ function buildLineupPlayerCard(p, pts, hasStarted, gameMap, showNotStartedTag, s
   return '<div class="lineup-card' + (hasStarted ? ' started' : '') + '"' + cardClick + '>'
     + lineupPhotoOrBadge(p, posBadgeHtml)
     + '<div class="lineup-card-mid">'
-    +   '<div class="lineup-card-name">' + escapeHtmlFR(p.name || '') + (p.pos ? ' · ' + escapeHtmlFR(p.pos) : '') + teamTag + '</div>'
+    +   '<div class="lineup-card-name">' + escapeHtmlFR(p.name || '') + (p.pos ? ' · ' + escapeHtmlFR(p.pos) : '') + teamTag + salaryTag + '</div>'
     +   gameLine
     + '</div>'
     + '<div class="lineup-card-pts-stack">'
