@@ -793,6 +793,52 @@ body{padding-bottom:calc(76px + env(safe-area-inset-bottom));}
 
 /* ── GUILLOTINE ── */
 .guill-wrap{padding:20px 24px;display:flex;flex-direction:column;gap:20px;}
+/* Cut Line — Last One Standing bubble board */
+.cl-wrap{display:flex;flex-direction:column;gap:10px;}
+.cl-explainer{position:relative;padding-right:32px;}
+.cl-sub{font-size:12.5px;color:var(--ink2);line-height:1.5;margin:0;}
+.cl-x{position:absolute;top:-2px;right:0;width:24px;height:24px;border-radius:7px;border:1px solid var(--bdr2);background:var(--bg2);color:var(--ink3);font-size:15px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;}
+.cl-x:hover{color:var(--pk);border-color:var(--pk);}
+.cl-reopen{font-family:var(--fd);font-size:11.5px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:var(--or);background:none;border:none;padding:6px 0 0;cursor:pointer;}
+.cl-note{font-family:var(--fd);font-size:12px;font-weight:700;color:var(--ink2);}
+.cl-note b{color:var(--pk);}
+.cl-toggle{display:inline-flex;background:var(--bg2);border:1px solid var(--bdr2);border-radius:10px;padding:3px;gap:2px;align-self:flex-start;}
+.cl-toggle button{font-family:var(--fd);font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;padding:6px 12px;border:none;background:none;color:var(--ink3);border-radius:7px;cursor:pointer;}
+.cl-toggle button.on{background:linear-gradient(135deg,var(--or),var(--pk));color:#050808;}
+.cl-legend{display:flex;gap:12px;flex-wrap:wrap;font-family:var(--fd);font-size:11px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;color:var(--ink3);}
+.cl-legend span{display:inline-flex;align-items:center;gap:5px;}
+.cl-dot{width:8px;height:8px;border-radius:50%;display:inline-block;}
+.cl-dot.final{background:#69BE28;} .cl-dot.live{background:#FF9A3A;} .cl-dot.pre{background:var(--ink3);}
+.cl-board{display:flex;flex-direction:column;gap:7px;}
+.cl-row{background:var(--bg2);border:1px solid var(--bdr);border-left:4px solid var(--bdr2);border-radius:11px;overflow:hidden;}
+.cl-row.danger{border-left-color:var(--pk);background:linear-gradient(180deg,rgba(255,95,160,.08),transparent);}
+.cl-row.safe{border-left-color:#69BE28;}
+.cl-row.doomed{border-left-color:var(--pk);box-shadow:inset 0 0 0 1px rgba(255,95,160,.5);background:linear-gradient(180deg,rgba(255,95,160,.16),transparent);}
+.cl-row.doomed .cl-name{opacity:.72;}
+.cl-rowhead{display:grid;grid-template-columns:30px 1fr auto 20px;align-items:center;gap:10px;padding:11px 13px;cursor:pointer;}
+.cl-rank{font-family:var(--fd);font-weight:900;font-size:18px;color:var(--ink3);text-align:center;font-variant-numeric:tabular-nums;}
+.cl-row.danger .cl-rank{color:var(--pk);}
+.cl-name{font-family:var(--fd);font-weight:800;font-size:15px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cl-meta{display:flex;align-items:center;gap:6px;margin-top:3px;flex-wrap:wrap;}
+.cl-chip{font-family:var(--fd);font-size:10px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;padding:2px 7px;border-radius:20px;display:inline-flex;align-items:center;gap:4px;}
+.cl-chip.final{color:#69BE28;background:rgba(105,190,40,.14);}
+.cl-chip.live{color:#FF9A3A;background:rgba(255,154,58,.14);}
+.cl-chip.pre{color:var(--ink3);background:var(--bg3);}
+.cl-doombadge{font-family:var(--fd);font-size:10px;font-weight:900;letter-spacing:.4px;text-transform:uppercase;color:#fff;background:var(--pk);padding:2px 8px;border-radius:20px;}
+.cl-pts{font-family:var(--fd);font-weight:900;font-size:19px;color:var(--ink);font-variant-numeric:tabular-nums;text-align:right;line-height:1;}
+.cl-safety{font-family:var(--fd);font-size:11px;font-weight:700;margin-top:3px;white-space:nowrap;text-align:right;}
+.cl-safety.need{color:var(--pk);} .cl-safety.cushion{color:var(--or);}
+.cl-chev{color:var(--ink3);font-size:13px;text-align:center;transition:transform .2s;}
+.cl-row.open .cl-chev{transform:rotate(90deg);}
+.cl-cut{display:flex;align-items:center;gap:10px;margin:3px 2px;}
+.cl-cut .lbl{font-family:var(--fd);font-size:11px;font-weight:900;letter-spacing:1.2px;text-transform:uppercase;color:var(--pk);}
+.cl-cut .bar{flex:1;height:2px;background:repeating-linear-gradient(90deg,var(--pk) 0 9px,transparent 9px 16px);opacity:.8;}
+.cl-roster{border-top:1px solid var(--bdr);background:var(--bg3);}
+.cl-notecard{text-align:center;background:var(--bg2);border:1px solid var(--bdr);border-radius:14px;padding:32px 20px;}
+.cl-notecard .ic{font-size:40px;margin-bottom:8px;}
+.cl-notecard .nt{font-family:var(--fd);font-size:20px;font-weight:900;text-transform:uppercase;letter-spacing:.4px;color:var(--ink);margin-bottom:8px;}
+.cl-notecard .ns{font-size:13px;color:var(--ink2);line-height:1.5;max-width:40ch;margin:0 auto;}
+.cl-notecard .kick{margin-top:14px;display:inline-block;font-family:var(--fd);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:#FF9A3A;border:1px solid rgba(255,154,58,.4);border-radius:20px;padding:4px 11px;}
 .guill-hero{background:linear-gradient(135deg,var(--hdr) 0%,var(--hdr2) 100%);border-radius:14px;padding:20px 24px;border-top:3px solid var(--or);border-bottom:3px solid var(--pk);display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1px;background-blend-mode:normal;}
 .guill-stat{background:rgba(0,0,0,.3);padding:14px 16px;text-align:center;border-radius:8px;}
 .guill-stat-lbl{font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;min-height:26px;display:flex;align-items:flex-end;justify-content:center;line-height:1.3;}
@@ -4176,6 +4222,146 @@ function guillToggleWeek(w){
   if(acc) acc.classList.toggle('open', !!guillWeekOpen[w]);
 }
 
+// ── CUT LINE (Last One Standing bubble board) ──────────────────────
+// Built from the same data the guillotine tab already has: survivors from
+// gsTeams, this-week scores + timeRemaining from seasonData, and the cut
+// count straight from buildElimSchedule (so it always matches the posted
+// elimination schedule). Adapts to field size — a big field shows the
+// closest 10 (gated until the noon games produce real scores so it's never
+// ten 0.00s); once the field is small (≤ 3× the week's cut), it shows every
+// remaining team from the first kickoff.
+var guillCutView = 'cut'; // 'cut' | 'all' (big field only)
+// Hard-latest unlock for a big field: 3:00 PM ET Sunday, by which the early
+// slate is done. Before that, the board only fires if scores are already in.
+function pastSun3ET(){
+  try{
+    var parts = new Intl.DateTimeFormat('en-US',{ timeZone:'America/New_York', weekday:'short', hour:'2-digit', hour12:false }).formatToParts(new Date());
+    var wd='', hr=0;
+    parts.forEach(function(p){ if(p.type==='weekday') wd=p.value; else if(p.type==='hour') hr=parseInt(p.value,10); });
+    return wd==='Sun' && hr>=15;
+  }catch(e){ return false; }
+}
+function buildCutLineSection(gsTeams, schedule, currentSurvivors, totalTeams){
+  var wk = currentWeek;
+  var sched = (schedule || []).find(function(s){ return s.week === wk; });
+  if(!sched || sched.finale) return '';            // no cut line on the finale
+  var cut = sched.eliminate;
+  if(!cut) return '';
+  var remaining = (currentSurvivors || []).length;
+  if(remaining <= cut) return '';                   // fewer teams left than the cut
+  var smallField = remaining <= 3 * cut;
+
+  var wkEntries = seasonData[String(wk)] || [];
+  var rows = [];
+  Object.keys(gsTeams || {}).forEach(function(uid){
+    var t = gsTeams[uid];
+    if(!t || t.status !== 'alive') return;
+    var name = memberNameByUid[uid] || t.team || uid;
+    var e = wkEntries.find(function(x){ return (x.uid && x.uid === uid) || teamMatch(x.name, name); });
+    var score = e ? (parseFloat(e.score) || 0) : 0;
+    var tr = e ? (e.timeRemaining || '') : '';
+    var live = !!(tr && tr !== '0' && tr !== '');
+    rows.push({ uid: uid, name: name, score: score, live: live, started: (score > 0 || live) });
+  });
+  if(!rows.length) return '';
+  rows.sort(function(a, b){ return a.score - b.score; });
+
+  var startedCount = rows.filter(function(r){ return r.started; }).length;
+  var zeroCount = rows.filter(function(r){ return !(r.score > 0); }).length;
+  // Big field: never show a board whose bottom is all zeros. Fire once fewer
+  // teams are still scoreless than the week's cut number (so the danger zone
+  // holds real scores) — or at 3:00 PM ET Sunday at the latest. Small field
+  // shows from the first kickoff.
+  var ready = smallField ? (startedCount >= 1) : (zeroCount < cut || pastSun3ET());
+
+  var expDismissed = false; try{ expDismissed = localStorage.getItem('fr_cutline_exp') === '1'; }catch(e){}
+  var explainer = '<div class="cl-explainer" id="cl-explainer"' + (expDismissed ? ' hidden' : '') + '>'
+    + '<button class="cl-x" onclick="guillCutCloseExp()" aria-label="Hide">×</button>'
+    + '<p class="cl-sub">The teams closest to the cut, lowest score first' + (smallField ? ' — everyone still standing' : '') + '. Each danger team shows how many points it needs to climb to safety; teams finished below the line are flagged as all but gone.</p>'
+    + '</div>'
+    + '<button class="cl-reopen" id="cl-reopen" onclick="guillCutOpenExp()"' + (expDismissed ? '' : ' hidden') + '>ⓘ What is the Cut Line?</button>';
+
+  var cutnote = '<div class="cl-note">🪓 Cutting <b>' + cut + '</b> of <b>' + remaining + '</b> this week'
+    + (smallField ? ' · full field shown' : ' · showing the 10 nearest the cut') + '</div>';
+
+  var toggle = smallField ? '' :
+    '<div class="cl-toggle">'
+    + '<button class="' + (guillCutView === 'cut' ? 'on' : '') + '" onclick="guillCutSetView(\'cut\')">🪓 Cut Line</button>'
+    + '<button class="' + (guillCutView === 'all' ? 'on' : '') + '" onclick="guillCutSetView(\'all\')">All Remaining</button>'
+    + '</div>';
+
+  var body, legend = '<div class="cl-legend"><span><i class="cl-dot final"></i>Complete</span><span><i class="cl-dot live"></i>Live</span><span><i class="cl-dot pre"></i>Yet to play</span></div>';
+  if(!ready){
+    legend = '';
+    body = '<div class="cl-notecard"><div class="ic">🕛</div>'
+      + '<div class="nt">Come back after the noon games</div>'
+      + '<div class="ns">With ' + remaining + ' teams still in, almost everyone is near zero until the afternoon scores roll in — so there’s nothing meaningful to rank yet.</div>'
+      + '</div>';
+  } else {
+    var showAll = smallField || guillCutView === 'all';
+    var list = showAll ? rows : rows.slice(0, 10);
+    var safeThresh = rows[cut] ? rows[cut].score : rows[rows.length - 1].score;
+    var dangerTop = rows[cut - 1] ? rows[cut - 1].score : 0;
+    var showCut = (guillCutView === 'cut' || smallField);
+    var boardRows = list.map(function(r, i){
+      var rank = i + 1;
+      var inDanger = rank <= cut;
+      var status = r.live ? 'live' : (r.started ? 'final' : 'pre');
+      var doomed = inDanger && status === 'final';
+      var chip = status === 'final' ? '<span class="cl-chip final"><i class="cl-dot final"></i>Final</span>'
+               : status === 'live' ? '<span class="cl-chip live"><i class="cl-dot live"></i>Live</span>'
+               : '<span class="cl-chip pre"><i class="cl-dot pre"></i>Yet to play</span>';
+      var doomBadge = doomed ? '<span class="cl-doombadge">💀 Elimination likely</span>' : '';
+      var safetyHtml;
+      if(doomed){ safetyHtml = '<div class="cl-safety need">💀 ' + Math.max(0, safeThresh - r.score).toFixed(1) + ' below · locked</div>'; }
+      else if(inDanger){ safetyHtml = '<div class="cl-safety need">▲ ' + Math.max(0, safeThresh - r.score).toFixed(1) + ' to safety</div>'; }
+      else { safetyHtml = '<div class="cl-safety cushion">+' + (r.score - dangerTop).toFixed(1) + ' cushion</div>'; }
+      var block = '<div class="cl-row ' + (inDanger ? 'danger' : 'safe') + (doomed ? ' doomed' : '') + '" id="clrow-' + r.uid + '">'
+        + '<div class="cl-rowhead" onclick="guillCutToggleRow(this,\'' + r.uid + '\')">'
+        + '<div class="cl-rank">' + rank + '</div>'
+        + '<div style="min-width:0"><div class="cl-name">' + escapeHtmlFR(r.name) + '</div><div class="cl-meta">' + chip + doomBadge + '</div></div>'
+        + '<div><div class="cl-pts">' + r.score.toFixed(1) + '</div>' + safetyHtml + '</div>'
+        + '<div class="cl-chev">▸</div>'
+        + '</div>'
+        + '<div class="cl-roster" id="clros-' + r.uid + '" hidden></div>'
+        + '</div>';
+      if(showCut && rank === cut){ block += '<div class="cl-cut"><span class="lbl">🪓 Cut Line</span><span class="bar"></span></div>'; }
+      return block;
+    }).join('');
+    body = '<div class="cl-board">' + boardRows + '</div>';
+  }
+
+  return '<div class="guill-section"><div class="guill-section-hdr" style="color:var(--pk)">🪓 The Cut Line — Week ' + wk + '</div>'
+    + '<div style="padding:14px 18px;"><div class="cl-wrap">' + explainer + cutnote + toggle + legend + body + '</div></div></div>';
+}
+
+window.guillCutSetView = function(v){ guillCutView = v; renderGuillotine(); };
+window.guillCutCloseExp = function(){ try{ localStorage.setItem('fr_cutline_exp','1'); }catch(e){} var e=document.getElementById('cl-explainer'), r=document.getElementById('cl-reopen'); if(e) e.hidden=true; if(r) r.hidden=false; };
+window.guillCutOpenExp = function(){ try{ localStorage.removeItem('fr_cutline_exp'); }catch(e){} var e=document.getElementById('cl-explainer'), r=document.getElementById('cl-reopen'); if(e) e.hidden=false; if(r) r.hidden=true; };
+// Lazy-load a survivor's roster into the chevron, reusing the same lineup +
+// game-status rendering the standings roster reveal uses.
+window.guillCutToggleRow = function(headEl, uid){
+  var row = headEl.parentElement;
+  var ros = document.getElementById('clros-' + uid);
+  if(!ros) return;
+  if(!ros.hidden){ ros.hidden = true; row.classList.remove('open'); return; }
+  ros.hidden = false; row.classList.add('open');
+  if(ros.dataset.loaded) return;
+  ros.innerHTML = '<div style="padding:10px 13px;font-family:var(--fd);font-size:12px;color:var(--ink3);">Loading…</div>';
+  var ctx = FRAuth.getLeagueCtx();
+  var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
+  var season = FR.seasonKey();
+  Promise.all([
+    FR.fb.get('/leagues/' + leagueId + '/lineups/' + season + '/week' + currentWeek + '/' + uid).catch(function(){ return null; }),
+    FR.fb.get('/leagues/' + leagueId + '/season/' + season + '/' + currentWeek + '/' + uid).catch(function(){ return null; }),
+    FR.fb.get('/leagues/' + leagueId + '/locks/' + season + '/week' + currentWeek).catch(function(){ return {}; }),
+    fetchWeekSchedule(currentWeek).catch(function(){ return {}; })
+  ]).then(function(res){
+    ros.innerHTML = rosterColumn(res[0], res[1], res[2] || {}, false, res[3] || {});
+    ros.dataset.loaded = '1';
+  }).catch(function(){ ros.innerHTML = '<div style="padding:10px 13px;font-family:var(--fd);font-size:12px;color:var(--ink3);">Couldn’t load this roster.</div>'; });
+};
+
 function renderGuillotine(){
   var el = document.getElementById('wg');
   if(!el) return;
@@ -4555,6 +4741,7 @@ function renderGuillotine(){
 
   el.innerHTML = '<div class="guill-wrap">'
     + heroHTML
+    + buildCutLineSection(gsTeams, schedule, currentSurvivors, totalTeams)
     + progressHTML
     + fullScheduleHTML
     + (winnersHTML || '')
