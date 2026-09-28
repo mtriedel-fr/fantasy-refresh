@@ -9112,13 +9112,29 @@ function updateChatUnreadBadge(){
 
 var chatUnreadCount = 0;
 
+// Chat is pinned to a known node under the league rather than routed through
+// an FR.paths.chat() helper — an older deployed league-context.js may not
+// define that helper, in which case calling it throws and silently breaks
+// BOTH sending and loading for everyone (commissioner included). This path
+// lives under leagues/$leagueId, where the commissioner/creator rule already
+// permits writes and the per-message chat rule lets any signed-in member post.
+function chatBasePath(){
+  var ctx = (typeof FRAuth !== 'undefined' && FRAuth.getLeagueCtx) ? FRAuth.getLeagueCtx() : null;
+  var leagueId = (ctx && ctx.leagueId) ? ctx.leagueId : 'fr_refresh26';
+  return '/leagues/' + leagueId + '/chat';
+}
+function chatReadUrl(){
+  var base = (typeof FR !== 'undefined' && FR.FB_DB_URL) ? FR.FB_DB_URL : '';
+  return base + chatBasePath() + '.json';
+}
+
 function loadChatMessages(){
   // Only pull the most recent messages, not the entire (ever-growing) feed.
   // Chat keys are timestamp-prefixed, so native $key order is chronological
   // and limitToLast returns the newest N. This turns a poll that used to
   // re-download the whole chat history every 20s into a small bounded read,
   // while renderChatFeed's sort + unread-count logic still work unchanged.
-  var url = FR.paths.url(FR.paths.chat());
+  var url = chatReadUrl();
   url += (url.indexOf('?') >= 0 ? '&' : '?') + 'orderBy=' + encodeURIComponent('"$key"') + '&limitToLast=50';
   fetch(url)
     .then(function(r){ return r.json(); })
@@ -9267,11 +9283,14 @@ function sendGifMessage(gifId){
   if(!gifUrl){ showToast('Could not load that GIF — pick another', true); return; }
 
   closeGifSearch();
-  FR.fb.put(FR.paths.chat() + '/' + key, { uid: user.uid, team: teamName, gifUrl: gifUrl, ts: now })
+  FR.fb.put(chatBasePath() + '/' + key, { uid: user.uid, team: teamName, gifUrl: gifUrl, ts: now })
     .then(function(){ loadChatMessages(); })
     .catch(function(err){
       console.error('[FR] GIF send failed:', err);
-      showToast('Could not send — try again', true);
+      var msg = String((err && (err.message || err.code)) || '');
+      showToast(/permission|denied|401|403/i.test(msg)
+        ? 'Chat is locked — the commissioner needs to deploy the chat rules.'
+        : 'Could not send — try again', true);
     });
 }
 
@@ -9295,14 +9314,17 @@ function sendChatMessage(){
   // no need for a server-side push ID for a single-league chat feed.
   var key = now + '_' + Math.random().toString(36).slice(2, 8);
 
-  FR.fb.put(FR.paths.chat() + '/' + key, { uid: user.uid, team: teamName, text: text, ts: now })
+  FR.fb.put(chatBasePath() + '/' + key, { uid: user.uid, team: teamName, text: text, ts: now })
     .then(function(){
       input.value = '';
       loadChatMessages();
     })
     .catch(function(err){
       console.error('[FR] Chat send failed:', err);
-      showToast('Could not send — try again', true);
+      var msg = String((err && (err.message || err.code)) || '');
+      showToast(/permission|denied|401|403/i.test(msg)
+        ? 'Chat is locked — the commissioner needs to deploy the chat rules.'
+        : 'Could not send — try again', true);
     })
     .then(function(){
       btn.disabled = false;
@@ -9313,7 +9335,7 @@ function sendChatMessage(){
 
 function deleteChatMessage(key){
   if(!confirm('Delete this message?')) return;
-  FR.fb.delete(FR.paths.chat() + '/' + key)
+  FR.fb.delete(chatBasePath() + '/' + key)
     .then(function(){ loadChatMessages(); })
     .catch(function(){ showToast('Could not delete', true); });
 }
