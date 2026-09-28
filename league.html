@@ -805,6 +805,11 @@ body{padding-bottom:calc(76px + env(safe-area-inset-bottom));}
 .cl-toggle{display:inline-flex;background:var(--bg2);border:1px solid var(--bdr2);border-radius:10px;padding:3px;gap:2px;align-self:flex-start;}
 .cl-toggle button{font-family:var(--fd);font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;padding:6px 12px;border:none;background:none;color:var(--ink3);border-radius:7px;cursor:pointer;}
 .cl-toggle button.on{background:linear-gradient(135deg,var(--or),var(--pk));color:#050808;}
+/* Landing Standings⇄Cut Line control — a single full-width segmented switch.
+   Scoped by #id so the in-board .cl-toggle (Cut Line / All Remaining) is unaffected. */
+#cum-view-toggle{display:flex;width:100%;gap:0;padding:4px;background:var(--bg2);border:1px solid var(--bdr2);border-radius:12px;align-self:stretch;}
+#cum-view-toggle button{flex:1 1 0;justify-content:center;text-align:center;padding:9px 12px;border-radius:9px;color:var(--ink3);transition:background .18s ease,color .18s ease;}
+#cum-view-toggle button.on{background:linear-gradient(135deg,var(--or),var(--pk));color:#050808;box-shadow:0 1px 6px rgba(0,0,0,.28);}
 .cl-legend{display:flex;gap:12px;flex-wrap:wrap;font-family:var(--fd);font-size:11px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;color:var(--ink3);}
 .cl-legend span{display:inline-flex;align-items:center;gap:5px;}
 .cl-dot{width:8px;height:8px;border-radius:50%;display:inline-block;}
@@ -3811,10 +3816,7 @@ function renderCumStandingsPage(page){
       .catch(function(){ guillotineStatusCache[losGsKey] = {teams:{}}; });
   }
   var losMatch = getEliminatedMatcher();
-  var losElimCount = losMatch.count;
-  var all = (losFilterOn && losElimCount)
-    ? allRaw.filter(function(t){ return !losMatch.isElim(t); })
-    : allRaw;
+  var all = allRaw;
 
   var perPage = 10;
   var totalPages = Math.ceil(all.length / perPage);
@@ -3831,7 +3833,7 @@ function renderCumStandingsPage(page){
     var isMe = myTeam && teamMatch(t.name, myTeam);
     // Eliminated from Last One Standing (by uid). Only marked in the
     // unfiltered view — when survivors-only is on, no eliminated rows remain.
-    var isElim = !losFilterOn && losMatch.isElim(t);
+    var isElim = losMatch.isElim(t);
     var outBadge = isElim ? ' <span style="vertical-align:middle;" title="Eliminated from Last One Standing">☠️</span>' : '';
     var rosterId = 'cum-home-roster-' + page + '-' + i;
     var expandBtn = (t.uid && !t.notSubmitted)
@@ -3854,16 +3856,10 @@ function renderCumStandingsPage(page){
       + '<tr id="' + rosterId + '" style="display:none;"><td colspan="4" style="padding:0;background:var(--bg2);"></td></tr>';
   }).join('');
 
-  // Last One Standing toggle — only shown once teams have actually been
-  // eliminated. Lets survivors hide eliminated teams and see just the field
-  // they're still competing against this week.
-  var losBar = (losElimCount > 0)
-    ? '<div style="padding:10px 12px;margin-bottom:8px;background:var(--bg2);border:1px solid var(--bdr);border-radius:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
-      + '<button onclick="toggleLosFilter()" style="font-family:var(--fd);font-size:11px;font-weight:800;padding:6px 12px;border-radius:20px;border:1.5px solid var(--pk);background:' + (losFilterOn ? 'var(--pk)' : 'rgba(232,51,122,.1)') + ';color:' + (losFilterOn ? '#fff' : 'var(--pk)') + ';cursor:pointer;text-transform:uppercase;letter-spacing:.5px;">☠️ ' + (losFilterOn ? 'Survivors only ✓' : 'Last One Standing') + '</button>'
-      + '<span style="font-family:var(--fd);font-size:10px;color:var(--ink3);letter-spacing:.3px;">' + (losFilterOn ? all.length + ' still alive' : losElimCount + ' eliminated — tap to hide them') + '</span>'
-      + '</div>'
-    : '';
-  wrap.innerHTML = losBar + '<table class="st-table"><thead><tr><th class="rk">#</th><th>Team</th><th style="text-align:center;">Left</th><th style="text-align:right;">Score</th></tr></thead><tbody>' + rows + '</tbody></table>';
+  // The old "Last One Standing" survivors-only filter pill was removed here —
+  // the Cut Line view (Standings⇄Cut Line toggle above) now covers seeing the
+  // live guillotine field. Eliminated teams are still marked with ☠️ inline.
+  wrap.innerHTML = '<table class="st-table"><thead><tr><th class="rk">#</th><th>Team</th><th style="text-align:center;">Left</th><th style="text-align:right;">Score</th></tr></thead><tbody>' + rows + '</tbody></table>';
 
   // Background-load the data needed for the "Left" column — never
   // blocks the table above from showing immediately. Cached per week
@@ -7728,7 +7724,6 @@ var guillRecapEmbedCache = {}; // "season:week" -> rendered recap HTML string, f
 // Lets a surviving team see the standings with eliminated teams hidden,
 // so they can see exactly who they're trying to stay ahead of. Reads the
 // same persisted guillotine status the Last One Standing page uses.
-var losFilterOn = false;
 // Build a matcher for eliminated teams that works with BOTH status formats:
 // the new uid-keyed one (from the recompute) and the older name-keyed one
 // (no uid field), so the marker/filter work now and after the status is
@@ -7756,7 +7751,6 @@ function getEliminatedMatcher(){
     }
   };
 }
-function toggleLosFilter(){ losFilterOn = !losFilterOn; renderCumStandingsPage(0); }
 var weekLineupsCache = {}; // week -> {uid: {slots: {...}}, ...} — real lineup data, fetched separately since score entries never actually carry a lineup field (see below)
 var weekScoresCache = {}; // week -> {uid: {score, slotPts: {slotId: points}, ...}, ...} — real, per-slot scoring data, fetched separately from lineups since the lineup itself only has player identity, not points
 var weekLocksCache = {}; // week -> {team: true, ...} — which teams have locked (kicked off), used to gate player identity in Roster/Most Started until their game has actually started
