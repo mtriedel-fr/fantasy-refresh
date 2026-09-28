@@ -1153,6 +1153,10 @@ setTimeout(function(){
         <button onclick="openRecap()" style="font-family:var(--fd);font-size:11px;font-weight:800;padding:6px 12px;border-radius:20px;border:1.5px solid var(--or);background:rgba(0,229,212,.1);color:var(--or);cursor:pointer;">📰 Weekly Review</button>
       </div>
     </div>
+    <div id="cum-view-toggle" class="cl-toggle" style="margin:0 0 12px;display:none;">
+      <button id="cum-view-standings" class="on" onclick="setCumStandView('standings')">🏆 Standings</button>
+      <button id="cum-view-cutline" onclick="setCumStandView('cutline')">🪓 Cut Line</button>
+    </div>
     <div id="cum-standings-wrap"></div>
     <div id="cum-standings-pager" style="display:flex;gap:6px;justify-content:center;margin-top:12px;flex-wrap:wrap;"></div>
   </div>
@@ -3392,6 +3396,13 @@ function renderCumHome(){
   if(IS_H2H_LEAGUE){ home.classList.add('hidden'); return; }
   home.classList.remove('hidden');
 
+  // Cut Line toggle above the standings — only for Last One Standing leagues.
+  var cumViewToggle = document.getElementById('cum-view-toggle');
+  if(cumViewToggle){
+    var lctx = (typeof FRAuth !== 'undefined' && FRAuth.getLeagueCtx) ? FRAuth.getLeagueCtx() : null;
+    cumViewToggle.style.display = (lctx && lctx.guillotine) ? '' : 'none';
+  }
+
   updateMyTeamLabelsForCumulative();
 
   // Lineup + standings already live permanently on the landing page above
@@ -3711,10 +3722,51 @@ function countPlayersLeft(lineup, gameMap){
   return { left: left, total: slots.length };
 }
 
+// Landing-page standings view: 'standings' (the table) or 'cutline' (the
+// Last One Standing bubble board). The toggle above the standings flips it.
+var cumStandView = 'standings';
+function setCumStandView(v){
+  cumStandView = v;
+  var s = document.getElementById('cum-view-standings'), c = document.getElementById('cum-view-cutline');
+  if(s) s.classList.toggle('on', v === 'standings');
+  if(c) c.classList.toggle('on', v === 'cutline');
+  renderCumStandingsPage(0);
+}
+// Renders the Cut Line board into the standings container, reusing the shared
+// builder. Loads guillotine status first if it isn't cached yet.
+function renderCumCutLine(){
+  var wrap = document.getElementById('cum-standings-wrap');
+  if(!wrap) return;
+  var key = FR.seasonKey();
+  if(!guillotineStatusCache[key]){
+    wrap.innerHTML = '<div style="padding:20px;text-align:center;color:var(--ink3);font-family:var(--fd);font-size:12px;">Loading…</div>';
+    var ctx = (typeof FRAuth !== 'undefined' && FRAuth.getLeagueCtx) ? FRAuth.getLeagueCtx() : null;
+    var lid = ctx ? ctx.leagueId : 'fr_refresh26';
+    FR.fb.get('/leagues/' + lid + '/guillotineStatus/' + key)
+      .then(function(d){ guillotineStatusCache[key] = d || {teams:{}}; if(cumStandView === 'cutline') renderCumCutLine(); })
+      .catch(function(){ guillotineStatusCache[key] = {teams:{}}; if(cumStandView === 'cutline') renderCumCutLine(); });
+    return;
+  }
+  var gsTeams = (guillotineStatusCache[key] && guillotineStatusCache[key].teams) || {};
+  var totalTeams = (seasonData['1'] || []).length || Object.keys(gsTeams).length;
+  var schedule = buildElimSchedule(totalTeams, WEEKS);
+  var survivors = Object.keys(gsTeams).filter(function(k){ return gsTeams[k] && gsTeams[k].status === 'alive'; })
+    .map(function(k){ return memberNameByUid[k] || gsTeams[k].team || k; });
+  var html = buildCutLineSection(gsTeams, schedule, survivors, totalTeams);
+  wrap.innerHTML = html || '<div style="padding:24px;text-align:center;color:var(--ink3);font-family:var(--fd);font-size:13px;">The Cut Line isn’t available yet — it appears once eliminations begin.</div>';
+}
+
 function renderCumStandingsPage(page){
   var wrap = document.getElementById('cum-standings-wrap');
   var pager = document.getElementById('cum-standings-pager');
   if(!wrap) return;
+
+  // Cut Line view takes over the standings container (and clears the pager).
+  if(cumStandView === 'cutline'){
+    if(pager) pager.innerHTML = '';
+    renderCumCutLine();
+    return;
+  }
 
   var allRaw = computeCumStandings();
   if(!allRaw.length){
@@ -4335,7 +4387,7 @@ function buildCutLineSection(gsTeams, schedule, currentSurvivors, totalTeams){
     + '<div style="padding:14px 18px;"><div class="cl-wrap">' + explainer + cutnote + toggle + legend + body + '</div></div></div>';
 }
 
-window.guillCutSetView = function(v){ guillCutView = v; renderGuillotine(); };
+window.guillCutSetView = function(v){ guillCutView = v; if(typeof renderCumStandingsPage === 'function') renderCumStandingsPage(0); };
 window.guillCutCloseExp = function(){ try{ localStorage.setItem('fr_cutline_exp','1'); }catch(e){} var e=document.getElementById('cl-explainer'), r=document.getElementById('cl-reopen'); if(e) e.hidden=true; if(r) r.hidden=false; };
 window.guillCutOpenExp = function(){ try{ localStorage.removeItem('fr_cutline_exp'); }catch(e){} var e=document.getElementById('cl-explainer'), r=document.getElementById('cl-reopen'); if(e) e.hidden=false; if(r) r.hidden=true; };
 // Lazy-load a survivor's roster into the chevron, reusing the same lineup +
@@ -4741,7 +4793,6 @@ function renderGuillotine(){
 
   el.innerHTML = '<div class="guill-wrap">'
     + heroHTML
-    + buildCutLineSection(gsTeams, schedule, currentSurvivors, totalTeams)
     + progressHTML
     + fullScheduleHTML
     + (winnersHTML || '')
