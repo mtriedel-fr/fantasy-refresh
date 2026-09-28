@@ -2442,7 +2442,7 @@ function buildLineupPlayerCard(p, pts, hasStarted, gameMap, showNotStartedTag, s
   var slotLabel = slotId ? lineupSlotStructuralLabel(slotId, p.pos) : (p.pos || '');
   var posColor = LINEUP_POS_COLORS[slotLabel] || LINEUP_POS_COLORS[p.pos] || 'var(--ink2)';
   var ptsLabel = (typeof pts === 'number') ? pts.toFixed(2) : '0.00';
-  var game = (gameMap && p.team) ? gameMap[p.team] : null;
+  var game = (gameMap && p.team) ? (gameMap[normTeam(p.team)] || gameMap[p.team]) : null;
   var gameLine = '';
   if(game){
     if(game.liveStatusCode === 1){
@@ -3659,7 +3659,7 @@ function countPlayersLeft(lineup, gameMap){
   var slots = Object.values(lineup.slots).filter(Boolean);
   if(!slots.length) return null;
   var left = slots.filter(function(p){
-    var game = (gameMap && p.team) ? gameMap[p.team] : null;
+    var game = (gameMap && p.team) ? (gameMap[normTeam(p.team)] || gameMap[p.team]) : null;
     return !game || game.liveStatusCode !== 2; // no game info yet, or genuinely not final
   }).length;
   return { left: left, total: slots.length };
