@@ -4381,7 +4381,7 @@ function buildCutLineSection(gsTeams, schedule, currentSurvivors, data){
     + '<button class="' + (guillCutView === 'all' ? 'on' : '') + '" onclick="guillCutSetView(\'all\')">All Remaining</button>'
     + '</div>';
 
-  var body, legend = '<div class="cl-legend"><span class="chase">Chasing</span><span class="out">💀 Eliminated</span><span class="warn">⚠ Likely</span><span class="clinch">Clinched</span></div>';
+  var body, legend = '<div class="cl-legend"><span class="chase">Chasing</span><span class="out">💀 Eliminated</span><span class="warn">🪓 On the Block</span><span class="clinch">Clinched</span></div>';
   if(!ready){
     legend = '';
     body = '<div class="cl-notecard"><div class="ic">🕛</div>'
@@ -4427,7 +4427,7 @@ function buildCutLineSection(gsTeams, schedule, currentSurvivors, data){
       } else if(r.complete){
         // above the line, locked score, but not enough teams finished below
         // yet — live teams underneath can still climb past
-        badge = '<span class="cl-badge warn">⚠ Likely eliminated</span>';
+        badge = '<span class="cl-badge warn">🪓 On the Block</span>';
         hint  = ' <span class="cl-hint">needs ' + (cut - finalBelow) + ' more to finish below</span>';
       } else {
         badge = '<span class="cl-badge clear">Clear of the line</span>';
