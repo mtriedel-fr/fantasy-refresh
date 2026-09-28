@@ -1280,19 +1280,46 @@ jobs:
               // an approximation, not a perfect reconstruction, since a
               // 2-point attempt after that specific score isn't visible
               // in this data.
+              // Tank01's team-defense (DST) object does NOT include special-
+              // teams return touchdowns — it only carries DEFENSIVE TDs.
+              // Confirmed against a real box score: a Vikings 86-yd punt-return
+              // TD showed up on the returner's own player line
+              // (Punting.puntReturnTD = 1) and in scoringPlays, but DST.defTD
+              // stayed "0" — so a defense that returned a punt/kick for a score
+              // silently got nothing for it. Sum those ST return TDs per team
+              // from the raw player lines and fold them into the defense's TD
+              // count, which calcDKPoints already scores at 6 pts ("Defensive/
+              // ST TD"). (A blocked-kick or fumble/INT return TD is credited as
+              // a DEFENSIVE TD in DST.defTD, so those are already covered.)
+              function stReturnTDsFor(teamAbv){
+                let n = 0;
+                Object.values(bs.playerStats || {}).forEach(p => {
+                  if ((p.teamAbv || p.team) !== teamAbv) return;
+                  const k = p.Kicking || {}, pu = p.Punting || {};
+                  n += (parseFloat(k.kickReturnTD) || 0) + (parseFloat(pu.puntReturnTD) || 0);
+                });
+                return n;
+              }
+
               const sides = ['home', 'away'];
               sides.forEach((side, i) => {
                 const d = bs.DST && bs.DST[side];
                 if (!d || !d.teamAbv) return;
                 const opp = bs.DST && bs.DST[sides[1 - i]];
-                const oppDefTDs = opp ? (parseFloat(opp.defTD) || 0) : 0;
+                const stTDs = stReturnTDsFor(d.teamAbv);
+                // Exclude the opponent's def + ST return TDs from THIS team's
+                // points-allowed tier — a return TD isn't something the defense
+                // let the offense do. Now counts ST return TDs too, not just
+                // defensive ones.
+                const oppDefTDs = (opp ? (parseFloat(opp.defTD) || 0) : 0) + (opp ? stReturnTDsFor(opp.teamAbv) : 0);
                 const rawPtsAllowed = parseFloat(d.ptsAllowed) || 0;
                 const adjustedPtsAllowed = Math.max(0, rawPtsAllowed - oppDefTDs * 7);
+                if (stTDs > 0) console.log(`  🏈 ${d.teamAbv} special-teams return TD(s): +${stTDs} → added to defense TD count`);
                 playerStats[d.teamAbv] = {
                   sacks:      d.sacks,
                   defInt:     d.defensiveInterceptions,
                   fumbRec:    d.fumblesRecovered,
-                  defTD:      d.defTD,
+                  defTD:      (parseFloat(d.defTD) || 0) + stTDs,
                   safety:     d.safeties,
                   ptsAllowed: adjustedPtsAllowed,
                   // Defense entries had no name field at all before,
