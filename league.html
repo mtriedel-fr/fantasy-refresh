@@ -6326,7 +6326,7 @@ function renderStandings(sorted, prevRank, curMap, wkHighName){
 
     return '<tr class="' + tierClass + divider + (isMe ? ' my-team' : '') + '">'
       + '<td class="rk' + (r <= 3 ? ' g' : '') + '">' + (r <= 3 ? MED[r-1] : r) + '</td>'
-      + '<td><div class="tn-wrap"><a class="season-name-link" href="player.html?team=' + encodeURIComponent(t.name) + '">' + t.name + '</a>'
+      + '<td><div class="tn-wrap"><span class="season-name-link" onclick="openTeamSeason(\'' + t.name.replace(/'/g,"\\'") + '\')" style="cursor:pointer;">' + t.name + '</span>'
       + (isMe ? '<span class="my-team-badge">You</span>' : '')
       + (isHigh ? '<span class="bdg">🔥 Wk High</span>' : '')
       + streakBadge
@@ -7328,7 +7328,10 @@ function hideDropdown(){
 }
 
 function goToProfile(encodedName){
-  window.location.href = 'player.html?team=' + encodedName;
+  // Was a navigation to the standalone per-team page; now opens the in-app
+  // season overview modal so it works within the single-page app.
+  try{ openTeamSeason(decodeURIComponent(String(encodedName).replace(/\+/g,' '))); }
+  catch(e){ openTeamSeason(encodedName); }
 }
 
 
@@ -7485,12 +7488,26 @@ function renderMySeasonInline(){
     return;
   }
 
+  el.innerHTML = buildTeamSeasonHtml(myTeam, true);
+}
+
+// Full-season overview for ANY team — the exact layout "My Season" uses,
+// parameterized by team name so the standings team-name click can open the
+// same view for another team. Returns a self-contained HTML string, with its
+// own empty state when the team has no imported scores yet. Single source of
+// truth: renderMySeasonInline() delegates here for the viewer's own team.
+function buildTeamSeasonHtml(displayName, isYou){
+  var resolvedName = resolveTeamName(displayName);
+  if(!resolvedName){
+    return '<div class="myteam-empty"><div class="myteam-empty-icon">📭</div>'
+      + '<div class="myteam-empty-title">No data for "' + escapeHtmlFR(displayName || '') + '"</div>'
+      + '<div class="myteam-empty-sub">No scores have been imported for this team yet.</div></div>';
+  }
   var weekData = getPlayerWeekData(resolvedName);
   var scores = weekData.map(function(d){ return d.score; });
   var total = scores.reduce(function(a,b){ return a+b; }, 0);
   var avg = scores.length ? total / scores.length : 0;
   var best = scores.length ? Math.max.apply(null, scores) : 0;
-  var bestWk = weekData.find(function(d){ return d.score === best; });
   var weeks = Object.keys(seasonData).filter(function(k){
     return !isNaN(Number(k)) && seasonData[k] && seasonData[k].length > 0;
   }).map(Number).sort(function(a,b){ return a-b; });
@@ -7498,16 +7515,13 @@ function renderMySeasonInline(){
   weeks.forEach(function(w){
     (seasonData[String(w)]||[]).forEach(function(e){ allTotals[e.name] = (allTotals[e.name]||0) + e.score; });
   });
-  var myCurEntry = (seasonData[String(currentWeek)]||[]).find(function(e){ return teamMatch(e.name, resolvedName); });
-  var sznRank = (myCurEntry && getCorrectedRank(myCurEntry.uid)) || Object.keys(allTotals).sort(function(a,b){ return allTotals[b]-allTotals[a]; }).indexOf(resolvedName) + 1;
+  var curEntry = (seasonData[String(currentWeek)]||[]).find(function(e){ return teamMatch(e.name, resolvedName); });
+  var sznRank = (curEntry && getCorrectedRank(curEntry.uid)) || Object.keys(allTotals).sort(function(a,b){ return allTotals[b]-allTotals[a]; }).indexOf(resolvedName) + 1;
 
   var scoreChart = buildScoreChartInline(weekData);
   var rankChart = buildRankChartInline(weekData);
 
-  // Week by week table
   var tableRows = weekData.slice().reverse().map(function(d){
-    var moveStr = (d.cumStanding && weekData.indexOf(d) > 0)
-      ? '' : '';
     return '<tr>'
       + '<td class="wk-num">Week ' + d.week + '</td>'
       + '<td style="font-family:var(--fd);font-weight:700;font-size:15px;color:var(--or);text-align:right">' + fmtScore(d.score) + '</td>'
@@ -7517,11 +7531,12 @@ function renderMySeasonInline(){
       + '</tr>';
   }).join('');
 
-  el.innerHTML = '<div class="myseason-wrap">'
+  var scoreLbl = isYou ? 'Your score' : 'Team score';
+  return '<div class="myseason-wrap">'
     // Hero stats
     + '<div class="myteam-card">'
     + '<div class="myteam-hero">'
-    + '<div><div class="myteam-name">' + myTeam + '</div>'
+    + '<div><div class="myteam-name">' + escapeHtmlFR(resolvedName) + (isYou ? ' <span class="my-team-badge">You</span>' : '') + '</div>'
     + '<div style="font-family:var(--fd);font-size:11px;color:#1A5A5A;text-transform:uppercase;letter-spacing:1px;margin-top:4px;">Full Season Overview</div></div>'
     + '<div style="text-align:right"><div class="myteam-score">#' + sznRank + '</div><div class="myteam-score-lbl">Season rank</div></div>'
     + '</div>'
@@ -7533,7 +7548,7 @@ function renderMySeasonInline(){
     // Score chart
     + (scoreChart ? '<div class="chart-section"><div class="chart-section-hdr">Weekly Score vs League Average</div>'
       + '<div class="chart-wrap"><div class="chart-canvas">' + scoreChart + '</div></div>'
-      + '<div class="chart-legend"><div class="legend-item"><div class="legend-dot" style="background:var(--pk)"></div>Your score</div>'
+      + '<div class="chart-legend"><div class="legend-item"><div class="legend-dot" style="background:var(--pk)"></div>' + scoreLbl + '</div>'
       + '<div class="legend-item"><div class="legend-dot" style="background:var(--bdr2)"></div>League avg</div></div></div>' : '')
     // Rank chart
     + (rankChart ? '<div class="chart-section"><div class="chart-section-hdr">Weekly Finish & Season Standing</div>'
@@ -7569,6 +7584,37 @@ function renderMySeasonInline(){
       })()
     + '</div>';
 }
+
+// Open any team's full-season overview in a modal — used by the team-name
+// click in season standings. Reuses the recap-overlay shell.
+function openTeamSeason(teamName){
+  var ov = document.getElementById('team-season-overlay');
+  var body = document.getElementById('team-season-body');
+  if(!ov || !body) return;
+  var isYou = !!(myTeam && String(teamName).toLowerCase() === String(myTeam).toLowerCase());
+  body.innerHTML = buildTeamSeasonHtml(teamName, isYou);
+  ov.classList.add('open');
+}
+function closeTeamSeason(){
+  var ov = document.getElementById('team-season-overlay');
+  if(ov) ov.classList.remove('open');
+}
+// Every remaining team-name link in the app still points at the old
+// standalone player.html page (movement, numbers, weekly board, swap pods,
+// comparisons). Rather than rewrite each call site, catch those clicks here
+// and open the in-app season overview modal instead — one place, no dead
+// navigation. New span-based links (e.g. season standings) call
+// openTeamSeason directly and are unaffected.
+document.addEventListener('click', function(ev){
+  var a = (ev.target && ev.target.closest) ? ev.target.closest('a[href^="player.html?team="]') : null;
+  if(!a) return;
+  ev.preventDefault();
+  try{
+    var q = (a.getAttribute('href').split('team=')[1] || '');
+    var name = decodeURIComponent(q.split('&')[0].replace(/\+/g,' '));
+    if(name) openTeamSeason(name);
+  }catch(e){}
+});
 
 
 function renderMyTeam(sorted, curEntries, prevRank, curMap){
@@ -11255,6 +11301,16 @@ function removeCommissioner(uid){
     </div>
     <div id="fbs-pos-filter" style="display:flex;gap:6px;flex-wrap:wrap;padding:0 20px 12px;"></div>
     <div class="recap-body" id="fbs-body"></div>
+  </div>
+</div>
+
+<div class="recap-overlay" id="team-season-overlay" onclick="if(event.target===this)closeTeamSeason()">
+  <div class="recap-box">
+    <div class="recap-hdr">
+      <div style="font-family:var(--fd);font-size:16px;font-weight:900;color:var(--or);text-transform:uppercase;letter-spacing:.5px;">Season Overview</div>
+      <button class="recap-close-btn" onclick="closeTeamSeason()">✕</button>
+    </div>
+    <div class="recap-body" id="team-season-body"></div>
   </div>
 </div>
 
