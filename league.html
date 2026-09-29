@@ -4347,31 +4347,48 @@ function buildCutLineSection(gsTeams, schedule, currentSurvivors, data){
   if(!sched || sched.finale) return '';            // no cut line on the finale
   var cut = sched.eliminate;
   if(!cut) return '';
-  var remaining = (currentSurvivors || []).length;
+  // The field for THIS week = the teams alive at the START of the week:
+  // everyone still alive PLUS anyone eliminated in this exact week. Once the
+  // week finalizes, that week's casualties are already flagged eliminated and
+  // would otherwise drop off the board — which made it wrongly show the
+  // NEXT-worst survivors as the ones getting cut. Adding them back rebuilds the
+  // real week-of field so the board shows the actual result, not the next five.
+  var fieldUids = Object.keys(gsTeams || {}).filter(function(uid){
+    var t = gsTeams[uid];
+    return t && (t.status === 'alive' || t.eliminatedWeek === wk);
+  });
+  var remaining = fieldUids.length;
   if(remaining <= cut) return '';                   // fewer teams left than the cut
   var smallField = remaining <= 3 * cut;
+  // "Resolved" = this week's cut has already been applied (its casualties are
+  // marked eliminated for this week). In that state the board shows the
+  // historical result rather than a live, in-progress prediction.
+  var resolved = fieldUids.some(function(uid){ return gsTeams[uid].eliminatedWeek === wk; });
 
   var wkEntries = seasonData[String(wk)] || [];
   var lineups = (data && data.lineups) || null;
   var gameMap = (data && data.gameMap) || null;
   var rows = [];
-  Object.keys(gsTeams || {}).forEach(function(uid){
+  fieldUids.forEach(function(uid){
     var t = gsTeams[uid];
-    if(!t || t.status !== 'alive') return;
     var name = memberNameByUid[uid] || t.team || uid;
     var e = wkEntries.find(function(x){ return (x.uid && x.uid === uid) || teamMatch(x.name, name); });
     var score = e ? (parseFloat(e.score) || 0) : 0;
     // Real completion signal, same as the standings "Left" column: how many
     // of the team's players still have a game left to finish. left === 0
-    // means the week is locked in — the only thing "Elimination likely"
-    // should trigger on.
+    // means the week is locked in.
     var pl = lineups ? countPlayersLeft(lineups[uid], gameMap) : null; // {left,total} or null
     var complete = !!(pl && pl.left === 0);
     var started = (score > 0) || !!(pl && pl.left < pl.total);
-    rows.push({ uid: uid, name: name, score: score, pl: pl, complete: complete, started: started });
+    var isElim = (t.eliminatedWeek === wk);          // actually cut this week
+    rows.push({ uid: uid, name: name, score: score, pl: pl, complete: complete, started: started, isElim: isElim });
   });
   if(!rows.length) return '';
-  rows.sort(function(a, b){ return a.score - b.score; });
+  // Live: worst score first. Resolved: pin the teams actually eliminated to the
+  // top danger zone (so no-show/tie ordering can't misplace them), then score.
+  rows.sort(resolved
+    ? function(a, b){ return ((b.isElim?1:0) - (a.isElim?1:0)) || (a.score - b.score); }
+    : function(a, b){ return a.score - b.score; });
 
   var startedCount = rows.filter(function(r){ return r.started; }).length;
   var zeroCount = rows.filter(function(r){ return !(r.score > 0); }).length;
@@ -4379,7 +4396,7 @@ function buildCutLineSection(gsTeams, schedule, currentSurvivors, data){
   // teams are still scoreless than the week's cut number (so the danger zone
   // holds real scores) — or at 3:00 PM ET Sunday at the latest. Small field
   // shows from the first kickoff.
-  var ready = smallField ? (startedCount >= 1) : (zeroCount < cut || pastSun3ET());
+  var ready = resolved ? true : (smallField ? (startedCount >= 1) : (zeroCount < cut || pastSun3ET()));
 
   var expDismissed = false; try{ expDismissed = localStorage.getItem('fr_cutline_exp') === '1'; }catch(e){}
   var explainer = '<div class="cl-explainer" id="cl-explainer"' + (expDismissed ? ' hidden' : '') + '>'
@@ -4388,7 +4405,7 @@ function buildCutLineSection(gsTeams, schedule, currentSurvivors, data){
     + '</div>'
     + '<button class="cl-reopen" id="cl-reopen" onclick="guillCutOpenExp()"' + (expDismissed ? '' : ' hidden') + '>ⓘ What is the Cut Line?</button>';
 
-  var cutnote = '<div class="cl-note">🪓 Cutting <b>' + cut + '</b> of <b>' + remaining + '</b> this week'
+  var cutnote = '<div class="cl-note">🪓 ' + (resolved ? 'Cut <b>' + cut + '</b> of <b>' + remaining + '</b> · final' : 'Cutting <b>' + cut + '</b> of <b>' + remaining + '</b> this week')
     + (smallField ? ' · full field shown' : ' · showing the 10 nearest the cut') + '</div>';
 
   var toggle = smallField ? '' :
@@ -4397,7 +4414,9 @@ function buildCutLineSection(gsTeams, schedule, currentSurvivors, data){
     + '<button class="' + (guillCutView === 'all' ? 'on' : '') + '" onclick="guillCutSetView(\'all\')">All Remaining</button>'
     + '</div>';
 
-  var body, legend = '<div class="cl-legend"><span class="chase">Chasing</span><span class="out">💀 Eliminated</span><span class="warn">🪓 On the Block</span><span class="clinch">Clinched</span></div>';
+  var body, legend = resolved
+    ? '<div class="cl-legend"><span class="out">💀 Eliminated</span><span class="clinch">✓ Survived</span></div>'
+    : '<div class="cl-legend"><span class="chase">Chasing</span><span class="out">💀 Eliminated</span><span class="warn">🪓 On the Block</span><span class="clinch">Clinched</span></div>';
   if(!ready){
     legend = '';
     body = '<div class="cl-notecard"><div class="ic">🕛</div>'
@@ -4425,8 +4444,15 @@ function buildCutLineSection(gsTeams, schedule, currentSurvivors, data){
       var statusChip = status === 'final' ? '<span class="cl-chip final">🔒 Final</span>'
                      : status === 'live'  ? '<span class="cl-chip live">⏳ ' + (r.pl ? r.pl.left + '/' + r.pl.total : '') + ' left</span>'
                      : '<span class="cl-chip pre">Yet to play</span>';
+      // Danger styling follows the ACTUAL result once the week is resolved,
+      // otherwise the live danger zone (bottom `cut` by score).
+      var dangerRow = resolved ? r.isElim : inDanger;
       var badge, hint = '', doomed = false;
-      if(inDanger){
+      if(resolved){
+        // Week's cut already applied — show the real outcome, not a prediction.
+        if(r.isElim){ badge = '<span class="cl-badge out">💀 Eliminated</span>'; doomed = true; }
+        else { badge = '<span class="cl-badge clinch">✓ Survived</span>'; }
+      } else if(inDanger){
         if(r.complete){
           // below the line and locked in — gone
           badge = '<span class="cl-badge out">💀 Eliminated</span>'; doomed = true;
@@ -4448,7 +4474,7 @@ function buildCutLineSection(gsTeams, schedule, currentSurvivors, data){
       } else {
         badge = '<span class="cl-badge clear">Clear of the line</span>';
       }
-      var block = '<div class="cl-row ' + (inDanger ? 'danger' : 'safe') + (doomed ? ' doomed' : '') + '" id="clrow-' + r.uid + '">'
+      var block = '<div class="cl-row ' + (dangerRow ? 'danger' : 'safe') + (doomed ? ' doomed' : '') + '" id="clrow-' + r.uid + '">'
         + '<div class="cl-rowhead" onclick="guillCutToggleRow(this,\'' + r.uid + '\')">'
         + '<div class="cl-rank">' + rank + '</div>'
         + '<div style="min-width:0"><div class="cl-name">' + escapeHtmlFR(r.name) + '</div><div class="cl-meta">' + statusChip + badge + hint + '</div></div>'
