@@ -434,7 +434,7 @@ jobs:
 
             const salaries = {};
             let count = 0;
-            const BACKUP_QB_SALARY = 4300;
+            const BACKUP_QB_SALARY = 3800;
             projPlayers.forEach(p => {
               if (!POSITIONS[p.pos]) return;
               const poolP = poolPlayers ? poolPlayers[p.id] : null; // exact id match
@@ -513,7 +513,7 @@ jobs:
 
             const salaries = {};
             let count = 0;
-            const BACKUP_QB_SALARY = 4300; // floor for a QB with no real projection yet — covers both a genuine deep-bench backup and a suddenly-elevated starter (e.g. an injury replacement) whose projection just hasn't caught up to the depth chart change yet, so they're never mispriced at an unrealistically low number
+            const BACKUP_QB_SALARY = 3800; // floor for a QB with no real projection yet — covers both a genuine deep-bench backup and a suddenly-elevated starter (e.g. an injury replacement) whose projection just hasn't caught up to the depth chart change yet, so they're never mispriced at an unrealistically low number
 
             projPlayers.forEach(p => {
               if (!p.proj || p.proj <= 0) return;

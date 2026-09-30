@@ -73,7 +73,7 @@ jobs:
               }
             };
           }
-          const NEW = makeConsts(9000, 9600, 1.068, 4300); // staged
+          const NEW = makeConsts(9000, 9600, 1.068, 3800); // staged
           const OLD = makeConsts(8900, 9400, 1.058, 3800); // currently deployed
 
           // ── HTTP helpers ──

@@ -159,7 +159,7 @@ jobs:
           const SAL_MIN_DEFAULT = 100;
           const SAL_MAX_DEFAULT = 9600;
           const SAL_ROUND = 100;
-          const BACKUP_QB_SALARY = 4300; // floor for a QB with no real projection yet
+          const BACKUP_QB_SALARY = 3800; // floor for a QB with no real projection yet
 
           // Suffix/punctuation-safe name match — confirmed directly:
           // Tank01's projections source and the real player pool
