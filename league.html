@@ -1106,6 +1106,7 @@ setTimeout(function(){
         <span id="fr-avatar" style="width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,var(--or),var(--pk));display:flex;align-items:center;justify-content:center;font-family:var(--fd);font-size:12px;font-weight:800;color:#050808;flex-shrink:0;">—</span>
         <span id="fr-sign-name">—</span>
       </button>
+      <button id="hdr-menu-btn" onclick="toggleHdrMenu(event)" title="League menu" style="display:none;background:none;border:1px solid var(--bdr2);border-radius:8px;color:var(--ink2);font-size:16px;line-height:1;padding:6px 10px;cursor:pointer;flex-shrink:0;">☰</button>
     </div>
   </div>
 </div>
@@ -12041,6 +12042,30 @@ function goHome(){
   window.location.href = '/home.html';
 }
 
+// Beta top-right menu (League / Financials / Commissioner) — replaces the
+// bottom "More" overflow for admin/hub items.
+function toggleHdrMenu(e){
+  if(e && e.stopPropagation) e.stopPropagation();
+  var m = document.getElementById('hdr-menu'), s = document.getElementById('hdr-menu-scrim');
+  if(!m) return;
+  var open = m.style.display !== 'block';
+  m.style.display = open ? 'block' : 'none';
+  if(s) s.style.display = open ? 'block' : 'none';
+  if(open){
+    // Commissioner row only for commissioners — mirror the comm-toggle gate.
+    var cb = document.getElementById('hdr-menu-comm');
+    var ct = document.getElementById('comm-toggle');
+    if(cb) cb.style.display = (ct && ct.style.display !== 'none') ? 'flex' : 'none';
+  }
+}
+function closeHdrMenu(){
+  var m = document.getElementById('hdr-menu'), s = document.getElementById('hdr-menu-scrim');
+  if(m) m.style.display = 'none';
+  if(s) s.style.display = 'none';
+}
+function hdrMenuGo(nav){ closeHdrMenu(); handleNav(nav); }
+function hdrMenuComm(){ closeHdrMenu(); if(typeof toggleComm === 'function') toggleComm(); }
+
 var moreMenuOpen = false;
 function closeMoreMenu(){
   var menu = document.getElementById('more-menu');
@@ -12134,17 +12159,42 @@ if(IS_PRESEASON_LEAGUE){
   if(gBtn2) gBtn2.style.display = (ctxG && ctxG.guillotine) ? '' : 'none';
 }
 
-// Beta (fr_test_full) — Stage 1 entry point: the bottom "This Week" button
-// becomes "My Team" and opens the consolidated My Team tab (This Week | My
-// Season). Full adaptive nav + top menu comes in Stage 2. Other leagues
-// are untouched.
+// Beta (fr_test_full) — Option B adaptive nav. Bottom bar is gameplay only,
+// built from the league's actual formats; league admin moves to the top-right
+// ☰ menu. No "More" overflow. Other leagues are completely untouched.
 if(typeof isBetaLeague === 'function' && isBetaLeague()){
+  // Button 2 → My Team (This Week | My Season)
   var bwBtn = document.getElementById('bn-week');
   if(bwBtn){
     bwBtn.setAttribute('onclick', "closeMoreMenu();switchBottomNav('yourteam','bn-week')");
     var bwLbl = bwBtn.querySelector('.bn-label'); if(bwLbl) bwLbl.textContent = 'My Team';
     var bwIc = bwBtn.querySelector('.bn-icon'); if(bwIc) bwIc.textContent = '👤';
   }
+
+  // Buttons 3 & 4 → one per format this league runs (adaptive, so future
+  // leagues with a different mix get the right tabs automatically).
+  var ctxB = FRAuth.getLeagueCtx();
+  var betaFmts = [];
+  if(ctxB && ctxB.guillotine) betaFmts.push({ label:'Last One Standing', icon:'🪓', nav:'guillotine', wrap:true });
+  if(typeof IS_PRESEASON_LEAGUE === 'undefined' || !IS_PRESEASON_LEAGUE) betaFmts.push({ label:'Playoffs', icon:'🏆', nav:'playoffs', wrap:false });
+  var betaSlots = ['bn-season', 'bn-more'];
+  betaSlots.forEach(function(id, i){
+    var btn = document.getElementById(id);
+    if(!btn) return;
+    var f = betaFmts[i];
+    if(f){
+      btn.style.display = '';
+      btn.setAttribute('onclick', "closeMoreMenu();switchBottomNav('" + f.nav + "','" + id + "')");
+      var l = btn.querySelector('.bn-label');
+      if(l){ l.textContent = f.label; if(f.wrap){ l.style.whiteSpace = 'normal'; l.style.lineHeight = '1.05'; l.style.fontSize = '8.5px'; } }
+      var ic = btn.querySelector('.bn-icon'); if(ic) ic.textContent = f.icon;
+    } else {
+      btn.style.display = 'none'; // format not used by this league
+    }
+  });
+
+  // Reveal the top-right ☰ menu (League / Financials / Commissioner).
+  var hb = document.getElementById('hdr-menu-btn'); if(hb) hb.style.display = '';
 }
 if(IS_H2H_LEAGUE) initH2HVisibility();
 
@@ -12214,6 +12264,14 @@ document.addEventListener('DOMContentLoaded', function(){
       style="padding:9px 14px;background:linear-gradient(135deg,var(--or),var(--pk));border:none;border-radius:9px;color:#050808;font-family:var(--fd);font-weight:800;font-size:12px;text-transform:uppercase;letter-spacing:.5px;cursor:pointer;white-space:nowrap;">Send</button>
   </div>
   </div>
+</div>
+
+<!-- BETA league top-right menu (League / Financials / Commissioner) -->
+<div id="hdr-menu-scrim" onclick="closeHdrMenu()" style="display:none;position:fixed;inset:0;z-index:566;"></div>
+<div id="hdr-menu" style="display:none;position:fixed;top:56px;right:12px;z-index:567;width:220px;background:var(--bg2);border:1px solid var(--bdr2);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.5);overflow:hidden;">
+  <button onclick="hdrMenuGo('league')" style="display:flex;align-items:center;gap:10px;width:100%;padding:13px 15px;background:none;border:none;border-bottom:1px solid var(--bdr);color:var(--ink);font-family:var(--fd);font-weight:700;font-size:13px;cursor:pointer;text-align:left;"><span style="font-size:16px;width:20px;text-align:center;">🏈</span> League Info</button>
+  <button onclick="hdrMenuGo('dues')" style="display:flex;align-items:center;gap:10px;width:100%;padding:13px 15px;background:none;border:none;border-bottom:1px solid var(--bdr);color:var(--ink);font-family:var(--fd);font-weight:700;font-size:13px;cursor:pointer;text-align:left;"><span style="font-size:16px;width:20px;text-align:center;">💰</span> Financials</button>
+  <button id="hdr-menu-comm" onclick="hdrMenuComm()" style="display:none;align-items:center;gap:10px;width:100%;padding:13px 15px;background:rgba(0,229,212,.06);border:none;color:var(--or);font-family:var(--fd);font-weight:700;font-size:13px;cursor:pointer;text-align:left;"><span style="font-size:16px;width:20px;text-align:center;">⚙️</span> Commissioner</button>
 </div>
 
 <!-- MORE MENU OVERLAY -->
