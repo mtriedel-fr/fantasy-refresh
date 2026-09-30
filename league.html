@@ -819,6 +819,10 @@ body{padding-bottom:calc(76px + env(safe-area-inset-bottom));}
 #cum-view-toggle{display:flex;width:100%;gap:0;padding:4px;background:var(--bg2);border:1px solid var(--bdr2);border-radius:12px;align-self:stretch;}
 #cum-view-toggle button{flex:1 1 0;justify-content:center;text-align:center;padding:9px 12px;border-radius:9px;color:var(--ink3);transition:background .18s ease,color .18s ease;}
 #cum-view-toggle button.on{background:linear-gradient(135deg,var(--or),var(--pk));color:#050808;box-shadow:0 1px 6px rgba(0,0,0,.28);}
+/* Beta: Standings/Cut Line reads as a smaller, centered SECONDARY control
+   under the primary Season/Weekly switch. Scoped to the beta league only. */
+.beta-league #cum-view-toggle{width:fit-content;max-width:100%;margin:0 auto 12px;padding:3px;background:var(--bg3);}
+.beta-league #cum-view-toggle button{flex:0 0 auto;font-size:10.5px;padding:5px 14px;}
 /* Beta (fr_test_full): Season⇄Weekly standings switch below My Team */
 #cum-mode-toggle{display:flex;width:100%;gap:0;padding:4px;background:var(--bg2);border:1px solid var(--bdr2);border-radius:12px;margin:0 0 10px;box-sizing:border-box;}
 #cum-mode-toggle button{flex:1 1 0;font-family:var(--fd);font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;padding:9px 12px;border:none;background:none;color:var(--ink3);border-radius:9px;cursor:pointer;transition:background .18s ease,color .18s ease;}
@@ -3517,9 +3521,11 @@ function renderCumHome(){
     var lctx = (typeof FRAuth !== 'undefined' && FRAuth.getLeagueCtx) ? FRAuth.getLeagueCtx() : null;
     cumViewToggle.style.display = (lctx && lctx.guillotine) ? '' : 'none';
   }
-  // Beta league: reveal the Season⇄Weekly switch below My Team.
+  // Beta league: reveal the Season⇄Weekly switch below My Team, and re-apply
+  // the beta bottom nav in case this render reset it.
   var cumModeToggle = document.getElementById('cum-mode-toggle');
   if(cumModeToggle) cumModeToggle.style.display = isBetaLeague() ? 'flex' : 'none';
+  if(typeof applyBetaNav === 'function') applyBetaNav();
 
   updateMyTeamLabelsForCumulative();
 
@@ -12227,7 +12233,13 @@ if(IS_PRESEASON_LEAGUE){
 // Beta (fr_test_full) — Option B adaptive nav. Bottom bar is gameplay only,
 // built from the league's actual formats; league admin moves to the top-right
 // ☰ menu. No "More" overflow. Other leagues are completely untouched.
-if(typeof isBetaLeague === 'function' && isBetaLeague()){
+// Wrapped in a re-appliable function and called again after boot renders so it
+// can't be clobbered by a later nav re-render, and idempotent so repeat calls
+// are safe.
+function applyBetaNav(){
+  if(!(typeof isBetaLeague === 'function' && isBetaLeague())) return;
+  try{ document.body.classList.add('beta-league'); }catch(e){}
+
   // Button 2 → My Team (This Week | My Season)
   var bwBtn = document.getElementById('bn-week');
   if(bwBtn){
@@ -12238,12 +12250,11 @@ if(typeof isBetaLeague === 'function' && isBetaLeague()){
 
   // Buttons 3 & 4 → one per format this league runs (adaptive, so future
   // leagues with a different mix get the right tabs automatically).
-  var ctxB = FRAuth.getLeagueCtx();
+  var ctxB = (typeof FRAuth !== 'undefined' && FRAuth.getLeagueCtx) ? FRAuth.getLeagueCtx() : null;
   var betaFmts = [];
   if(ctxB && ctxB.guillotine) betaFmts.push({ label:'Last One Standing', icon:'🪓', nav:'guillotine', wrap:true });
   if(typeof IS_PRESEASON_LEAGUE === 'undefined' || !IS_PRESEASON_LEAGUE) betaFmts.push({ label:'Playoffs', icon:'🏆', nav:'playoffs', wrap:false });
-  var betaSlots = ['bn-season', 'bn-more'];
-  betaSlots.forEach(function(id, i){
+  ['bn-season', 'bn-more'].forEach(function(id, i){
     var btn = document.getElementById(id);
     if(!btn) return;
     var f = betaFmts[i];
@@ -12251,7 +12262,7 @@ if(typeof isBetaLeague === 'function' && isBetaLeague()){
       btn.style.display = '';
       btn.setAttribute('onclick', "closeMoreMenu();switchBottomNav('" + f.nav + "','" + id + "')");
       var l = btn.querySelector('.bn-label');
-      if(l){ l.textContent = f.label; if(f.wrap){ l.style.whiteSpace = 'normal'; l.style.lineHeight = '1.05'; l.style.fontSize = '8.5px'; } }
+      if(l){ l.textContent = f.label; l.style.whiteSpace = f.wrap ? 'normal' : ''; l.style.lineHeight = f.wrap ? '1.05' : ''; l.style.fontSize = f.wrap ? '8.5px' : ''; }
       var ic = btn.querySelector('.bn-icon'); if(ic) ic.textContent = f.icon;
     } else {
       btn.style.display = 'none'; // format not used by this league
@@ -12261,6 +12272,8 @@ if(typeof isBetaLeague === 'function' && isBetaLeague()){
   // Reveal the top-right ☰ menu (League / Financials / Commissioner).
   var hb = document.getElementById('hdr-menu-btn'); if(hb) hb.style.display = '';
 }
+applyBetaNav();
+document.addEventListener('DOMContentLoaded', applyBetaNav);
 if(IS_H2H_LEAGUE) initH2HVisibility();
 
 // Run commissioner check after a short delay to ensure Firebase is ready
