@@ -1,148 +1,145 @@
-name: Clear Week Salaries (one-time fix)
+name: Clear Week Salaries (manual, confirm-gated)
 
-# One-click removal of a single week's generated salary sheet. Built for the
-# Sept 2026 case: a Weekly Prep TEST run generated Week 3's salaries early,
-# which made Week 3 draftable ~14h before the intended Wed 7am CT open. Since
-# the client treats a week as "ready to draft" the moment its salaries exist,
-# deleting them puts Week 3 back to held. Weekly Auto-Open then regenerates a
-# fresh sheet and unlocks the draft on schedule Wednesday morning — this works
-# whether or not the updated auto-open is deployed, because the salaries will
-# no longer pre-exist.
+# Deletes a single week's salary sheet so it can be regenerated (e.g. after a
+# pricing-constant change). This is the "Clear Week Salaries" action the app UI
+# never had — the commissioner panel only has Lock/Unlock.
 #
-# It:
-#   1. BACKS UP the salary node to /backups (nothing is truly lost)
-#   2. DELETES  /leagues/<league>/salaries/<season>/week<week>
+# SAFE BY DESIGN:
+#   • Manual only (workflow_dispatch) — never fires on a schedule.
+#   • Requires typing the exact confirm phrase, so it can't run by accident.
+#   • Logs what it's about to delete (count / flat / generated) before deleting.
+#   • Optionally re-locks the draft so nobody can draft on an empty sheet during
+#     the gap between clearing and regenerating (default: yes).
 #
-# SAFETY: requires typing the confirm phrase, refuses if any lineups already
-# exist for that week (so it never yanks salaries out from under a real draft),
-# and backs up before deleting.
-
-concurrency:
-  group: clear-week-salaries
-  cancel-in-progress: false
+# TYPICAL RECOVERY FLOW (after deploying updated pricing constants):
+#   1. Run THIS workflow for the target week (relock = true).
+#   2. Run "Weekly Prep" — rebuilds a complete real sheet on the new constants.
+#   3. Run "Weekly Auto-Open" — re-opens the draft once the sheet is complete.
+#
+# ⚠️ Clearing a week that people have ALREADY drafted will reprice under them.
+#    Only clear a week before real drafting has started, or when you intend to
+#    reprice everyone.
 
 on:
   workflow_dispatch:
     inputs:
-      confirm:
-        description: 'Type EXACTLY: CLEAR WEEK 3 SALARIES   (guard against accidental runs)'
-        required: true
-        default: ''
       league_id:
         description: 'League ID'
         required: true
         default: 'fr_refresh26'
       season:
-        description: 'Season key'
+        description: 'Season key (2026, or 2026P for preseason)'
         required: true
         default: '2026'
       week:
-        description: 'Week number whose salaries to clear'
+        description: 'Week number to clear (no default — must be set on purpose)'
         required: true
-        default: '3'
-      force:
-        description: 'Set to "true" to delete even if lineups already exist for this week (normally leave blank)'
-        required: false
+      confirm:
+        description: 'Type CLEAR to confirm deletion'
+        required: true
         default: ''
-
-permissions:
-  contents: read
+      relock:
+        description: 'Re-lock the draft after clearing (true/false)'
+        required: true
+        default: 'true'
 
 jobs:
-  clear:
+  clear-week-salaries:
     runs-on: ubuntu-latest
     steps:
-      - name: Backup and delete the week's salary sheet
+      - name: Clear one week's salary sheet
         env:
-          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_DB_URL:     ${{ secrets.FIREBASE_DB_URL }}
           FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
-          CONFIRM: ${{ inputs.confirm }}
-          LEAGUE_ID: ${{ inputs.league_id }}
-          SEASON: ${{ inputs.season }}
-          WEEK: ${{ inputs.week }}
-          FORCE: ${{ inputs.force }}
+          IN_LEAGUE:  ${{ github.event.inputs.league_id }}
+          IN_SEASON:  ${{ github.event.inputs.season }}
+          IN_WEEK:    ${{ github.event.inputs.week }}
+          IN_CONFIRM: ${{ github.event.inputs.confirm }}
+          IN_RELOCK:  ${{ github.event.inputs.relock }}
         run: |
           node << 'SCRIPT'
           const https = require('https');
 
           const FB_URL   = process.env.FIREBASE_DB_URL;
           const FB_TOKEN = process.env.FIREBASE_AUTH_TOKEN;
-          const LEAGUE   = (process.env.LEAGUE_ID || 'fr_refresh26').trim();
-          const SEASON   = (process.env.SEASON || '2026').trim();
-          const WEEK     = (process.env.WEEK || '3').trim();
-          const FORCE    = (process.env.FORCE || '').trim() === 'true';
+          const LEAGUE   = (process.env.IN_LEAGUE || '').trim();
+          const SEASON   = (process.env.IN_SEASON || '').trim();
+          const WEEK     = parseInt(process.env.IN_WEEK || '', 10);
+          const CONFIRM  = (process.env.IN_CONFIRM || '').trim();
+          const RELOCK   = (process.env.IN_RELOCK || 'true').trim().toLowerCase() === 'true';
 
-          const EXPECTED = `CLEAR WEEK ${WEEK} SALARIES`;
-          if ((process.env.CONFIRM || '').trim() !== EXPECTED) {
-            console.error(`❌ Confirm phrase did not match "${EXPECTED}" — aborting. Nothing was changed.`);
+          // ── Guards ──
+          if (CONFIRM !== 'CLEAR') {
+            console.error(`❌ Confirmation failed: you typed "${CONFIRM}", expected exactly "CLEAR". Nothing deleted.`);
             process.exit(1);
           }
-          if (!FB_URL)   { console.error('Missing FIREBASE_DB_URL secret.'); process.exit(1); }
-          if (!FB_TOKEN) { console.error('Missing FIREBASE_AUTH_TOKEN secret — writes would be rejected. Aborting.'); process.exit(1); }
+          if (!LEAGUE || !SEASON || !Number.isInteger(WEEK) || WEEK < 1 || WEEK > 18) {
+            console.error(`❌ Bad inputs: league="${LEAGUE}" season="${SEASON}" week="${process.env.IN_WEEK}". Nothing deleted.`);
+            process.exit(1);
+          }
+          if (!FB_URL || !FB_TOKEN) {
+            console.error('❌ Missing FIREBASE_DB_URL or FIREBASE_AUTH_TOKEN secret. Nothing deleted.');
+            process.exit(1);
+          }
 
           function authed(path) {
             const sep = path.includes('?') ? '&' : '?';
-            return FB_URL + path + sep + 'auth=' + FB_TOKEN;
+            return FB_TOKEN ? `${path}${sep}auth=${FB_TOKEN}` : path;
           }
-          function req(method, path, body) {
+          function fbRequest(method, path, body) {
             return new Promise((resolve, reject) => {
-              const u = new URL(authed(path));
+              const u = new URL(FB_URL + authed(path));
               const opts = { hostname: u.hostname, path: u.pathname + u.search, method,
                 headers: { 'Content-Type': 'application/json' } };
-              const payload = body != null ? JSON.stringify(body) : null;
+              const payload = body !== undefined ? JSON.stringify(body) : null;
               if (payload) opts.headers['Content-Length'] = Buffer.byteLength(payload);
-              const r = https.request(opts, res => {
+              const req = https.request(opts, res => {
                 let d = ''; res.on('data', c => d += c);
                 res.on('end', () => {
-                  if (res.statusCode >= 200 && res.statusCode < 300) resolve(d ? JSON.parse(d) : null);
+                  if (res.statusCode >= 200 && res.statusCode < 300) resolve(d);
                   else reject(new Error(`HTTP ${res.statusCode} on ${method} ${path} — ${d.slice(0,200)}`));
                 });
               });
-              r.on('error', reject);
-              if (payload) r.write(payload);
-              r.end();
+              req.on('error', reject);
+              if (payload) req.write(payload);
+              req.end();
             });
           }
+          const fbGet = p => fbRequest('GET', p).then(d => { try { return JSON.parse(d); } catch { return null; } });
+          const fbDelete = p => fbRequest('DELETE', p);
+          const fbPut = (p, v) => fbRequest('PUT', p, v);
 
-          (async () => {
-            const salaryPath = `/leagues/${LEAGUE}/salaries/${SEASON}/week${WEEK}.json`;
-            const lineupsPath = `/leagues/${LEAGUE}/lineups/${SEASON}/week${WEEK}.json?shallow=true`;
-            const ts = Date.now();
-            const backupPath = `/backups/salaries_${LEAGUE}_${SEASON}_wk${WEEK}_${ts}.json`;
+          async function main() {
+            const base = `/leagues/${LEAGUE}/salaries/${SEASON}/week${WEEK}`;
+            console.log('════════════════════════════════════════════════════════════');
+            console.log(`  CLEAR WEEK SALARIES`);
+            console.log(`  League ${LEAGUE} · Season ${SEASON} · Week ${WEEK} · ${new Date().toISOString()}`);
+            console.log('════════════════════════════════════════════════════════════');
 
-            // Guard: never pull salaries out from under a draft in progress.
-            const lineups = await req('GET', lineupsPath).catch(() => null);
-            const lineupCount = lineups ? Object.keys(lineups).length : 0;
-            if (lineupCount > 0 && !FORCE) {
-              console.error(`❌ ${lineupCount} lineup(s) already exist for week ${WEEK} — refusing to delete salaries under an active draft.`);
-              console.error(`   If you really mean to, re-run with force = "true".`);
-              process.exit(1);
-            }
-            if (lineupCount > 0) {
-              console.log(`⚠️  ${lineupCount} lineup(s) exist for week ${WEEK}, but force=true — proceeding anyway.`);
+            // Show what's there before deleting.
+            const meta = await fbGet(`${base}/meta.json`).catch(() => null);
+            if (!meta) {
+              console.log(`No existing sheet at ${base} (meta is null). Nothing to delete — treating as already clear.`);
             } else {
-              console.log(`✓ No lineups exist for week ${WEEK} — safe to clear.`);
+              console.log(`Existing sheet: count=${meta.count} flat=${meta.flat} locked=${meta.locked} generated=${meta.generated ? new Date(meta.generated).toISOString() : '?'}`);
+              if (meta.locked) {
+                console.error('❌ This week is LOCKED (meta.locked=true). Unlock it first (commissioner panel) — refusing to clear a locked week.');
+                process.exit(1);
+              }
+              await fbDelete(`${base}.json`);
+              console.log(`🗑️  Deleted ${base}`);
             }
 
-            console.log(`Reading current salaries at ${salaryPath} …`);
-            const current = await req('GET', salaryPath).catch(e => { console.log('  (read failed: ' + e.message + ')'); return null; });
-            const playerCount = (current && current.meta && typeof current.meta.count === 'number')
-              ? current.meta.count
-              : (current && current.players ? Object.keys(current.players).length : 0);
-            console.log(`  Found a salary sheet with ${playerCount} player(s).`);
-
-            if (current) {
-              await req('PUT', backupPath, { savedAt: ts, note: `pre-clear backup of week ${WEEK} salaries`, data: current });
-              console.log(`  ✅ Backed up to ${backupPath}`);
+            // Optionally re-lock the draft so nobody drafts on an empty sheet.
+            if (RELOCK) {
+              const HOLD_MS = 30 * 24 * 60 * 60 * 1000;
+              await fbPut(`/leagues/${LEAGUE}/settings/draftLockedUntil.json`, Date.now() + HOLD_MS);
+              console.log(`🔒 Re-locked draft (draftLockedUntil set ~30 days out). Regenerate, then Auto-Open will re-open it.`);
             } else {
-              console.log('  Nothing to back up (node already empty).');
+              console.log('Draft lock left unchanged (relock=false).');
             }
 
-            await req('DELETE', salaryPath);
-            console.log(`  ✅ Deleted salary node ${salaryPath}`);
-
-            console.log(`\nDone. Week ${WEEK} is no longer draftable. Weekly Auto-Open will regenerate a`);
-            console.log(`fresh sheet and open the draft at its scheduled time. To undo, restore the`);
-            console.log(`node from ${backupPath}.`);
-          })().catch(e => { console.error('Clear failed:', e.message); process.exit(1); });
+            console.log('\n✅ Done. Next: run "Weekly Prep" to rebuild, then "Weekly Auto-Open" to re-open.');
+          }
+          main().catch(e => { console.error('Clear failed:', e.message); process.exit(1); });
           SCRIPT
