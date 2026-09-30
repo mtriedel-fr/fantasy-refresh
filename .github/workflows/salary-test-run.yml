@@ -1,0 +1,300 @@
+name: Salary Test Run (DRY RUN — prints only, writes nothing)
+
+# Manual, read-only preview of a week's salaries on REAL projections.
+#
+# Why this exists: the sandbox that tunes these constants can't reach Sleeper
+# or Tank01 (egress is locked to package registries). GitHub's runners CAN, so
+# this workflow fetches the live projections exactly the way weekly-prep.yml
+# does, prices them with the SAME self-calibrating formula, and prints the
+# curve to the Actions log — old constants vs. new — WITHOUT touching Firebase.
+#
+# It is safe to run any time. It only READS the player pool; it never writes a
+# salary sheet, never opens or locks a draft, never changes league state.
+#
+# Trigger: Actions tab → "Salary Test Run" → Run workflow → set week (default 4).
+
+on:
+  workflow_dispatch:
+    inputs:
+      week:
+        description: 'NFL week to price'
+        required: true
+        default: '4'
+      season:
+        description: 'Season'
+        required: true
+        default: '2026'
+      top_n:
+        description: 'How many top players to list per position'
+        required: false
+        default: '15'
+
+jobs:
+  salary-test-run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dry-run salary preview (real projections, no writes)
+        env:
+          FIREBASE_DB_URL:     ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+          TANK01_KEY:          ${{ secrets.TANK01_KEY }}
+          FR_SEASON:           ${{ github.event.inputs.season }}
+          FR_WEEK:             ${{ github.event.inputs.week }}
+          FR_TOPN:             ${{ github.event.inputs.top_n }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+
+          const FB_URL   = process.env.FIREBASE_DB_URL;
+          const FB_TOKEN = process.env.FIREBASE_AUTH_TOKEN;
+          const T01_KEY  = process.env.TANK01_KEY;
+          const SEASON   = process.env.FR_SEASON || '2026';
+          const WEEK     = parseInt(process.env.FR_WEEK || '4', 10);
+          const TOP_N    = parseInt(process.env.FR_TOPN || '15', 10);
+          const T01_HOST = 'tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com';
+          const WORKER   = 'https://fantasy-refresh-news.mtriedel.workers.dev';
+
+          // ── Constant sets: NEW (staged) vs OLD (currently live before deploy) ──
+          const TOP_ANCHOR_EXP = 0.6;
+          const MIN_SANITY = 100;
+          const SAL_ROUND = 100;
+          const SALARY_MIN_BY_POS = { QB: 24, RB: 50, WR: 70, TE: 24, DEF: 24 };
+
+          function makeConsts(SHARED_CAP, RB_WR_MAX, RB_PREM, BACKUP_QB) {
+            return {
+              SHARED_CAP, RB_WR_MAX, BACKUP_QB_SALARY: BACKUP_QB,
+              SAL_MIN_DEFAULT: 100, SAL_MAX_DEFAULT: RB_WR_MAX,
+              POSITIONS: {
+                QB:  { exp: 1.3,  premium: 1.0,     clamp: SHARED_CAP },
+                RB:  { exp: 0.55, premium: RB_PREM, clamp: RB_WR_MAX },
+                WR:  { exp: 0.55, premium: 1.12,    clamp: RB_WR_MAX },
+                TE:  { exp: 0.7,  premium: 1.21,    clamp: SHARED_CAP },
+                DEF: { exp: 0.6,  premium: 0.97,    clamp: SHARED_CAP }
+              }
+            };
+          }
+          const NEW = makeConsts(9000, 9600, 1.068, 4300); // staged
+          const OLD = makeConsts(8900, 9400, 1.058, 3800); // currently deployed
+
+          // ── HTTP helpers ──
+          function fetchJson(url, headers) {
+            return new Promise((resolve, reject) => {
+              const opts = new URL(url);
+              https.get({ hostname: opts.hostname, path: opts.pathname + opts.search, headers: headers || {} }, res => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch (e) { reject(e); } });
+              }).on('error', reject);
+            });
+          }
+          function firebaseGet(path) {
+            const sep = path.includes('?') ? '&' : '?';
+            const authedPath = FB_TOKEN ? `${path}${sep}auth=${FB_TOKEN}` : path;
+            return fetchJson(FB_URL + authedPath);
+          }
+          function t01(path) {
+            return fetchJson(`https://${T01_HOST}${path}`, { 'X-RapidAPI-Key': T01_KEY, 'X-RapidAPI-Host': T01_HOST });
+          }
+          function normalizeNameForMatch(name) {
+            return (name || '').toLowerCase().replace(/[.,']/g, '').replace(/\s+(jr|sr|ii|iii|iv|v)$/i, '').trim();
+          }
+
+          // ── Sleeper projections — exact copy of weekly-prep.yml's primary source ──
+          async function getSleeperProjections(week) {
+            const url = `https://api.sleeper.com/projections/nfl/${SEASON}/${week}`
+              + `?season_type=regular&position[]=QB&position[]=RB&position[]=WR&position[]=TE&position[]=DEF&order_by=ppr`;
+            let arr = [];
+            for (let attempt = 1; attempt <= 3 && !arr.length; attempt++) {
+              try {
+                const res = await fetch(url, { headers: { 'User-Agent': 'fantasyrefresh' } });
+                if (res.ok) {
+                  const data = await res.json();
+                  if (Array.isArray(data)) {
+                    arr = data.map(e => {
+                      const pl = e.player || {};
+                      return {
+                        id:   e.player_id,
+                        name: ((pl.first_name || '') + ' ' + (pl.last_name || '')).trim(),
+                        pos:  (e.position || pl.position || '').toUpperCase(),
+                        team: e.team || pl.team || '',
+                        proj: parseFloat((e.stats && e.stats.pts_ppr) || 0)
+                      };
+                    }).filter(p => p.id && ['QB','RB','WR','TE','DEF'].includes(p.pos) && p.proj > 0);
+                  } else { console.log(`  Sleeper attempt ${attempt}: response was not an array.`); }
+                } else { console.log(`  Sleeper attempt ${attempt}: HTTP ${res.status}.`); }
+              } catch (e) { console.log(`  Sleeper attempt ${attempt} failed: ${e.message}`); }
+              if (!arr.length && attempt < 3) await new Promise(r => setTimeout(r, 1500 * attempt));
+            }
+            if (arr.length) console.log(`  Sleeper projections: ${arr.length} projected players.`);
+            return arr;
+          }
+
+          // ── Tank01 projections — exact copy of weekly-auto-open.yml's source ──
+          async function getTank01Projections(week, season) {
+            const scoring = [
+              'itemFormat=list', 'twoPointConversions=2', 'passYards=.04', 'passTD=4',
+              'passInterceptions=-1', 'pointsPerReception=1', 'rushYards=.1', 'rushTD=6',
+              'fumbles=-1', 'receivingYards=.1', 'receivingTD=6'
+            ].join('&');
+            const attempts = [
+              `/getNFLProjections?week=${week}&${scoring}`,
+              `/getNFLProjections?week=${week}&archiveSeason=${parseInt(season) - 1}&${scoring}`
+            ];
+            for (const path of attempts) {
+              try {
+                const res = await t01(path);
+                const body = (res.body && res.body.body) || {};
+                const playerArr = Array.isArray(body.playerProjections) ? body.playerProjections : [];
+                const defArr = Array.isArray(body.teamDefenseProjections) ? body.teamDefenseProjections : [];
+                if (!playerArr.length && !defArr.length) continue;
+                const players = playerArr.map(p => {
+                  const pts = parseFloat(p.fantasyPoints || 0) ||
+                    ((p.fantasyPointsDefault && p.fantasyPointsDefault.PPR) ? parseFloat(p.fantasyPointsDefault.PPR) : 0);
+                  return { id: p.playerID || '', name: p.longName || p.playerName || '', pos: p.pos || '', team: p.team || p.teamAbv || '', proj: pts };
+                }).filter(p => p.name && p.pos && ['QB','RB','WR','TE'].includes(p.pos) && p.proj > 0);
+                const defs = defArr.map(d => ({ id: (d.teamAbv || d.team || '') + '_DEF', name: d.teamAbv || d.team || '', pos: 'DEF', team: d.teamAbv || d.team || '', proj: parseFloat(d.fantasyPointsDefault || 0) })).filter(d => d.name && d.proj > 0);
+                const all = [...players, ...defs];
+                if (all.length) return all;
+              } catch (e) { continue; }
+            }
+            return [];
+          }
+
+          // ── Shared, self-calibrating pricing (identical math in both real generators) ──
+          function price(consts, projPlayers) {
+            const P = consts.POSITIONS;
+            const maxProjByPos = {};
+            ['QB','RB','WR','TE','DEF'].forEach(pos => {
+              const atPos = projPlayers.filter(p => p.pos === pos && p.proj > 0);
+              maxProjByPos[pos] = atPos.length ? Math.max(...atPos.map(p => p.proj)) : 0;
+            });
+            const globalMaxProj = Math.max(...Object.values(maxProjByPos).filter(v => v > 0), 1);
+            const baseRate = consts.SHARED_CAP / Math.pow(globalMaxProj, TOP_ANCHOR_EXP);
+            const multByPos = {}, topAnchorByPos = {};
+            Object.entries(P).forEach(([pos, conf]) => {
+              if (!maxProjByPos[pos]) return;
+              let topAnchor = Math.pow(maxProjByPos[pos], TOP_ANCHOR_EXP) * baseRate * conf.premium;
+              topAnchor = Math.min(topAnchor, conf.clamp);
+              topAnchorByPos[pos] = topAnchor;
+              multByPos[pos] = topAnchor / Math.pow(maxProjByPos[pos], conf.exp);
+            });
+            const priced = projPlayers.map(p => {
+              if (!P[p.pos] || !(p.proj > 0)) return null;
+              const conf = P[p.pos];
+              const mult = multByPos[p.pos] || 0;
+              let sal = Math.ceil((Math.pow(p.proj, conf.exp) * mult) / SAL_ROUND) * SAL_ROUND;
+              sal = Math.max(MIN_SANITY, Math.min(conf.clamp, sal));
+              sal = Math.max(consts.SAL_MIN_DEFAULT, Math.min(consts.SAL_MAX_DEFAULT, sal));
+              return { ...p, salary: sal };
+            }).filter(Boolean);
+            return { priced, maxProjByPos, globalMaxProj, baseRate, topAnchorByPos, multByPos };
+          }
+
+          function pad(s, n) { s = String(s); return s.length >= n ? s : s + ' '.repeat(n - s.length); }
+          function padL(s, n) { s = String(s); return s.length >= n ? s : ' '.repeat(n - s.length) + s; }
+
+          async function main() {
+            console.log('════════════════════════════════════════════════════════════');
+            console.log(`  SALARY TEST RUN — DRY RUN (no Firebase writes)`);
+            console.log(`  Season ${SEASON}  ·  Week ${WEEK}  ·  ${new Date().toISOString()}`);
+            console.log('════════════════════════════════════════════════════════════');
+
+            // Read the player pool (READ ONLY) for id/name matching, like the real generators.
+            let pool = null;
+            try { pool = await firebaseGet(`/playerPool/${SEASON}/players.json`); } catch (e) { pool = null; }
+            const poolBySleeperId = pool || {};
+            const nameMap = {};
+            if (pool) Object.values(pool).forEach(p => { if (p && p.name) nameMap[normalizeNameForMatch(p.name)] = p; });
+            console.log(`Player pool: ${pool ? Object.keys(pool).length + ' players' : 'NOT READABLE (pricing will run unfiltered)'}`);
+
+            // ── Source selection: Sleeper primary → Tank01 fallback (mirrors real behavior) ──
+            let source = 'sleeper';
+            let proj = await getSleeperProjections(WEEK);
+            if (!proj.length) {
+              console.log('Sleeper returned nothing — falling back to Tank01 (as the real generators do).');
+              source = 'tank01';
+              proj = await getTank01Projections(WEEK, SEASON);
+            }
+            if (!proj.length) {
+              console.log('\n❌ No projections from EITHER source. In production this would NOT write a sheet');
+              console.log('   and the draft would stay CLOSED (flat fallback is last-resort only). Try again later.');
+              return;
+            }
+
+            // Faithful pool filter: only players that match a pooled player (what actually gets written).
+            // Also keep an UNFILTERED view so a missing pool never hides the curve.
+            function attachPool(list) {
+              return list.map(p => {
+                let poolP = null;
+                if (source === 'sleeper') poolP = poolBySleeperId[p.id] || null;
+                else poolP = nameMap[normalizeNameForMatch(p.name)] || null;
+                return { ...p, matched: !!poolP, name: (poolP && poolP.name) || p.name, status: poolP ? (poolP.status || null) : null };
+              });
+            }
+            const withPool = attachPool(proj);
+            const injFiltered = withPool.filter(p => p.status !== 'O' && p.status !== 'IR');
+            const faithful = pool ? injFiltered.filter(p => p.matched) : injFiltered;
+
+            console.log(`\nSource used: ${source.toUpperCase()}  ·  ${proj.length} projected players (> 0 pts)`);
+            console.log(`Priced (pool-matched, non-O/IR): ${faithful.length}`);
+
+            // Completeness gate (same thresholds the auto-open uses to allow a draft to open)
+            const realByPos = { QB:0, RB:0, WR:0, TE:0, DEF:0 };
+            faithful.forEach(p => { if (realByPos[p.pos] !== undefined) realByPos[p.pos]++; });
+            const missing = Object.keys(SALARY_MIN_BY_POS).filter(pos => realByPos[pos] < SALARY_MIN_BY_POS[pos]);
+            console.log(`Completeness by position: ${JSON.stringify(realByPos)}`);
+            console.log(missing.length
+              ? `⚠️  INCOMPLETE (below min: ${missing.join(', ')}) — production would HOLD and retry, not open.`
+              : `✅ COMPLETE — production would price & (in prep) write this sheet.`);
+
+            const RN = price(NEW, faithful);
+            const RO = price(OLD, faithful);
+            const salById = {};
+            RO.priced.forEach(p => { salById[(p.id||'') + '|' + p.pos + '|' + p.proj] = p.salary; });
+
+            console.log(`\nglobalMaxProj = ${RN.globalMaxProj.toFixed(2)}   (baseRate NEW ${RN.baseRate.toFixed(2)} / OLD ${RO.baseRate.toFixed(2)})`);
+            console.log('Per-position top anchor (NEW):');
+            ['QB','RB','WR','TE','DEF'].forEach(pos => {
+              if (!RN.maxProjByPos[pos]) return;
+              console.log(`   ${pad(pos,4)} maxProj ${padL(RN.maxProjByPos[pos].toFixed(1),6)}  →  top $${padL(Math.round(RN.topAnchorByPos[pos]||0),5)}`);
+            });
+
+            // Per-position tables, NEW price with OLD delta
+            ['QB','RB','WR','TE','DEF'].forEach(pos => {
+              const rowsN = RN.priced.filter(p => p.pos === pos).sort((a,b) => b.salary - a.salary || b.proj - a.proj);
+              if (!rowsN.length) return;
+              console.log(`\n── ${pos}  (top ${Math.min(TOP_N, rowsN.length)} of ${rowsN.length}) ──`);
+              console.log(`   ${pad('Player',22)} ${pad('Tm',4)} ${padL('Proj',6)}  ${padL('NEW',7)}  ${padL('OLD',7)}  Δ`);
+              rowsN.slice(0, TOP_N).forEach(p => {
+                const key = (p.id||'') + '|' + p.pos + '|' + p.proj;
+                const oldSal = salById[key];
+                const d = (oldSal != null) ? (p.salary - oldSal) : null;
+                const dStr = d == null ? '' : (d === 0 ? '—' : (d > 0 ? '+$'+d : '-$'+Math.abs(d)));
+                console.log(`   ${pad((p.name||p.id).slice(0,22),22)} ${pad(p.team||'',4)} ${padL(p.proj.toFixed(1),6)}  ${padL('$'+p.salary,7)}  ${padL(oldSal!=null?'$'+oldSal:'?',7)}  ${dStr}`);
+              });
+              // decile curve across the full priced set for this position
+              const projSorted = rowsN.map(p => p).sort((a,b) => b.proj - a.proj);
+              const marks = [0, .25, .5, .75, .9].map(f => projSorted[Math.min(projSorted.length-1, Math.floor(f*projSorted.length))]).filter(Boolean);
+              console.log(`   curve: ` + marks.map(p => `${p.proj.toFixed(1)}→$${p.salary}`).join('  '));
+            });
+
+            // Backup-QB floor illustration (unpriced pooled QBs → floor)
+            let backupCount = 0;
+            if (pool) {
+              const pricedIds = new Set(RN.priced.filter(p=>p.pos==='QB').map(p => p.id));
+              Object.values(pool).forEach(pp => {
+                if (!pp || pp.pos !== 'QB') return;
+                if (pp.status === 'O' || pp.status === 'IR') return;
+                if (source === 'sleeper' ? pricedIds.has(pp.id) : nameMap[normalizeNameForMatch(pp.name)] && pricedIds.has(pp.id)) return;
+                backupCount++;
+              });
+            }
+            console.log(`\nBackup-QB floor: NEW $${NEW.BACKUP_QB_SALARY} / OLD $${OLD.BACKUP_QB_SALARY}` + (pool ? `  (~${backupCount} pooled QBs would take the floor)` : ''));
+
+            console.log('\n════════════════════════════════════════════════════════════');
+            console.log('  DRY RUN COMPLETE — nothing was written to Firebase.');
+            console.log('════════════════════════════════════════════════════════════');
+          }
+
+          main().catch(e => { console.error('Test run error:', e); process.exit(1); });
+          SCRIPT
