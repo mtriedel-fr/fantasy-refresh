@@ -12274,6 +12274,27 @@ function applyBetaNav(){
 }
 applyBetaNav();
 document.addEventListener('DOMContentLoaded', applyBetaNav);
+
+// ── Non-gameplay → top-right ☰ (all leagues) ──────────────────────────
+// Ported from the beta Option-B pattern: League Info / Financials /
+// Commissioner now live in the top-right ☰ menu for EVERY league, not just
+// beta. The bottom "More" overflow is reduced to gameplay-only (Last One
+// Standing / Playoffs). Adaptive: if a league has no gameplay overflow left
+// (e.g. preseason, where both are hidden), the More button hides itself so it
+// never opens an empty sheet. Beta keeps its own bottom-bar layout untouched.
+function applyMainNav(){
+  var hb = document.getElementById('hdr-menu-btn'); if(hb) hb.style.display = '';   // reveal ☰ for all leagues
+  if(typeof isBetaLeague === 'function' && isBetaLeague()) return;                   // beta manages its own bar
+  var moreMenu = document.getElementById('more-menu');
+  var moreBtn  = document.getElementById('bn-more');
+  if(!moreMenu) return;
+  var grid = moreMenu.querySelector('div');
+  var vis  = grid ? Array.prototype.filter.call(grid.children, function(b){ return b.style && b.style.display !== 'none'; }) : [];
+  if(moreBtn) moreBtn.style.display = vis.length ? '' : 'none';
+  if(grid && vis.length) grid.style.gridTemplateColumns = 'repeat(' + Math.min(vis.length, 3) + ',1fr)';
+}
+applyMainNav();
+document.addEventListener('DOMContentLoaded', applyMainNav);
 if(IS_H2H_LEAGUE) initH2HVisibility();
 
 // Run commissioner check after a short delay to ensure Firebase is ready
@@ -12362,21 +12383,9 @@ document.addEventListener('DOMContentLoaded', function(){
       <div style="font-size:20px;margin-bottom:4px;">⚔️</div>
       <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink2);text-transform:uppercase;">Last One Standing</div>
     </button>
-    <button onclick="closeMoreMenu();switchBottomNav('league','bn-more')" style="background:var(--bg3);border:1px solid var(--bdr2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;">
-      <div style="font-size:20px;margin-bottom:4px;">🏈</div>
-      <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink2);text-transform:uppercase;">League</div>
-    </button>
     <button id="more-playoffs-btn" onclick="closeMoreMenu();switchBottomNav('playoffs','bn-more')" style="background:var(--bg3);border:1px solid var(--bdr2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;">
       <div style="font-size:20px;margin-bottom:4px;">🎯</div>
       <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink2);text-transform:uppercase;">Playoffs</div>
-    </button>
-    <button onclick="closeMoreMenu();switchBottomNav('dues','bn-more')" style="background:var(--bg3);border:1px solid var(--bdr2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;">
-      <div style="font-size:20px;margin-bottom:4px;">💰</div>
-      <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink2);text-transform:uppercase;">Financials</div>
-    </button>
-    <button onclick="closeMoreMenu();toggleComm()" id="more-comm-btn" style="display:none;background:rgba(0,229,212,.08);border:1px solid rgba(0,229,212,.2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;">
-      <div style="font-size:20px;margin-bottom:4px;">⚙️</div>
-      <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--or);text-transform:uppercase;">Comm</div>
     </button>
   </div>
 </div>
