@@ -830,10 +830,10 @@ body{padding-bottom:calc(76px + env(safe-area-inset-bottom));}
 /* Season standings — header-driven sorting */
 .st-table th.sortable{cursor:pointer;user-select:none;-webkit-user-select:none;}
 .st-table th .cx{font-size:9px;margin-left:2px;color:var(--or);}
-/* Points header built-in Total / Avg toggle (tap a unit to show + sort by it) */
-.st-table th .mh-seg{cursor:pointer;color:var(--ink3);font-weight:800;-webkit-user-select:none;user-select:none;}
-.st-table th .mh-seg.on{color:var(--or);}
-.st-table th .mh-sep{color:var(--ink3);opacity:.45;font-weight:400;margin:0 3px;}
+/* Points header built-in Total / Avg toggle — pill style, matches site toggles */
+.st-table th .mh-pill{display:inline-flex;gap:0;padding:2px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:14px;vertical-align:middle;}
+.st-table th .mh-pill-seg{font-family:var(--fd);font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.3px;padding:3px 9px;border:none;background:none;color:var(--ink3);border-radius:12px;cursor:pointer;line-height:1.4;-webkit-user-select:none;user-select:none;}
+.st-table th .mh-pill-seg.on{background:linear-gradient(135deg,var(--or),var(--pk));color:#050808;box-shadow:0 1px 4px rgba(0,0,0,.28);}
 /* Beta landing recap card (Season view) */
 .frecap{background:var(--bg2);border:1px solid var(--bdr2);border-radius:12px;overflow:hidden;margin:0 auto 12px;max-width:380px;}
 .frecap-head{display:flex;align-items:center;gap:10px;padding:10px 13px;cursor:pointer;}
@@ -3987,11 +3987,11 @@ function renderCumSeasonTable(){
   var metricCaret = (seasonSort === 'metric') ? ' <span class="cx">▾</span>' : '';
   var moveCaret   = (seasonSort === 'move-desc') ? ' <span class="cx">▾</span>' : (seasonSort === 'move-asc') ? ' <span class="cx">▴</span>' : '';
 
-  // Points header = inline Total / Avg toggle (tap to show + sort by that unit).
-  var metricHead = '<span class="mh-seg' + (seasonMetric === 'total' ? ' on' : '') + '" onclick="setSeasonMetricSort(\'total\')">Total</span>'
-    + '<span class="mh-sep">/</span>'
-    + '<span class="mh-seg' + (seasonMetric === 'avg' ? ' on' : '') + '" onclick="setSeasonMetricSort(\'avg\')">Avg</span>'
-    + metricCaret;
+  // Points header = pill-style Total / Avg toggle (tap a unit to show + sort by it).
+  var metricHead = '<span class="mh-pill">'
+    + '<button type="button" class="mh-pill-seg' + (seasonMetric === 'total' ? ' on' : '') + '" onclick="setSeasonMetricSort(\'total\')">Total</button>'
+    + '<button type="button" class="mh-pill-seg' + (seasonMetric === 'avg' ? ' on' : '') + '" onclick="setSeasonMetricSort(\'avg\')">Avg</button>'
+    + '</span>' + metricCaret;
 
   var rows = view.map(function(x){
     var t = x.t, r = x.r, diff = x.diff;
