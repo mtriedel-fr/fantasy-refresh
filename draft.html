@@ -185,6 +185,19 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
   .picker-cap-bar{display:block;}
   .picker-list{flex:1;overflow-y:auto;}
   body{overflow-y:auto;}
+  /* Narrow phones (incl. iOS Display Zoom / larger text, which renders a Pro
+     at ~320px logical) were starving the flexible name column — the fixed
+     photo + DEF-RANK + salary + Draft columns ate the row, clipping the name
+     to one letter. Compact the secondary columns and floor the name width so
+     the player's name is always readable while drafting. */
+  .player-row{gap:6px;padding:11px 10px;}
+  .p-photo{width:34px;height:34px;}
+  .p-info{min-width:96px;}                 /* guaranteed readable name width */
+  .p-name{font-size:15px;}
+  .p-meta{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11.5px;}
+  .p-mcol{width:30px;}
+  .p-sal{min-width:auto;font-size:15px;}
+  .draft-btn{width:62px;font-size:11px;padding:5px 3px;letter-spacing:0;}
 }
 
 /* ── NEWS MODAL ── */
