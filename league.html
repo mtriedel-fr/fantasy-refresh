@@ -823,6 +823,23 @@ body{padding-bottom:calc(76px + env(safe-area-inset-bottom));}
 #cum-mode-toggle{display:flex;width:100%;gap:0;padding:4px;background:var(--bg2);border:1px solid var(--bdr2);border-radius:12px;margin:0 0 10px;box-sizing:border-box;}
 #cum-mode-toggle button{flex:1 1 0;font-family:var(--fd);font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;padding:9px 12px;border:none;background:none;color:var(--ink3);border-radius:9px;cursor:pointer;transition:background .18s ease,color .18s ease;}
 #cum-mode-toggle button.on{background:linear-gradient(135deg,var(--or),var(--pk));color:#050808;box-shadow:0 1px 6px rgba(0,0,0,.28);}
+/* Beta landing recap card (Season view) */
+.frecap{background:var(--bg2);border:1px solid var(--bdr2);border-radius:12px;overflow:hidden;margin:0 auto 12px;max-width:380px;}
+.frecap-head{display:flex;align-items:center;gap:10px;padding:10px 13px;cursor:pointer;}
+.frecap-head:hover{background:var(--bg3);}
+.frecap-title{font-family:var(--fd);font-weight:800;font-size:13px;color:var(--or);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;}
+.frecap-chips{display:flex;gap:6px;flex:1;min-width:0;flex-wrap:wrap;}
+.frc{font-family:var(--fd);font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:20px;background:var(--bg3);border:1px solid var(--bdr);color:var(--ink2);white-space:nowrap;}
+.frc.hi{color:#69BE28;border-color:rgba(105,190,40,.35);}
+.frc.lo{color:#7FD4FF;border-color:rgba(127,212,255,.35);}
+.frecap-chev{color:var(--ink3);font-size:13px;transition:transform .2s;flex:none;}
+.frecap.open .frecap-chev{transform:rotate(180deg);}
+.frecap-body{max-height:0;overflow:hidden;opacity:0;transition:max-height .22s ease,opacity .18s ease;padding:0 13px;}
+.frecap.open .frecap-body{max-height:280px;opacity:1;padding:4px 13px 12px;}
+.frrow{display:flex;justify-content:space-between;align-items:baseline;padding:6px 0;border-bottom:1px solid var(--bdr);font-size:12.5px;color:var(--ink3);}
+.frrow:last-of-type{border-bottom:none;}
+.frrow b{font-family:var(--fd);color:var(--ink);font-weight:700;}
+.frecap-full{margin-top:8px;width:100%;padding:9px;background:rgba(0,229,212,.1);border:1.5px solid var(--or);border-radius:9px;color:var(--or);font-family:var(--fd);font-weight:800;font-size:12px;text-transform:uppercase;letter-spacing:.5px;cursor:pointer;}
 /* Beta My Team tab — This Week | My Season sub-toggle + This Week dashboard */
 #yt-subtoggle{display:flex;width:100%;gap:0;padding:4px;background:var(--bg2);border:1px solid var(--bdr2);border-radius:12px;margin:0 0 14px;box-sizing:border-box;}
 #yt-subtoggle button{flex:1 1 0;font-family:var(--fd);font-size:12.5px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;padding:9px 12px;border:none;background:none;color:var(--ink3);border-radius:9px;cursor:pointer;transition:background .18s ease,color .18s ease;}
@@ -1216,7 +1233,7 @@ setTimeout(function(){
   <div class="h2h-section h2h-section-standings">
     <div class="h2h-section-hdr" style="display:flex;align-items:center;justify-content:space-between;">
       <span id="cum-stand-hdr">🏆 Weekly Standings</span>
-      <div style="display:flex;gap:8px;">
+      <div id="cum-hdr-actions" style="display:flex;gap:8px;">
         <button onclick="openFullBoardStats()" style="font-family:var(--fd);font-size:11px;font-weight:800;padding:6px 12px;border-radius:20px;border:1.5px solid var(--pu);background:rgba(155,109,255,.1);color:var(--pu);cursor:pointer;">🏈 All Players</button>
         <button onclick="openRecap()" style="font-family:var(--fd);font-size:11px;font-weight:800;padding:6px 12px;border-radius:20px;border:1.5px solid var(--or);background:rgba(0,229,212,.1);color:var(--or);cursor:pointer;">📰 Weekly Review</button>
       </div>
@@ -1229,6 +1246,7 @@ setTimeout(function(){
       <button id="cum-view-standings" class="on" onclick="setCumStandView('standings')">🏆 Standings</button>
       <button id="cum-view-cutline" onclick="setCumStandView('cutline')">🪓 Cut Line</button>
     </div>
+    <div id="cum-actions" style="display:none;justify-content:center;gap:8px;margin:0 0 12px;"></div>
     <div id="cum-standings-wrap"></div>
     <div id="cum-standings-pager" style="display:flex;gap:6px;justify-content:center;margin-top:12px;flex-wrap:wrap;"></div>
   </div>
@@ -3933,10 +3951,44 @@ function renderCumSeasonTable(){
       + '<td class="move-col">' + mv + '</td>'
       + '</tr>';
   }).join('');
-  wrap.innerHTML = '<table class="st-table"><thead><tr><th class="rk">#</th><th>Team</th>'
+  wrap.innerHTML = buildLandingRecapCard()
+    + '<table class="st-table"><thead><tr><th class="rk">#</th><th>Team</th>'
     + '<th style="text-align:right">Total</th><th style="text-align:right">Avg</th>'
     + '<th class="move-col">Move</th></tr></thead><tbody>' + rows + '</tbody></table>';
 }
+
+// Beta landing recap card (shown in the Season view) — a thin, expandable
+// card summarizing the latest completed week; "Read the full review" opens the
+// existing recap. Retrospective, so it lives in the Season (between-games) view.
+function buildLandingRecapCard(){
+  var weeks = Object.keys(seasonData).filter(function(k){ return !isNaN(Number(k)) && seasonData[k] && seasonData[k].length; }).map(Number).sort(function(a,b){ return a-b; });
+  if(!weeks.length) return '';
+  var rw = weeks[weeks.length - 1];
+  var arr = seasonData[String(rw)] || [];
+  var active = (typeof realActiveMemberUids !== 'undefined' && realActiveMemberUids) ? arr.filter(function(e){ return e.uid && realActiveMemberUids[e.uid]; }) : arr;
+  var scored = active.filter(function(e){ return (parseFloat(e.score)||0) > 0; });
+  if(!scored.length) return '';
+  var hi = scored.reduce(function(a,b){ return (parseFloat(b.score)||0) > (parseFloat(a.score)||0) ? b : a; });
+  var lo = scored.reduce(function(a,b){ return (parseFloat(b.score)||0) < (parseFloat(a.score)||0) ? b : a; });
+  var avg = scored.reduce(function(s,e){ return s + (parseFloat(e.score)||0); }, 0) / scored.length;
+  var mover = null;
+  try{ var ss = computeSeasonStandings(); ss.sorted.forEach(function(t,i){ var r = i+1, p = ss.prevRank[t.name]; if(p !== undefined){ var d = p - r; if(!mover || d > mover.d) mover = { name: t.name, d: d }; } }); }catch(e){}
+  var nm = function(e){ return (e.uid && memberNameByUid[e.uid]) || e.name; };
+  var moverRow = (mover && mover.d > 0) ? '<div class="frrow"><span>🚀 Biggest jump</span><b>' + escapeHtmlFR(mover.name) + ' ▲' + mover.d + '</b></div>' : '';
+  return '<div class="frecap" id="fr-recap">'
+    + '<div class="frecap-head" onclick="toggleFrecap()">'
+    + '<span class="frecap-title">📰 Week ' + rw + ' Review</span>'
+    + '<span class="frecap-chips"><span class="frc hi">🔥 ' + (parseFloat(hi.score)||0).toFixed(1) + '</span><span class="frc lo">🧊 ' + (parseFloat(lo.score)||0).toFixed(1) + '</span></span>'
+    + '<span class="frecap-chev">▾</span></div>'
+    + '<div class="frecap-body">'
+    + '<div class="frrow"><span>🔥 High score</span><b>' + escapeHtmlFR(nm(hi)) + ' — ' + (parseFloat(hi.score)||0).toFixed(1) + '</b></div>'
+    + moverRow
+    + '<div class="frrow"><span>🧊 Low score</span><b>' + escapeHtmlFR(nm(lo)) + ' — ' + (parseFloat(lo.score)||0).toFixed(1) + '</b></div>'
+    + '<div class="frrow"><span>📊 Week average</span><b>' + avg.toFixed(1) + '</b></div>'
+    + '<button class="frecap-full" onclick="openRecap()">Read the full review →</button>'
+    + '</div></div>';
+}
+function toggleFrecap(){ var el = document.getElementById('fr-recap'); if(el) el.classList.toggle('open'); }
 
 // ── BETA My Team tab (This Week | My Season) ───────────────────────
 var ytView = 'week'; // 'week' | 'season'
@@ -4151,15 +4203,28 @@ function renderCumStandingsPage(page){
     syncCumModeToggle();
     var hdrEl = document.getElementById('cum-stand-hdr');
     var viewToggle = document.getElementById('cum-view-toggle');
+    var hdrActions = document.getElementById('cum-hdr-actions');
+    if(hdrActions) hdrActions.style.display = 'none'; // beta moves actions below, contextually
+    var acts = document.getElementById('cum-actions');
     if(effectiveCumMode() === 'season'){
       if(hdrEl) hdrEl.textContent = '🏆 Season Standings';
       if(viewToggle) viewToggle.style.display = 'none';
+      if(acts) acts.style.display = 'none'; // recap card lives inside the season table
       renderCumSeasonTable();
       return;
     } else {
       if(hdrEl) hdrEl.textContent = '🏆 Weekly Standings';
       var lctxB = (typeof FRAuth !== 'undefined' && FRAuth.getLeagueCtx) ? FRAuth.getLeagueCtx() : null;
       if(viewToggle) viewToggle.style.display = (lctxB && lctxB.guillotine) ? '' : 'none';
+      // Weekly (standings view) → centered All Players; hidden on the Cut Line view.
+      if(acts){
+        if(cumStandView !== 'cutline'){
+          acts.style.display = 'flex';
+          acts.innerHTML = '<button onclick="openFullBoardStats()" style="font-family:var(--fd);font-size:11px;font-weight:800;padding:6px 14px;border-radius:20px;border:1.5px solid var(--pu);background:rgba(155,109,255,.1);color:var(--pu);cursor:pointer;">🏈 All Players</button>';
+        } else {
+          acts.style.display = 'none';
+        }
+      }
     }
   }
 
