@@ -31,11 +31,22 @@ name: Weekly Auto-Open (Salaries + Draft Unlock)
 # league entirely.
 
 on:
-  # Triggered externally by cron-job.org (a POST to this workflow's
-  # workflow_dispatch), the same reliable cadence used for auto-scoring and
-  # kickoff-locks. GitHub's own schedule trigger was REMOVED in favor of that
-  # reliable external cadence — the draft opening on time depends on this job,
-  # so it shouldn't ride GitHub's flaky scheduler.
+  # PRIMARY: triggered externally by cron-job.org (a POST to this workflow's
+  # workflow_dispatch), the same cadence used for auto-scoring and kickoff-locks.
+  #
+  # REDUNDANCY (added): GitHub's own scheduler now also runs this every 30 min.
+  # It was previously removed for being less punctual than cron-job.org, but as a
+  # BACKUP it costs nothing and closes the single-point-of-failure that made the
+  # draft fail to open on time every week: cron-job.org is the ONLY thing that
+  # opens the draft (prep only WRITES the sheet, it never unlocks), so if that one
+  # POST didn't land, the week never opened and a manual run was needed. This job
+  # is fully idempotent — it does nothing if it isn't yet time or a complete sheet
+  # is already open — so an extra scheduler firing it can never double-open or
+  # reprice. Native cron can lag 5–15 min under load; that's fine here because the
+  # job just re-checks and opens the moment conditions are met. Whichever trigger
+  # fires first wins; the other then no-ops.
+  schedule:
+    - cron: '*/30 * * * *'   # every 30 min, all days — backup to cron-job.org
   workflow_dispatch:
 
 jobs:
@@ -159,6 +170,11 @@ jobs:
           const SAL_MIN_DEFAULT = 100;
           const SAL_MAX_DEFAULT = 9600;
           const SAL_ROUND = 100;
+          // Hard salary floor for every real price — identical to weekly-prep.yml's
+          // SALARY_FLOOR. Both generators now floor at the same value so a week prices
+          // the same regardless of which one built it (previously prep honored a stale
+          // settings.minSalary of 3700 while this one floored at 100). Keep in sync.
+          const SALARY_FLOOR = 2000;
           const BACKUP_QB_SALARY = 3800; // floor for a QB with no real projection yet
 
           // Suffix/punctuation-safe name match — confirmed directly:
@@ -271,7 +287,7 @@ jobs:
               const mult = multByPos[p.pos] || 0;
               let sal = Math.ceil((Math.pow(p.proj, conf.exp) * mult) / SAL_ROUND) * SAL_ROUND;
               sal = Math.max(MIN_SANITY, Math.min(conf.clamp, sal));
-              sal = Math.max(SAL_MIN_DEFAULT, Math.min(SAL_MAX_DEFAULT, sal));
+              sal = Math.max(SALARY_FLOOR, Math.min(SAL_MAX_DEFAULT, sal));
               salaries[pid] = { id: pid, name: p.name, pos: p.pos, team: p.team, proj: Math.round(p.proj * 10) / 10, salary: sal, status: inj, tank01PlayerID: poolP ? poolP.tank01PlayerID : null, headshot: poolP ? poolP.headshot : null };
               count++;
             });

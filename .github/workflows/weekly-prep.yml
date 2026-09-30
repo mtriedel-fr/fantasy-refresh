@@ -84,6 +84,13 @@ jobs:
             DEF: { exp: 0.6,  premium: 0.97,  clamp: SHARED_CAP }
           };
           const SAL_MIN_DEFAULT = 100;   // matches MIN_SANITY — the old $4,500 default was the artificial floor this whole redesign specifically removed
+          // Hard salary floor, applied to every real (regular-season, non-flat) price.
+          // Deliberately NOT read from settings.minSalary any more: a stale per-league
+          // min (fr_refresh26 still carried 3700 from the old era) was re-imposing a
+          // floor this redesign meant to drop, AND weekly-auto-open ignored that setting
+          // and floored at 100 — so the two generators produced different sheets for the
+          // same week. This constant is identical in weekly-auto-open.yml; keep them in sync.
+          const SALARY_FLOOR = 2000;
           const SAL_MAX_DEFAULT = 9600;  // matches the highest real position clamp (RB/WR) — each position's own clamp above is what actually governs pricing; this is just an outer safety bound
           const SAL_ROUND = 100;
           const FLAT = { QB: 8500, RB: 6500, WR: 6000, TE: 5500, DEF: 5000 };
@@ -694,8 +701,11 @@ jobs:
             }
 
             const cap = (settings && settings.cap) || 60000;
-            const min = (settings && settings.minSalary) || SAL_MIN_DEFAULT;
-            const max = (settings && settings.maxSalary) || SAL_MAX_DEFAULT;
+            // Bounds are hard-coded (NOT settings.minSalary / settings.maxSalary) so this
+            // generator and weekly-auto-open always price a week identically. settings.cap
+            // is still honored — only the per-player floor/ceiling bounds are fixed here.
+            const min = SALARY_FLOOR;      // $2,000 floor, identical in weekly-auto-open.yml
+            const max = SAL_MAX_DEFAULT;   // $9,600 outer bound; per-position clamps govern below it
 
             // Sleeper is the primary projection source (complete, includes all
             // 32 defenses, exact id match to the pool). The Worker/Tank01 feed

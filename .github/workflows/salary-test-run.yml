@@ -60,10 +60,10 @@ jobs:
           const SAL_ROUND = 100;
           const SALARY_MIN_BY_POS = { QB: 24, RB: 50, WR: 70, TE: 24, DEF: 24 };
 
-          function makeConsts(SHARED_CAP, RB_WR_MAX, RB_PREM, BACKUP_QB) {
+          function makeConsts(SHARED_CAP, RB_WR_MAX, RB_PREM, BACKUP_QB, FLOOR) {
             return {
               SHARED_CAP, RB_WR_MAX, BACKUP_QB_SALARY: BACKUP_QB,
-              SAL_MIN_DEFAULT: 100, SAL_MAX_DEFAULT: RB_WR_MAX,
+              SAL_MIN_DEFAULT: FLOOR, SAL_MAX_DEFAULT: RB_WR_MAX,
               POSITIONS: {
                 QB:  { exp: 1.3,  premium: 1.0,     clamp: SHARED_CAP },
                 RB:  { exp: 0.55, premium: RB_PREM, clamp: RB_WR_MAX },
@@ -73,8 +73,9 @@ jobs:
               }
             };
           }
-          const NEW = makeConsts(9000, 9600, 1.068, 3800); // staged
-          const OLD = makeConsts(8900, 9400, 1.058, 3800); // currently deployed
+          //                       cap  ceil  RBprem backup floor
+          const NEW = makeConsts(9000, 9600, 1.068, 3800, 2000); // staged: floor 2000, hard-coded in both generators
+          const OLD = makeConsts(8900, 9400, 1.058, 3800, 3700); // currently deployed: prep floored at settings.minSalary 3700
 
           // ── HTTP helpers ──
           function fetchJson(url, headers) {
