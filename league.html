@@ -835,10 +835,10 @@ body{padding-bottom:calc(76px + env(safe-area-inset-bottom));}
 .st-table th .mh-pill-seg{font-family:var(--fd);font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.3px;padding:3px 9px;border:none;background:none;color:var(--ink3);border-radius:12px;cursor:pointer;line-height:1.4;-webkit-user-select:none;user-select:none;}
 .st-table th .mh-pill-seg.on{background:linear-gradient(135deg,var(--or),var(--pk));color:#050808;box-shadow:0 1px 4px rgba(0,0,0,.28);}
 /* Beta landing recap card (Season view) */
-.frecap{background:var(--bg2);border:1px solid var(--bdr2);border-radius:12px;overflow:hidden;margin:0 auto 12px;max-width:380px;}
-.frecap-head{display:flex;align-items:center;gap:10px;padding:10px 13px;cursor:pointer;}
+.frecap{background:var(--bg2);border:1px solid var(--bdr2);border-radius:12px;overflow:hidden;margin:0 auto 12px;max-width:300px;}
+.frecap-head{display:flex;align-items:center;gap:8px;padding:7px 11px;cursor:pointer;}
 .frecap-head:hover{background:var(--bg3);}
-.frecap-title{font-family:var(--fd);font-weight:800;font-size:13px;color:var(--or);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;}
+.frecap-title{font-family:var(--fd);font-weight:800;font-size:11.5px;color:var(--or);text-transform:uppercase;letter-spacing:.4px;white-space:nowrap;}
 .frecap-chips{display:flex;gap:6px;flex:1;min-width:0;flex-wrap:wrap;}
 .frc{font-family:var(--fd);font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:20px;background:var(--bg3);border:1px solid var(--bdr);color:var(--ink2);white-space:nowrap;}
 .frc.hi{color:#69BE28;border-color:rgba(105,190,40,.35);}
@@ -1246,7 +1246,7 @@ setTimeout(function(){
       <span id="cum-stand-hdr">🏆 Weekly Standings</span>
       <div id="cum-hdr-actions" style="display:flex;gap:8px;">
         <button onclick="openFullBoardStats()" style="font-family:var(--fd);font-size:11px;font-weight:800;padding:6px 12px;border-radius:20px;border:1.5px solid var(--pu);background:rgba(155,109,255,.1);color:var(--pu);cursor:pointer;">🏈 All Players</button>
-        <button onclick="openRecap()" style="font-family:var(--fd);font-size:11px;font-weight:800;padding:6px 12px;border-radius:20px;border:1.5px solid var(--or);background:rgba(0,229,212,.1);color:var(--or);cursor:pointer;">📰 Weekly Review</button>
+        <button onclick="openRecap()" style="font-family:var(--fd);font-size:11px;font-weight:800;padding:6px 12px;border-radius:20px;border:1.5px solid var(--or);background:rgba(0,229,212,.1);color:var(--or);cursor:pointer;">📰 Weekly Wrap</button>
       </div>
     </div>
     <div id="cum-mode-toggle" style="display:none;">
@@ -2502,7 +2502,7 @@ function updateMyTeamLabel(filledCount, totalCount, targetWeek){
   // opens that week's recap instead of an editor.
   var myEntry = myTeam ? (seasonData[String(currentWeek)] || []).find(function(e){ return teamMatch(e.name, myTeam); }) : null;
   var isPastFinal = myEntry && (myEntry.status === 'final' || myEntry.locked);
-  var text = isPastFinal ? '📰 Week ' + currentWeek + ' Review'
+  var text = isPastFinal ? '📰 Week ' + currentWeek + ' Wrap'
     : filledCount === 0 ? '📝 Draft Team' + wk
     : filledCount < totalCount ? '🧩 Finish Lineup' + wk
     : '✏️ Edit Lineup' + wk;
@@ -2891,7 +2891,7 @@ var WELCOME_TOUR_ITEMS = [
   { icon: '👤', title: 'My Team', body: 'View and edit your lineup for the current week — tap the pencil to swap players before they lock.' },
   { icon: '🏆', title: 'Weekly Standings', body: 'See how everyone ranks this week. Tap any team\u2019s name to expand their live roster and scores.' },
   { icon: '📅', title: 'Week Selector', body: 'Switch between weeks using the dropdown at the top — check past results or a locked-in upcoming lineup.' },
-  { icon: '📰', title: 'Weekly Review', body: 'A full recap of each week once it\u2019s done — league leader, high/low score, MVP, and more.' }
+  { icon: '📰', title: 'Weekly Wrap', body: 'A full recap of each week once it\u2019s done — league leader, high/low score, MVP, and more.' }
 ];
 
 function showMyWelcomeTour(){
@@ -3984,14 +3984,13 @@ function renderCumSeasonTable(){
   // 'rank' → leave in rank order
 
   var rankCaret   = (seasonSort === 'rank') ? ' <span class="cx">▾</span>' : '';
-  var metricCaret = (seasonSort === 'metric') ? ' <span class="cx">▾</span>' : '';
   var moveCaret   = (seasonSort === 'move-desc') ? ' <span class="cx">▾</span>' : (seasonSort === 'move-asc') ? ' <span class="cx">▴</span>' : '';
 
   // Points header = pill-style Total / Avg toggle (tap a unit to show + sort by it).
   var metricHead = '<span class="mh-pill">'
     + '<button type="button" class="mh-pill-seg' + (seasonMetric === 'total' ? ' on' : '') + '" onclick="setSeasonMetricSort(\'total\')">Total</button>'
     + '<button type="button" class="mh-pill-seg' + (seasonMetric === 'avg' ? ' on' : '') + '" onclick="setSeasonMetricSort(\'avg\')">Avg</button>'
-    + '</span>' + metricCaret;
+    + '</span>';
 
   var rows = view.map(function(x){
     var t = x.t, r = x.r, diff = x.diff;
@@ -4037,7 +4036,7 @@ function buildLandingRecapCard(){
   var moverRow = (mover && mover.d > 0) ? '<div class="frrow"><span>🚀 Biggest jump</span><b>' + escapeHtmlFR(mover.name) + ' ▲' + mover.d + '</b></div>' : '';
   return '<div class="frecap" id="fr-recap">'
     + '<div class="frecap-head" onclick="toggleFrecap()">'
-    + '<span class="frecap-title">📰 Week ' + rw + ' Review</span>'
+    + '<span class="frecap-title">📰 Week ' + rw + ' Wrap</span>'
     + '<span class="frecap-chips"><span class="frc hi">🔥 ' + (parseFloat(hi.score)||0).toFixed(1) + '</span><span class="frc lo">🧊 ' + (parseFloat(lo.score)||0).toFixed(1) + '</span></span>'
     + '<span class="frecap-chev">▾</span></div>'
     + '<div class="frecap-body">'
@@ -5375,7 +5374,7 @@ function renderGuillotine(){
     + (winnersHTML || '')
     + survivorsHTML
     + eliminationsByWeekHTML
-    + (recapEmbedHTML ? '<div class="guill-section"><div class="guill-section-hdr">📰 Week ' + recapWeek + ' Review</div>' + recapEmbedHTML + '</div>' : '')
+    + (recapEmbedHTML ? '<div class="guill-section"><div class="guill-section-hdr">📰 Week ' + recapWeek + ' Wrap</div>' + recapEmbedHTML + '</div>' : '')
     + '</div>';
 }
 
@@ -9185,7 +9184,7 @@ function openRecap(week){
   var season   = FR.seasonKey();
   var w = week || currentWeek;
 
-  document.getElementById('recap-title').textContent = 'Week ' + w + ' Review';
+  document.getElementById('recap-title').textContent = 'Week ' + w + ' Wrap';
   document.getElementById('recap-body').innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--ink3);font-size:13px;">Loading…</div>';
   document.getElementById('recap-overlay').classList.add('open');
 
@@ -11833,7 +11832,7 @@ function removeCommissioner(uid){
 <div class="recap-overlay" id="recap-overlay" onclick="if(event.target===this)closeRecap()">
   <div class="recap-box">
     <div class="recap-hdr">
-      <div style="font-family:var(--fd);font-size:16px;font-weight:900;color:var(--or);text-transform:uppercase;letter-spacing:.5px;" id="recap-title">Weekly Review</div>
+      <div style="font-family:var(--fd);font-size:16px;font-weight:900;color:var(--or);text-transform:uppercase;letter-spacing:.5px;" id="recap-title">Weekly Wrap</div>
       <button class="recap-close-btn" onclick="closeRecap()">✕</button>
     </div>
     <div class="recap-body" id="recap-body"></div>
