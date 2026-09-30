@@ -1126,8 +1126,8 @@ setTimeout(function(){
       <button class="fr-badge" id="fr-sign-btn" onclick="openProfileDrawer()" style="display:flex;align-items:center;gap:6px;">
         <span id="fr-avatar" style="width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,var(--or),var(--pk));display:flex;align-items:center;justify-content:center;font-family:var(--fd);font-size:12px;font-weight:800;color:#050808;flex-shrink:0;">—</span>
         <span id="fr-sign-name">—</span>
+        <span style="color:var(--ink3);font-size:11px;margin-left:1px;">▾</span>
       </button>
-      <button id="hdr-menu-btn" onclick="toggleHdrMenu(event)" title="League menu" style="display:none;background:none;border:1px solid var(--bdr2);border-radius:8px;color:var(--ink2);font-size:16px;line-height:1;padding:6px 10px;cursor:pointer;flex-shrink:0;">☰</button>
     </div>
   </div>
 </div>
@@ -11846,8 +11846,32 @@ function removeCommissioner(uid){
   <!-- Settings rows -->
   <div style="padding:8px 0;">
 
+    <!-- League Info -->
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 24px;cursor:pointer;" onclick="closeProfileDrawer();setTimeout(function(){handleNav('league');},200)">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <span style="font-size:18px;">🏈</span>
+        <div>
+          <div style="font-family:var(--fd);font-size:15px;font-weight:700;color:var(--ink);text-transform:uppercase;">League Info</div>
+          <div style="font-size:12px;color:var(--ink3);">Rules, members &amp; settings</div>
+        </div>
+      </div>
+      <span style="color:var(--ink3);font-size:18px;">›</span>
+    </div>
+
+    <!-- Financials -->
+    <div style="border-top:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;padding:14px 24px;cursor:pointer;" onclick="closeProfileDrawer();setTimeout(function(){handleNav('dues');},200)">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <span style="font-size:18px;">💰</span>
+        <div>
+          <div style="font-family:var(--fd);font-size:15px;font-weight:700;color:var(--ink);text-transform:uppercase;">Financials</div>
+          <div style="font-size:12px;color:var(--ink3);">Dues &amp; payouts</div>
+        </div>
+      </div>
+      <span style="color:var(--ink3);font-size:18px;">›</span>
+    </div>
+
     <!-- Dark/Light mode -->
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 24px;cursor:pointer;" onclick="toggleThemeFromDrawer()">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 24px;cursor:pointer;border-top:1px solid var(--bdr);" onclick="toggleThemeFromDrawer()">
       <div style="display:flex;align-items:center;gap:12px;">
         <span id="pd-theme-icon" style="font-size:18px;">🌙</span>
         <div>
@@ -12269,21 +12293,17 @@ function applyBetaNav(){
     }
   });
 
-  // Reveal the top-right ☰ menu (League / Financials / Commissioner).
-  var hb = document.getElementById('hdr-menu-btn'); if(hb) hb.style.display = '';
 }
 applyBetaNav();
 document.addEventListener('DOMContentLoaded', applyBetaNav);
 
-// ── Non-gameplay → top-right ☰ (all leagues) ──────────────────────────
-// Ported from the beta Option-B pattern: League Info / Financials /
-// Commissioner now live in the top-right ☰ menu for EVERY league, not just
-// beta. The bottom "More" overflow is reduced to gameplay-only (Last One
-// Standing / Playoffs). Adaptive: if a league has no gameplay overflow left
-// (e.g. preseason, where both are hidden), the More button hides itself so it
-// never opens an empty sheet. Beta keeps its own bottom-bar layout untouched.
+// ── Bottom "More" overflow: gameplay-adaptive (all leagues) ───────────
+// Non-gameplay (League Info / Financials / Commissioner) now lives in the
+// profile drawer opened from the name/avatar chip — one menu, no separate ☰.
+// This just keeps the bottom "More" overflow gameplay-only: it reflows to the
+// visible count and hides the More button entirely if a league has no gameplay
+// overflow left (e.g. preseason). Beta manages its own bottom bar.
 function applyMainNav(){
-  var hb = document.getElementById('hdr-menu-btn'); if(hb) hb.style.display = '';   // reveal ☰ for all leagues
   if(typeof isBetaLeague === 'function' && isBetaLeague()) return;                   // beta manages its own bar
   var moreMenu = document.getElementById('more-menu');
   var moreBtn  = document.getElementById('bn-more');
@@ -12365,13 +12385,8 @@ document.addEventListener('DOMContentLoaded', function(){
   </div>
 </div>
 
-<!-- BETA league top-right menu (League / Financials / Commissioner) -->
-<div id="hdr-menu-scrim" onclick="closeHdrMenu()" style="display:none;position:fixed;inset:0;z-index:566;"></div>
-<div id="hdr-menu" style="display:none;position:fixed;top:56px;right:12px;z-index:567;width:220px;background:var(--bg2);border:1px solid var(--bdr2);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.5);overflow:hidden;">
-  <button onclick="hdrMenuGo('league')" style="display:flex;align-items:center;gap:10px;width:100%;padding:13px 15px;background:none;border:none;border-bottom:1px solid var(--bdr);color:var(--ink);font-family:var(--fd);font-weight:700;font-size:13px;cursor:pointer;text-align:left;"><span style="font-size:16px;width:20px;text-align:center;">🏈</span> League Info</button>
-  <button onclick="hdrMenuGo('dues')" style="display:flex;align-items:center;gap:10px;width:100%;padding:13px 15px;background:none;border:none;border-bottom:1px solid var(--bdr);color:var(--ink);font-family:var(--fd);font-weight:700;font-size:13px;cursor:pointer;text-align:left;"><span style="font-size:16px;width:20px;text-align:center;">💰</span> Financials</button>
-  <button id="hdr-menu-comm" onclick="hdrMenuComm()" style="display:none;align-items:center;gap:10px;width:100%;padding:13px 15px;background:rgba(0,229,212,.06);border:none;color:var(--or);font-family:var(--fd);font-weight:700;font-size:13px;cursor:pointer;text-align:left;"><span style="font-size:16px;width:20px;text-align:center;">⚙️</span> Commissioner</button>
-</div>
+<!-- (Former ☰ top-right menu removed — League Info / Financials / Commissioner
+     now live in the profile drawer, opened from the name/avatar chip.) -->
 
 <!-- MORE MENU OVERLAY -->
 <div id="more-overlay" onclick="closeMoreMenu()" style="display:none;position:fixed;inset:0;z-index:565;"></div>
