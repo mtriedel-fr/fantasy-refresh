@@ -819,6 +819,47 @@ body{padding-bottom:calc(76px + env(safe-area-inset-bottom));}
 #cum-view-toggle{display:flex;width:100%;gap:0;padding:4px;background:var(--bg2);border:1px solid var(--bdr2);border-radius:12px;align-self:stretch;}
 #cum-view-toggle button{flex:1 1 0;justify-content:center;text-align:center;padding:9px 12px;border-radius:9px;color:var(--ink3);transition:background .18s ease,color .18s ease;}
 #cum-view-toggle button.on{background:linear-gradient(135deg,var(--or),var(--pk));color:#050808;box-shadow:0 1px 6px rgba(0,0,0,.28);}
+/* Beta (fr_test_full): Season⇄Weekly standings switch below My Team */
+#cum-mode-toggle{display:flex;width:100%;gap:0;padding:4px;background:var(--bg2);border:1px solid var(--bdr2);border-radius:12px;margin:0 0 10px;box-sizing:border-box;}
+#cum-mode-toggle button{flex:1 1 0;font-family:var(--fd);font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;padding:9px 12px;border:none;background:none;color:var(--ink3);border-radius:9px;cursor:pointer;transition:background .18s ease,color .18s ease;}
+#cum-mode-toggle button.on{background:linear-gradient(135deg,var(--or),var(--pk));color:#050808;box-shadow:0 1px 6px rgba(0,0,0,.28);}
+/* Beta My Team tab — This Week | My Season sub-toggle + This Week dashboard */
+#yt-subtoggle{display:flex;width:100%;gap:0;padding:4px;background:var(--bg2);border:1px solid var(--bdr2);border-radius:12px;margin:0 0 14px;box-sizing:border-box;}
+#yt-subtoggle button{flex:1 1 0;font-family:var(--fd);font-size:12.5px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;padding:9px 12px;border:none;background:none;color:var(--ink3);border-radius:9px;cursor:pointer;transition:background .18s ease,color .18s ease;}
+#yt-subtoggle button.on{background:linear-gradient(135deg,var(--or),var(--pk));color:#050808;box-shadow:0 1px 6px rgba(0,0,0,.28);}
+.ytw-sec{font-family:var(--fd);font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--ink2);margin:16px 2px 8px;}
+.ytw-card{background:var(--bg2);border:1px solid var(--bdr);border-radius:14px;padding:14px 16px;}
+.ytw-hero{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.ytw-hero .nm{font-family:var(--fd);font-weight:900;font-size:20px;color:var(--ink);line-height:1;}
+.ytw-hero .sub{font-family:var(--fd);font-size:11px;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;margin-top:4px;}
+.ytw-hero .big{font-family:var(--fd);font-weight:900;font-size:28px;color:var(--or);line-height:1;text-align:right;}
+.ytw-hero .biglbl{font-family:var(--fd);font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-top:3px;text-align:right;}
+.ytw-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--bdr);border-radius:10px;overflow:hidden;margin-top:12px;}
+.ytw-stats .s{background:var(--bg2);padding:11px 8px;text-align:center;}
+.ytw-stats .v{font-family:var(--fd);font-weight:900;font-size:18px;color:var(--ink);}
+.ytw-stats .l{font-family:var(--fd);font-size:9px;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-top:3px;}
+.ytw-plc{position:relative;height:52px;margin:14px 6px 4px;}
+.ytw-plc .rail{position:absolute;top:24px;left:0;right:0;height:7px;border-radius:5px;background:linear-gradient(90deg,var(--pk),#FFC24B,var(--or));opacity:.55;}
+.ytw-plc .avg{position:absolute;top:22px;width:0;}
+.ytw-plc .avg .tick{position:absolute;left:-1px;top:0;width:2px;height:11px;background:var(--ink2);}
+.ytw-plc .avg .lbl{position:absolute;top:13px;left:0;transform:translateX(-50%);font-family:var(--fd);font-size:9px;color:var(--ink3);white-space:nowrap;}
+.ytw-plc .you{position:absolute;top:2px;width:0;}
+.ytw-plc .you .dot{position:absolute;left:-8px;top:14px;width:16px;height:16px;border-radius:50%;background:var(--or);border:3px solid var(--bg);box-shadow:0 0 0 1px var(--or);}
+.ytw-plc .you .lbl{position:absolute;bottom:20px;left:0;transform:translateX(-50%);font-family:var(--fd);font-size:11px;font-weight:900;color:var(--or);white-space:nowrap;}
+.ytw-plc .ends{position:absolute;top:33px;left:0;right:0;display:flex;justify-content:space-between;font-family:var(--fd);font-size:9.5px;color:var(--ink3);}
+.ytw-pct{text-align:center;font-family:var(--fd);font-size:11px;color:var(--ink2);letter-spacing:.3px;margin-top:2px;}
+.ytw-pct b{color:var(--or);}
+.pbar{display:flex;align-items:center;gap:9px;padding:5px 0;}
+.pbar .pl{font-family:var(--fd);font-weight:800;font-size:10px;width:38px;text-align:center;padding:3px 0;border-radius:6px;flex:none;}
+.pbar .track{flex:1;height:10px;background:var(--bg3);border-radius:6px;overflow:hidden;}
+.pbar .fill{height:100%;border-radius:6px;}
+.pbar .val{font-family:var(--fd);font-weight:800;font-size:12.5px;color:var(--ink);width:44px;text-align:right;flex:none;}
+.ytw-stand{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.ytw-stand .s{background:var(--bg3);border:1px solid var(--bdr);border-radius:10px;padding:10px 12px;}
+.ytw-stand .s .h{font-family:var(--fd);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;}
+.ytw-stand .s.hot .h{color:var(--or);} .ytw-stand .s.cold .h{color:#7FD4FF;}
+.ytw-stand .s .n2{font-family:var(--fd);font-weight:800;font-size:14px;color:var(--ink);}
+.ytw-stand .s .p2{font-family:var(--fd);font-size:12px;color:var(--ink3);margin-top:2px;}
 .cl-legend{display:flex;gap:12px;flex-wrap:wrap;font-family:var(--fd);font-size:11px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;color:var(--ink3);}
 .cl-legend span{display:inline-flex;align-items:center;gap:5px;}
 .cl-dot{width:8px;height:8px;border-radius:50%;display:inline-block;}
@@ -1173,11 +1214,15 @@ setTimeout(function(){
   </div>
   <div class="h2h-section h2h-section-standings">
     <div class="h2h-section-hdr" style="display:flex;align-items:center;justify-content:space-between;">
-      <span>🏆 Weekly Standings</span>
+      <span id="cum-stand-hdr">🏆 Weekly Standings</span>
       <div style="display:flex;gap:8px;">
         <button onclick="openFullBoardStats()" style="font-family:var(--fd);font-size:11px;font-weight:800;padding:6px 12px;border-radius:20px;border:1.5px solid var(--pu);background:rgba(155,109,255,.1);color:var(--pu);cursor:pointer;">🏈 All Players</button>
         <button onclick="openRecap()" style="font-family:var(--fd);font-size:11px;font-weight:800;padding:6px 12px;border-radius:20px;border:1.5px solid var(--or);background:rgba(0,229,212,.1);color:var(--or);cursor:pointer;">📰 Weekly Review</button>
       </div>
+    </div>
+    <div id="cum-mode-toggle" style="display:none;">
+      <button id="cum-mode-season" onclick="setCumMode('season')">📊 Season</button>
+      <button id="cum-mode-weekly" class="on" onclick="setCumMode('weekly')">📅 Weekly</button>
     </div>
     <div id="cum-view-toggle" class="cl-toggle" style="margin:0 0 12px;display:none;">
       <button id="cum-view-standings" class="on" onclick="setCumStandView('standings')">🏆 Standings</button>
@@ -1222,6 +1267,24 @@ setTimeout(function(){
   <div class="nav-tab" id="navtab-draft" onclick="goToDraft()">
     <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/><circle cx="12" cy="12" r="3"/></svg>
     <span>Draft</span>
+  </div>
+</div>
+
+<!-- MY TEAM (beta) — This Week | My Season, consolidating the personal views -->
+<div id="tab-yourteam" class="content hidden">
+  <div class="tab-overlay-close-bar hidden">
+    <div class="tab-overlay-close-bar-row">
+      <span class="tab-overlay-close-bar-title">👤 My Team</span>
+      <button class="tab-overlay-close-btn" onclick="closeH2HTabOverlay()">✕ Close</button>
+    </div>
+  </div>
+  <div style="padding:14px 16px;">
+    <div id="yt-subtoggle">
+      <button id="yt-tab-week" class="on" onclick="ytSetView('week')">📅 This Week</button>
+      <button id="yt-tab-season" onclick="ytSetView('season')">📈 My Season</button>
+    </div>
+    <div id="yt-week-wrap"></div>
+    <div id="yt-season-wrap" style="display:none;"></div>
   </div>
 </div>
 
@@ -2210,7 +2273,7 @@ function applyH2HChrome(){
   // takeovers for H2H, same pattern as the commissioner panel — but this
   // only applies here in JS, gated on IS_H2H_LEAGUE, so the cumulative OG
   // league's tab behavior is completely untouched.
-  ['tab-yourweek','tab-yourseason','tab-guillotine','tab-playoffs','tab-league'].forEach(function(id){
+  ['tab-yourweek','tab-yourteam','tab-yourseason','tab-guillotine','tab-playoffs','tab-league'].forEach(function(id){
     var t = document.getElementById(id);
     if(t) t.classList.add('tab-overlay');
   });
@@ -3435,6 +3498,9 @@ function renderCumHome(){
     var lctx = (typeof FRAuth !== 'undefined' && FRAuth.getLeagueCtx) ? FRAuth.getLeagueCtx() : null;
     cumViewToggle.style.display = (lctx && lctx.guillotine) ? '' : 'none';
   }
+  // Beta league: reveal the Season⇄Weekly switch below My Team.
+  var cumModeToggle = document.getElementById('cum-mode-toggle');
+  if(cumModeToggle) cumModeToggle.style.display = isBetaLeague() ? 'flex' : 'none';
 
   updateMyTeamLabelsForCumulative();
 
@@ -3455,7 +3521,7 @@ function renderCumHome(){
   // wired up for H2H before, so these tabs were just showing inline here,
   // which is why the landing page (lineup + standings) stayed visible
   // behind every one of them.
-  ['tab-yourweek','tab-yourseason','tab-guillotine','tab-playoffs','tab-league'].forEach(function(id){
+  ['tab-yourweek','tab-yourteam','tab-yourseason','tab-guillotine','tab-playoffs','tab-league'].forEach(function(id){
     var t = document.getElementById(id);
     if(t) t.classList.add('tab-overlay');
   });
@@ -3755,6 +3821,264 @@ function countPlayersLeft(lineup, gameMap){
   return { left: left, total: slots.length };
 }
 
+// ── BETA / experimental leagues ────────────────────────────────────
+// Feature-flag gate so new looks can be trialled in one test league without
+// touching fr_refresh26 or any other real league. isBetaLeague() is the only
+// check any experiment should use; flip a feature "live for everyone" later by
+// dropping that guard.
+var BETA_LEAGUES = { 'fr_test_full': true };
+function isBetaLeague(){
+  var ctx = (typeof FRAuth !== 'undefined' && FRAuth.getLeagueCtx) ? FRAuth.getLeagueCtx() : null;
+  return !!(ctx && ctx.leagueId && BETA_LEAGUES[ctx.leagueId]);
+}
+
+// Season-long aggregation (Rank / Team / Total / Avg + prev-week rank for the
+// Move column) — the same math renderAll() feeds the Season tab, pulled into a
+// standalone helper so the beta landing "Season" view can mirror it without a
+// refactor of renderAll.
+function computeSeasonStandings(){
+  var weeks = Object.keys(seasonData).filter(function(k){ return !isNaN(Number(k)) && seasonData[k] && seasonData[k].length; });
+  function agg(uptoExclusive){
+    var t = {};
+    weeks.forEach(function(w){
+      if(uptoExclusive != null && Number(w) >= uptoExclusive) return;
+      seasonData[w].forEach(function(e){
+        if(realActiveMemberUids && (!e.uid || !realActiveMemberUids[e.uid])) return;
+        var key = e.uid || ('nm:' + e.name);
+        if(!t[key]) t[key] = { name: (e.uid && memberNameByUid[e.uid]) || e.name, uid: e.uid || '', total: 0, cnt: 0 };
+        t[key].total += e.score; t[key].cnt++;
+      });
+    });
+    return t;
+  }
+  var totals = agg(null);
+  var sorted = Object.keys(totals).map(function(k){ var d = totals[k]; return { name: d.name, uid: d.uid, total: d.total, cnt: d.cnt, avg: d.cnt ? d.total / d.cnt : 0 }; })
+    .sort(function(a, b){ return b.total - a.total; });
+  var prevTotals = agg(currentWeek);
+  var prevRank = {};
+  Object.keys(prevTotals).sort(function(a, b){ return prevTotals[b].total - prevTotals[a].total; })
+    .forEach(function(k, i){ prevRank[prevTotals[k].name] = i + 1; });
+  return { sorted: sorted, prevRank: prevRank };
+}
+
+// Season⇄Weekly mode for the beta landing standings. 'auto' picks a sensible
+// default from where the week is; a manual tap pins it for the session.
+var cumMode = 'auto';                 // 'auto' | 'weekly' | 'season'
+var betaFinalizedAtCache = {};        // week -> finalizedAt (ms) or null
+var betaMetaFetched = {};             // week -> true once meta fetch started
+function getCumModeDefault(){
+  // Season before the week's first kickoff AND after it closes (finalized +
+  // 24h); Weekly through the live window in between.
+  var wk = String(currentWeek);
+  var gm = cumStandingsGameMapCache[wk];
+  var kicked = gm && Object.keys(gm).some(function(k){ var g = gm[k]; return g && (g.liveStatusCode === 1 || g.liveStatusCode === 2); });
+  if(!kicked) return 'season';
+  var fin = betaFinalizedAtCache[wk];
+  if(typeof fin === 'number' && Date.now() > fin + 24 * 3600 * 1000) return 'season';
+  return 'weekly';
+}
+function effectiveCumMode(){ return cumMode === 'auto' ? getCumModeDefault() : cumMode; }
+function syncCumModeToggle(){
+  var eff = effectiveCumMode();
+  var s = document.getElementById('cum-mode-season'), w = document.getElementById('cum-mode-weekly');
+  if(s) s.classList.toggle('on', eff === 'season');
+  if(w) w.classList.toggle('on', eff === 'weekly');
+}
+function setCumMode(m){ cumMode = m; syncCumModeToggle(); renderCumStandingsPage(0); }
+// Load the two pieces the auto default needs (week finalizedAt + this week's
+// game map for kickoff detection), once per week, then re-render if we're still
+// on auto so the default settles correctly.
+function ensureBetaWeekMeta(){
+  var wk = String(currentWeek);
+  if(betaMetaFetched[wk]) return;
+  betaMetaFetched[wk] = true;
+  var ctx = (typeof FRAuth !== 'undefined' && FRAuth.getLeagueCtx) ? FRAuth.getLeagueCtx() : null;
+  var lid = ctx ? ctx.leagueId : 'fr_test_full';
+  var season = FR.seasonKey();
+  Promise.all([
+    FR.fb.get('/leagues/' + lid + '/season/' + season + '/' + wk + '/finalizedAt').catch(function(){ return null; }),
+    cumStandingsGameMapCache[wk] ? Promise.resolve(cumStandingsGameMapCache[wk]) : fetchWeekSchedule(wk).catch(function(){ return null; })
+  ]).then(function(res){
+    betaFinalizedAtCache[wk] = (typeof res[0] === 'number') ? res[0] : null;
+    if(res[1] && !cumStandingsGameMapCache[wk]) cumStandingsGameMapCache[wk] = res[1];
+    if(cumMode === 'auto'){ syncCumModeToggle(); renderCumStandingsPage(0); }
+  });
+}
+
+// Beta "Season" table — mirrors the Season tab columns (Rank / Team / Total /
+// Avg / Move), team names click through to the season-overview modal.
+function renderCumSeasonTable(){
+  var wrap = document.getElementById('cum-standings-wrap');
+  var pager = document.getElementById('cum-standings-pager');
+  if(pager) pager.innerHTML = '';
+  if(!wrap) return;
+  var data = computeSeasonStandings();
+  var sorted = data.sorted, prevRank = data.prevRank;
+  if(!sorted.length){ wrap.innerHTML = '<div style="padding:24px;text-align:center;color:var(--ink3);font-family:var(--fd);font-size:13px;">No season data yet.</div>'; return; }
+  var rows = sorted.map(function(t, i){
+    var r = i + 1;
+    var prev = prevRank[t.name];
+    var diff = (prev !== undefined) ? prev - r : null;
+    var mv = diff === null ? '<span class="fl">—</span>'
+      : diff > 0 ? '<span class="up">' + AUP + diff + '</span>'
+      : diff < 0 ? '<span class="dn">' + ADN + Math.abs(diff) + '</span>'
+      : '<span class="fl">—</span>';
+    var isMe = myTeam && teamMatch(t.name, myTeam);
+    return '<tr' + (isMe ? ' class="my-team"' : '') + '>'
+      + '<td class="rk' + (r <= 3 ? ' g' : '') + '">' + (r <= 3 ? MED[r-1] : r) + '</td>'
+      + '<td><span class="season-name-link" onclick="openTeamSeason(\'' + t.name.replace(/'/g,"\\'") + '\')" style="cursor:pointer;">' + escapeHtmlFR(t.name) + '</span>' + (isMe ? '<span class="my-team-badge">You</span>' : '') + '</td>'
+      + '<td class="tp" style="text-align:right">' + fmtTotal(t.total) + '</td>'
+      + '<td class="av" style="text-align:right">' + fmtScore(t.avg) + '</td>'
+      + '<td class="move-col">' + mv + '</td>'
+      + '</tr>';
+  }).join('');
+  wrap.innerHTML = '<table class="st-table"><thead><tr><th class="rk">#</th><th>Team</th>'
+    + '<th style="text-align:right">Total</th><th style="text-align:right">Avg</th>'
+    + '<th class="move-col">Move</th></tr></thead><tbody>' + rows + '</tbody></table>';
+}
+
+// ── BETA My Team tab (This Week | My Season) ───────────────────────
+var ytView = 'week'; // 'week' | 'season'
+function ytSetView(v){
+  ytView = v;
+  var w = document.getElementById('yt-tab-week'), s = document.getElementById('yt-tab-season');
+  if(w) w.classList.toggle('on', v === 'week');
+  if(s) s.classList.toggle('on', v === 'season');
+  renderMyTeamTab();
+}
+function ytEmpty(t, s){
+  return '<div class="myteam-empty"><div class="myteam-empty-icon">📅</div><div class="myteam-empty-title">' + t + '</div><div class="myteam-empty-sub">' + s + '</div></div>';
+}
+function renderMyTeamTab(){
+  var wWrap = document.getElementById('yt-week-wrap'), sWrap = document.getElementById('yt-season-wrap');
+  if(!wWrap || !sWrap) return;
+  if(ytView === 'season'){
+    wWrap.style.display = 'none'; sWrap.style.display = '';
+    sWrap.innerHTML = myTeam ? buildTeamSeasonHtml(myTeam, true)
+      : ytEmpty('No team set', 'Set your team name to see your season overview.');
+  } else {
+    sWrap.style.display = 'none'; wWrap.style.display = '';
+    renderMyWeek(wWrap);
+  }
+}
+// This Week dashboard: hero + league placement (synchronous from seasonData),
+// then lineup + points-by-position + standouts loaded from the real lineup.
+function renderMyWeek(wrap){
+  var user = (typeof FRAuth !== 'undefined' && FRAuth.getUser) ? FRAuth.getUser() : null;
+  var uid = user ? user.uid : null;
+  var wk = String(currentWeek);
+  var entries = seasonData[wk] || [];
+  var active = (typeof realActiveMemberUids !== 'undefined' && realActiveMemberUids)
+    ? entries.filter(function(e){ return e.uid && realActiveMemberUids[e.uid]; }) : entries;
+  var mine = (uid && active.find(function(e){ return e.uid === uid; }))
+    || (myTeam && active.find(function(e){ return teamMatch(e.name, myTeam); })) || null;
+  if(!myTeam && !uid){ wrap.innerHTML = ytEmpty('No team set', 'Set your team name to see your week.'); return; }
+  if(!mine){ wrap.innerHTML = ytEmpty('No score yet', 'Your Week ' + wk + ' details appear once games start.'); return; }
+
+  var myScore = parseFloat(mine.score) || 0;
+  var sortedDesc = active.slice().sort(function(a, b){ return (parseFloat(b.score)||0) - (parseFloat(a.score)||0); });
+  var rank = sortedDesc.findIndex(function(e){ return (uid && e.uid === uid) || teamMatch(e.name, mine.name); }) + 1;
+  var of = active.length;
+  var scored = active.map(function(e){ return parseFloat(e.score)||0; }).filter(function(v){ return v > 0; });
+  var low = scored.length ? Math.min.apply(null, scored) : 0;
+  var high = scored.length ? Math.max.apply(null, scored) : 0;
+  var avg = scored.length ? scored.reduce(function(a,b){ return a+b; },0)/scored.length : 0;
+
+  var weeks = Object.keys(seasonData).filter(function(k){ return !isNaN(Number(k)) && seasonData[k] && seasonData[k].length; });
+  var myScores = weeks.map(function(w){
+    var arr = seasonData[w] || [];
+    var m = (uid && arr.find(function(e){ return e.uid === uid; })) || arr.find(function(e){ return teamMatch(e.name, mine.name); });
+    return m ? (parseFloat(m.score)||0) : null;
+  }).filter(function(v){ return v != null; });
+  var seasonAvg = myScores.length ? myScores.reduce(function(a,b){ return a+b; },0)/myScores.length : 0;
+  var vsAvg = myScore - seasonAvg;
+
+  function pctPos(v){ return high <= low ? 50 : Math.max(0, Math.min(100, (v-low)/(high-low)*100)); }
+  var railHtml = (scored.length >= 2)
+    ? '<div class="ytw-plc"><div class="rail"></div>'
+      + '<div class="avg" style="left:' + pctPos(avg).toFixed(1) + '%"><div class="tick"></div><div class="lbl">Lg avg ' + avg.toFixed(0) + '</div></div>'
+      + '<div class="you" style="left:' + pctPos(myScore).toFixed(1) + '%"><div class="lbl">You ' + myScore.toFixed(1) + '</div><div class="dot"></div></div>'
+      + '<div class="ends"><span>' + low.toFixed(0) + '</span><span>' + high.toFixed(0) + '</span></div></div>'
+    : '<div class="ytw-pct" style="padding:12px 0;">The board fills in once more teams have scores this week.</div>';
+  var beat = Math.max(0, of - rank), pctile = of > 1 ? Math.round(beat/(of-1)*100) : 100;
+  var pctLine = (scored.length >= 2) ? '<div class="ytw-pct">#' + rank + ' of ' + of + ' this week · ahead of <b>' + beat + ' of ' + (of-1) + '</b> (' + pctile + 'th pct)</div>' : '';
+  var vsColor = vsAvg >= 0 ? 'var(--or)' : 'var(--pk)';
+
+  wrap.innerHTML = '<div class="ytw-card"><div class="ytw-hero"><div><div class="nm">' + escapeHtmlFR(mine.name) + '</div><div class="sub">Week ' + wk + (mine.status === 'live' ? ' · Live' : (mine.locked ? ' · Final' : '')) + '</div></div>'
+    + '<div><div class="big">' + myScore.toFixed(1) + '</div><div class="biglbl">This week</div></div></div>'
+    + '<div class="ytw-stats"><div class="s"><div class="v">#' + (rank || '—') + '</div><div class="l">Wk rank</div></div>'
+    + '<div class="s"><div class="v" id="ytw-left">—</div><div class="l">Left</div></div>'
+    + '<div class="s"><div class="v" style="color:' + vsColor + '">' + (myScores.length > 1 ? ((vsAvg >= 0 ? '+' : '') + vsAvg.toFixed(1)) : '—') + '</div><div class="l">vs your avg</div></div></div></div>'
+    + '<div class="ytw-sec">Where you stand this week</div><div class="ytw-card">' + railHtml + pctLine + '</div>'
+    + '<div class="ytw-sec">Points by position</div><div class="ytw-card" id="ytw-pos"><div style="color:var(--ink3);font-family:var(--fd);font-size:12px;">Loading…</div></div>'
+    + '<div class="ytw-sec">Standouts</div><div id="ytw-stand"></div>'
+    + '<div class="ytw-sec">Your lineup</div><div id="ytw-lineup"><div style="padding:12px;color:var(--ink3);font-family:var(--fd);font-size:12px;">Loading…</div></div>';
+
+  loadMyWeekDetail(uid || mine.uid, mine);
+}
+function loadMyWeekDetail(uid, mine){
+  if(!uid) return;
+  var ctx = (typeof FRAuth !== 'undefined' && FRAuth.getLeagueCtx) ? FRAuth.getLeagueCtx() : null;
+  var lid = ctx ? ctx.leagueId : 'fr_test_full';
+  var season = FR.seasonKey(); var wk = String(currentWeek);
+  Promise.all([
+    FR.fb.get('/leagues/' + lid + '/lineups/' + season + '/week' + wk + '/' + uid).catch(function(){ return null; }),
+    FR.fb.get('/leagues/' + lid + '/season/' + season + '/' + wk + '/' + uid).catch(function(){ return null; }),
+    FR.fb.get('/leagues/' + lid + '/locks/' + season + '/week' + wk).catch(function(){ return {}; }),
+    fetchWeekSchedule(wk).catch(function(){ return {}; })
+  ]).then(function(res){
+    if(ytView !== 'week') return; // switched away while loading
+    var lineup = res[0], scoreEntry = res[1] || mine, locks = res[2] || {}, gameMap = res[3] || {};
+    var slotPts = (scoreEntry && scoreEntry.slotPts) || {};
+
+    var lu = document.getElementById('ytw-lineup');
+    if(lu) lu.innerHTML = rosterColumn(lineup, scoreEntry, locks, true, gameMap);
+
+    var pl = countPlayersLeft(lineup, gameMap);
+    var leftEl = document.getElementById('ytw-left'); if(leftEl) leftEl.textContent = pl ? (pl.left + '/' + pl.total) : '—';
+
+    var posEl = document.getElementById('ytw-pos');
+    if(posEl){
+      if(lineup && lineup.slots && Object.keys(slotPts).length){
+        var byPos = {}, order = [];
+        Object.keys(lineup.slots).forEach(function(sid){
+          var p = lineup.slots[sid]; if(!p) return;
+          var pos = p.pos || 'FLEX';
+          if(!(pos in byPos)){ byPos[pos] = 0; order.push(pos); }
+          byPos[pos] += (parseFloat(slotPts[sid]) || 0);
+        });
+        var maxv = Math.max.apply(null, order.map(function(k){ return byPos[k]; }).concat([0.01]));
+        posEl.innerHTML = order.map(function(k){
+          var c = (typeof LINEUP_POS_COLORS !== 'undefined' && LINEUP_POS_COLORS[k]) || 'var(--ink2)';
+          var v = byPos[k];
+          return '<div class="pbar"><span class="pl" style="background:' + c + '1f;color:' + c + '">' + escapeHtmlFR(k) + '</span>'
+            + '<span class="track"><span class="fill" style="width:' + (v/maxv*100).toFixed(0) + '%;background:' + c + '"></span></span>'
+            + '<span class="val">' + v.toFixed(1) + '</span></div>';
+        }).join('') || '<div style="color:var(--ink3);font-family:var(--fd);font-size:12px;">No scoring yet.</div>';
+      } else {
+        posEl.innerHTML = '<div style="color:var(--ink3);font-family:var(--fd);font-size:12px;">Points by position appears once your players start scoring.</div>';
+      }
+    }
+
+    var standEl = document.getElementById('ytw-stand');
+    if(standEl){
+      var players = [];
+      if(lineup && lineup.slots){
+        Object.keys(lineup.slots).forEach(function(sid){ var p = lineup.slots[sid]; if(!p) return; players.push({ name: p.name || p.pos, pos: p.pos || '', pts: parseFloat(slotPts[sid]) || 0 }); });
+      }
+      var withPts = players.filter(function(p){ return p.pts > 0; });
+      if(withPts.length){
+        var top = withPts.slice().sort(function(a,b){ return b.pts - a.pts; })[0];
+        var cold = players.slice().sort(function(a,b){ return a.pts - b.pts; })[0];
+        standEl.innerHTML = '<div class="ytw-stand"><div class="s hot"><div class="h">🔥 Top scorer</div><div class="n2">' + escapeHtmlFR(top.name) + '</div><div class="p2">' + escapeHtmlFR(top.pos) + ' · ' + top.pts.toFixed(1) + ' pts</div></div>'
+          + '<div class="s cold"><div class="h">🧊 Cold spot</div><div class="n2">' + escapeHtmlFR(cold.name) + '</div><div class="p2">' + escapeHtmlFR(cold.pos) + ' · ' + cold.pts.toFixed(1) + ' pts</div></div></div>';
+      } else {
+        standEl.innerHTML = '<div class="ytw-card" style="color:var(--ink3);font-family:var(--fd);font-size:12px;">Standouts appear once games are underway.</div>';
+      }
+    }
+  });
+}
+
 // Landing-page standings view: 'standings' (the table) or 'cutline' (the
 // Last One Standing bubble board). The toggle above the standings flips it.
 var cumStandView = 'standings';
@@ -3817,6 +4141,26 @@ function renderCumStandingsPage(page){
   var wrap = document.getElementById('cum-standings-wrap');
   var pager = document.getElementById('cum-standings-pager');
   if(!wrap) return;
+
+  // Beta league: a Season⇄Weekly switch sits above the standings. In Season
+  // mode we render the cumulative table and ignore the weekly Standings/Cut
+  // Line sub-toggle entirely.
+  if(isBetaLeague()){
+    ensureBetaWeekMeta();
+    syncCumModeToggle();
+    var hdrEl = document.getElementById('cum-stand-hdr');
+    var viewToggle = document.getElementById('cum-view-toggle');
+    if(effectiveCumMode() === 'season'){
+      if(hdrEl) hdrEl.textContent = '🏆 Season Standings';
+      if(viewToggle) viewToggle.style.display = 'none';
+      renderCumSeasonTable();
+      return;
+    } else {
+      if(hdrEl) hdrEl.textContent = '🏆 Weekly Standings';
+      var lctxB = (typeof FRAuth !== 'undefined' && FRAuth.getLeagueCtx) ? FRAuth.getLeagueCtx() : null;
+      if(viewToggle) viewToggle.style.display = (lctxB && lctxB.guillotine) ? '' : 'none';
+    }
+  }
 
   // Cut Line view takes over the standings container (and clears the pager).
   if(cumStandView === 'cutline'){
@@ -8395,6 +8739,7 @@ function handleNav(val){
   if(val === 'league'){ document.body.style.overflow = 'hidden'; document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); }); document.getElementById('tab-league').classList.remove('hidden'); document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); }); document.getElementById('navtab-league').classList.add('active'); setStatBoxes('hidden'); renderLeague(); return; }
   if(val === 'playoffs'){ document.body.style.overflow = 'hidden'; document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); }); document.getElementById('tab-playoffs').classList.remove('hidden'); document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); }); document.getElementById('navtab-playoffs').classList.add('active'); setStatBoxes('hidden'); renderPlayoffs(); return; }
   if(val === 'dues'){ document.body.style.overflow = 'hidden'; document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); }); document.getElementById('tab-dues').classList.remove('hidden'); document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); }); setStatBoxes('hidden'); var cumHomeEl = document.getElementById('cum-home'); if(cumHomeEl) cumHomeEl.classList.add('hidden'); renderPayouts(); renderDues(); return; }
+  if(val === 'yourteam'){ document.body.style.overflow = 'hidden'; document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); }); var ytEl = document.getElementById('tab-yourteam'); if(ytEl) ytEl.classList.remove('hidden'); document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); }); setStatBoxes('hidden'); renderMyTeamTab(); return; }
   if(val === 'guillotine'){ document.body.style.overflow = 'hidden'; document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); }); document.getElementById('tab-guillotine').classList.remove('hidden'); document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); }); document.getElementById('navtab-guillotine').classList.add('active'); setStatBoxes('guillotine'); renderGuillotine(); return; }
   if(val === 'yourseason'){
     var completedWeeks = Object.keys(seasonData).filter(function(k){
@@ -11665,6 +12010,37 @@ function switchBottomNav(tabName, btnId, subTab){
   if(btn) btn.classList.add('active');
 }
 
+// Are we sitting on the bare league landing (My Team card + standings), with
+// no full-screen tab open?
+function isAtLeagueLanding(){
+  var anyTab = false;
+  document.querySelectorAll('.content').forEach(function(c){ if(!c.classList.contains('hidden')) anyTab = true; });
+  var cumHome = document.getElementById('cum-home');
+  return !anyTab && !!cumHome && !cumHome.classList.contains('hidden');
+}
+// Return to the league landing from inside any tab, in-app (no navigation).
+function showLeagueLanding(){
+  document.body.style.overflow = '';
+  document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); });
+  document.querySelectorAll('.tab-overlay').forEach(function(t){ t.classList.add('hidden'); });
+  document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); });
+  document.querySelectorAll('.bn-item').forEach(function(b){ b.classList.remove('active'); });
+  if(typeof setStatBoxes === 'function') setStatBoxes('normal');
+  if(typeof renderCumHome === 'function') renderCumHome();
+  window.scrollTo(0, 0);
+}
+// Home button: first press returns to the league you're reviewing; press it
+// again from the landing to leave for the all-leagues page. Two-stage behavior
+// is gated to the beta league; every other league keeps the direct exit.
+function goHome(){
+  closeMoreMenu();
+  if(isBetaLeague() && !isAtLeagueLanding()){
+    showLeagueLanding();
+    return;
+  }
+  window.location.href = '/home.html';
+}
+
 var moreMenuOpen = false;
 function closeMoreMenu(){
   var menu = document.getElementById('more-menu');
@@ -11757,6 +12133,19 @@ if(IS_PRESEASON_LEAGUE){
   var gBtn2 = document.getElementById('more-guillotine-btn');
   if(gBtn2) gBtn2.style.display = (ctxG && ctxG.guillotine) ? '' : 'none';
 }
+
+// Beta (fr_test_full) — Stage 1 entry point: the bottom "This Week" button
+// becomes "My Team" and opens the consolidated My Team tab (This Week | My
+// Season). Full adaptive nav + top menu comes in Stage 2. Other leagues
+// are untouched.
+if(typeof isBetaLeague === 'function' && isBetaLeague()){
+  var bwBtn = document.getElementById('bn-week');
+  if(bwBtn){
+    bwBtn.setAttribute('onclick', "closeMoreMenu();switchBottomNav('yourteam','bn-week')");
+    var bwLbl = bwBtn.querySelector('.bn-label'); if(bwLbl) bwLbl.textContent = 'My Team';
+    var bwIc = bwBtn.querySelector('.bn-icon'); if(bwIc) bwIc.textContent = '👤';
+  }
+}
 if(IS_H2H_LEAGUE) initH2HVisibility();
 
 // Run commissioner check after a short delay to ensure Firebase is ready
@@ -11771,7 +12160,7 @@ document.addEventListener('DOMContentLoaded', function(){
 <!-- TEAM NAME PROMPT MODAL -->
 <!-- BOTTOM NAV -->
 <nav class="bottom-nav" id="bottom-nav">
-  <button class="bn-item" onclick="closeMoreMenu();window.location.href='/home.html'">
+  <button class="bn-item" onclick="goHome()">
     <span class="bn-icon">🏠</span>
     <span class="bn-label">Home</span>
   </button>
