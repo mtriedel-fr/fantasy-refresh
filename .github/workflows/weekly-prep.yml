@@ -73,18 +73,18 @@ jobs:
           // price is a consequence of their real projection, not a fixed
           // floor every deep-bench player alike gets pushed up to.
           const TOP_ANCHOR_EXP = 0.6; // shared cross-position rate, calibrated off whichever position has the single highest real projection this week
-          const SHARED_CAP = 8900;   // QB, TE, DEF clamp — raised +300 from 8600 (also the base-rate anchor, so this lifts the whole curve ~3.5%)
-          const RB_WR_MAX = 9400;    // RB, WR get their own, higher clamp — raised +300 from 9100 to keep RB/WR separation
+          const SHARED_CAP = 9000;   // QB, TE, DEF clamp + global base-rate anchor — 9000 (was 8900). Raising it lifts the whole curve slightly across all positions.
+          const RB_WR_MAX = 9600;    // RB, WR ceiling — 9600 (was 9400). WR is clamp-bound so this scales the whole WR curve; RB rarely reaches it.
           const MIN_SANITY = 100;
           const POSITIONS = {
             QB:  { exp: 1.3,  premium: 1.0,   clamp: SHARED_CAP },
-            RB:  { exp: 0.55, premium: 1.058, clamp: RB_WR_MAX },
+            RB:  { exp: 0.55, premium: 1.068, clamp: RB_WR_MAX }, // premium nudged 1.058→1.068 for a slight whole-curve RB lift (ceiling doesn't reach RB)
             WR:  { exp: 0.55, premium: 1.12,  clamp: RB_WR_MAX },
             TE:  { exp: 0.7,  premium: 1.21,  clamp: SHARED_CAP },
             DEF: { exp: 0.6,  premium: 0.97,  clamp: SHARED_CAP }
           };
           const SAL_MIN_DEFAULT = 100;   // matches MIN_SANITY — the old $4,500 default was the artificial floor this whole redesign specifically removed
-          const SAL_MAX_DEFAULT = 9400;  // matches the highest real position clamp (RB/WR) — each position's own clamp above is what actually governs pricing; this is just an outer safety bound
+          const SAL_MAX_DEFAULT = 9600;  // matches the highest real position clamp (RB/WR) — each position's own clamp above is what actually governs pricing; this is just an outer safety bound
           const SAL_ROUND = 100;
           const FLAT = { QB: 8500, RB: 6500, WR: 6000, TE: 5500, DEF: 5000 };
 
@@ -434,7 +434,7 @@ jobs:
 
             const salaries = {};
             let count = 0;
-            const BACKUP_QB_SALARY = 3800;
+            const BACKUP_QB_SALARY = 4300;
             projPlayers.forEach(p => {
               if (!POSITIONS[p.pos]) return;
               const poolP = poolPlayers ? poolPlayers[p.id] : null; // exact id match
@@ -513,7 +513,7 @@ jobs:
 
             const salaries = {};
             let count = 0;
-            const BACKUP_QB_SALARY = 3800; // floor for a QB with no real projection yet — covers both a genuine deep-bench backup and a suddenly-elevated starter (e.g. an injury replacement) whose projection just hasn't caught up to the depth chart change yet, so they're never mispriced at an unrealistically low number
+            const BACKUP_QB_SALARY = 4300; // floor for a QB with no real projection yet — covers both a genuine deep-bench backup and a suddenly-elevated starter (e.g. an injury replacement) whose projection just hasn't caught up to the depth chart change yet, so they're never mispriced at an unrealistically low number
 
             projPlayers.forEach(p => {
               if (!p.proj || p.proj <= 0) return;
