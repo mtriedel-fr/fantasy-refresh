@@ -3846,12 +3846,18 @@ function countPlayersLeft(lineup, gameMap){
   return { left: left, total: slots.length };
 }
 
-// ── BETA / experimental leagues ────────────────────────────────────
-// Feature-flag gate so new looks can be trialled in one test league without
-// touching fr_refresh26 or any other real league. isBetaLeague() is the only
-// check any experiment should use; flip a feature "live for everyone" later by
-// dropping that guard.
-var BETA_LEAGUES = { 'fr_test_full': true };
+// ── Option B "new nav" leagues ─────────────────────────────────────
+// Roster of leagues running the Option B experience: gameplay bottom bar
+// (Home · My Team · Last One Standing · Playoffs), consolidated My Team tab
+// (This Week | My Season), Season/Weekly landing toggle, landing recap card,
+// and two-stage Home. Was originally a beta-only gate on fr_test_full; the
+// main league fr_refresh26 now runs it too. Add a leagueId here to opt it in;
+// remove it to instantly revert that league to the classic nav. The function
+// name stays isBetaLeague() (referenced in several places) but it really means
+// "uses the Option B nav." The bar is adaptive — it builds from each league's
+// real formats (guillotine / playoffs), so mixed-format leagues get the right
+// tabs automatically.
+var BETA_LEAGUES = { 'fr_test_full': true, 'fr_refresh26': true };
 function isBetaLeague(){
   var ctx = (typeof FRAuth !== 'undefined' && FRAuth.getLeagueCtx) ? FRAuth.getLeagueCtx() : null;
   return !!(ctx && ctx.leagueId && BETA_LEAGUES[ctx.leagueId]);
