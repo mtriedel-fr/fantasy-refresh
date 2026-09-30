@@ -833,6 +833,14 @@ body{padding-bottom:calc(76px + env(safe-area-inset-bottom));}
 .szn-mv-chip svg{width:11px;height:11px;stroke:currentColor;}
 .szn-mv-chip.on{border-color:transparent;background:linear-gradient(135deg,var(--or),var(--pk));color:#050808;box-shadow:0 1px 6px rgba(0,0,0,.28);}
 .szn-mv-n{background:rgba(0,0,0,.18);border-radius:10px;padding:0 5px;font-size:10px;line-height:1.5;}
+/* Season controls row: metric toggle (Total / Avg per week) + movement filter */
+.szn-ctrls{display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap;margin:0 0 12px;}
+.szn-ctrls .szn-mv-filter{margin:0;}
+.szn-metric-tog{display:inline-flex;gap:0;padding:3px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:20px;flex-shrink:0;}
+.szn-metric-tog button{font-family:var(--fd);font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.3px;padding:5px 12px;border:none;background:none;color:var(--ink3);border-radius:16px;cursor:pointer;white-space:nowrap;}
+.szn-metric-tog button.on{background:linear-gradient(135deg,var(--or),var(--pk));color:#050808;}
+.st-table th.sortable{cursor:pointer;user-select:none;-webkit-user-select:none;}
+.st-table th.sortable .cx{font-size:9px;margin-left:2px;color:var(--or);}
 /* Beta landing recap card (Season view) */
 .frecap{background:var(--bg2);border:1px solid var(--bdr2);border-radius:12px;overflow:hidden;margin:0 auto 12px;max-width:380px;}
 .frecap-head{display:flex;align-items:center;gap:10px;padding:10px 13px;cursor:pointer;}
@@ -3944,12 +3952,22 @@ function ensureBetaWeekMeta(){
 
 // Beta "Season" table — mirrors the Season tab columns (Rank / Team / Total /
 // Avg / Move), team names click through to the season-overview modal.
-// Season standings movement filter: 'all' | 'up' | 'down'. When 'up'/'down',
-// the table is filtered to risers/fallers and sorted by movement magnitude,
-// but each row keeps its TRUE season rank (# reflects standings position, not
-// the filtered position).
+// Season standings controls:
+//  • seasonMetric  — which single stat column shows: 'total' or 'avg' (per week)
+//  • seasonMoveFilter — 'all' | 'up' | 'down' (risers/fallers), keeps true rank
+//  • seasonSort    — 'rank' (default) | 'metric' | 'move-desc' | 'move-asc'
+// # ALWAYS reflects the true season rank (by total), regardless of filter/sort.
+var seasonMetric = 'total';
 var seasonMoveFilter = 'all';
+var seasonSort = 'rank';
+function setSeasonMetric(m){ seasonMetric = m; renderCumSeasonTable(); }
 function setSeasonMoveFilter(f){ seasonMoveFilter = f; renderCumSeasonTable(); }
+function setSeasonSort(key){
+  if(key === 'move'){ seasonSort = (seasonSort === 'move-desc') ? 'move-asc' : 'move-desc'; }
+  else if(key === 'metric'){ seasonSort = 'metric'; }
+  else { seasonSort = 'rank'; }
+  renderCumSeasonTable();
+}
 function renderCumSeasonTable(){
   var wrap = document.getElementById('cum-standings-wrap');
   var pager = document.getElementById('cum-standings-pager');
@@ -3959,23 +3977,38 @@ function renderCumSeasonTable(){
   var sorted = data.sorted, prevRank = data.prevRank;
   if(!sorted.length){ wrap.innerHTML = '<div style="padding:24px;text-align:center;color:var(--ink3);font-family:var(--fd);font-size:13px;">No season data yet.</div>'; return; }
 
-  // Enrich with true rank + movement, then filter/sort by the active chip.
+  // Enrich with true rank + movement (spots gained/lost vs last week).
   var enriched = sorted.map(function(t, i){
     var prev = prevRank[t.name];
     return { t: t, r: i + 1, diff: (prev !== undefined) ? prev - i - 1 : null };
   });
   var upCount = enriched.filter(function(x){ return x.diff !== null && x.diff > 0; }).length;
   var dnCount = enriched.filter(function(x){ return x.diff !== null && x.diff < 0; }).length;
-  var view = enriched;
-  if(seasonMoveFilter === 'up')   view = enriched.filter(function(x){ return x.diff !== null && x.diff > 0; }).sort(function(a,b){ return b.diff - a.diff; });
-  else if(seasonMoveFilter === 'down') view = enriched.filter(function(x){ return x.diff !== null && x.diff < 0; }).sort(function(a,b){ return a.diff - b.diff; });
 
+  // Filter (risers/fallers), then sort. Rows keep their true rank either way.
+  var view = enriched.slice();
+  if(seasonMoveFilter === 'up')   view = view.filter(function(x){ return x.diff !== null && x.diff > 0; });
+  else if(seasonMoveFilter === 'down') view = view.filter(function(x){ return x.diff !== null && x.diff < 0; });
+  var LOW = -1e9, HIGH = 1e9;
+  if(seasonSort === 'move-desc')      view.sort(function(a,b){ return (b.diff===null?LOW:b.diff) - (a.diff===null?LOW:a.diff); });
+  else if(seasonSort === 'move-asc')  view.sort(function(a,b){ return (a.diff===null?HIGH:a.diff) - (b.diff===null?HIGH:b.diff); });
+  else if(seasonSort === 'metric')    view.sort(function(a,b){ var mv=function(t){ return seasonMetric==='avg'?(t.avg||0):(t.total||0); }; return mv(b.t) - mv(a.t); });
+  // 'rank' → leave in rank order (subset already in rank order)
+
+  // Controls: metric toggle (Total | Avg/wk) + movement filter chips.
+  function mtog(id, label){ return '<button class="' + (seasonMetric === id ? 'on' : '') + '" onclick="setSeasonMetric(\'' + id + '\')">' + label + '</button>'; }
   function chip(id, label){ return '<button class="szn-mv-chip' + (seasonMoveFilter === id ? ' on' : '') + '" onclick="setSeasonMoveFilter(\'' + id + '\')">' + label + '</button>'; }
-  var filterBar = '<div class="szn-mv-filter">'
-    + chip('all', 'All')
-    + chip('up', AUP2 + ' Risers' + (upCount ? ' <span class="szn-mv-n">' + upCount + '</span>' : ''))
-    + chip('down', ADN2 + ' Fallers' + (dnCount ? ' <span class="szn-mv-n">' + dnCount + '</span>' : ''))
-    + '</div>';
+  var controls = '<div class="szn-ctrls">'
+    + '<div class="szn-metric-tog">' + mtog('total', '📊 Total') + mtog('avg', '📅 Avg/wk') + '</div>'
+    + '<div class="szn-mv-filter">'
+      + chip('all', 'All')
+      + chip('up', AUP2 + ' Risers' + (upCount ? ' <span class="szn-mv-n">' + upCount + '</span>' : ''))
+      + chip('down', ADN2 + ' Fallers' + (dnCount ? ' <span class="szn-mv-n">' + dnCount + '</span>' : ''))
+    + '</div></div>';
+
+  var metricLabel = (seasonMetric === 'avg') ? 'Avg/wk' : 'Total';
+  var metricCaret = (seasonSort === 'metric') ? ' <span class="cx">▾</span>' : '';
+  var moveCaret   = (seasonSort === 'move-desc') ? ' <span class="cx">▾</span>' : (seasonSort === 'move-asc') ? ' <span class="cx">▴</span>' : '';
 
   var rows = view.map(function(x){
     var t = x.t, r = x.r, diff = x.diff;
@@ -3983,12 +4016,12 @@ function renderCumSeasonTable(){
       : diff > 0 ? '<span class="up">' + AUP + diff + '</span>'
       : diff < 0 ? '<span class="dn">' + ADN + Math.abs(diff) + '</span>'
       : '<span class="fl">—</span>';
+    var metricVal = (seasonMetric === 'avg') ? fmtScore(t.avg) : fmtTotal(t.total);
     var isMe = myTeam && teamMatch(t.name, myTeam);
     return '<tr' + (isMe ? ' class="my-team"' : '') + '>'
       + '<td class="rk' + (r <= 3 ? ' g' : '') + '">' + (r <= 3 ? MED[r-1] : r) + '</td>'
       + '<td><span class="season-name-link" onclick="openTeamSeason(\'' + t.name.replace(/'/g,"\\'") + '\')" style="cursor:pointer;">' + escapeHtmlFR(t.name) + '</span>' + (isMe ? '<span class="my-team-badge">You</span>' : '') + '</td>'
-      + '<td class="tp" style="text-align:right">' + fmtTotal(t.total) + '</td>'
-      + '<td class="av" style="text-align:right">' + fmtScore(t.avg) + '</td>'
+      + '<td class="tp" style="text-align:right">' + metricVal + '</td>'
       + '<td class="move-col">' + mv + '</td>'
       + '</tr>';
   }).join('');
@@ -3997,10 +4030,12 @@ function renderCumSeasonTable(){
     : '<div style="padding:18px;text-align:center;color:var(--ink3);font-family:var(--fd);font-size:12.5px;">No teams ' + (seasonMoveFilter === 'up' ? 'moved up' : 'moved down') + ' vs last week.</div>';
 
   wrap.innerHTML = buildLandingRecapCard()
-    + filterBar
-    + '<table class="st-table"><thead><tr><th class="rk">#</th><th>Team</th>'
-    + '<th style="text-align:right">Total</th><th style="text-align:right">Avg</th>'
-    + '<th class="move-col">Move</th></tr></thead><tbody>' + rows + '</tbody></table>'
+    + controls
+    + '<table class="st-table"><thead><tr>'
+    + '<th class="rk sortable" onclick="setSeasonSort(\'rank\')">#</th><th>Team</th>'
+    + '<th class="sortable" style="text-align:right" onclick="setSeasonSort(\'metric\')">' + metricLabel + metricCaret + '</th>'
+    + '<th class="move-col sortable" onclick="setSeasonSort(\'move\')">Move' + moveCaret + '</th>'
+    + '</tr></thead><tbody>' + rows + '</tbody></table>'
     + emptyNote;
 }
 
