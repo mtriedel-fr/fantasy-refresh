@@ -1,0 +1,251 @@
+name: Rebuild & Reopen Week (manual, confirm-gated)
+
+# One-click recovery: rebuild a week's salaries on the CURRENT pricing
+# constants and (optionally) reopen the draft — replacing the three-step
+# Clear → Weekly Prep → Weekly Auto-Open dance.
+#
+# SAFETY MODEL (important):
+#   • Manual only. Requires typing REBUILD to run.
+#   • Builds the NEW complete sheet in memory FIRST. If projections are
+#     incomplete, it ABORTS and changes NOTHING — your existing sheet, rosters
+#     and draft state are left exactly as they were. It can never leave you
+#     with an empty/half-built week.
+#   • Only after a complete sheet is built does it: write the new salaries,
+#     optionally wipe that week's rosters, and (optionally) reopen the draft.
+#   • Refuses to run if the week's salary sheet is LOCKED.
+#
+# PRICING: identical formula + constants to weekly-prep.yml / weekly-auto-open.yml
+#   (SHARED_CAP 9000, RB/WR clamp 9600, RB premium 1.068, backup-QB 3800,
+#    hard floor 2000). If you change those in the two generators, change them
+#    here too — this file intentionally embeds the formula so it is a single,
+#    self-contained recovery tool.
+#
+# ⚠️ Rebuilding reprices everyone. Wiping rosters deletes every drafted lineup
+#    for that week. Use deliberately.
+
+on:
+  workflow_dispatch:
+    inputs:
+      league_id:
+        description: 'League ID'
+        required: true
+        default: 'fr_refresh26'
+      season:
+        description: 'Season key (2026, or 2026P for preseason)'
+        required: true
+        default: '2026'
+      week:
+        description: 'Week number to rebuild (no default — set on purpose)'
+        required: true
+      confirm:
+        description: 'Type REBUILD to confirm'
+        required: true
+        default: ''
+      clear_rosters:
+        description: 'Also DELETE all drafted rosters for this week? (true/false)'
+        required: true
+        default: 'false'
+      reopen:
+        description: 'Reopen the draft after rebuild? (true/false)'
+        required: true
+        default: 'true'
+
+jobs:
+  rebuild-week:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Rebuild one week's salaries (and optionally rosters + reopen)
+        env:
+          FIREBASE_DB_URL:     ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+          TANK01_KEY:          ${{ secrets.TANK01_KEY }}
+          IN_LEAGUE:  ${{ github.event.inputs.league_id }}
+          IN_SEASON:  ${{ github.event.inputs.season }}
+          IN_WEEK:    ${{ github.event.inputs.week }}
+          IN_CONFIRM: ${{ github.event.inputs.confirm }}
+          IN_ROSTERS: ${{ github.event.inputs.clear_rosters }}
+          IN_REOPEN:  ${{ github.event.inputs.reopen }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+
+          const FB_URL   = process.env.FIREBASE_DB_URL;
+          const FB_TOKEN = process.env.FIREBASE_AUTH_TOKEN;
+          const T01_KEY  = process.env.TANK01_KEY;
+          const LEAGUE   = (process.env.IN_LEAGUE || '').trim();
+          const SEASON   = (process.env.IN_SEASON || '').trim();
+          const WEEK     = parseInt(process.env.IN_WEEK || '', 10);
+          const CONFIRM  = (process.env.IN_CONFIRM || '').trim();
+          const CLEAR_ROSTERS = (process.env.IN_ROSTERS || 'false').trim().toLowerCase() === 'true';
+          const REOPEN   = (process.env.IN_REOPEN || 'true').trim().toLowerCase() === 'true';
+          const T01_HOST = 'tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com';
+
+          // ── Guards ──
+          if (CONFIRM !== 'REBUILD') { console.error(`❌ Confirmation failed (got "${CONFIRM}", need "REBUILD"). Nothing changed.`); process.exit(1); }
+          if (!LEAGUE || !SEASON || !Number.isInteger(WEEK) || WEEK < 1 || WEEK > 18) { console.error(`❌ Bad inputs. Nothing changed.`); process.exit(1); }
+          if (!FB_URL || !FB_TOKEN) { console.error('❌ Missing Firebase secrets. Nothing changed.'); process.exit(1); }
+
+          // ── Pricing constants — KEEP IN SYNC with weekly-prep.yml / weekly-auto-open.yml ──
+          const TOP_ANCHOR_EXP = 0.6;
+          const SHARED_CAP = 9000;
+          const RB_WR_MAX  = 9600;
+          const MIN_SANITY = 100;
+          const SALARY_FLOOR = 2000;
+          const SAL_MAX_DEFAULT = 9600;
+          const SAL_ROUND = 100;
+          const BACKUP_QB_SALARY = 3800;
+          const POSITIONS = {
+            QB:  { exp: 1.3,  premium: 1.0,   clamp: SHARED_CAP },
+            RB:  { exp: 0.55, premium: 1.068, clamp: RB_WR_MAX },
+            WR:  { exp: 0.55, premium: 1.12,  clamp: RB_WR_MAX },
+            TE:  { exp: 0.7,  premium: 1.21,  clamp: SHARED_CAP },
+            DEF: { exp: 0.6,  premium: 0.97,  clamp: SHARED_CAP }
+          };
+          const SALARY_MIN_BY_POS = { QB: 24, RB: 50, WR: 70, TE: 24, DEF: 24 };
+
+          // ── HTTP helpers ──
+          function authed(path){ const s = path.includes('?')?'&':'?'; return FB_TOKEN ? `${path}${s}auth=${FB_TOKEN}` : path; }
+          function fbReq(method, path, body){
+            return new Promise((resolve, reject) => {
+              const u = new URL(FB_URL + authed(path));
+              const opts = { hostname:u.hostname, path:u.pathname+u.search, method, headers:{'Content-Type':'application/json'} };
+              const payload = body !== undefined ? JSON.stringify(body) : null;
+              if (payload) opts.headers['Content-Length'] = Buffer.byteLength(payload);
+              const req = https.request(opts, res => { let d=''; res.on('data',c=>d+=c); res.on('end',()=> (res.statusCode>=200&&res.statusCode<300)?resolve(d):reject(new Error(`HTTP ${res.statusCode} ${method} ${path} — ${d.slice(0,200)}`))); });
+              req.on('error', reject); if (payload) req.write(payload); req.end();
+            });
+          }
+          const fbGet = p => fbReq('GET', p).then(d=>{ try { return JSON.parse(d); } catch { return null; } });
+          const fbPut = (p,v) => fbReq('PUT', p, v);
+          const fbDelete = p => fbReq('DELETE', p);
+          function t01(path){ return new Promise((resolve,reject)=>{ https.get({hostname:T01_HOST, path, headers:{'X-RapidAPI-Key':T01_KEY,'X-RapidAPI-Host':T01_HOST}}, res=>{ let d=''; res.on('data',c=>d+=c); res.on('end',()=>{ try{resolve(JSON.parse(d));}catch(e){reject(e);} }); }).on('error',reject); }); }
+          function norm(n){ return (n||'').toLowerCase().replace(/[.,']/g,'').replace(/\s+(jr|sr|ii|iii|iv|v)$/i,'').trim(); }
+
+          // ── Projections: Sleeper primary, Tank01 fallback ──
+          async function getSleeper(week){
+            const url = `https://api.sleeper.com/projections/nfl/${SEASON}/${week}?season_type=regular&position[]=QB&position[]=RB&position[]=WR&position[]=TE&position[]=DEF&order_by=ppr`;
+            let arr = [];
+            for (let a=1; a<=3 && !arr.length; a++){
+              try {
+                const res = await fetch(url, { headers:{'User-Agent':'fantasyrefresh'} });
+                if (res.ok){ const data = await res.json();
+                  if (Array.isArray(data)) arr = data.map(e=>{ const pl=e.player||{}; return { id:e.player_id, pos:(e.position||pl.position||'').toUpperCase(), team:e.team||pl.team||'', proj:parseFloat((e.stats&&e.stats.pts_ppr)||0) }; }).filter(p=>p.id && ['QB','RB','WR','TE','DEF'].includes(p.pos) && p.proj>0);
+                }
+              } catch(e){ console.log(`  Sleeper attempt ${a}: ${e.message}`); }
+              if (!arr.length && a<3) await new Promise(r=>setTimeout(r,1500*a));
+            }
+            return arr;
+          }
+          async function getTank01(week){
+            const scoring = ['itemFormat=list','twoPointConversions=2','passYards=.04','passTD=4','passInterceptions=-1','pointsPerReception=1','rushYards=.1','rushTD=6','fumbles=-1','receivingYards=.1','receivingTD=6'].join('&');
+            for (const path of [`/getNFLProjections?week=${week}&${scoring}`, `/getNFLProjections?week=${week}&archiveSeason=${parseInt(SEASON)-1}&${scoring}`]){
+              try {
+                const res = await t01(path); const body=(res.body&&res.body.body)||{};
+                const pArr = Array.isArray(body.playerProjections)?body.playerProjections:[];
+                const dArr = Array.isArray(body.teamDefenseProjections)?body.teamDefenseProjections:[];
+                if (!pArr.length && !dArr.length) continue;
+                const players = pArr.map(p=>{ const pts=parseFloat(p.fantasyPoints||0)||((p.fantasyPointsDefault&&p.fantasyPointsDefault.PPR)?parseFloat(p.fantasyPointsDefault.PPR):0); return { id:p.playerID||'', name:p.longName||p.playerName||'', pos:p.pos||'', team:p.team||p.teamAbv||'', proj:pts }; }).filter(p=>p.name&&p.pos&&['QB','RB','WR','TE'].includes(p.pos)&&p.proj>0);
+                const defs = dArr.map(d=>({ id:(d.teamAbv||d.team||'')+'_DEF', name:d.teamAbv||d.team||'', pos:'DEF', team:d.teamAbv||d.team||'', proj:parseFloat(d.fantasyPointsDefault||0) })).filter(d=>d.name&&d.proj>0);
+                const all=[...players,...defs]; if (all.length) return all;
+              } catch(e){ continue; }
+            }
+            return [];
+          }
+
+          // ── Shared pricing (identical to the two generators) ──
+          function buildSheet(proj, pool, source){
+            const nameMap = {}; if (pool) Object.values(pool).forEach(p=>{ if(p&&p.name) nameMap[norm(p.name)]=p; });
+            const maxByPos = {};
+            ['QB','RB','WR','TE','DEF'].forEach(pos=>{ const at=proj.filter(p=>p.pos===pos&&p.proj>0); maxByPos[pos]=at.length?Math.max(...at.map(p=>p.proj)):0; });
+            const gMax = Math.max(...Object.values(maxByPos).filter(v=>v>0),1);
+            const baseRate = SHARED_CAP / Math.pow(gMax, TOP_ANCHOR_EXP);
+            const mult = {};
+            Object.entries(POSITIONS).forEach(([pos,conf])=>{ if(!maxByPos[pos]) return; let ta=Math.pow(maxByPos[pos],TOP_ANCHOR_EXP)*baseRate*conf.premium; ta=Math.min(ta,conf.clamp); mult[pos]=ta/Math.pow(maxByPos[pos],conf.exp); });
+            const salaries = {}; let count = 0;
+            proj.forEach(p=>{
+              if(!POSITIONS[p.pos] || !(p.proj>0)) return;
+              const poolP = source==='sleeper' ? (pool?pool[p.id]:null) : (nameMap[norm(p.name)]||null);
+              if (source==='sleeper' && !poolP) return;          // Sleeper rows must match a pooled player
+              const pid = poolP ? poolP.id : ('t01_'+p.id);
+              const inj = poolP ? (poolP.status||null) : null;
+              if (inj==='O' || inj==='IR') return;
+              const conf = POSITIONS[p.pos]; const m = mult[p.pos]||0;
+              let sal = Math.ceil((Math.pow(p.proj,conf.exp)*m)/SAL_ROUND)*SAL_ROUND;
+              sal = Math.max(MIN_SANITY, Math.min(conf.clamp, sal));
+              sal = Math.max(SALARY_FLOOR, Math.min(SAL_MAX_DEFAULT, sal));
+              salaries[pid] = { id:pid, name:(poolP&&poolP.name)||p.name, pos:p.pos, team:(poolP&&poolP.team)||p.team, proj:Math.round(p.proj*10)/10, salary:sal, status:inj, tank01PlayerID:poolP?poolP.tank01PlayerID||null:null, headshot:poolP?poolP.headshot||null:null };
+              count++;
+            });
+            // Backup QBs → floor
+            if (pool) Object.values(pool).forEach(pp=>{ if(!pp||pp.pos!=='QB') return; if(salaries[pp.id]) return; if(pp.status==='O'||pp.status==='IR') return; salaries[pp.id]={ id:pp.id, name:pp.name, pos:'QB', team:pp.team, proj:0, salary:BACKUP_QB_SALARY, status:pp.status||null, tank01PlayerID:pp.tank01PlayerID||null, headshot:pp.headshot||null }; count++; });
+            return { salaries, count };
+          }
+          function completeness(salaries){
+            const real={QB:0,RB:0,WR:0,TE:0,DEF:0};
+            Object.values(salaries).forEach(p=>{ if(p && real[p.pos]!==undefined && parseFloat(p.proj||0)>0) real[p.pos]++; });
+            const missing = Object.keys(SALARY_MIN_BY_POS).filter(pos=>real[pos]<SALARY_MIN_BY_POS[pos]);
+            return { ok:missing.length===0, real, missing };
+          }
+          const pad=(s,n)=>{s=String(s);return s.length>=n?s:s+' '.repeat(n-s.length);};
+
+          async function main(){
+            const salBase = `/leagues/${LEAGUE}/salaries/${SEASON}/week${WEEK}`;
+            const lineBase = `/leagues/${LEAGUE}/lineups/${SEASON}/week${WEEK}`;
+            console.log('════════════════════════════════════════════════════════════');
+            console.log(`  REBUILD & REOPEN WEEK`);
+            console.log(`  League ${LEAGUE} · Season ${SEASON} · Week ${WEEK} · ${new Date().toISOString()}`);
+            console.log(`  clear_rosters=${CLEAR_ROSTERS}  reopen=${REOPEN}`);
+            console.log('════════════════════════════════════════════════════════════');
+
+            // Refuse if locked.
+            const meta = await fbGet(`${salBase}/meta.json`).catch(()=>null);
+            if (meta && meta.locked){ console.error('❌ Week salary sheet is LOCKED (meta.locked=true). Unlock it first. Nothing changed.'); process.exit(1); }
+            if (meta) console.log(`Existing sheet: count=${meta.count} flat=${meta.flat} generated=${meta.generated?new Date(meta.generated).toISOString():'?'}`);
+            else console.log('No existing sheet (fresh build).');
+
+            const settings = await fbGet(`/leagues/${LEAGUE}/settings.json`).catch(()=>null);
+            const cap = (settings && settings.cap) || 60000;
+
+            // ── BUILD FIRST (in memory), abort on incomplete BEFORE touching anything ──
+            const pool = await fbGet(`/playerPool/${SEASON}/players.json`).catch(()=>null);
+            console.log(`Player pool: ${pool?Object.keys(pool).length+' players':'NOT READABLE'}`);
+            let source='sleeper';
+            let proj = await getSleeper(WEEK);
+            if (!proj.length){ console.log('Sleeper empty — trying Tank01.'); source='tank01'; proj = await getTank01(WEEK); }
+            if (!proj.length){ console.error('❌ No projections from Sleeper OR Tank01. ABORTING — nothing changed.'); process.exit(1); }
+            console.log(`Source: ${source.toUpperCase()} (${proj.length} projected players).`);
+
+            const built = buildSheet(proj, pool, source);
+            const chk = completeness(built.salaries);
+            console.log(`Built ${built.count} salaries. Completeness ${JSON.stringify(chk.real)} — ${chk.ok?'OK':'INCOMPLETE ('+chk.missing.join(',')+')'}`);
+            if (!chk.ok){ console.error('❌ New sheet is INCOMPLETE — ABORTING before any change. Existing sheet/rosters/draft untouched. Try again once projections fill in.'); process.exit(1); }
+
+            // Sample log
+            ['QB','RB','WR','TE','DEF'].forEach(pos=>{ const rows=Object.values(built.salaries).filter(p=>p.pos===pos&&p.proj>0).sort((a,b)=>b.salary-a.salary).slice(0,3); console.log(`  ${pad(pos,4)} top: `+rows.map(r=>`${r.name} $${r.salary}`).join(' · ')); });
+
+            // ── COMMIT (only now that we have a complete sheet) ──
+            await fbPut(`${salBase}.json`, { players: built.salaries, meta: { week:WEEK, count:built.count, generated:Date.now(), locked:false, cap, automated:true, flat:false, rebuiltBy:'rebuild-week' } });
+            console.log(`✓ Wrote new salary sheet (${built.count} players).`);
+
+            if (CLEAR_ROSTERS){
+              const existing = await fbGet(`${lineBase}.json`).catch(()=>null);
+              const n = existing ? Object.keys(existing).length : 0;
+              await fbDelete(`${lineBase}.json`);
+              console.log(`🗑️  Cleared ${n} drafted roster(s) for week ${WEEK}.`);
+            } else {
+              console.log('Rosters left in place (clear_rosters=false).');
+            }
+
+            if (REOPEN){
+              await fbPut(`/leagues/${LEAGUE}/settings/draftLockedUntil.json`, Date.now());
+              console.log('🔓 Draft reopened (draftLockedUntil = now).');
+            } else {
+              const HOLD_MS = 30*24*60*60*1000;
+              await fbPut(`/leagues/${LEAGUE}/settings/draftLockedUntil.json`, Date.now()+HOLD_MS);
+              console.log('🔒 Draft left CLOSED (reopen=false).');
+            }
+
+            console.log('\n✅ Rebuild complete.');
+          }
+          main().catch(e=>{ console.error('Rebuild failed:', e.message); process.exit(1); });
+          SCRIPT
