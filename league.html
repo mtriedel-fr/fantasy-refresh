@@ -827,6 +827,12 @@ body{padding-bottom:calc(76px + env(safe-area-inset-bottom));}
 #cum-mode-toggle{display:flex;width:100%;gap:0;padding:4px;background:var(--bg2);border:1px solid var(--bdr2);border-radius:12px;margin:0 0 10px;box-sizing:border-box;}
 #cum-mode-toggle button{flex:1 1 0;font-family:var(--fd);font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;padding:9px 12px;border:none;background:none;color:var(--ink3);border-radius:9px;cursor:pointer;transition:background .18s ease,color .18s ease;}
 #cum-mode-toggle button.on{background:linear-gradient(135deg,var(--or),var(--pk));color:#050808;box-shadow:0 1px 6px rgba(0,0,0,.28);}
+/* Season standings movement filter (All / Risers / Fallers) */
+.szn-mv-filter{display:flex;gap:6px;justify-content:center;align-items:center;flex-wrap:wrap;margin:0 0 12px;}
+.szn-mv-chip{display:inline-flex;align-items:center;gap:4px;font-family:var(--fd);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.3px;padding:6px 12px;border-radius:20px;border:1.5px solid var(--bdr2);background:var(--bg3);color:var(--ink3);cursor:pointer;transition:background .15s,color .15s,border-color .15s;}
+.szn-mv-chip svg{width:11px;height:11px;stroke:currentColor;}
+.szn-mv-chip.on{border-color:transparent;background:linear-gradient(135deg,var(--or),var(--pk));color:#050808;box-shadow:0 1px 6px rgba(0,0,0,.28);}
+.szn-mv-n{background:rgba(0,0,0,.18);border-radius:10px;padding:0 5px;font-size:10px;line-height:1.5;}
 /* Beta landing recap card (Season view) */
 .frecap{background:var(--bg2);border:1px solid var(--bdr2);border-radius:12px;overflow:hidden;margin:0 auto 12px;max-width:380px;}
 .frecap-head{display:flex;align-items:center;gap:10px;padding:10px 13px;cursor:pointer;}
@@ -3938,6 +3944,12 @@ function ensureBetaWeekMeta(){
 
 // Beta "Season" table — mirrors the Season tab columns (Rank / Team / Total /
 // Avg / Move), team names click through to the season-overview modal.
+// Season standings movement filter: 'all' | 'up' | 'down'. When 'up'/'down',
+// the table is filtered to risers/fallers and sorted by movement magnitude,
+// but each row keeps its TRUE season rank (# reflects standings position, not
+// the filtered position).
+var seasonMoveFilter = 'all';
+function setSeasonMoveFilter(f){ seasonMoveFilter = f; renderCumSeasonTable(); }
 function renderCumSeasonTable(){
   var wrap = document.getElementById('cum-standings-wrap');
   var pager = document.getElementById('cum-standings-pager');
@@ -3946,10 +3958,27 @@ function renderCumSeasonTable(){
   var data = computeSeasonStandings();
   var sorted = data.sorted, prevRank = data.prevRank;
   if(!sorted.length){ wrap.innerHTML = '<div style="padding:24px;text-align:center;color:var(--ink3);font-family:var(--fd);font-size:13px;">No season data yet.</div>'; return; }
-  var rows = sorted.map(function(t, i){
-    var r = i + 1;
+
+  // Enrich with true rank + movement, then filter/sort by the active chip.
+  var enriched = sorted.map(function(t, i){
     var prev = prevRank[t.name];
-    var diff = (prev !== undefined) ? prev - r : null;
+    return { t: t, r: i + 1, diff: (prev !== undefined) ? prev - i - 1 : null };
+  });
+  var upCount = enriched.filter(function(x){ return x.diff !== null && x.diff > 0; }).length;
+  var dnCount = enriched.filter(function(x){ return x.diff !== null && x.diff < 0; }).length;
+  var view = enriched;
+  if(seasonMoveFilter === 'up')   view = enriched.filter(function(x){ return x.diff !== null && x.diff > 0; }).sort(function(a,b){ return b.diff - a.diff; });
+  else if(seasonMoveFilter === 'down') view = enriched.filter(function(x){ return x.diff !== null && x.diff < 0; }).sort(function(a,b){ return a.diff - b.diff; });
+
+  function chip(id, label){ return '<button class="szn-mv-chip' + (seasonMoveFilter === id ? ' on' : '') + '" onclick="setSeasonMoveFilter(\'' + id + '\')">' + label + '</button>'; }
+  var filterBar = '<div class="szn-mv-filter">'
+    + chip('all', 'All')
+    + chip('up', AUP2 + ' Risers' + (upCount ? ' <span class="szn-mv-n">' + upCount + '</span>' : ''))
+    + chip('down', ADN2 + ' Fallers' + (dnCount ? ' <span class="szn-mv-n">' + dnCount + '</span>' : ''))
+    + '</div>';
+
+  var rows = view.map(function(x){
+    var t = x.t, r = x.r, diff = x.diff;
     var mv = diff === null ? '<span class="fl">—</span>'
       : diff > 0 ? '<span class="up">' + AUP + diff + '</span>'
       : diff < 0 ? '<span class="dn">' + ADN + Math.abs(diff) + '</span>'
@@ -3963,10 +3992,16 @@ function renderCumSeasonTable(){
       + '<td class="move-col">' + mv + '</td>'
       + '</tr>';
   }).join('');
+
+  var emptyNote = view.length ? ''
+    : '<div style="padding:18px;text-align:center;color:var(--ink3);font-family:var(--fd);font-size:12.5px;">No teams ' + (seasonMoveFilter === 'up' ? 'moved up' : 'moved down') + ' vs last week.</div>';
+
   wrap.innerHTML = buildLandingRecapCard()
+    + filterBar
     + '<table class="st-table"><thead><tr><th class="rk">#</th><th>Team</th>'
     + '<th style="text-align:right">Total</th><th style="text-align:right">Avg</th>'
-    + '<th class="move-col">Move</th></tr></thead><tbody>' + rows + '</tbody></table>';
+    + '<th class="move-col">Move</th></tr></thead><tbody>' + rows + '</tbody></table>'
+    + emptyNote;
 }
 
 // Beta landing recap card (shown in the Season view) — a thin, expandable
