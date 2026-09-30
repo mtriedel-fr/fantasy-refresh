@@ -827,20 +827,13 @@ body{padding-bottom:calc(76px + env(safe-area-inset-bottom));}
 #cum-mode-toggle{display:flex;width:100%;gap:0;padding:4px;background:var(--bg2);border:1px solid var(--bdr2);border-radius:12px;margin:0 0 10px;box-sizing:border-box;}
 #cum-mode-toggle button{flex:1 1 0;font-family:var(--fd);font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;padding:9px 12px;border:none;background:none;color:var(--ink3);border-radius:9px;cursor:pointer;transition:background .18s ease,color .18s ease;}
 #cum-mode-toggle button.on{background:linear-gradient(135deg,var(--or),var(--pk));color:#050808;box-shadow:0 1px 6px rgba(0,0,0,.28);}
-/* Season standings movement filter (All / Risers / Fallers) */
-.szn-mv-filter{display:flex;gap:6px;justify-content:center;align-items:center;flex-wrap:wrap;margin:0 0 12px;}
-.szn-mv-chip{display:inline-flex;align-items:center;gap:4px;font-family:var(--fd);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.3px;padding:6px 12px;border-radius:20px;border:1.5px solid var(--bdr2);background:var(--bg3);color:var(--ink3);cursor:pointer;transition:background .15s,color .15s,border-color .15s;}
-.szn-mv-chip svg{width:11px;height:11px;stroke:currentColor;}
-.szn-mv-chip.on{border-color:transparent;background:linear-gradient(135deg,var(--or),var(--pk));color:#050808;box-shadow:0 1px 6px rgba(0,0,0,.28);}
-.szn-mv-n{background:rgba(0,0,0,.18);border-radius:10px;padding:0 5px;font-size:10px;line-height:1.5;}
-/* Season controls row: metric toggle (Total / Avg per week) + movement filter */
-.szn-ctrls{display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap;margin:0 0 12px;}
-.szn-ctrls .szn-mv-filter{margin:0;}
-.szn-metric-tog{display:inline-flex;gap:0;padding:3px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:20px;flex-shrink:0;}
-.szn-metric-tog button{font-family:var(--fd);font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.3px;padding:5px 12px;border:none;background:none;color:var(--ink3);border-radius:16px;cursor:pointer;white-space:nowrap;}
-.szn-metric-tog button.on{background:linear-gradient(135deg,var(--or),var(--pk));color:#050808;}
+/* Season standings — header-driven sorting */
 .st-table th.sortable{cursor:pointer;user-select:none;-webkit-user-select:none;}
-.st-table th.sortable .cx{font-size:9px;margin-left:2px;color:var(--or);}
+.st-table th .cx{font-size:9px;margin-left:2px;color:var(--or);}
+/* Points header built-in Total / Avg toggle (tap a unit to show + sort by it) */
+.st-table th .mh-seg{cursor:pointer;color:var(--ink3);font-weight:800;-webkit-user-select:none;user-select:none;}
+.st-table th .mh-seg.on{color:var(--or);}
+.st-table th .mh-sep{color:var(--ink3);opacity:.45;font-weight:400;margin:0 3px;}
 /* Beta landing recap card (Season view) */
 .frecap{background:var(--bg2);border:1px solid var(--bdr2);border-radius:12px;overflow:hidden;margin:0 auto 12px;max-width:380px;}
 .frecap-head{display:flex;align-items:center;gap:10px;padding:10px 13px;cursor:pointer;}
@@ -3952,19 +3945,18 @@ function ensureBetaWeekMeta(){
 
 // Beta "Season" table — mirrors the Season tab columns (Rank / Team / Total /
 // Avg / Move), team names click through to the season-overview modal.
-// Season standings controls:
-//  • seasonMetric  — which single stat column shows: 'total' or 'avg' (per week)
-//  • seasonMoveFilter — 'all' | 'up' | 'down' (risers/fallers), keeps true rank
-//  • seasonSort    — 'rank' (default) | 'metric' | 'move-desc' | 'move-asc'
-// # ALWAYS reflects the true season rank (by total), regardless of filter/sort.
-var seasonMetric = 'total';
-var seasonMoveFilter = 'all';
-var seasonSort = 'rank';
-function setSeasonMetric(m){ seasonMetric = m; renderCumSeasonTable(); }
-function setSeasonMoveFilter(f){ seasonMoveFilter = f; renderCumSeasonTable(); }
+// Season standings — fully header-driven, no controls row above the table:
+//  • Points header is a built-in Total / Avg toggle; tapping a unit shows it
+//    AND sorts by it (descending).
+//  • Move header sorts by movement (tap = biggest risers ▾, tap again = biggest
+//    fallers ▴).
+//  • # header returns to season-rank order (medals), keeping the chosen unit.
+// The # value ALWAYS reflects the true season rank (by total), whatever the sort.
+var seasonMetric = 'total';           // 'total' | 'avg'
+var seasonSort = 'rank';              // 'rank' | 'metric' | 'move-desc' | 'move-asc'
+function setSeasonMetricSort(m){ seasonMetric = m; seasonSort = 'metric'; renderCumSeasonTable(); }
 function setSeasonSort(key){
   if(key === 'move'){ seasonSort = (seasonSort === 'move-desc') ? 'move-asc' : 'move-desc'; }
-  else if(key === 'metric'){ seasonSort = 'metric'; }
   else { seasonSort = 'rank'; }
   renderCumSeasonTable();
 }
@@ -3982,33 +3974,24 @@ function renderCumSeasonTable(){
     var prev = prevRank[t.name];
     return { t: t, r: i + 1, diff: (prev !== undefined) ? prev - i - 1 : null };
   });
-  var upCount = enriched.filter(function(x){ return x.diff !== null && x.diff > 0; }).length;
-  var dnCount = enriched.filter(function(x){ return x.diff !== null && x.diff < 0; }).length;
 
-  // Filter (risers/fallers), then sort. Rows keep their true rank either way.
+  // Sort per the active header. Rows keep their true rank regardless.
   var view = enriched.slice();
-  if(seasonMoveFilter === 'up')   view = view.filter(function(x){ return x.diff !== null && x.diff > 0; });
-  else if(seasonMoveFilter === 'down') view = view.filter(function(x){ return x.diff !== null && x.diff < 0; });
   var LOW = -1e9, HIGH = 1e9;
   if(seasonSort === 'move-desc')      view.sort(function(a,b){ return (b.diff===null?LOW:b.diff) - (a.diff===null?LOW:a.diff); });
   else if(seasonSort === 'move-asc')  view.sort(function(a,b){ return (a.diff===null?HIGH:a.diff) - (b.diff===null?HIGH:b.diff); });
   else if(seasonSort === 'metric')    view.sort(function(a,b){ var mv=function(t){ return seasonMetric==='avg'?(t.avg||0):(t.total||0); }; return mv(b.t) - mv(a.t); });
-  // 'rank' → leave in rank order (subset already in rank order)
+  // 'rank' → leave in rank order
 
-  // Controls: metric toggle (Total | Avg/wk) + movement filter chips.
-  function mtog(id, label){ return '<button class="' + (seasonMetric === id ? 'on' : '') + '" onclick="setSeasonMetric(\'' + id + '\')">' + label + '</button>'; }
-  function chip(id, label){ return '<button class="szn-mv-chip' + (seasonMoveFilter === id ? ' on' : '') + '" onclick="setSeasonMoveFilter(\'' + id + '\')">' + label + '</button>'; }
-  var controls = '<div class="szn-ctrls">'
-    + '<div class="szn-metric-tog">' + mtog('total', '📊 Total') + mtog('avg', '📅 Avg/wk') + '</div>'
-    + '<div class="szn-mv-filter">'
-      + chip('all', 'All')
-      + chip('up', AUP2 + ' Risers' + (upCount ? ' <span class="szn-mv-n">' + upCount + '</span>' : ''))
-      + chip('down', ADN2 + ' Fallers' + (dnCount ? ' <span class="szn-mv-n">' + dnCount + '</span>' : ''))
-    + '</div></div>';
-
-  var metricLabel = (seasonMetric === 'avg') ? 'Avg/wk' : 'Total';
+  var rankCaret   = (seasonSort === 'rank') ? ' <span class="cx">▾</span>' : '';
   var metricCaret = (seasonSort === 'metric') ? ' <span class="cx">▾</span>' : '';
   var moveCaret   = (seasonSort === 'move-desc') ? ' <span class="cx">▾</span>' : (seasonSort === 'move-asc') ? ' <span class="cx">▴</span>' : '';
+
+  // Points header = inline Total / Avg toggle (tap to show + sort by that unit).
+  var metricHead = '<span class="mh-seg' + (seasonMetric === 'total' ? ' on' : '') + '" onclick="setSeasonMetricSort(\'total\')">Total</span>'
+    + '<span class="mh-sep">/</span>'
+    + '<span class="mh-seg' + (seasonMetric === 'avg' ? ' on' : '') + '" onclick="setSeasonMetricSort(\'avg\')">Avg</span>'
+    + metricCaret;
 
   var rows = view.map(function(x){
     var t = x.t, r = x.r, diff = x.diff;
@@ -4026,17 +4009,12 @@ function renderCumSeasonTable(){
       + '</tr>';
   }).join('');
 
-  var emptyNote = view.length ? ''
-    : '<div style="padding:18px;text-align:center;color:var(--ink3);font-family:var(--fd);font-size:12.5px;">No teams ' + (seasonMoveFilter === 'up' ? 'moved up' : 'moved down') + ' vs last week.</div>';
-
   wrap.innerHTML = buildLandingRecapCard()
-    + controls
     + '<table class="st-table"><thead><tr>'
-    + '<th class="rk sortable" onclick="setSeasonSort(\'rank\')">#</th><th>Team</th>'
-    + '<th class="sortable" style="text-align:right" onclick="setSeasonSort(\'metric\')">' + metricLabel + metricCaret + '</th>'
+    + '<th class="rk sortable" onclick="setSeasonSort(\'rank\')">#' + rankCaret + '</th><th>Team</th>'
+    + '<th style="text-align:right;white-space:nowrap;">' + metricHead + '</th>'
     + '<th class="move-col sortable" onclick="setSeasonSort(\'move\')">Move' + moveCaret + '</th>'
-    + '</tr></thead><tbody>' + rows + '</tbody></table>'
-    + emptyNote;
+    + '</tr></thead><tbody>' + rows + '</tbody></table>';
 }
 
 // Beta landing recap card (shown in the Season view) — a thin, expandable
