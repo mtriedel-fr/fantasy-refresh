@@ -46,7 +46,7 @@ html{overflow-x:hidden;}
 .logo-sub{font-family:var(--fd);font-size:11px;font-weight:600;color:#1A5A5A;letter-spacing:2px;text-transform:uppercase;margin-top:2px;}
 .hdr-r{text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:6px;}
 .s-badge{background:rgba(255,26,110,.12);color:var(--pk);font-family:var(--fd);font-size:11px;font-weight:700;padding:4px 13px;border-radius:20px;letter-spacing:1.2px;text-transform:uppercase;border:1px solid rgba(255,26,110,.35);}
-.hdr-sub{color:#1A5A5A;font-size:11px;font-family:var(--fd);letter-spacing:.8px;text-transform:uppercase;}
+.hdr-sub{display:none;color:#1A5A5A;font-size:11px;font-family:var(--fd);letter-spacing:.8px;text-transform:uppercase;}
 .comm-btn{background:transparent;border:1px solid #0A3A3A;color:#1A5A5A;font-family:var(--fd);font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;padding:4px 12px;border-radius:6px;cursor:pointer;transition:all .15s;}
 .comm-btn:hover{border-color:var(--or);color:var(--or);}
 
@@ -498,8 +498,8 @@ tr.my-team:hover td{background:rgba(255,95,160,.18) !important;}
 @media(max-width:600px){
   body{padding:0;}
   .wrap{border-radius:0;border:none;box-shadow:none;width:100%;min-width:0;}
-  .hdr{padding:12px 14px;flex-wrap:wrap;gap:8px;}
-  .hdr-r{flex-direction:row;align-items:center;gap:6px;flex-wrap:wrap;}
+  .hdr{padding:12px 14px;flex-wrap:nowrap;gap:8px;}
+  .hdr-r{flex-direction:row;align-items:center;gap:6px;flex-wrap:nowrap;flex-shrink:0;}
   .logo-txt{font-size:20px;}
   .logo-sub{display:none;}
   .s-badge{display:none;}
@@ -1125,8 +1125,8 @@ setTimeout(function(){
     <div style="display:flex;gap:6px;align-items:center;justify-content:flex-end;">
       <button class="fr-badge" id="fr-sign-btn" onclick="openProfileDrawer()" style="display:flex;align-items:center;gap:6px;">
         <span id="fr-avatar" style="width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,var(--or),var(--pk));display:flex;align-items:center;justify-content:center;font-family:var(--fd);font-size:12px;font-weight:800;color:#050808;flex-shrink:0;">—</span>
-        <span id="fr-sign-name">—</span>
-        <span style="color:var(--ink3);font-size:11px;margin-left:1px;">▾</span>
+        <span id="fr-sign-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px;">—</span>
+        <span style="color:var(--ink3);font-size:11px;margin-left:1px;flex-shrink:0;">▾</span>
       </button>
     </div>
   </div>
