@@ -460,6 +460,43 @@ function computeSeasonStats(l, teamName) {
   return out;
 }
 
+// ── DRAFTED ROSTER (expandable on the card) ──────────────────────
+function escHome(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+function slotLabelFor(id, pos){
+  if (/^(fx|flex)/i.test(id)) return 'FLEX';
+  if (/^(sf|superflex)/i.test(id)) return 'SFLX';
+  return String(pos || id.replace(/[0-9]/g, '')).toUpperCase();
+}
+function buildHomeRoster(lineup){
+  if (!lineup || !lineup.slots) return '';
+  var order = ['qb1','rb1','rb2','wr1','wr2','wr3','te1','fx1','fx2','df1'];
+  var keys = Object.keys(lineup.slots).sort(function(a, b){
+    var ia = order.indexOf(a), ib = order.indexOf(b);
+    if (ia < 0) ia = 99; if (ib < 0) ib = 99;
+    return ia - ib;
+  });
+  var rows = keys.map(function(k){
+    var p = lineup.slots[k]; if (!p) return '';
+    var sal = (typeof p.salary === 'number') ? '$' + p.salary.toLocaleString() : '';
+    return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--bdr);">'
+      + '<span style="font-family:var(--fd);font-size:10px;font-weight:800;color:var(--ink3);width:36px;flex-shrink:0;text-transform:uppercase;letter-spacing:.3px;">' + slotLabelFor(k, p.pos) + '</span>'
+      + '<span style="flex:1;min-width:0;font-family:var(--fd);font-size:13px;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escHome(p.name || '—') + '</span>'
+      + '<span style="font-size:11px;color:var(--ink3);flex-shrink:0;">' + escHome(p.team || '') + '</span>'
+      + '<span style="font-family:var(--fd);font-size:11px;font-weight:800;color:var(--or);flex-shrink:0;min-width:52px;text-align:right;">' + sal + '</span>'
+      + '</div>';
+  }).join('');
+  var total = (typeof lineup.totalSal === 'number') ? '$' + lineup.totalSal.toLocaleString() : '';
+  return rows
+    + (total ? '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0 0;font-family:var(--fd);font-size:11px;font-weight:800;color:var(--ink2);text-transform:uppercase;letter-spacing:.5px;"><span>Total Spent</span><span style="color:var(--or);">' + total + '</span></div>' : '');
+}
+function toggleHomeRoster(id, btn){
+  var el = document.getElementById(id);
+  if (!el) return;
+  var open = el.style.display === 'none' || !el.style.display;
+  el.style.display = open ? 'block' : 'none';
+  if (btn) btn.style.transform = open ? 'rotate(180deg)' : '';
+}
+
 // ── BUILD LEAGUE CARD ────────────────────────────────────────────
 function buildCard(l) {
   var s        = l.settings;
@@ -561,9 +598,20 @@ function buildCard(l) {
     : '';
 
   var weekComplete = typeof l.currentWeekFinalizedAt === 'number';
+  var hasDrafted = !!(l.myDraftLineup && l.myDraftLineup.slots && Object.keys(l.myDraftLineup.slots).length);
+  var rosterPanelId = 'home-roster-' + cardIdSuffix;
   var weeklyActionBtn = '';
   if (nextWeekDraftOpen) {
-    weeklyActionBtn = '<button onclick="event.stopPropagation();goToWeeklyAction(\'' + l.leagueId + '\',\'draft\');" style="width:100%;margin-top:8px;padding:10px;border-radius:10px;border:none;background:var(--pk,#FF5FA0);color:#fff;font-family:var(--fd);font-size:13px;font-weight:800;letter-spacing:.3px;cursor:pointer;">🏈 DRAFT NOW</button>';
+    if (hasDrafted) {
+      // Already drafted → "Edit Team" + a chevron that expands the roster inline.
+      weeklyActionBtn = '<div style="display:flex;gap:6px;margin-top:8px;align-items:stretch;" onclick="event.stopPropagation();">'
+        + '<button onclick="event.stopPropagation();goToWeeklyAction(\'' + l.leagueId + '\',\'draft\');" style="flex:1;padding:10px;border-radius:10px;border:none;background:var(--pk,#FF5FA0);color:#fff;font-family:var(--fd);font-size:13px;font-weight:800;letter-spacing:.3px;cursor:pointer;">✏️ EDIT TEAM</button>'
+        + '<button onclick="event.stopPropagation();toggleHomeRoster(\'' + rosterPanelId + '\',this);" title="View your roster" style="width:44px;flex-shrink:0;border-radius:10px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--ink2);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .2s;">▾</button>'
+        + '</div>'
+        + '<div id="' + rosterPanelId + '" style="display:none;margin-top:8px;background:var(--bg3);border:1px solid var(--bdr);border-radius:10px;padding:6px 12px 10px;" onclick="event.stopPropagation();">' + buildHomeRoster(l.myDraftLineup) + '</div>';
+    } else {
+      weeklyActionBtn = '<button onclick="event.stopPropagation();goToWeeklyAction(\'' + l.leagueId + '\',\'draft\');" style="width:100%;margin-top:8px;padding:10px;border-radius:10px;border:none;background:var(--pk,#FF5FA0);color:#fff;font-family:var(--fd);font-size:13px;font-weight:800;letter-spacing:.3px;cursor:pointer;">🏈 DRAFT NOW</button>';
+    }
   } else if (weekComplete) {
     weeklyActionBtn = '<button onclick="event.stopPropagation();goToWeeklyAction(\'' + l.leagueId + '\',\'recap\',' + latest + ');" style="width:100%;margin-top:8px;padding:10px;border-radius:10px;border:1px solid var(--bdr);background:transparent;color:var(--ink2);font-family:var(--fd);font-size:13px;font-weight:800;letter-spacing:.3px;cursor:pointer;">📰 WEEKLY REVIEW</button>';
   }
@@ -823,7 +871,15 @@ function renderCards(leagueIds, uid) {
           // league). Raw seasonData can contain orphaned/stale entries
           // (leftover test accounts) that both views were previously
           // counting as real teams.
-          fetch(FB_DB_URL + '/leagues/' + leagueId + '/members.json').then(function(r) { return r.json(); }).catch(function() { return null; })
+          fetch(FB_DB_URL + '/leagues/' + leagueId + '/members.json').then(function(r) { return r.json(); }).catch(function() { return null; }),
+          // The signed-in user's own submitted lineup for the next (draft-open)
+          // week, if any — lets the card show "Edit Team" instead of "Draft Now"
+          // and expand the drafted roster inline from this page.
+          fetch(FB_DB_URL + '/leagues/' + leagueId + '/season/' + seasonKey + '/meta.json').then(function(r) { return r.json(); }).then(function(meta) {
+            var nextWeek = (meta && typeof meta.week === 'number') ? meta.week + 1 : null;
+            if (!nextWeek) return null;
+            return fetch(FB_DB_URL + '/leagues/' + leagueId + '/lineups/' + seasonKey + '/week' + nextWeek + '/' + uid + '.json').then(function(r) { return r.json(); });
+          }).catch(function() { return null; })
         ]);
       })
       .then(function(res) {
@@ -847,7 +903,8 @@ function renderCards(leagueIds, uid) {
           seasonMeta: res[5],
           nextWeekSalaryMeta: res[6],
           currentWeekFinalizedAt: res[7],
-          realActiveMemberUids: realActiveMemberUids
+          realActiveMemberUids: realActiveMemberUids,
+          myDraftLineup: res[9]
         };
       }).catch(function() { return null; });
   }))
