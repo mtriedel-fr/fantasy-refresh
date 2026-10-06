@@ -7863,11 +7863,12 @@ function getPlayerWeekData(name){
     weeks.filter(function(ww){ return ww <= w; }).forEach(function(ww){
       (seasonData[String(ww)]||[]).forEach(function(e){
         if(realActiveMemberUids && (!e.uid || !realActiveMemberUids[e.uid])) return;
-        cumTotals[e.name] = (cumTotals[e.name]||0) + e.score;
+        var k = e.uid || ('nm:' + e.name); // uid-keyed, same as computeSeasonStandings
+        cumTotals[k] = (cumTotals[k]||0) + e.score;
       });
     });
     var cumSorted = Object.keys(cumTotals).sort(function(a,b){ return cumTotals[b]-cumTotals[a]; });
-    var cumStanding = cumSorted.indexOf(name) + 1;
+    var cumStanding = cumSorted.indexOf(entry.uid || ('nm:' + entry.name)) + 1;
     return { week:w, score:entry.score, avg:avg, rank:rank, total:wkData.length, cumStanding:cumStanding };
   }).filter(Boolean);
 }
@@ -8016,8 +8017,19 @@ function buildTeamSeasonHtml(displayName, isYou){
   weeks.forEach(function(w){
     (seasonData[String(w)]||[]).forEach(function(e){ allTotals[e.name] = (allTotals[e.name]||0) + e.score; });
   });
-  var curEntry = (seasonData[String(currentWeek)]||[]).find(function(e){ return teamMatch(e.name, resolvedName); });
-  var sznRank = (curEntry && getCorrectedRank(curEntry.uid)) || Object.keys(allTotals).sort(function(a,b){ return allTotals[b]-allTotals[a]; }).indexOf(resolvedName) + 1;
+  // Season rank must come from the SAME source as the Season standings
+  // table (computeSeasonStandings: uid-keyed, active members only).
+  // Previously this used getCorrectedRank(), which reads the current
+  // WEEK's standings cache — so the modal showed this week's finish
+  // labelled as "Season rank", disagreeing with the Season standings.
+  var teamUid = '';
+  weeks.forEach(function(w){
+    var e = (seasonData[String(w)]||[]).find(function(x){ return teamMatch(x.name, resolvedName); });
+    if(e && e.uid) teamUid = e.uid;
+  });
+  var seasonSorted = computeSeasonStandings().sorted;
+  var sznIdx = seasonSorted.findIndex(function(t){ return teamUid ? t.uid === teamUid : teamMatch(t.name, resolvedName); });
+  var sznRank = sznIdx >= 0 ? sznIdx + 1 : (Object.keys(allTotals).sort(function(a,b){ return allTotals[b]-allTotals[a]; }).indexOf(resolvedName) + 1);
 
   var scoreChart = buildScoreChartInline(weekData);
   var rankChart = buildRankChartInline(weekData);
