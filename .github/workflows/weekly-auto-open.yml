@@ -274,10 +274,32 @@ jobs:
               multByPos[pos] = topAnchor / Math.pow(maxProjByPos[pos], conf.exp);
             });
 
+            // Teams actually playing this week, from the cached schedule.
+            // Tank01 projects all 32 defenses even on a bye, and the
+            // backup-QB pass below walks the whole pool — so without this,
+            // bye-week DEF/QBs end up priced and draftable. If the schedule
+            // looks incomplete (<16 teams), skip filtering rather than
+            // risk wiping out real players.
+            const TEAM_ALIAS = { WSH: 'WAS', JAC: 'JAX', LA: 'LAR' };
+            const nt = t => { const u = String(t || '').toUpperCase(); return TEAM_ALIAS[u] || u; };
+            let playingTeams = null;
+            try {
+              const sched = await firebaseGet(`/nflSchedule/${season}/Regular.json`);
+              const games = sched && sched.weeks && sched.weeks[`week${week}`];
+              if (Array.isArray(games)) {
+                const set = new Set();
+                games.forEach(g => { if (g && g.home) set.add(nt(g.home)); if (g && g.away) set.add(nt(g.away)); });
+                if (set.size >= 16) playingTeams = set;
+              }
+            } catch(e) { /* no schedule — don't filter */ }
+            const isPlaying = team => !playingTeams || playingTeams.has(nt(team));
+            if (playingTeams) console.log(`  Bye filter: ${playingTeams.size} teams playing week ${week}`);
+
             const salaries = {};
             let count = 0;
             projPlayers.forEach(p => {
               if (!p.proj || p.proj <= 0) return;
+              if (!isPlaying(p.team)) return;
               if (!POSITIONS[p.pos]) return;
               const poolP = nameMap[normalizeNameForMatch(p.name)];
               const pid = poolP ? poolP.id : ('t01_' + p.id);
@@ -300,6 +322,7 @@ jobs:
             Object.values(pool || {}).forEach(poolP => {
               if (!poolP || poolP.pos !== 'QB') return;
               if (salaries[poolP.id]) return;
+              if (!isPlaying(poolP.team)) return;
               const inj = poolP.status || null;
               if (inj === 'O' || inj === 'IR') return;
               salaries[poolP.id] = { id: poolP.id, name: poolP.name, pos: 'QB', team: poolP.team, proj: 0, salary: BACKUP_QB_SALARY, status: inj, tank01PlayerID: poolP.tank01PlayerID || null, headshot: poolP.headshot || null };
