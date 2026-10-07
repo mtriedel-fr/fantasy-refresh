@@ -910,6 +910,9 @@ function loadSalaries(){
         var flatBanner = document.getElementById('flat-sal-banner');
         if(flatBanner) flatBanner.style.display = 'none';
         allPlayers = Object.values(data.players).filter(function(p){ return p && p.name && p.pos; });
+        // Drop bye-week teams (Tank01 still projects every defense, and
+        // backup QBs come from the full pool, so byes leak in otherwise).
+        if(schedule.length) filterPlayersToSchedule();
         renderPicker();
         repriceLineup();   // saved lineup may have loaded first with stale snapshot prices
 
@@ -960,8 +963,8 @@ function loadFlatSalariesFromPool(){
                   salary:FLAT[p.pos], proj:null, status:p.status||null,
                   tank01PlayerID:p.tank01PlayerID||null, headshot:p.headshot||null};
         });
-      // In preseason mode — filter to only teams playing this week
-      if(PS_MODE && schedule.length){
+      // Filter to only teams playing this week (byes / preseason)
+      if(schedule.length){
         filterPlayersToSchedule();
       }
       renderPicker();
@@ -978,13 +981,18 @@ function loadFlatSalariesFromPool(){
 // globals — removed the local duplicate that used to live here.
 
 function filterPlayersToSchedule(){
-  // Build set of teams playing this week from schedule
+  // Build set of teams playing this week from schedule. Regular-season
+  // games from the worker carry home/away (not always a teams array), so
+  // read both shapes.
   var playingTeams = {};
   schedule.forEach(function(g){
-    if(g.teams) g.teams.forEach(function(t){ playingTeams[normTeam(t)] = true; });
+    var ts = (g.teams && g.teams.length) ? g.teams : [g.home, g.away];
+    ts.forEach(function(t){ if(t) playingTeams[normTeam(t)] = true; });
   });
-  if(!Object.keys(playingTeams).length) return;
-  allPlayers = allPlayers.filter(function(p){ return playingTeams[normTeam(p.team)]; });
+  // Safety: a partial/broken schedule must never wipe out the pool. A real
+  // NFL week (even the heaviest bye week) has well over 8 games.
+  if(Object.keys(playingTeams).length < 16) return;
+  allPlayers = allPlayers.filter(function(p){ return p.team && playingTeams[normTeam(p.team)]; });
 }
 
 
@@ -1126,8 +1134,10 @@ function loadSchedule(){
         renderRoster();
       }).catch(function(){});
 
-      // In preseason: re-filter player pool to only teams playing this week
-      if(PS_MODE && allPlayers.length){
+      // Re-filter player pool to only teams playing this week — covers
+      // bye weeks in the regular season as well as preseason, whichever
+      // of salaries/schedule finishes loading second.
+      if(allPlayers.length){
         filterPlayersToSchedule();
         renderPicker();
       }
