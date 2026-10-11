@@ -472,7 +472,25 @@ jobs:
 
               for (const [slotId, player] of Object.entries(lineup.slots)) {
                 if (!player) continue;
-                let stats = playerStats[player.id] || playerStats[(player.name || '').toLowerCase()] || playerStats[stripNameSuffix((player.name || '').toLowerCase())] || playerStats[(player.name || '').toUpperCase()];
+                // ID lookup first, but VERIFY it's the same player. playerStats
+                // is keyed by Tank01's numeric playerID AND by Sleeper's numeric
+                // ID in the same object, so a lineup's Sleeper ID can collide
+                // with an unrelated player's Tank01 ID (or a bad sleeperBotID)
+                // and silently return the wrong player's stats — this is how
+                // Justin Jefferson scored 0.00 on rosters in Week 5 while his
+                // real line (18.8) was in the box score. DEF entries are keyed
+                // by team abbreviation and have no name to compare, so they're
+                // trusted as-is.
+                const normNm = n => stripNameSuffix(String(n || '').toLowerCase().replace(/[.'’`]/g, '').replace(/\s+/g, ' ').trim());
+                let stats = playerStats[player.id];
+                if (stats && player.pos !== 'DEF') {
+                  const statName = stats.longName || stats.playerName || '';
+                  if (statName && player.name && normNm(statName) !== normNm(player.name)) {
+                    console.log(`    ⚠️  ID ${player.id} matched "${statName}", not "${player.name}" — ignoring ID match, using name`);
+                    stats = null;
+                  }
+                }
+                stats = stats || playerStats[(player.name || '').toLowerCase()] || playerStats[stripNameSuffix((player.name || '').toLowerCase())] || playerStats[(player.name || '').toUpperCase()];
                 let result;
                 if (stats) {
                   result = calcDKPoints(stats, player.pos);
