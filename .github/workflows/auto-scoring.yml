@@ -70,6 +70,19 @@ jobs:
           // scope (not nested inside main() or scoreLeague()) so both
           // functions can actually call it — they're siblings, not
           // nested within each other.
+          // Every box-score entry per normalized name (not just the last one
+          // seen). A plain name->stats map lets a second entry with the same
+          // name (a duplicate/empty Tank01 row, or a different player who
+          // shares the name) silently overwrite the real one — the player
+          // then scores 0 with no breakdown while the Week Stats board,
+          // which lists every entry, still shows his real points.
+          const STATS_BY_NAME = {};
+          function normPlayerName(n) {
+            return stripNameSuffix(String(n || '').toLowerCase().replace(/[.'’`]/g, '').replace(/\s+/g, ' ').trim());
+          }
+          const TEAM_ALIAS_SC = { WSH: 'WAS', JAC: 'JAX', LA: 'LAR' };
+          function normTeamSC(t) { const u = String(t || '').toUpperCase(); return TEAM_ALIAS_SC[u] || u; }
+
           function stripNameSuffix(name) {
             return (name || '').replace(/\s+(jr|sr|ii|iii|iv|v)\.?$/i, '').trim();
           }
@@ -476,18 +489,29 @@ jobs:
                 // is keyed by Tank01's numeric playerID AND by Sleeper's numeric
                 // ID in the same object, so a lineup's Sleeper ID can collide
                 // with an unrelated player's Tank01 ID (or a bad sleeperBotID)
-                // and silently return the wrong player's stats — this is how
-                // Justin Jefferson scored 0.00 on rosters in Week 5 while his
-                // real line (18.8) was in the box score. DEF entries are keyed
+                // and silently return the wrong player's stats. DEF entries are keyed
                 // by team abbreviation and have no name to compare, so they're
                 // trusted as-is.
-                const normNm = n => stripNameSuffix(String(n || '').toLowerCase().replace(/[.'’`]/g, '').replace(/\s+/g, ' ').trim());
                 let stats = playerStats[player.id];
                 if (stats && player.pos !== 'DEF') {
                   const statName = stats.longName || stats.playerName || '';
-                  if (statName && player.name && normNm(statName) !== normNm(player.name)) {
-                    console.log(`    ⚠️  ID ${player.id} matched "${statName}", not "${player.name}" — ignoring ID match, using name`);
+                  // No name to verify, or a different name → don't trust the ID hit.
+                  if (!statName || (player.name && normPlayerName(statName) !== normPlayerName(player.name))) {
+                    console.log(`    ⚠️  ID ${player.id} matched "${statName || '(no name)'}", not "${player.name}" — ignoring ID match, using name`);
                     stats = null;
+                  }
+                }
+                // Even a verified ID hit can be an empty duplicate row with the
+                // right name, so for players always resolve through every
+                // same-name entry: same team first, then the one that actually
+                // produced points. The ID hit is only a fallback.
+                if (player.pos !== 'DEF') {
+                  const cands = STATS_BY_NAME[normPlayerName(player.name)] || [];
+                  if (cands.length) {
+                    const sameTeam = player.team ? cands.filter(c => normTeamSC(c.teamAbv || c.team) === normTeamSC(player.team)) : [];
+                    const pool = sameTeam.length ? sameTeam : cands;
+                    stats = pool.reduce((best, c) => (calcDKPoints(c, player.pos).pts > calcDKPoints(best, player.pos).pts ? c : best), pool[0]);
+                    if (cands.length > 1) console.log(`    🔀 "${player.name}": ${cands.length} box-score entries share this name — using ${normTeamSC(stats.teamAbv || stats.team)} entry (${calcDKPoints(stats, player.pos).pts} pts)`);
                   }
                 }
                 stats = stats || playerStats[(player.name || '').toLowerCase()] || playerStats[stripNameSuffix((player.name || '').toLowerCase())] || playerStats[(player.name || '').toUpperCase()];
@@ -1259,6 +1283,8 @@ jobs:
                 if (stats.sleeperBotID) playerStats[stats.sleeperBotID] = stats;
                 const name = (stats.longName || stats.playerName || '').toLowerCase();
                 if (name) {
+                  const nk = normPlayerName(name);
+                  (STATS_BY_NAME[nk] = STATS_BY_NAME[nk] || []).push(stats);
                   playerStats[name] = stats;
                   const stripped = stripNameSuffix(name);
                   if (stripped && stripped !== name && !playerStats[stripped]) playerStats[stripped] = stats;
