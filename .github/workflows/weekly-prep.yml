@@ -218,6 +218,12 @@ jobs:
               if (!p || !p.active) return;
               if (!p.position || POOL_POSITIONS.indexOf(p.position) < 0) return;
               if (!p.full_name && p.position !== 'DEF') return;
+              // Sleeper leaves many retired / unsigned players flagged
+              // active:true (Bortles, Roethlisberger…). Only keep players
+              // actually on an NFL roster: they must have a team, and must
+              // not carry an Inactive/Retired roster status.
+              if (p.position !== 'DEF' && !p.team) return;
+              if (p.position !== 'DEF' && p.status && /inactive|retired/i.test(p.status)) return;
               pool[id] = {
                 id,
                 name: p.position === 'DEF' ? (p.full_name || p.team + ' Defense') : p.full_name,

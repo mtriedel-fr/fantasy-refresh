@@ -909,7 +909,8 @@ function loadSalaries(){
       if(data && data.players && Object.keys(data.players).length){
         var flatBanner = document.getElementById('flat-sal-banner');
         if(flatBanner) flatBanner.style.display = 'none';
-        allPlayers = Object.values(data.players).filter(function(p){ return p && p.name && p.pos; });
+        // No team = retired / free agent (Sleeper keeps some flagged active)
+        allPlayers = Object.values(data.players).filter(function(p){ return p && p.name && p.pos && p.team; });
         // Drop bye-week teams (Tank01 still projects every defense, and
         // backup QBs come from the full pool, so byes leak in otherwise).
         if(schedule.length) filterPlayersToSchedule();

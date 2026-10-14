@@ -10198,6 +10198,10 @@ function refreshPlayerPool(){
         if(!p || !p.active) return;
         if(!p.position || POOL_POSITIONS.indexOf(p.position) < 0) return;
         if(!p.full_name && p.position !== 'DEF') return;
+        // Sleeper leaves many retired / unsigned players flagged active:true.
+        // Keep only players on a real NFL roster (has a team, not Inactive/Retired).
+        if(p.position !== 'DEF' && !p.team) return;
+        if(p.position !== 'DEF' && p.status && /inactive|retired/i.test(p.status)) return;
 
         // Build clean player record
         var record = {
