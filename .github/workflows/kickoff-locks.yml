@@ -26,6 +26,22 @@ jobs:
           node << 'SCRIPT'
           const https = require('https');
 
+          // ── GitHub annotations ───────────────────────────────────────
+          // Important events are also emitted as workflow annotations
+          // (::warning:: / ::error:: / ::notice::). Annotations are readable
+          // through the GitHub API and show on the run's summary page, so a
+          // problem can be spotted without downloading the full log.
+          // De-duplicated per run; GitHub shows at most 10 of each level per step.
+          const _alerted = new Set();
+          function alert(level, title, msg) {
+            const key = level + '|' + title + '|' + msg;
+            if (_alerted.has(key)) return;
+            _alerted.add(key);
+            const esc = s => String(s).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+            const escT = s => esc(s).replace(/:/g, '%3A').replace(/,/g, '%2C');
+            console.log(`::${level} title=${escT(title)}::${esc(msg)}`);
+          }
+
           const FB_URL   = process.env.FIREBASE_DB_URL;
           const T01_KEY  = process.env.TANK01_KEY;
           let SEASON   = process.env.FR_SEASON || '2026';
@@ -430,6 +446,7 @@ jobs:
                 await lockLeagueWeek(leagueId, week, gamesForThisLeague, seasonKey);
               } catch(e) {
                 console.error(`Failed locking ${leagueId}:`, e.message);
+                alert('error', 'Kickoff lock failed', `${leagueId}: ${e.message}`);
               }
             }
           }
@@ -442,6 +459,7 @@ jobs:
           // runs and wasted Tank01 API calls for no benefit.
           main().catch(e => {
             console.error('Lock job failed:', e);
+            alert('error', 'Lock job failed', (e && e.stack) || String(e));
             process.exit(1);
           });
           SCRIPT

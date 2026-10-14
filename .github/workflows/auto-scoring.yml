@@ -58,6 +58,22 @@ jobs:
           node << 'SCRIPT'
           const https = require('https');
 
+          // ── GitHub annotations ───────────────────────────────────────
+          // Important events are also emitted as workflow annotations
+          // (::warning:: / ::error:: / ::notice::). Annotations are readable
+          // through the GitHub API and show on the run's summary page, so a
+          // problem can be spotted without downloading the full log.
+          // De-duplicated per run; GitHub shows at most 10 of each level per step.
+          const _alerted = new Set();
+          function alert(level, title, msg) {
+            const key = level + '|' + title + '|' + msg;
+            if (_alerted.has(key)) return;
+            _alerted.add(key);
+            const esc = s => String(s).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+            const escT = s => esc(s).replace(/:/g, '%3A').replace(/,/g, '%2C');
+            console.log(`::${level} title=${escT(title)}::${esc(msg)}`);
+          }
+
           // Strips a trailing name suffix (Jr, Sr, II, III, IV, V —
           // with or without a period) for matching purposes only.
           // Confirmed as a real, recurring failure mode tonight: Ted
@@ -454,6 +470,15 @@ jobs:
           async function scoreLeague(leagueId, week, seasonType, activeGames, allFinal, playerStats) {
             console.log(`\n--- Scoring league: ${leagueId} ---`);
 
+            // Teams whose game is already final in this run — used to flag
+            // lineup players who still couldn't be matched to any stats.
+            const finalTeams = new Set();
+            (activeGames || []).forEach(g => {
+              const s = (g.gameStatus || g.status || '').toLowerCase();
+              if (!(s.includes('final') || s.includes('completed'))) return;
+              [g.home || g.homeTeamAbbr || g.homeTeam, g.away || g.awayTeamAbbr || g.awayTeam].forEach(t => { if (t) finalTeams.add(normTeamSC(t)); });
+            });
+
             // Load lineups
             const lineups = await firebaseGet(`/leagues/${leagueId}/lineups/${SEASON}/week${week}.json`).catch(() => null);
             if (!lineups) {
@@ -498,6 +523,7 @@ jobs:
                   // No name to verify, or a different name → don't trust the ID hit.
                   if (!statName || (player.name && normPlayerName(statName) !== normPlayerName(player.name))) {
                     console.log(`    ⚠️  ID ${player.id} matched "${statName || '(no name)'}", not "${player.name}" — ignoring ID match, using name`);
+                    alert('notice', 'ID mismatch (handled)', `${player.name} (id ${player.id}) matched "${statName || '(no name)'}" by ID — scored by name instead`);
                     stats = null;
                   }
                 }
@@ -511,7 +537,10 @@ jobs:
                     const sameTeam = player.team ? cands.filter(c => normTeamSC(c.teamAbv || c.team) === normTeamSC(player.team)) : [];
                     const pool = sameTeam.length ? sameTeam : cands;
                     stats = pool.reduce((best, c) => (calcDKPoints(c, player.pos).pts > calcDKPoints(best, player.pos).pts ? c : best), pool[0]);
-                    if (cands.length > 1) console.log(`    🔀 "${player.name}": ${cands.length} box-score entries share this name — using ${normTeamSC(stats.teamAbv || stats.team)} entry (${calcDKPoints(stats, player.pos).pts} pts)`);
+                    if (cands.length > 1) {
+                      console.log(`    🔀 "${player.name}": ${cands.length} box-score entries share this name — using ${normTeamSC(stats.teamAbv || stats.team)} entry (${calcDKPoints(stats, player.pos).pts} pts)`);
+                      alert('notice', 'Duplicate box-score name (handled)', `${player.name}: ${cands.length} entries share this name — used ${normTeamSC(stats.teamAbv || stats.team)} entry (${calcDKPoints(stats, player.pos).pts} pts)`);
+                    }
                   }
                 }
                 stats = stats || playerStats[(player.name || '').toLowerCase()] || playerStats[stripNameSuffix((player.name || '').toLowerCase())] || playerStats[(player.name || '').toUpperCase()];
@@ -536,6 +565,9 @@ jobs:
                     console.log(`    ↩️  PRESERVED: "${player.name}" not in today's data — kept prior score of ${existingPts}`);
                   } else {
                     console.log(`    ❌ NO MATCH: lineup has "${player.name}" (id: ${player.id}) — not found in playerStats, no prior score to preserve`);
+                    if (player.team && finalTeams.has(normTeamSC(player.team))) {
+                      alert('warning', '0 pts after final', `Week ${week}: ${player.name} (${player.pos} ${player.team}) scored 0 — his game is final but no stats matched. Inactive, or a name/ID mismatch to fix.`);
+                    }
                   }
                 }
                 slotPts[slotId] = Math.round(result.pts * 100) / 100;
@@ -1222,6 +1254,7 @@ jobs:
                 }
               } catch(e) {
                 console.error(`  ❌ Failed box score ${gameId}:`, e.message);
+                alert('error', 'Box score fetch failed', `${gameId}: ${e.message}`);
               }
             }
 
@@ -1427,6 +1460,7 @@ jobs:
                 await scoreLeague(leagueId, week, seasonType, activeGames, allFinal, playerStats);
               } catch(e) {
                 console.error(`Failed scoring ${leagueId}:`, e.message);
+                alert('error', 'League scoring failed', `${leagueId}: ${e.message}`);
               }
             }
 
@@ -2080,6 +2114,7 @@ jobs:
           // frequency this loop existed to work around.
           main().catch(e => {
             console.error('Scoring job failed:', e);
+            alert('error', 'Scoring job failed', (e && e.stack) || String(e));
             process.exit(1);
           });
           SCRIPT
