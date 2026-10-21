@@ -1,0 +1,70 @@
+name: One-off - Week 7 QB cleanup
+
+# One-time, commissioner-approved (Oct 21 2026) removal of 10 QBs who can't
+# score in Week 7 from that week's salary sheet. Runs only on its own branch.
+# Safety: verifies each id+name, aborts if ANY saved lineup contains one of
+# them, prints a full backup of every removed entry first (annotation), and
+# only deletes those exact entries + corrects meta.count. No price changes.
+on:
+  push:
+    branches: [ops/week7-qb-cleanup]
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Remove unscoreable QBs from Week 7
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB_URL = process.env.FIREBASE_DB_URL, FB_TOKEN = process.env.FIREBASE_AUTH_TOKEN;
+          const BASE = '/leagues/fr_refresh26';
+          const WEEK = 7, SEASON = 2026;
+          const TARGETS = {
+            '138': 'Ben Roethlisberger', '1979': 'Blake Bortles', '4574': 'Cooper Rush',
+            '4683': 'Aaron Bailey', '4924': 'Zach Terrell', '4926': 'Nick Schuessler',
+            '4936': 'Skyler Howard', '6147': 'Clayton Thorson', '6904': 'Jalen Hurts', '7262': 'Jalen Morton'
+          };
+          const url = p => `${FB_URL}${p}${p.includes('?') ? '&' : '?'}auth=${FB_TOKEN}`;
+          const req = (method, p, body) => new Promise((res, rej) => {
+            const u = new URL(url(p)); const data = body === undefined ? null : JSON.stringify(body);
+            const r = https.request({ hostname: u.hostname, path: u.pathname + u.search, method,
+              headers: data ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) } : {} }, rs => {
+              let d = ''; rs.on('data', c => d += c);
+              rs.on('end', () => rs.statusCode >= 200 && rs.statusCode < 300 ? res(d ? JSON.parse(d) : null) : rej(new Error(`${method} ${p} → HTTP ${rs.statusCode} ${d.slice(0, 200)}`)));
+            }); r.on('error', rej); if (data) r.write(data); r.end();
+          });
+          const esc = s => String(s).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+          const ann = (lvl, t, m) => console.log(`::${lvl} title=${esc(t).replace(/:/g,'%3A').replace(/,/g,'%2C')}::${esc(m)}`);
+
+          (async () => {
+            const sheetPath = `${BASE}/salaries/${SEASON}/week${WEEK}`;
+            const players = await req('GET', `${sheetPath}/players.json`);
+            const meta = await req('GET', `${sheetPath}/meta.json`);
+            const lineups = await req('GET', `${BASE}/lineups/${SEASON}/week${WEEK}.json`) || {};
+            const inLineups = [];
+            Object.values(lineups).forEach(l => l && l.slots && Object.values(l.slots).forEach(p => { if (p && TARGETS[p.id]) inLineups.push(`${p.name} (${l.team || '?'})`); }));
+            if (inLineups.length) { ann('error', 'Cleanup ABORTED - player already in a lineup', inLineups.join('\n')); process.exit(1); }
+
+            const backup = {}, skipped = [];
+            Object.entries(TARGETS).forEach(([id, name]) => {
+              const p = players && players[id];
+              if (!p) skipped.push(`${id} ${name}: not in sheet`);
+              else if (p.name !== name || p.pos !== 'QB' || parseFloat(p.proj) > 0) skipped.push(`${id}: expected ${name} QB proj 0, found ${p.name} ${p.pos} proj ${p.proj}`);
+              else backup[id] = p;
+            });
+            ann('notice', `Backup of ${Object.keys(backup).length} entries (restore = PUT each back under players/{id})`, JSON.stringify(backup));
+            if (skipped.length) ann('warning', 'Skipped (safety check)', skipped.join('\n'));
+
+            for (const id of Object.keys(backup)) await req('DELETE', `${sheetPath}/players/${id}.json`);
+            const after = await req('GET', `${sheetPath}/players.json?shallow=true`);
+            const newCount = Object.keys(after || {}).length;
+            if (meta && typeof meta.count === 'number') await req('PUT', `${sheetPath}/meta/count.json`, newCount);
+            const still = Object.keys(backup).filter(id => after && after[id]);
+            ann(still.length ? 'error' : 'notice', `Week ${WEEK} cleanup done`,
+              `Removed: ${Object.values(backup).map(p => p.name).join(', ')}\nPlayers in sheet: ${meta && meta.count} → ${newCount}${still.length ? '\nSTILL PRESENT: ' + still.join(', ') : ''}`);
+          })().catch(e => { ann('error', 'Cleanup failed', (e && e.stack) || String(e)); process.exit(1); });
+          SCRIPT
