@@ -127,6 +127,21 @@ jobs:
             if (stale.length) ann('warning', `Week ${wk}: ${stale.length} priced player(s) flagged by live Sleeper data`, stale.join('\n'));
             else ann('notice', `Week ${wk}: live Sleeper check clean`, 'Every priced player is active, rostered on the same team, and not OUT/IR/Doubtful.');
 
+            // Cleanup candidates: can't score this week, priced only as flat backups
+            const cand = players.filter(p => {
+              if (p.pos !== 'QB' || parseFloat(p.proj) > 0) return false;
+              const sp = sleeper[p.id];
+              const ghost = !p.tank01PlayerID;                       // not on Tank01's current player list
+              const out = sp && ((sp.injury_status && /^(out|ir|pup|sus)/i.test(sp.injury_status)) || (sp.status && /inactive|retired/i.test(sp.status)) || !sp.team);
+              return ghost || out;
+            });
+            const lineups = await get(`/leagues/${LEAGUE_ID}/lineups/${season}/week${wk}.json`).catch(() => null) || {};
+            const lus = Object.values(lineups).filter(l => l && l.slots);
+            const used = {};
+            lus.forEach(l => Object.values(l.slots).forEach(pl => { if (pl && pl.id) used[pl.id] = (used[pl.id] || 0) + 1; }));
+            ann('notice', `Week ${wk}: ${cand.length} cleanup candidates · ${lus.length} lineups saved so far`,
+              cand.map(p => `${p.id} · ${p.name} ${p.team} $${p.salary} · ${p.tank01PlayerID ? 'on Tank01 list' : 'NOT on Tank01 list'} · in ${used[p.id] || 0} lineup(s)`).join('\n'));
+
             ann('notice', `Week ${wk} draft report`, L.join('\n'));
             if (issues.length) ann('warning', `Week ${wk}: ${issues.length} pricing issue(s)`, issues.slice(0, 80).join('\n'));
             else ann('notice', `Week ${wk}: no pricing issues found`, 'Bye teams, no-team players, OUT/IR, duplicates and price inversions all clear.');
