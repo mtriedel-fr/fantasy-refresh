@@ -207,6 +207,10 @@ jobs:
 
           // ── Step 1: refresh the shared player pool (Sleeper) — same source/logic
           // as league.html's refreshPlayerPool(), just running here instead of a click.
+          // Sleeper injury_status values are words ("Out", "IR", "PUP", "Sus",
+          // "Doubtful", "Questionable"), not the single letter 'O' this code
+          // used to compare against — so OUT players were never excluded.
+          function isUnavailable(inj) { return !!inj && /^(o$|out|ir|pup|sus|na$)/i.test(String(inj).trim()); }
           async function refreshPlayerPool() {
             console.log('Fetching player pool from Sleeper…');
             const all = await fetchJson('https://api.sleeper.app/v1/players/nfl');
@@ -453,7 +457,7 @@ jobs:
               const poolP = poolPlayers ? poolPlayers[p.id] : null; // exact id match
               if (!poolP) return;                                   // must be a real pooled player
               const inj = poolP.status || null;
-              if (inj === 'O' || inj === 'IR') return;
+              if (isUnavailable(inj)) return;
               const conf = POSITIONS[p.pos];
               const mult = multByPos[p.pos] || 0;
               let sal = Math.ceil((Math.pow(p.proj, conf.exp) * mult) / SAL_ROUND) * SAL_ROUND;
@@ -467,9 +471,10 @@ jobs:
             // so a suddenly-elevated backup is never unpriced. QB only.
             Object.values(poolPlayers || {}).forEach(poolP => {
               if (!poolP || poolP.pos !== 'QB') return;
+              if (!poolP.tank01PlayerID || !poolP.team) return; // not on Tank01's current player list = not on a roster
               if (salaries[poolP.id]) return;
               const inj = poolP.status || null;
-              if (inj === 'O' || inj === 'IR') return;
+              if (isUnavailable(inj)) return;
               salaries[poolP.id] = { id: poolP.id, name: poolP.name, pos: 'QB', team: poolP.team, proj: 0, salary: BACKUP_QB_SALARY, status: inj, tank01PlayerID: poolP.tank01PlayerID || null, headshot: poolP.headshot || null };
               count++;
             });
@@ -534,7 +539,7 @@ jobs:
               const poolP = nameMap[normalizeNameForMatch(p.name)];
               const pid = poolP ? poolP.id : ('t01_' + p.id);
               const inj = poolP ? (poolP.status || p.status || null) : (p.status || null);
-              if (inj === 'O' || inj === 'IR') return;
+              if (isUnavailable(inj)) return;
               const conf = POSITIONS[p.pos];
               const mult = multByPos[p.pos] || 0;
               let sal = Math.ceil((Math.pow(p.proj, conf.exp) * mult) / SAL_ROUND) * SAL_ROUND;
@@ -560,9 +565,10 @@ jobs:
             // position's existing exclusion is completely untouched.
             Object.values(poolPlayers || {}).forEach(poolP => {
               if (!poolP || poolP.pos !== 'QB') return;
+              if (!poolP.tank01PlayerID || !poolP.team) return; // not on Tank01's current player list = not on a roster
               if (salaries[poolP.id]) return; // already has a real projection-based price
               const inj = poolP.status || null;
-              if (inj === 'O' || inj === 'IR') return; // still exclude injured/IR backups, same standard as everyone else
+              if (isUnavailable(inj)) return; // still exclude injured/IR backups, same standard as everyone else
               salaries[poolP.id] = { id: poolP.id, name: poolP.name, pos: 'QB', team: poolP.team, proj: 0, salary: BACKUP_QB_SALARY, status: inj, tank01PlayerID: poolP.tank01PlayerID || null, headshot: poolP.headshot || null };
               count++;
             });
