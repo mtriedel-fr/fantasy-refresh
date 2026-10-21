@@ -3055,5 +3055,131 @@ function goBack(){
       });
     }
   </script>
+<!-- ── HALLOWEEN JUMP SCARE ───────────────────────────────────────────
+     Seasonal, self-contained. Shows once per draft week per device while
+     BOO_START..BOO_END is active. Step 1 is a harmless "Trick or treat?"
+     card (with a no-scares opt-out); the tap that dismisses it is what
+     lets the browser play the sound, so the scare lands with audio even on
+     iPhone. No flashing (photosensitivity-safe), and a gentle version for
+     anyone with Reduce Motion turned on. Preview any time with ?boo=1.
+     To remove after Halloween: delete this block, or just let the dates
+     lapse — it does nothing outside the window. -->
+<style>
+#boo{position:fixed;inset:0;z-index:99999;display:none;align-items:center;justify-content:center;background:rgba(4,6,8,.92);font-family:var(--fd,system-ui),system-ui,sans-serif;-webkit-tap-highlight-color:transparent;}
+#boo.on{display:flex;}
+#boo .boo-card{max-width:340px;margin:0 16px;padding:28px 24px 22px;text-align:center;background:#11161a;border:1px solid #2a3a3a;border-radius:18px;color:#e9f3f3;box-shadow:0 10px 40px rgba(0,0,0,.6);}
+#boo .boo-pump{font-size:58px;line-height:1;animation:booBob 1.6s ease-in-out infinite;}
+#boo .boo-h{font-size:24px;font-weight:900;letter-spacing:.5px;margin:12px 0 6px;color:#ff8a1f;text-transform:uppercase;}
+#boo .boo-p{font-size:14px;color:#9fb8b8;margin:0 0 18px;}
+#boo .boo-go{display:block;width:100%;padding:13px 0;border:0;border-radius:12px;background:#ff8a1f;color:#170a00;font:inherit;font-size:16px;font-weight:900;letter-spacing:.6px;text-transform:uppercase;cursor:pointer;}
+#boo .boo-skip{margin-top:12px;background:none;border:0;color:#6f8a8a;font:inherit;font-size:12px;text-decoration:underline;cursor:pointer;}
+#boo .boo-face{display:none;position:absolute;inset:0;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 45%,#2a0505 0%,#000 70%);}
+#boo.scare .boo-card{display:none;}
+#boo.scare .boo-face{display:flex;}
+#boo .boo-face svg{width:min(92vw,560px);height:auto;transform-origin:50% 55%;animation:booLunge .32s cubic-bezier(.2,1.6,.4,1) both, booShake .45s .32s linear 2;}
+#boo .boo-bye{position:absolute;left:0;right:0;bottom:max(28px,env(safe-area-inset-bottom));text-align:center;color:#ffb36b;font-size:15px;font-weight:800;letter-spacing:.6px;opacity:0;transition:opacity .4s;}
+#boo .boo-bye small{display:block;margin-top:6px;color:#9a7b6b;font-size:12px;font-weight:600;letter-spacing:.4px;}
+#boo.done .boo-bye{opacity:1;}
+@keyframes booBob{0%,100%{transform:translateY(0) rotate(-4deg);}50%{transform:translateY(-6px) rotate(4deg);}}
+@keyframes booLunge{0%{transform:scale(.15);opacity:0;}60%{opacity:1;}100%{transform:scale(1.08);opacity:1;}}
+@keyframes booShake{0%,100%{translate:0 0;}20%{translate:-10px 4px;}40%{translate:9px -6px;}60%{translate:-7px -3px;}80%{translate:6px 5px;}}
+@media (prefers-reduced-motion: reduce){
+  #boo .boo-pump{animation:none;}
+  #boo .boo-face svg{animation:booFade .6s ease both;}
+  @keyframes booFade{from{opacity:0;}to{opacity:1;}}
+}
+</style>
+<div id="boo" role="dialog" aria-modal="true" aria-label="Happy Halloween">
+  <div class="boo-card">
+    <div class="boo-pump" aria-hidden="true">🎃</div>
+    <div class="boo-h">Trick or treat?</div>
+    <p class="boo-p">Something's lurking in the draft room this week…</p>
+    <button class="boo-go" type="button" id="boo-go">Enter if you dare</button>
+    <button class="boo-skip" type="button" id="boo-skip">No scares, please</button>
+  </div>
+  <div class="boo-face" aria-hidden="true">
+    <svg viewBox="0 0 400 440" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <radialGradient id="booSkin" cx="50%" cy="40%" r="60%"><stop offset="0" stop-color="#9fb39a"/><stop offset=".7" stop-color="#4e6150"/><stop offset="1" stop-color="#1c261e"/></radialGradient>
+        <radialGradient id="booEye" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#fff6c2"/><stop offset=".35" stop-color="#ffd23a"/><stop offset="1" stop-color="#b30000"/></radialGradient>
+      </defs>
+      <path d="M200 18c-96 0-162 70-162 168 0 58 20 104 46 140 18 25 22 52 30 76 8 24 46 34 86 34s78-10 86-34c8-24 12-51 30-76 26-36 46-82 46-140C362 88 296 18 200 18z" fill="url(#booSkin)"/>
+      <path d="M78 112l112 44M322 112l-112 44" stroke="#141a12" stroke-width="16" stroke-linecap="round" fill="none"/><path d="M96 200c10 26 70 30 86 0M218 200c16 30 76 26 86 0" fill="#0a0d0a"/>
+      <ellipse cx="136" cy="176" rx="50" ry="40" fill="#0a0d0a"/>
+      <ellipse cx="264" cy="176" rx="50" ry="40" fill="#0a0d0a"/>
+      <circle cx="140" cy="178" r="20" fill="url(#booEye)"/>
+      <circle cx="260" cy="178" r="20" fill="url(#booEye)"/>
+      <circle cx="140" cy="178" r="5" fill="#000"/>
+      <circle cx="260" cy="178" r="5" fill="#000"/>
+      <path d="M188 228l12-26 12 26z" fill="#141a14"/>
+      <path d="M104 286c30 40 162 40 192 0 6 56-30 112-96 112s-102-56-96-112z" fill="#120404"/>
+      <path d="M108 290l18 34 16-30 18 36 16-34 24 38 22-38 16 34 18-36 16 30 18-34" fill="#efe6c8" stroke="#efe6c8" stroke-linejoin="round" stroke-width="3"/>
+      <path d="M128 392l16-34 16 30 18-36 22 40 22-40 18 36 16-30 16 34" fill="#efe6c8" stroke="#efe6c8" stroke-linejoin="round" stroke-width="3"/>
+      <path d="M150 330c0 18-4 34 2 46 6-12 2-28 2-46z" fill="#8a0a0a"/><path d="M246 334c0 22-5 42 2 58 7-16 2-36 2-58z" fill="#8a0a0a"/><circle cx="152" cy="380" r="4" fill="#8a0a0a"/><circle cx="248" cy="396" r="5" fill="#8a0a0a"/><path d="M70 250c-12 10-20 26-18 44M330 250c12 10 20 26 18 44" stroke="#1b2219" stroke-width="6" stroke-linecap="round" fill="none" opacity=".7"/>
+    </svg>
+    <div class="boo-bye">Happy Halloween from Fantasy Refresh 🎃<small>Tap anywhere to start drafting</small></div>
+  </div>
+</div>
+<script>
+(function(){
+  var BOO_START = new Date('2026-10-20T00:00:00-04:00').getTime();
+  var BOO_END   = new Date('2026-11-03T06:00:00-05:00').getTime(); // through Halloween-week MNF
+  var force = /[?&]boo=1\b/.test(location.search);
+  var now = Date.now();
+  if(!force && (now < BOO_START || now > BOO_END)) return;
+
+  // One scare per draft week per device. Draft weeks roll over Tuesday
+  // (scores lock Tue 9am ET), so key on the most recent Tuesday.
+  var d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate() - ((d.getDay() + 5) % 7));
+  var KEY = 'fr_boo_' + d.getFullYear() + '-' + (d.getMonth()+1) + '-' + d.getDate();
+  function seen(){ try{ return localStorage.getItem(KEY) === '1'; }catch(e){ return false; } }
+  function markSeen(){ try{ localStorage.setItem(KEY, '1'); }catch(e){} }
+  if(!force && seen()) return;
+
+  var el = document.getElementById('boo');
+  var reduced = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var stage = 'card';
+
+  function scream(){
+    if(reduced) return;
+    try{
+      var AC = window.AudioContext || window.webkitAudioContext; if(!AC) return;
+      var ac = new AC(), t = ac.currentTime;
+      var master = ac.createGain(); master.gain.value = 0.55; master.connect(ac.destination);
+      // Hit: short noise burst
+      var len = Math.floor(ac.sampleRate * 0.9), buf = ac.createBuffer(1, len, ac.sampleRate), ch = buf.getChannelData(0);
+      for(var i=0;i<len;i++) ch[i] = (Math.random()*2-1) * Math.pow(1 - i/len, 2.2);
+      var nz = ac.createBufferSource(); nz.buffer = buf;
+      var bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1400; bp.Q.value = 0.8;
+      nz.connect(bp); bp.connect(master); nz.start(t);
+      // Shriek: two detuned saws sweeping down
+      [0, 7].forEach(function(det){
+        var o = ac.createOscillator(), g = ac.createGain();
+        o.type = 'sawtooth'; o.detune.value = det * 100;
+        o.frequency.setValueAtTime(1150, t); o.frequency.exponentialRampToValueAtTime(320, t + 1.1);
+        g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.22, t + 0.03); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.2);
+        o.connect(g); g.connect(master); o.start(t); o.stop(t + 1.25);
+      });
+      setTimeout(function(){ try{ ac.close(); }catch(e){} }, 1600);
+    }catch(e){}
+  }
+  function close(){ el.classList.remove('on','scare','done'); markSeen(); document.removeEventListener('keydown', onKey); }
+  function scare(){
+    stage = 'scare';
+    el.classList.add('scare');
+    scream();
+    if(navigator.vibrate && !reduced){ try{ navigator.vibrate([120,60,200]); }catch(e){} }
+    setTimeout(function(){ stage = 'done'; el.classList.add('done'); }, 1100);
+  }
+  function onKey(e){ if(e.key === 'Escape') close(); }
+
+  document.getElementById('boo-go').addEventListener('click', function(e){ e.stopPropagation(); scare(); });
+  document.getElementById('boo-skip').addEventListener('click', function(e){ e.stopPropagation(); close(); });
+  el.addEventListener('click', function(){ if(stage === 'done') close(); });
+  document.addEventListener('keydown', onKey);
+
+  el.classList.add('on');
+})();
+</script>
 </body>
 </html>
