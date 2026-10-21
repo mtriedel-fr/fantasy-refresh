@@ -92,6 +92,21 @@ jobs:
             L.push('');
             L.push(`Backup QBs (no projection, flat price): ${zeroQBs.length} — ${zeroQBs.slice(0, 40).map(p => `${p.name} ${p.team}`).join('; ')}`);
 
+            // Player pool freshness + what the pool says about suspicious QBs
+            const poolUpd = await get(`/playerPool/${season}/updated.json`).catch(() => null);
+            const pool = await get(`/playerPool/${season}/players.json`).catch(() => null) || {};
+            const pv = Object.values(pool);
+            L.push(`Player pool: ${pv.length} players, last refreshed ${poolUpd ? ct(poolUpd) : '?'}`);
+            const look = ['Ben Roethlisberger','Blake Bortles','Aaron Bailey','Zach Terrell','Nick Schuessler','Skyler Howard','Jalen Hurts','Case Keenum','Josh Johnson','Tua Tagovailoa'];
+            look.forEach(n => {
+              const inPool = pv.filter(p => p.name === n);
+              const inSheet = players.filter(p => p.name === n);
+              L.push(`   ${n}: pool ${inPool.length ? inPool.map(p => `${p.team || '-'} yrs=${p.years_exp} st=${p.status || '-'} t01=${p.tank01PlayerID ? 'Y' : 'N'}`).join(' | ') : 'NOT IN POOL'} · sheet ${inSheet.length ? inSheet.map(p => `$${p.salary} proj=${p.proj} st=${p.status || '-'}`).join(' | ') : '-'}`);
+            });
+            const zq = players.filter(p => p.pos === 'QB' && !(parseFloat(p.proj) > 0));
+            const zqT01 = zq.filter(p => p.tank01PlayerID).length;
+            L.push(`Zero-proj QBs with a Tank01 ID (i.e. on Tank01's current player list): ${zqT01}/${zq.length}`);
+
             ann('notice', `Week ${wk} draft report`, L.join('\n'));
             if (issues.length) ann('warning', `Week ${wk}: ${issues.length} pricing issue(s)`, issues.slice(0, 80).join('\n'));
             else ann('notice', `Week ${wk}: no pricing issues found`, 'Bye teams, no-team players, OUT/IR, duplicates and price inversions all clear.');
