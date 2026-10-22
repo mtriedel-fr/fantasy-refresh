@@ -132,6 +132,15 @@ jobs:
                 .sort((a, b) => b.proj - a.proj);
               if (missing.length) ann('warning', `Week ${wk}: ${missing.length} projected player(s) missing from the draft`, missing.slice(0, 40).map(o => `${o.name} ${o.pos} ${o.team} · proj ${o.proj}`).join('\n'));
             } catch (e) { console.log('Missing-player check skipped:', e.message); }
+            {
+              const lu = await get(`/leagues/${LEAGUE_ID}/lineups/${season}/week${wk}.json`).catch(() => null) || {};
+              const ls = Object.values(lu).filter(l => l && l.slots);
+              const usedBy = {};
+              ls.forEach(l => Object.values(l.slots).forEach(pl => { if (pl && pl.id) (usedBy[pl.id] = usedBy[pl.id] || []).push(l.team || '?'); }));
+              const flaggedIds = players.filter(p => stale.some(x => x.startsWith(p.name + ' ') || x.includes(': ' + p.name + ' ')));
+              ann('notice', `Week ${wk}: lineups saved = ${ls.length}; flagged players in lineups`,
+                flaggedIds.map(p => `${p.name} ${p.pos} ${p.team}: ${(usedBy[p.id] || []).length} lineup(s)${(usedBy[p.id] || []).length ? ' — ' + usedBy[p.id].join(', ') : ''}`).join('\n') || 'none');
+            }
             if (stale.length) ann('warning', `Week ${wk}: ${stale.length} priced player(s) flagged by live Sleeper data`, stale.join('\n'));
             else ann('notice', `Week ${wk}: live Sleeper check clean`, 'Every priced player is active, rostered on the same team, and not OUT/IR/Doubtful.');
 
