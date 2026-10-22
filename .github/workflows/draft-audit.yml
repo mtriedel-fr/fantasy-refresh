@@ -1,0 +1,158 @@
+name: Draft Audit (read-only)
+
+# READ-ONLY health check of the upcoming week's draft: is it open, and does
+# the salary sheet look right? Never writes to Firebase. Results are emitted
+# as annotations (readable on the run page and through the GitHub API).
+on:
+  schedule:
+    - cron: '30 13 * * 3'   # Wednesday ~8:30am CT, after the draft opens (GitHub may run it late)
+    - cron: '0 18 * * 4'    # Thursday ~1pm CT, before TNF — catches injury news since Wednesday
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Audit draft + salaries
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB_URL = process.env.FIREBASE_DB_URL, FB_TOKEN = process.env.FIREBASE_AUTH_TOKEN;
+          const LEAGUE_ID = 'fr_refresh26';
+          const get = path => new Promise((res, rej) => {
+            const sep = path.includes('?') ? '&' : '?';
+            https.get(`${FB_URL}${path}${FB_TOKEN ? sep + 'auth=' + FB_TOKEN : ''}`, r => {
+              let d = ''; r.on('data', c => d += c);
+              r.on('end', () => { try { res(JSON.parse(d)); } catch (e) { rej(e); } });
+            }).on('error', rej);
+          });
+          const esc = s => String(s).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+          const escT = s => esc(s).replace(/:/g, '%3A').replace(/,/g, '%2C');
+          const ann = (lvl, title, msg) => console.log(`::${lvl} title=${escT(title)}::${esc(msg)}`);
+          const ALIAS = { WSH: 'WAS', JAC: 'JAX', LA: 'LAR' };
+          const nt = t => { const u = String(t || '').toUpperCase(); return ALIAS[u] || u; };
+          const ct = ms => new Date(ms).toLocaleString('en-US', { timeZone: 'America/Chicago', weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) + ' CT';
+
+          (async () => {
+            const settings = await get(`/leagues/${LEAGUE_ID}/settings.json`);
+            const season = (settings && settings.season) || 2026;
+            const meta = await get(`/leagues/${LEAGUE_ID}/season/${season}/meta.json`);
+            const cur = (meta && typeof meta.week === 'number') ? meta.week : null;
+            const wk = cur + 1;
+            const lock = settings && settings.draftLockedUntil;
+            const now = Date.now();
+            const state = typeof lock !== 'number' ? 'UNKNOWN (no draftLockedUntil)'
+              : lock <= now ? `OPEN (since ${ct(lock)})`
+              : (lock - now > 7 * 864e5) ? 'HELD CLOSED (salaries not complete yet)' : `CLOSED until ${ct(lock)}`;
+
+            const sched = await get(`/nflSchedule/${season}/Regular.json`);
+            const games = (sched && sched.weeks && sched.weeks[`week${wk}`]) || [];
+            const playing = new Set(); games.forEach(g => { if (g.home) playing.add(nt(g.home)); if (g.away) playing.add(nt(g.away)); });
+            const firstKick = Math.min(...games.filter(g => g.time).map(g => new Date(g.time).getTime()));
+
+            const sheet = await get(`/leagues/${LEAGUE_ID}/salaries/${season}/week${wk}.json`);
+            const players = Object.values((sheet && sheet.players) || {});
+            const L = [];
+            L.push(`Season week now: ${cur} → drafting week ${wk}`);
+            L.push(`Draft: ${state}`);
+            L.push(`Week ${wk}: ${games.length} games, ${playing.size} teams playing, first kickoff ${isFinite(firstKick) ? ct(firstKick) : '?'}`);
+            const byes = ['ARI','ATL','BAL','BUF','CAR','CHI','CIN','CLE','DAL','DEN','DET','GB','HOU','IND','JAX','KC','LAC','LAR','LV','MIA','MIN','NE','NO','NYG','NYJ','PHI','PIT','SEA','SF','TB','TEN','WAS'].filter(t => !playing.has(t));
+            L.push(`Byes: ${byes.join(', ') || 'none'}`);
+            L.push(`Salary sheet: ${players.length} players` + (sheet && sheet.meta ? ` · meta ${JSON.stringify(sheet.meta).slice(0, 160)}` : ''));
+            if (!players.length) { ann('error', `Week ${wk}: no salary sheet`, L.join('\n')); return; }
+
+            const POS = ['QB','RB','WR','TE','DEF'];
+            const issues = [];
+            L.push('');
+            POS.forEach(pos => {
+              const ps = players.filter(p => p.pos === pos);
+              const real = ps.filter(p => parseFloat(p.proj) > 0);
+              const sal = ps.map(p => p.salary).sort((a, b) => b - a);
+              L.push(`${pos}: ${ps.length} (${real.length} projected) · $${sal[sal.length - 1]}–$${sal[0]}`);
+              ps.slice().sort((a, b) => b.salary - a.salary).slice(0, 5).forEach(p =>
+                L.push(`   $${p.salary}  ${p.name} ${p.team} · proj ${p.proj}${p.status ? ' · ' + p.status : ''}`));
+              // price inversions: a clearly lower projection priced well above a higher one
+              const sorted = real.slice().sort((a, b) => b.proj - a.proj);
+              for (let i = 0; i < sorted.length; i++) for (let j = i + 1; j < Math.min(sorted.length, i + 40); j++) {
+                const hi = sorted[i], lo = sorted[j];
+                if (hi.proj - lo.proj >= 3 && lo.salary - hi.salary >= 500) issues.push(`${pos} price inversion: ${lo.name} $${lo.salary} (proj ${lo.proj}) > ${hi.name} $${hi.salary} (proj ${hi.proj})`);
+              }
+            });
+            players.forEach(p => {
+              if (!p.team) issues.push(`No team: ${p.name} ${p.pos} $${p.salary}`);
+              else if (playing.size >= 16 && !playing.has(nt(p.team))) issues.push(`On bye but priced: ${p.name} ${p.pos} ${p.team} $${p.salary}`);
+              if (p.status === 'O' || p.status === 'IR') issues.push(`Injured OUT/IR but priced: ${p.name} ${p.team} (${p.status})`);
+              if (!(p.salary > 0)) issues.push(`Bad salary: ${p.name} ${p.pos} ${p.salary}`);
+            });
+            const names = {}; players.forEach(p => { const k = p.name + '|' + p.pos; (names[k] = names[k] || []).push(p.team); });
+            Object.entries(names).filter(([, t]) => t.length > 1).forEach(([k, t]) => issues.push(`Duplicate: ${k.replace('|', ' ')} (${t.join(', ')})`));
+            const zeroQBs = players.filter(p => p.pos === 'QB' && !(parseFloat(p.proj) > 0));
+            L.push('');
+            L.push(`Backup QBs (no projection, flat price): ${zeroQBs.length} — ${zeroQBs.slice(0, 40).map(p => `${p.name} ${p.team}`).join('; ')}`);
+
+            // Player pool freshness + what the pool says about suspicious QBs
+            const poolUpd = await get(`/playerPool/${season}/updated.json`).catch(() => null);
+            const pool = await get(`/playerPool/${season}/players.json`).catch(() => null) || {};
+            const pv = Object.values(pool);
+            L.push(`Player pool: ${pv.length} players, last refreshed ${poolUpd ? ct(poolUpd) : '?'}`);
+            const zq = players.filter(p => p.pos === 'QB' && !(parseFloat(p.proj) > 0));
+            const zqT01 = zq.filter(p => p.tank01PlayerID).length;
+            L.push(`Zero-proj QBs with a Tank01 ID (i.e. on Tank01's current player list): ${zqT01}/${zq.length}`);
+
+            // Cross-check every priced player against LIVE Sleeper data
+            const sleeper = await new Promise((res, rej) => https.get('https://api.sleeper.app/v1/players/nfl', r => {
+              let d = ''; r.on('data', c => d += c); r.on('end', () => { try { res(JSON.parse(d)); } catch (e) { rej(e); } });
+            }).on('error', rej));
+            const stale = [];
+            players.forEach(p => {
+              if (p.pos === 'DEF') return;
+              const sp = sleeper[p.id];
+              if (!sp) { stale.push(`NOT ON SLEEPER: ${p.name} ${p.pos} ${p.team} $${p.salary} proj=${p.proj}`); return; }
+              const why = [];
+              if (!sp.active) why.push('inactive');
+              if (!sp.team) why.push('no team');
+              else if (nt(sp.team) !== nt(p.team)) why.push(`now ${sp.team}`);
+              if (sp.status && /inactive|retired/i.test(sp.status)) why.push(`status ${sp.status}`);
+              if (sp.injury_status && /^(out|ir|pup|sus|doubtful)/i.test(sp.injury_status)) why.push(`injury ${sp.injury_status}`);
+              if (why.length) stale.push(`${p.name} ${p.pos} ${p.team} $${p.salary} proj=${p.proj} → ${why.join(', ')}`);
+            });
+            // Projected players MISSING from the sheet (Week 7: A.J. Brown was
+            // absent from Tank01's projections when the sheet was built at 7am
+            // Wednesday, then reappeared). Compares against current projections.
+            try {
+              const pj = await new Promise((res, rej) => https.get(`https://fantasy-refresh-news.mtriedel.workers.dev/projections?week=${wk}&season=${season}`, r => {
+                let d = ''; r.on('data', c => d += c); r.on('end', () => { try { res(JSON.parse(d)); } catch (e) { rej(e); } });
+              }).on('error', rej));
+              const flat = []; (function walk(o) { if (Array.isArray(o)) o.forEach(walk); else if (o && typeof o === 'object') { if (o.name && o.proj !== undefined) flat.push(o); else Object.values(o).forEach(walk); } })(pj);
+              const norm = n => String(n || '').toLowerCase().replace(/[.'’`]/g, '').replace(/\s+(jr|sr|ii|iii|iv|v)$/, '').replace(/\s+/g, ' ').trim();
+              const inSheet = new Set(players.map(p => norm(p.name)));
+              const missing = flat.filter(o => ['QB','RB','WR','TE'].includes(o.pos) && parseFloat(o.proj) >= 5 && playing.has(nt(o.team)) && !inSheet.has(norm(o.name)) && !/^(o$|out|ir|pup|sus)/i.test(o.status || ''))
+                .sort((a, b) => b.proj - a.proj);
+              if (missing.length) ann('warning', `Week ${wk}: ${missing.length} projected player(s) missing from the draft`, missing.slice(0, 40).map(o => `${o.name} ${o.pos} ${o.team} · proj ${o.proj}`).join('\n'));
+            } catch (e) { console.log('Missing-player check skipped:', e.message); }
+            if (stale.length) ann('warning', `Week ${wk}: ${stale.length} priced player(s) flagged by live Sleeper data`, stale.join('\n'));
+            else ann('notice', `Week ${wk}: live Sleeper check clean`, 'Every priced player is active, rostered on the same team, and not OUT/IR/Doubtful.');
+
+            // Cleanup candidates: can't score this week, priced only as flat backups
+            const cand = players.filter(p => {
+              if (p.pos !== 'QB' || parseFloat(p.proj) > 0) return false;
+              const sp = sleeper[p.id];
+              const ghost = !p.tank01PlayerID;                       // not on Tank01's current player list
+              const out = sp && ((sp.injury_status && /^(out|ir|pup|sus)/i.test(sp.injury_status)) || (sp.status && /inactive|retired/i.test(sp.status)) || !sp.team);
+              return ghost || out;
+            });
+            const lineups = await get(`/leagues/${LEAGUE_ID}/lineups/${season}/week${wk}.json`).catch(() => null) || {};
+            const lus = Object.values(lineups).filter(l => l && l.slots);
+            const used = {};
+            lus.forEach(l => Object.values(l.slots).forEach(pl => { if (pl && pl.id) used[pl.id] = (used[pl.id] || 0) + 1; }));
+            ann('notice', `Week ${wk}: ${cand.length} cleanup candidates · ${lus.length} lineups saved so far`,
+              cand.map(p => `${p.id} · ${p.name} ${p.team} $${p.salary} · ${p.tank01PlayerID ? 'on Tank01 list' : 'NOT on Tank01 list'} · in ${used[p.id] || 0} lineup(s)`).join('\n'));
+
+            ann('notice', `Week ${wk} draft report`, L.join('\n'));
+            if (issues.length) ann('warning', `Week ${wk}: ${issues.length} pricing issue(s)`, issues.slice(0, 80).join('\n'));
+            else ann('notice', `Week ${wk}: no pricing issues found`, 'Bye teams, no-team players, OUT/IR, duplicates and price inversions all clear.');
+          })().catch(e => { ann('error', 'Audit failed', (e && e.stack) || String(e)); process.exit(1); });
+          SCRIPT

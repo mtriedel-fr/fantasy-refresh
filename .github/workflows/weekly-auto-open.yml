@@ -245,6 +245,10 @@ jobs:
 
           // Returns true ONLY if it wrote a complete real sheet; false if
           // projections aren't complete yet (nothing is written in that case).
+          // Sleeper injury_status values are words ("Out", "IR", "PUP", "Sus",
+          // "Doubtful", "Questionable"), not the single letter 'O' this code
+          // used to compare against — so OUT players were never excluded.
+          function isUnavailable(inj) { return !!inj && /^(o$|out|ir|pup|sus|na$)/i.test(String(inj).trim()); }
           async function generateRealSalaries(season, week) {
             const projPlayers = await getRealProjections(week, season);
             if (!projPlayers.length) {
@@ -253,6 +257,26 @@ jobs:
             }
 
             const pool = await firebaseGet(`/playerPool/${season}/players.json`).catch(() => null);
+
+            // LIVE roster/injury data. The stored pool is refreshed by
+            // weekly-prep.yml AFTER this job opens the draft (Wed ~8am CT vs
+            // 7am), so it's a week old here: Week 7 priced Jalen Hurts (IR)
+            // and a released Cooper Rush. One Sleeper read (only when a sheet
+            // is actually being built) gives current injury status and team.
+            // If Sleeper can't be reached, fall back to the pool as before.
+            let live = null;
+            try {
+              live = await new Promise((res, rej) => https.get('https://api.sleeper.app/v1/players/nfl', r => {
+                let d = ''; r.on('data', c => d += c); r.on('end', () => { try { res(JSON.parse(d)); } catch (e) { rej(e); } });
+              }).on('error', rej));
+              console.log(`  Live Sleeper data loaded (${Object.keys(live).length} players)`);
+            } catch (e) { console.log(`  Live Sleeper data unavailable (${e.message}) — using stored pool statuses`); }
+            const liveFor = poolP => (live && poolP && live[poolP.id]) || null;
+            const liveOut = poolP => {
+              const L = liveFor(poolP);
+              if (!L) return false;
+              return !L.active || !L.team || (L.status && /inactive|retired/i.test(L.status)) || isUnavailable(L.injury_status);
+            };
             const nameMap = {};
             if (pool) Object.values(pool).forEach(p => { if (p && p.name) nameMap[normalizeNameForMatch(p.name)] = p; });
 
@@ -303,8 +327,9 @@ jobs:
               if (!POSITIONS[p.pos]) return;
               const poolP = nameMap[normalizeNameForMatch(p.name)];
               const pid = poolP ? poolP.id : ('t01_' + p.id);
-              const inj = poolP ? (poolP.status || p.status || null) : (p.status || null);
-              if (inj === 'O' || inj === 'IR') return;
+              const liveP = liveFor(poolP);
+              const inj = liveP ? (liveP.injury_status || null) : (poolP ? (poolP.status || p.status || null) : (p.status || null));
+              if (isUnavailable(inj) || liveOut(poolP)) return;
               const conf = POSITIONS[p.pos];
               const mult = multByPos[p.pos] || 0;
               let sal = Math.ceil((Math.pow(p.proj, conf.exp) * mult) / SAL_ROUND) * SAL_ROUND;
@@ -322,9 +347,13 @@ jobs:
             Object.values(pool || {}).forEach(poolP => {
               if (!poolP || poolP.pos !== 'QB') return;
               if (salaries[poolP.id]) return;
+              // Must be on Tank01's current player list: Sleeper still shows some
+              // long-retired QBs as active on a team (Roethlisberger, Bortles…),
+              // but Tank01 only lists players on a current roster.
+              if (!poolP.tank01PlayerID || !poolP.team) return;
               if (!isPlaying(poolP.team)) return;
-              const inj = poolP.status || null;
-              if (inj === 'O' || inj === 'IR') return;
+              const inj = liveFor(poolP) ? (liveFor(poolP).injury_status || null) : (poolP.status || null);
+              if (isUnavailable(inj) || liveOut(poolP)) return;
               salaries[poolP.id] = { id: poolP.id, name: poolP.name, pos: 'QB', team: poolP.team, proj: 0, salary: BACKUP_QB_SALARY, status: inj, tank01PlayerID: poolP.tank01PlayerID || null, headshot: poolP.headshot || null };
               count++;
             });
