@@ -142,6 +142,26 @@ jobs:
             ann('notice', `Week ${wk}: ${cand.length} cleanup candidates · ${lus.length} lineups saved so far`,
               cand.map(p => `${p.id} · ${p.name} ${p.team} $${p.salary} · ${p.tank01PlayerID ? 'on Tank01 list' : 'NOT on Tank01 list'} · in ${used[p.id] || 0} lineup(s)`).join('\n'));
 
+            // Player lookup (A.J. Brown missing from Week 7 draft?)
+            {
+              const rx = /^a\.?\s?j\.?\s+brown/i;
+              const out = [];
+              out.push('SHEET: ' + (players.filter(p => rx.test(p.name) || /brown/i.test(p.name) && p.team === 'NE').map(p => JSON.stringify(p)).join(' | ') || 'none'));
+              out.push('POOL: ' + (pv.filter(p => rx.test(p.name)).map(p => JSON.stringify(p)).join(' | ') || 'none'));
+              const sl = Object.entries(sleeper).filter(([, v]) => v && v.full_name && rx.test(v.full_name));
+              out.push('SLEEPER: ' + (sl.map(([id, v]) => `${id} ${v.full_name} ${v.team} active=${v.active} status=${v.status} inj=${v.injury_status} body=${v.injury_body_part || ''} notes=${v.injury_notes || ''}`).join(' | ') || 'none'));
+              out.push('NE WRs in sheet: ' + players.filter(p => p.team === 'NE' && p.pos === 'WR').map(p => `${p.name} $${p.salary} proj ${p.proj}`).join('; '));
+              try {
+                const pj = await new Promise((res, rej) => https.get(`https://fantasy-refresh-news.mtriedel.workers.dev/projections?week=${wk}&season=${season}`, r => {
+                  let d = ''; r.on('data', c => d += c); r.on('end', () => { try { res(JSON.parse(d)); } catch (e) { res({ raw: d.slice(0, 300) }); } });
+                }).on('error', rej));
+                const flat = JSON.stringify(pj);
+                const i = flat.search(/A\.?\s?J\.?\s+Brown/i);
+                out.push('WORKER PROJECTIONS: ' + (i >= 0 ? flat.slice(Math.max(0, i - 200), i + 400) : 'no A.J. Brown entry · sample: ' + flat.slice(0, 300)));
+              } catch (e) { out.push('WORKER PROJECTIONS error: ' + e.message); }
+              ann('notice', 'Lookup: A.J. Brown', out.join('\n'));
+            }
+
             ann('notice', `Week ${wk} draft report`, L.join('\n'));
             if (issues.length) ann('warning', `Week ${wk}: ${issues.length} pricing issue(s)`, issues.slice(0, 80).join('\n'));
             else ann('notice', `Week ${wk}: no pricing issues found`, 'Bye teams, no-team players, OUT/IR, duplicates and price inversions all clear.');
