@@ -1,0 +1,104 @@
+name: One-off - Week 7 add A.J. Brown
+
+# One-time, commissioner-requested (Oct 22 2026): A.J. Brown (NE WR, healthy,
+# projected) was missing from the Week 7 salary sheet because he wasn't in
+# Tank01's projections when the sheet was built. Prices him with the exact
+# weekly-auto-open formula. Safety: first re-prices every existing player with
+# the same formula and refuses to write unless it reproduces their salaries.
+on:
+  push:
+    branches: [ops/week7-add-aj-brown]
+
+jobs:
+  add:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Add A.J. Brown to Week 7
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB_URL = process.env.FIREBASE_DB_URL, FB_TOKEN = process.env.FIREBASE_AUTH_TOKEN;
+          const SHEET = '/leagues/fr_refresh26/salaries/2026/week7';
+          const ID = '5859', NAME = 'A.J. Brown', T01 = '4047646';
+          // Formula constants — copied verbatim from weekly-auto-open.yml
+          const TOP_ANCHOR_EXP = 0.6, SHARED_CAP = 9000, RB_WR_MAX = 9600, MIN_SANITY = 100;
+          const POSITIONS = {
+            QB:  { exp: 1.3,  premium: 1.0,   clamp: SHARED_CAP },
+            RB:  { exp: 0.55, premium: 1.068, clamp: RB_WR_MAX },
+            WR:  { exp: 0.55, premium: 1.12,  clamp: RB_WR_MAX },
+            TE:  { exp: 0.7,  premium: 1.21,  clamp: SHARED_CAP },
+            DEF: { exp: 0.6,  premium: 0.97,  clamp: SHARED_CAP }
+          };
+          const SAL_MAX_DEFAULT = 9600, SAL_ROUND = 100, SALARY_FLOOR = 2000;
+
+          const url = p => `${FB_URL}${p}${p.includes('?') ? '&' : '?'}auth=${FB_TOKEN}`;
+          const req = (method, p, body) => new Promise((res, rej) => {
+            const u = new URL(url(p)); const data = body === undefined ? null : JSON.stringify(body);
+            const r = https.request({ hostname: u.hostname, path: u.pathname + u.search, method,
+              headers: data ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) } : {} }, rs => {
+              let d = ''; rs.on('data', c => d += c);
+              rs.on('end', () => rs.statusCode >= 200 && rs.statusCode < 300 ? res(d ? JSON.parse(d) : null) : rej(new Error(`${method} ${p} → HTTP ${rs.statusCode} ${d.slice(0, 200)}`)));
+            }); r.on('error', rej); if (data) r.write(data); r.end();
+          });
+          const getJSON = u => new Promise((res, rej) => https.get(u, r => { let d = ''; r.on('data', c => d += c); r.on('end', () => { try { res(JSON.parse(d)); } catch (e) { rej(e); } }); }).on('error', rej));
+          const esc = s => String(s).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+          const ann = (lvl, t, m) => console.log(`::${lvl} title=${esc(t).replace(/:/g,'%3A').replace(/,/g,'%2C')}::${esc(m)}`);
+
+          function priceAll(projByPos) {
+            const maxProjByPos = {};
+            Object.keys(POSITIONS).forEach(pos => { const a = projByPos[pos] || []; maxProjByPos[pos] = a.length ? Math.max(...a) : 0; });
+            const globalMax = Math.max(...Object.values(maxProjByPos).filter(v => v > 0), 1);
+            const baseRate = SHARED_CAP / Math.pow(globalMax, TOP_ANCHOR_EXP);
+            const mult = {};
+            Object.entries(POSITIONS).forEach(([pos, c]) => {
+              if (!maxProjByPos[pos]) return;
+              let top = Math.min(Math.pow(maxProjByPos[pos], TOP_ANCHOR_EXP) * baseRate * c.premium, c.clamp);
+              mult[pos] = top / Math.pow(maxProjByPos[pos], c.exp);
+            });
+            return (pos, proj) => {
+              const c = POSITIONS[pos];
+              let s = Math.ceil((Math.pow(proj, c.exp) * (mult[pos] || 0)) / SAL_ROUND) * SAL_ROUND;
+              s = Math.max(MIN_SANITY, Math.min(c.clamp, s));
+              return Math.max(SALARY_FLOOR, Math.min(SAL_MAX_DEFAULT, s));
+            };
+          }
+
+          (async () => {
+            const players = await req('GET', `${SHEET}/players.json`);
+            const meta = await req('GET', `${SHEET}/meta.json`);
+            if (players[ID] || Object.values(players).some(p => p.name === NAME)) { ann('warning', 'A.J. Brown already in sheet - nothing to do', JSON.stringify(players[ID] || '')); return; }
+
+            // 1) Validate: does the formula reproduce the existing sheet?
+            const real = Object.values(players).filter(p => parseFloat(p.proj) > 0 && POSITIONS[p.pos]);
+            const projByPos = {}; real.forEach(p => (projByPos[p.pos] = projByPos[p.pos] || []).push(parseFloat(p.proj)));
+            const price = priceAll(projByPos);
+            let exact = 0, within100 = 0; const off = [];
+            real.forEach(p => { const d = Math.abs(price(p.pos, parseFloat(p.proj)) - p.salary); if (d === 0) exact++; if (d <= 100) within100++; else if (off.length < 8) off.push(`${p.name} ${p.pos} proj ${p.proj}: sheet $${p.salary} vs formula $${price(p.pos, parseFloat(p.proj))}`); });
+            const okPct = within100 / real.length;
+            ann('notice', 'Formula check', `${real.length} priced players: ${exact} exact, ${within100} within $100 (${(okPct*100).toFixed(1)}%)${off.length ? '\nOff by more: ' + off.join('; ') : ''}`);
+            if (okPct < 0.97) { ann('error', 'ABORTED - formula does not reproduce the sheet', 'No changes made.'); process.exit(1); }
+
+            // 2) Current projection + live status
+            const pj = await getJSON('https://fantasy-refresh-news.mtriedel.workers.dev/projections?week=7&season=2026');
+            const flat = []; (function walk(o) { if (Array.isArray(o)) o.forEach(walk); else if (o && typeof o === 'object') { if (o.name && o.proj !== undefined) flat.push(o); else Object.values(o).forEach(walk); } })(pj);
+            const proj = flat.find(o => String(o.id) === T01 || o.name === NAME);
+            if (!proj || !(parseFloat(proj.proj) > 0)) { ann('error', 'ABORTED - no current projection for A.J. Brown', JSON.stringify(proj || null)); process.exit(1); }
+            const sl = await getJSON('https://api.sleeper.app/v1/players/nfl');
+            const live = sl[ID] || {};
+            if (!live.active || live.team !== 'NE' || /^(o$|out|ir|pup|sus)/i.test(live.injury_status || '')) { ann('error', 'ABORTED - live status not OK', JSON.stringify({ active: live.active, team: live.team, inj: live.injury_status })); process.exit(1); }
+            const pool = await req('GET', `/playerPool/2026/players/${ID}.json`) || {};
+
+            const p = parseFloat(proj.proj);
+            const salary = price('WR', p);
+            const neighbors = Object.values(players).filter(x => x.pos === 'WR' && Math.abs(parseFloat(x.proj) - p) <= 1).sort((a, b) => b.proj - a.proj).map(x => `${x.name} proj ${x.proj} $${x.salary}`);
+            const entry = { id: ID, name: NAME, pos: 'WR', team: 'NE', proj: Math.round(p * 10) / 10, salary, status: live.injury_status || null, tank01PlayerID: T01, headshot: pool.headshot || null };
+            await req('PUT', `${SHEET}/players/${ID}.json`, entry);
+            const after = await req('GET', `${SHEET}/players.json?shallow=true`);
+            const n = Object.keys(after || {}).length;
+            if (meta && typeof meta.count === 'number') await req('PUT', `${SHEET}/meta/count.json`, n);
+            ann('notice', `Added A.J. Brown at $${salary}`, `Entry: ${JSON.stringify(entry)}\nPlayers in sheet: ${meta && meta.count} → ${n}\nSimilar WRs (±1 pt): ${neighbors.join('; ')}`);
+          })().catch(e => { ann('error', 'Add failed', (e && e.stack) || String(e)); process.exit(1); });
+          SCRIPT
