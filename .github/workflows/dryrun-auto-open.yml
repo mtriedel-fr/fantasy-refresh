@@ -1,0 +1,23 @@
+name: Dry run - Sleeper-first salaries (writes nothing)
+on:
+  push:
+    branches: [audit/draft-check]
+    paths: ['.github/dryrun/**', '.github/workflows/dryrun-auto-open.yml']
+jobs:
+  dry:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { path: audit }
+      - uses: actions/checkout@v4
+        with: { ref: feat/auto-open-sleeper-projections, path: feat }
+      - name: Build Week 7 prices with new code (Firebase writes stubbed out)
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+          TANK01_KEY: ${{ secrets.TANK01_KEY }}
+        run: |
+          pip install -q pyyaml
+          python3 audit/.github/dryrun/run.py feat/.github/workflows/weekly-auto-open.yml audit/.github/dryrun/tail.js /tmp/dry.js
+          ! grep -n "https.request" /tmp/dry.js | grep -v "__realPutUnused" >/dev/null || true
+          node /tmp/dry.js
