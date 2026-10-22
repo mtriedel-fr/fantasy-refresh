@@ -150,6 +150,30 @@ jobs:
             ann('notice', `Week ${wk}: ${cand.length} cleanup candidates · ${lus.length} lineups saved so far`,
               cand.map(p => `${p.id} · ${p.name} ${p.team} $${p.salary} · ${p.tank01PlayerID ? 'on Tank01 list' : 'NOT on Tank01 list'} · in ${used[p.id] || 0} lineup(s)`).join('\n'));
 
+            // Sleeper projections vs the Tank01-built sheet (read-only comparison)
+            try {
+              const surl = `https://api.sleeper.com/projections/nfl/${season}/${wk}?season_type=regular&position[]=QB&position[]=RB&position[]=WR&position[]=TE&position[]=DEF&order_by=ppr`;
+              const sp = await new Promise((res, rej) => https.get(surl, { headers: { 'User-Agent': 'fantasyrefresh' } }, r => {
+                let d = ''; r.on('data', c => d += c); r.on('end', () => { try { res(JSON.parse(d)); } catch (e) { rej(e); } });
+              }).on('error', rej));
+              const rows = (Array.isArray(sp) ? sp : []).map(e => { const pl = e.player || {}; return { id: e.player_id, name: ((pl.first_name || '') + ' ' + (pl.last_name || '')).trim(), pos: (e.position || pl.position || '').toUpperCase(), team: e.team || pl.team || '', proj: parseFloat((e.stats && e.stats.pts_ppr) || 0) }; })
+                .filter(r => r.id && ['QB','RB','WR','TE','DEF'].includes(r.pos) && r.proj > 0);
+              const sheetIds = new Set(players.map(p => String(p.id)));
+              const byPos = {}; rows.forEach(r => { byPos[r.pos] = (byPos[r.pos] || 0) + 1; });
+              const notInSheet = rows.filter(r => r.proj >= 5 && !sheetIds.has(String(r.id)) && r.pos !== 'DEF').sort((a, b) => b.proj - a.proj);
+              const want = ['5859'];
+              const named = rows.filter(r => want.includes(String(r.id)) || /omar cooper|ja.?kobi lane/i.test(r.name));
+              const out = [];
+              out.push(`Sleeper week ${wk}: ${rows.length} projected · ` + Object.entries(byPos).map(([k, v]) => `${k} ${v}`).join(', '));
+              out.push(`Tank01 sheet: ${players.filter(p => parseFloat(p.proj) > 0).length} projected`);
+              out.push(`A.J. Brown / Omar Cooper Jr. / Ja'Kobi Lane in Sleeper: ` + (named.map(r => `${r.name} ${r.team} ${r.proj.toFixed(1)}`).join('; ') || 'none'));
+              out.push(`Sleeper-projected (≥5) not in sheet: ${notInSheet.length} — ` + notInSheet.slice(0, 25).map(r => `${r.name} ${r.pos} ${r.team} ${r.proj.toFixed(1)}`).join('; '));
+              // top-10 overlap / scale comparison
+              const top = rows.filter(r => r.pos !== 'DEF').sort((a, b) => b.proj - a.proj).slice(0, 12);
+              out.push('Top Sleeper vs sheet: ' + top.map(r => { const s = players.find(p => String(p.id) === String(r.id)); return `${r.name} S${r.proj.toFixed(1)}/T${s ? s.proj : '-'}`; }).join('; '));
+              ann('notice', 'Sleeper vs Tank01 comparison', out.join('\n'));
+            } catch (e) { ann('warning', 'Sleeper comparison failed', e.message); }
+
             ann('notice', `Week ${wk} draft report`, L.join('\n'));
             if (issues.length) ann('warning', `Week ${wk}: ${issues.length} pricing issue(s)`, issues.slice(0, 80).join('\n'));
             else ann('notice', `Week ${wk}: no pricing issues found`, 'Bye teams, no-team players, OUT/IR, duplicates and price inversions all clear.');
