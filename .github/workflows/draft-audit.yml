@@ -97,12 +97,6 @@ jobs:
             const pool = await get(`/playerPool/${season}/players.json`).catch(() => null) || {};
             const pv = Object.values(pool);
             L.push(`Player pool: ${pv.length} players, last refreshed ${poolUpd ? ct(poolUpd) : '?'}`);
-            const look = ['Ben Roethlisberger','Blake Bortles','Aaron Bailey','Zach Terrell','Nick Schuessler','Skyler Howard','Jalen Hurts','Case Keenum','Josh Johnson','Tua Tagovailoa'];
-            look.forEach(n => {
-              const inPool = pv.filter(p => p.name === n);
-              const inSheet = players.filter(p => p.name === n);
-              L.push(`   ${n}: pool ${inPool.length ? inPool.map(p => `${p.team || '-'} yrs=${p.years_exp} st=${p.status || '-'} t01=${p.tank01PlayerID ? 'Y' : 'N'}`).join(' | ') : 'NOT IN POOL'} · sheet ${inSheet.length ? inSheet.map(p => `$${p.salary} proj=${p.proj} st=${p.status || '-'}`).join(' | ') : '-'}`);
-            });
             const zq = players.filter(p => p.pos === 'QB' && !(parseFloat(p.proj) > 0));
             const zqT01 = zq.filter(p => p.tank01PlayerID).length;
             L.push(`Zero-proj QBs with a Tank01 ID (i.e. on Tank01's current player list): ${zqT01}/${zq.length}`);
@@ -124,6 +118,20 @@ jobs:
               if (sp.injury_status && /^(out|ir|pup|sus|doubtful)/i.test(sp.injury_status)) why.push(`injury ${sp.injury_status}`);
               if (why.length) stale.push(`${p.name} ${p.pos} ${p.team} $${p.salary} proj=${p.proj} → ${why.join(', ')}`);
             });
+            // Projected players MISSING from the sheet (Week 7: A.J. Brown was
+            // absent from Tank01's projections when the sheet was built at 7am
+            // Wednesday, then reappeared). Compares against current projections.
+            try {
+              const pj = await new Promise((res, rej) => https.get(`https://fantasy-refresh-news.mtriedel.workers.dev/projections?week=${wk}&season=${season}`, r => {
+                let d = ''; r.on('data', c => d += c); r.on('end', () => { try { res(JSON.parse(d)); } catch (e) { rej(e); } });
+              }).on('error', rej));
+              const flat = []; (function walk(o) { if (Array.isArray(o)) o.forEach(walk); else if (o && typeof o === 'object') { if (o.name && o.proj !== undefined) flat.push(o); else Object.values(o).forEach(walk); } })(pj);
+              const norm = n => String(n || '').toLowerCase().replace(/[.'’`]/g, '').replace(/\s+(jr|sr|ii|iii|iv|v)$/, '').replace(/\s+/g, ' ').trim();
+              const inSheet = new Set(players.map(p => norm(p.name)));
+              const missing = flat.filter(o => ['QB','RB','WR','TE'].includes(o.pos) && parseFloat(o.proj) >= 5 && playing.has(nt(o.team)) && !inSheet.has(norm(o.name)) && !/^(o$|out|ir|pup|sus)/i.test(o.status || ''))
+                .sort((a, b) => b.proj - a.proj);
+              if (missing.length) ann('warning', `Week ${wk}: ${missing.length} projected player(s) missing from the draft`, missing.slice(0, 40).map(o => `${o.name} ${o.pos} ${o.team} · proj ${o.proj}`).join('\n'));
+            } catch (e) { console.log('Missing-player check skipped:', e.message); }
             if (stale.length) ann('warning', `Week ${wk}: ${stale.length} priced player(s) flagged by live Sleeper data`, stale.join('\n'));
             else ann('notice', `Week ${wk}: live Sleeper check clean`, 'Every priced player is active, rostered on the same team, and not OUT/IR/Doubtful.');
 
@@ -141,26 +149,6 @@ jobs:
             lus.forEach(l => Object.values(l.slots).forEach(pl => { if (pl && pl.id) used[pl.id] = (used[pl.id] || 0) + 1; }));
             ann('notice', `Week ${wk}: ${cand.length} cleanup candidates · ${lus.length} lineups saved so far`,
               cand.map(p => `${p.id} · ${p.name} ${p.team} $${p.salary} · ${p.tank01PlayerID ? 'on Tank01 list' : 'NOT on Tank01 list'} · in ${used[p.id] || 0} lineup(s)`).join('\n'));
-
-            // Player lookup (A.J. Brown missing from Week 7 draft?)
-            {
-              const rx = /^a\.?\s?j\.?\s+brown/i;
-              const out = [];
-              out.push('SHEET: ' + (players.filter(p => rx.test(p.name) || /brown/i.test(p.name) && p.team === 'NE').map(p => JSON.stringify(p)).join(' | ') || 'none'));
-              out.push('POOL: ' + (pv.filter(p => rx.test(p.name)).map(p => JSON.stringify(p)).join(' | ') || 'none'));
-              const sl = Object.entries(sleeper).filter(([, v]) => v && v.full_name && rx.test(v.full_name));
-              out.push('SLEEPER: ' + (sl.map(([id, v]) => `${id} ${v.full_name} ${v.team} active=${v.active} status=${v.status} inj=${v.injury_status} body=${v.injury_body_part || ''} notes=${v.injury_notes || ''}`).join(' | ') || 'none'));
-              out.push('NE WRs in sheet: ' + players.filter(p => p.team === 'NE' && p.pos === 'WR').map(p => `${p.name} $${p.salary} proj ${p.proj}`).join('; '));
-              try {
-                const pj = await new Promise((res, rej) => https.get(`https://fantasy-refresh-news.mtriedel.workers.dev/projections?week=${wk}&season=${season}`, r => {
-                  let d = ''; r.on('data', c => d += c); r.on('end', () => { try { res(JSON.parse(d)); } catch (e) { res({ raw: d.slice(0, 300) }); } });
-                }).on('error', rej));
-                const flat = JSON.stringify(pj);
-                const i = flat.search(/A\.?\s?J\.?\s+Brown/i);
-                out.push('WORKER PROJECTIONS: ' + (i >= 0 ? flat.slice(Math.max(0, i - 200), i + 400) : 'no A.J. Brown entry · sample: ' + flat.slice(0, 300)));
-              } catch (e) { out.push('WORKER PROJECTIONS error: ' + e.message); }
-              ann('notice', 'Lookup: A.J. Brown', out.join('\n'));
-            }
 
             ann('notice', `Week ${wk} draft report`, L.join('\n'));
             if (issues.length) ann('warning', `Week ${wk}: ${issues.length} pricing issue(s)`, issues.slice(0, 80).join('\n'));
