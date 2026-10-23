@@ -99,6 +99,59 @@ jobs:
           const TEAM_ALIAS_SC = { WSH: 'WAS', JAC: 'JAX', LA: 'LAR' };
           function normTeamSC(t) { const u = String(t || '').toUpperCase(); return TEAM_ALIAS_SC[u] || u; }
 
+          // Index one box-score entry so lineup players can be matched to it:
+          // by Tank01 pid, by Sleeper id (sleeperBotID) when Tank01 provides it,
+          // by lowercased name (and suffix-stripped name), and in STATS_BY_NAME,
+          // which keeps EVERY entry per normalized name. Returns the lowercased
+          // name. Covered by tests/scoring.test.js.
+          function indexBoxScoreEntry(playerStats, pid, stats) {
+            playerStats[pid] = stats;
+            if (stats.sleeperBotID) playerStats[stats.sleeperBotID] = stats;
+            const name = (stats.longName || stats.playerName || '').toLowerCase();
+            if (name) {
+              const nk = normPlayerName(name);
+              (STATS_BY_NAME[nk] = STATS_BY_NAME[nk] || []).push(stats);
+              playerStats[name] = stats;
+              const stripped = stripNameSuffix(name);
+              if (stripped && stripped !== name && !playerStats[stripped]) playerStats[stripped] = stats;
+            }
+            return name;
+          }
+
+          // Find the box-score entry for a lineup player. Returns the stats
+          // object, or null if the player isn't in today's box scores.
+          //  - ID first, but VERIFIED by name: playerStats mixes Tank01 and
+          //    Sleeper numeric ids, so an id can collide with another player.
+          //  - Then every same-name entry (same team first, then whichever
+          //    produced points), because Tank01 sometimes ships an empty
+          //    duplicate row — the Week 5 Justin Jefferson 0.00.
+          //  - DEF entries are keyed by team abbreviation and trusted as-is.
+          // Covered by tests/scoring.test.js.
+          function resolvePlayerStats(player, playerStats) {
+            let stats = playerStats[player.id];
+            if (stats && player.pos !== 'DEF') {
+              const statName = stats.longName || stats.playerName || '';
+              if (!statName || (player.name && normPlayerName(statName) !== normPlayerName(player.name))) {
+                console.log(`    ⚠️  ID ${player.id} matched "${statName || '(no name)'}", not "${player.name}" — ignoring ID match, using name`);
+                alert('notice', 'ID mismatch (handled)', `${player.name} (id ${player.id}) matched "${statName || '(no name)'}" by ID — scored by name instead`);
+                stats = null;
+              }
+            }
+            if (player.pos !== 'DEF') {
+              const cands = STATS_BY_NAME[normPlayerName(player.name)] || [];
+              if (cands.length) {
+                const sameTeam = player.team ? cands.filter(c => normTeamSC(c.teamAbv || c.team) === normTeamSC(player.team)) : [];
+                const pool = sameTeam.length ? sameTeam : cands;
+                stats = pool.reduce((best, c) => (calcDKPoints(c, player.pos).pts > calcDKPoints(best, player.pos).pts ? c : best), pool[0]);
+                if (cands.length > 1) {
+                  console.log(`    🔀 "${player.name}": ${cands.length} box-score entries share this name — using ${normTeamSC(stats.teamAbv || stats.team)} entry (${calcDKPoints(stats, player.pos).pts} pts)`);
+                  alert('notice', 'Duplicate box-score name (handled)', `${player.name}: ${cands.length} entries share this name — used ${normTeamSC(stats.teamAbv || stats.team)} entry (${calcDKPoints(stats, player.pos).pts} pts)`);
+                }
+              }
+            }
+            return stats || playerStats[(player.name || '').toLowerCase()] || playerStats[stripNameSuffix((player.name || '').toLowerCase())] || playerStats[(player.name || '').toUpperCase()] || null;
+          }
+
           function stripNameSuffix(name) {
             return (name || '').replace(/\s+(jr|sr|ii|iii|iv|v)\.?$/i, '').trim();
           }
@@ -510,40 +563,7 @@ jobs:
 
               for (const [slotId, player] of Object.entries(lineup.slots)) {
                 if (!player) continue;
-                // ID lookup first, but VERIFY it's the same player. playerStats
-                // is keyed by Tank01's numeric playerID AND by Sleeper's numeric
-                // ID in the same object, so a lineup's Sleeper ID can collide
-                // with an unrelated player's Tank01 ID (or a bad sleeperBotID)
-                // and silently return the wrong player's stats. DEF entries are keyed
-                // by team abbreviation and have no name to compare, so they're
-                // trusted as-is.
-                let stats = playerStats[player.id];
-                if (stats && player.pos !== 'DEF') {
-                  const statName = stats.longName || stats.playerName || '';
-                  // No name to verify, or a different name → don't trust the ID hit.
-                  if (!statName || (player.name && normPlayerName(statName) !== normPlayerName(player.name))) {
-                    console.log(`    ⚠️  ID ${player.id} matched "${statName || '(no name)'}", not "${player.name}" — ignoring ID match, using name`);
-                    alert('notice', 'ID mismatch (handled)', `${player.name} (id ${player.id}) matched "${statName || '(no name)'}" by ID — scored by name instead`);
-                    stats = null;
-                  }
-                }
-                // Even a verified ID hit can be an empty duplicate row with the
-                // right name, so for players always resolve through every
-                // same-name entry: same team first, then the one that actually
-                // produced points. The ID hit is only a fallback.
-                if (player.pos !== 'DEF') {
-                  const cands = STATS_BY_NAME[normPlayerName(player.name)] || [];
-                  if (cands.length) {
-                    const sameTeam = player.team ? cands.filter(c => normTeamSC(c.teamAbv || c.team) === normTeamSC(player.team)) : [];
-                    const pool = sameTeam.length ? sameTeam : cands;
-                    stats = pool.reduce((best, c) => (calcDKPoints(c, player.pos).pts > calcDKPoints(best, player.pos).pts ? c : best), pool[0]);
-                    if (cands.length > 1) {
-                      console.log(`    🔀 "${player.name}": ${cands.length} box-score entries share this name — using ${normTeamSC(stats.teamAbv || stats.team)} entry (${calcDKPoints(stats, player.pos).pts} pts)`);
-                      alert('notice', 'Duplicate box-score name (handled)', `${player.name}: ${cands.length} entries share this name — used ${normTeamSC(stats.teamAbv || stats.team)} entry (${calcDKPoints(stats, player.pos).pts} pts)`);
-                    }
-                  }
-                }
-                stats = stats || playerStats[(player.name || '').toLowerCase()] || playerStats[stripNameSuffix((player.name || '').toLowerCase())] || playerStats[(player.name || '').toUpperCase()];
+                let stats = resolvePlayerStats(player, playerStats);
                 let result;
                 if (stats) {
                   result = calcDKPoints(stats, player.pos);
@@ -1305,23 +1325,7 @@ jobs:
             Object.entries(boxScores).forEach(([gameId, bs]) => {
               const thisGameStats = [];
               Object.entries(bs.playerStats || {}).forEach(([pid, stats]) => {
-                playerStats[pid] = stats;
-                // Tank01 ships a sleeperBotID field on player records in their other
-                // sport APIs (confirmed via their MLB product) — if it's present here
-                // too, this is the REAL fix for matching: our lineups store Sleeper's
-                // own player ID, which has never had any relationship to Tank01's
-                // internal numeric pid above. Indexing by it (when present) means the
-                // scoreLeague() lookup at `playerStats[player.id]` actually succeeds,
-                // instead of always silently falling through to name-matching.
-                if (stats.sleeperBotID) playerStats[stats.sleeperBotID] = stats;
-                const name = (stats.longName || stats.playerName || '').toLowerCase();
-                if (name) {
-                  const nk = normPlayerName(name);
-                  (STATS_BY_NAME[nk] = STATS_BY_NAME[nk] || []).push(stats);
-                  playerStats[name] = stats;
-                  const stripped = stripNameSuffix(name);
-                  if (stripped && stripped !== name && !playerStats[stripped]) playerStats[stripped] = stats;
-                }
+                const name = indexBoxScoreEntry(playerStats, pid, stats);
                 // Detailed stats for EVERY player in this game, not just
                 // rostered ones — for the "click into a completed game"
                 // stats view. calcDKPoints()'s position argument only
