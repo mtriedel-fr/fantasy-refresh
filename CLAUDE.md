@@ -77,6 +77,10 @@ locks/salaries, salary dry runs, Sleeper probes, migrations).
 - **Names:** match with suffixes (Jr./Sr./II/III) and punctuation stripped.
 - **Season standings** must group by uid, not team name (renames split a team in two).
   The team page rank uses `computeSeasonStandings()`, same as the Season table.
+- **Draft locks:** a player whose game has started counts only if he was in the team's
+  *submitted* lineup (`submittedIds` in `draft.html`). In an unsubmitted, browser-saved
+  draft he must be swapped out before submitting (`isStartedUnsubmitted`); submitted
+  started players stay locked (`isLockedIn`) while the rest of the roster stays editable.
 - GitHub's own cron runs late and unreliably; anything time-critical is triggered by
   cron-job.org via `workflow_dispatch`.
 - The draft page redirects signed-out visitors, so browser tests of draft UI need a
