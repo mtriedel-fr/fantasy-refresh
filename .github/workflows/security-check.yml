@@ -1,0 +1,42 @@
+name: Security check (read-only)
+on:
+  push:
+    branches: [audit/draft-check]
+    paths: ['.github/workflows/security-check.yml']
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: main, path: main }
+      - name: Compare deployed rules with repo; check join codes
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https'), fs = require('fs');
+          const FB = process.env.FIREBASE_DB_URL, T = process.env.FIREBASE_AUTH_TOKEN;
+          const get = (p, auth = true) => new Promise((res, rej) => https.get(`${FB}${p}${auth ? (p.includes('?') ? '&' : '?') + 'auth=' + T : ''}`, r => {
+            let d = ''; r.on('data', c => d += c); r.on('end', () => res({ status: r.statusCode, body: d }));
+          }).on('error', rej));
+          const esc = s => String(s).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+          const ann = (l, t, m) => console.log(`::${l} title=${esc(t).replace(/:/g,'%3A').replace(/,/g,'%2C')}::${esc(m)}`);
+          (async () => {
+            const live = await get('/.settings/rules.json');
+            const repo = fs.readFileSync('main/database.rules.json', 'utf8');
+            const strip = s => s.replace(/\/\/.*$/gm, '').replace(/\s+/g, '');
+            ann('notice', `Deployed rules (HTTP ${live.status}) · ${strip(live.body) === strip(repo) ? 'IDENTICAL to repo' : 'DIFFERENT from repo'}`, live.body.slice(0, 6000));
+            const jc = await get('/joinCodes.json');
+            const st = await get('/leagues/fr_refresh26/settings.json?shallow=true');
+            const s2 = JSON.parse((await get('/leagues/fr_refresh26/settings.json')).body || '{}');
+            const members = JSON.parse((await get('/leagues/fr_refresh26/members.json?shallow=true')).body || '{}');
+            ann('notice', 'Join codes & registration', `joinCodes: ${jc.body.slice(0, 600)}\nfr_refresh26 settings.joinCode=${JSON.stringify(s2.joinCode)} registrationClosed=${JSON.stringify(s2.registrationClosed)} · members: ${Object.keys(members).length}`);
+            // what an anonymous visitor can do (reads only — no writes attempted)
+            const anon = {};
+            for (const p of ['/leagues/fr_refresh26/members.json?shallow=true', '/users2026.json?shallow=true', '/users.json?shallow=true', '/waitlist.json?shallow=true', '/joinCodes.json?shallow=true']) {
+              const r = await get(p, false); anon[p] = r.status;
+            }
+            ann('notice', 'Anonymous read access (HTTP status, 200 = public)', Object.entries(anon).map(([k, v]) => `${v}  ${k}`).join('\n'));
+          })().catch(e => { ann('error', 'Security check failed', e.stack || String(e)); process.exit(1); });
+          SCRIPT
