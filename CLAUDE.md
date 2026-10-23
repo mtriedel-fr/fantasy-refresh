@@ -74,6 +74,8 @@ locks/salaries, salary dry runs, Sleeper probes, migrations).
 - **Box scores can contain an empty duplicate row** for a player, and Tank01/Sleeper numeric
   ids can collide. Scoring resolves players through `resolvePlayerStats()` (name-verified,
   same team first, most points wins) — Week 5 Justin Jefferson scored 0.00 before this.
+- **Scoring:** INT thrown −2 and fumble lost −2 (confirmed by the commissioner Oct 23, 2026);
+  Tank01 projection requests must use the same values.
 - **Names:** match with suffixes (Jr./Sr./II/III) and punctuation stripped.
 - **Season standings** must group by uid, not team name (renames split a team in two).
   The team page rank uses `computeSeasonStandings()`, same as the Season table.
@@ -91,8 +93,6 @@ locks/salaries, salary dry runs, Sleeper probes, migrations).
 - **Member privacy fix pending:** private member fields should move out of the public
   member records into a commissioner/self-only path (code in `js/auth.js` and Commissioner
   Tools, a data migration, and a rules update). Needs commissioner approval.
-- Scoring table mismatch: runbook says INT −1 / fumble −1; `calcDKPoints` uses −2. Ask
-  before changing either.
 - Cloudflare Worker source isn't in the repo yet (player-card rank/SNP%/suffix issues live
   there).
 - `preseason.html` / `archive2025.html` use a `COMM_PW` constant visible in page source — a
