@@ -32,6 +32,14 @@ jobs:
             const s2 = JSON.parse((await get('/leagues/fr_refresh26/settings.json')).body || '{}');
             const members = JSON.parse((await get('/leagues/fr_refresh26/members.json?shallow=true')).body || '{}');
             ann('notice', 'Join codes & registration', `joinCodes: ${jc.body.slice(0, 600)}\nfr_refresh26 settings.joinCode=${JSON.stringify(s2.joinCode)} registrationClosed=${JSON.stringify(s2.registrationClosed)} · members: ${Object.keys(members).length}`);
+            {
+              const m = JSON.parse((await get('/leagues/fr_refresh26/members.json', false)).body || '{}');
+              const keys = {}; Object.values(m).forEach(v => v && typeof v === 'object' && Object.keys(v).forEach(k => keys[k] = (keys[k] || 0) + 1));
+              const emailish = Object.values(m).filter(v => JSON.stringify(v).match(/[\w.+-]+@[\w-]+\.[\w.]+/)).length;
+              const s = JSON.parse((await get('/leagues/fr_refresh26/settings.json', false)).body || '{}');
+              const sEmail = (JSON.stringify(s).match(/[\w.+-]+@[\w-]+\.[\w.]+/g) || []).length;
+              ann('notice', 'Public member + settings fields (names only; no values)', `member fields: ${JSON.stringify(keys)}\nmembers containing an email address: ${emailish}\nsettings keys: ${Object.keys(s).join(', ')}\nemail addresses in public settings: ${sEmail}`);
+            }
             // what an anonymous visitor can do (reads only — no writes attempted)
             const anon = {};
             for (const p of ['/leagues/fr_refresh26/members.json?shallow=true', '/users2026.json?shallow=true', '/users.json?shallow=true', '/waitlist.json?shallow=true', '/joinCodes.json?shallow=true']) {
