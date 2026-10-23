@@ -191,7 +191,7 @@ jobs:
               .trim();
           }
 
-          async function getRealProjections(week, season) {
+          async function getTank01Projections(week, season) {
             const scoring = [
               'itemFormat=list', 'twoPointConversions=2', 'passYards=.04', 'passTD=4',
               'passInterceptions=-1', 'pointsPerReception=1', 'rushYards=.1', 'rushTD=6',
@@ -222,6 +222,63 @@ jobs:
               } catch(e) { continue; }
             }
             return [];
+          }
+
+          // Sleeper weekly projections, keyed by the same Sleeper player_id as
+          // our pool (exact match, no name guessing). Same endpoint/shape that
+          // weekly-prep.yml already uses as its primary source.
+          async function getSleeperProjections(week, season) {
+            const url = `https://api.sleeper.com/projections/nfl/${season}/${week}?season_type=regular&position[]=QB&position[]=RB&position[]=WR&position[]=TE&position[]=DEF&order_by=ppr`;
+            for (let attempt = 1; attempt <= 3; attempt++) {
+              try {
+                const data = await new Promise((res, rej) => https.get(url, { headers: { 'User-Agent': 'fantasyrefresh' } }, r => {
+                  let d = ''; r.on('data', c => d += c);
+                  r.on('end', () => { if (r.statusCode !== 200) return rej(new Error('HTTP ' + r.statusCode)); try { res(JSON.parse(d)); } catch (e) { rej(e); } });
+                }).on('error', rej));
+                if (!Array.isArray(data)) throw new Error('not an array');
+                const rows = data.map(e => {
+                  const pl = e.player || {};
+                  return {
+                    sleeperId: String(e.player_id || ''),
+                    name: ((pl.first_name || '') + ' ' + (pl.last_name || '')).trim(),
+                    pos: String(e.position || pl.position || '').toUpperCase(),
+                    team: e.team || pl.team || '',
+                    proj: parseFloat((e.stats && e.stats.pts_ppr) || 0),
+                    status: pl.injury_status || 'Active'
+                  };
+                }).filter(r => r.sleeperId && ['QB','RB','WR','TE','DEF'].includes(r.pos) && r.proj > 0);
+                if (rows.length) return rows;
+              } catch (e) { console.log(`  Sleeper projections attempt ${attempt} failed: ${e.message}`); }
+              await new Promise(r => setTimeout(r, 1500 * attempt));
+            }
+            return [];
+          }
+
+          // Projection source for the live sheet. Sleeper is primary (it's
+          // complete — Week 7 Tank01 omitted A.J. Brown, Omar Cooper Jr. and
+          // Ja'Kobi Lane, all of whom Sleeper had), and this job builds the
+          // sheet BEFORE weekly-prep.yml runs, so weekly-prep's Sleeper path
+          // never got the chance. Tank01 fills any skill player Sleeper lacks,
+          // and supplies defenses exactly as before (same id/name shape that
+          // scoring and kickoff locks expect); Sleeper defenses are used only
+          // if Tank01 has none. If Sleeper is unavailable, it's Tank01 only,
+          // which is the old behavior.
+          async function getRealProjections(week, season) {
+            const [sl, t1] = await Promise.all([
+              getSleeperProjections(week, season).catch(() => []),
+              getTank01Projections(week, season).catch(() => [])
+            ]);
+            const slSkill = sl.filter(r => r.pos !== 'DEF');
+            if (slSkill.length < 150) {
+              console.log(`  Projections: Sleeper too thin (${slSkill.length}) — using Tank01 only (${t1.length}).`);
+              return t1;
+            }
+            const have = new Set(slSkill.map(r => normalizeNameForMatch(r.name)));
+            const gap = t1.filter(p => p.pos !== 'DEF' && !have.has(normalizeNameForMatch(p.name)));
+            let defs = t1.filter(p => p.pos === 'DEF');
+            if (!defs.length) defs = sl.filter(r => r.pos === 'DEF').map(r => ({ id: r.team + '_DEF', name: r.team, pos: 'DEF', team: r.team, proj: r.proj, status: 'Active' }));
+            console.log(`  Projections: Sleeper ${slSkill.length} skill players + Tank01 gap-fill ${gap.length}${gap.length ? ' (' + gap.slice(0, 15).map(p => p.name).join(', ') + ')' : ''} + ${defs.length} defenses`);
+            return [...slSkill, ...gap, ...defs];
           }
 
           // A salary sheet is "complete" only when REAL, projection-based
@@ -325,8 +382,8 @@ jobs:
               if (!p.proj || p.proj <= 0) return;
               if (!isPlaying(p.team)) return;
               if (!POSITIONS[p.pos]) return;
-              const poolP = nameMap[normalizeNameForMatch(p.name)];
-              const pid = poolP ? poolP.id : ('t01_' + p.id);
+              const poolP = (p.sleeperId && pool && pool[p.sleeperId]) || nameMap[normalizeNameForMatch(p.name)];
+              const pid = poolP ? poolP.id : (p.sleeperId || ('t01_' + p.id));
               const liveP = liveFor(poolP);
               const inj = liveP ? (liveP.injury_status || null) : (poolP ? (poolP.status || p.status || null) : (p.status || null));
               if (isUnavailable(inj) || liveOut(poolP)) return;
