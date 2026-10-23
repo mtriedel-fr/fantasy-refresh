@@ -1034,8 +1034,8 @@ setTimeout(function(){
         <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--bdr);">
           <div class="csect">League Join Code</div>
           <div style="font-size:12px;color:var(--ink2);margin-bottom:8px;">Share this with new players so they can create an account.</div>
-          <div class="comm-join-code" id="join-code-display">REFRESH26</div>
-          <div style="font-size:11px;color:var(--ink3);margin-top:6px;">Change by editing <code>FR_JOIN_CODE</code> in the file.</div>
+          <div class="comm-join-code" id="join-code-display">—</div>
+          <div style="font-size:11px;color:var(--ink3);margin-top:6px;">Join codes are managed in Commissioner Tools on the league page.</div>
         </div>
 
        <!-- MANAGE COMMISSIONERS -->
@@ -4322,7 +4322,7 @@ function toggleReaction(containerId, encodedName, week, cp, ev){
 // ── FR AUTH MODULE ────────────────────────────────────────────
 var FR_API_KEY  = 'AIzaSyA-2hcf2hzThk7MuEm9DAvRICK95koE9gM';
 var FR_SEASON   = '2026';
-var FR_JOIN_CODE = 'REFRESH26';
+var FR_JOIN_CODE = ''; // join codes now live in /joinCodes, managed from league.html Commissioner Tools
 
 function $id(id){ return document.getElementById(id); }
 function frApiPost(endpoint, body){

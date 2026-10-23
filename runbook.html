@@ -9,7 +9,8 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Fantasy Refresh">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Fantasy Refresh — Commissioner Runbook</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20400%20400'><defs><linearGradient%20id='tg'%20x1='100%'%20y1='0%'%20x2='0%'%20y2='100%'><stop%20offset='0%'%20stop-color='%2300E5D4'/><stop%20offset='100%'%20stop-color='%2300E5D4'%20stop-opacity='0.6'/></linearGradient><linearGradient%20id='pg'%20x1='0%'%20y1='100%'%20x2='100%'%20y2='0%'><stop%20offset='0%'%20stop-color='%23FF5FA0'/><stop%20offset='100%'%20stop-color='%23FF5FA0'%20stop-opacity='0.6'/></linearGradient></defs><rect%20x='25'%20y='25'%20width='350'%20height='350'%20rx='70'%20fill='%23050808'/><g%20transform='translate(200,200)%20scale(3.79)%20translate(-475.5,-241.6)'><path%20fill='url(%23tg)'%20d='M504.547,265.443h-9.019a30.964,30.964,0,0,0-29.042-52.733,1.5,1.5,0,1,0,.792,2.894,27.955,27.955,0,0,1,25.512,48.253l0-10.169h-.011a1.493,1.493,0,0,0-2.985,0h0v13.255a1.5,1.5,0,0,0,1.5,1.5h13.256a1.5,1.5,0,1,0,0-3Z'/><path%20fill='url(%23pg)'%20d='M485.389,267.995a27.956,27.956,0,0,1-25.561-48.213l0,10.2h.015a1.491,1.491,0,0,0,2.978,0h.007V216.791a1.484,1.484,0,0,0-1.189-1.532l-.018-.005a1.533,1.533,0,0,0-.223-.022c-.024,0-.046-.007-.07-.007H448.071a1.5,1.5,0,0,0,0,3h8.995a30.963,30.963,0,0,0,29.115,52.664,1.5,1.5,0,0,0-.792-2.894Z'/></g></svg>">
   <link rel="apple-touch-icon" href="/icons/icon.svg">
@@ -568,16 +569,15 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
         <thead><tr><th>Item</th><th>Value / Location</th></tr></thead>
         <tbody>
           <tr><td>Salary Cap</td><td>$60,000 per week</td></tr>
-          <tr><td>Max player salary</td><td>$11,300</td></tr>
-          <tr><td>Min player salary</td><td>$3,700</td></tr>
+          <tr><td>Max player salary</td><td>$9,600 (RB/WR) · $9,000 (QB/TE/DEF)</td></tr>
+          <tr><td>Min player salary</td><td>$2,000 · backup QBs $3,800</td></tr>
           <tr><td>Roster</td><td>QB · RB · RB · WR · WR · WR · TE · FLEX · DEF</td></tr>
           <tr><td>FLEX eligible</td><td>WR / RB / TE</td></tr>
           <tr><td>Score lock day</td><td>Tuesday 9am ET (auto)</td></tr>
-          <tr><td>Join code (2026)</td><td>REFRESH26</td></tr>
-          <tr><td>League ID</td><td>fr_refresh26</td></tr>
-          <tr><td>Firebase DB</td><td>fantasy-refresh-default-rtdb.firebaseio.com</td></tr>
-          <tr><td>Cloudflare Worker</td><td>fantasy-refresh-news.mtriedel.workers.dev</td></tr>
-          <tr><td>Tank01 plan</td><td>Basic (free) → upgrade to Pro Sept 1</td></tr>
+          <tr><td>Join code</td><td>Managed in Commissioner Tools (registration currently closed)</td></tr>
+          <tr><td>Draft opens</td><td>Automatically, Wednesday ~7am CT, once the salary sheet is complete</td></tr>
+          <tr><td>Draft check</td><td>Automatic: Wed after open + Thu before TNF (Actions → Draft Audit)</td></tr>
+          <tr><td>Tank01 plan</td><td>Ultra (RapidAPI)</td></tr>
           <tr><td>GitHub repo</td><td>github.com/mtriedel-fr/fantasy-refresh</td></tr>
           <tr><td>Live site</td><td>fantasyrefresh.com</td></tr>
         </tbody>
