@@ -15,7 +15,7 @@
         "members": {
           ".read": true,
           "$uid": {
-            ".write": true
+            ".write": "auth != null && (auth.uid === $uid || root.child('leagues/' + $leagueId + '/settings/commissioners/' + auth.uid).val() === true || root.child('leagues/' + $leagueId + '/settings/createdBy').val() === auth.uid)"
           }
         },
         "season": {
@@ -35,7 +35,7 @@
           "$season": {
             "$week": {
               "$uid": {
-                ".write": "auth != null && auth.uid === $uid"
+                ".write": "auth != null && auth.uid === $uid && (!root.child('leagues/' + $leagueId + '/settings/draftLockedUntil').exists() || now > root.child('leagues/' + $leagueId + '/settings/draftLockedUntil').val())"
               }
             }
           }
@@ -43,6 +43,13 @@
         "reactions": {
           ".read": true,
           ".write": "auth != null"
+        },
+        "chat": {
+          ".read": true,
+          "$msgId": {
+            ".write": "auth != null && ((!data.exists() && newData.child('uid').val() === auth.uid) || (data.exists() && !newData.exists() && (data.child('uid').val() === auth.uid || root.child('leagues/' + $leagueId + '/settings/commissioners/' + auth.uid).val() === true || root.child('leagues/' + $leagueId + '/settings/createdBy').val() === auth.uid)))",
+            ".validate": "newData.hasChildren(['uid','ts']) && newData.child('uid').val() === auth.uid && newData.child('ts').isNumber() && (newData.hasChild('text') || newData.hasChild('gifUrl')) && (!newData.hasChild('text') || (newData.child('text').isString() && newData.child('text').val().length <= 2000)) && (!newData.hasChild('gifUrl') || (newData.child('gifUrl').isString() && newData.child('gifUrl').val().length <= 1000)) && (!newData.hasChild('team') || (newData.child('team').isString() && newData.child('team').val().length <= 120))"
+          }
         },
         "matchups": {
           ".read": true,
@@ -66,9 +73,17 @@
       ".read": true,
       ".write": "auth != null && root.child('leagues/fr_refresh26/settings/commissioners/' + auth.uid).val() === true"
     },
+    "gameStats": {
+      ".read": true,
+      ".write": "auth != null && root.child('leagues/fr_refresh26/settings/commissioners/' + auth.uid).val() === true"
+    },
+    "liveGameStatus": {
+      ".read": true,
+      ".write": "auth != null && root.child('leagues/fr_refresh26/settings/commissioners/' + auth.uid).val() === true"
+    },
     "computedFantasyHistory": {
       ".read": true,
-      ".write": "auth != null"
+      ".write": "auth != null && root.child('leagues/fr_refresh26/settings/commissioners/' + auth.uid).val() === true"
     },
     "waitlist": {
       ".read": "auth != null && root.child('leagues/fr_refresh26/settings/commissioners/' + auth.uid).val() === true",
@@ -78,8 +93,9 @@
       }
     },
     "users": {
-      ".read": true,
+      ".read": false,
       "$uid": {
+        ".read": true,
         ".write": "auth != null && auth.uid === $uid"
       }
     },
@@ -88,8 +104,12 @@
       ".write": "auth != null"
     },
     "joinCodes": {
-      ".read": true,
-      ".write": "auth != null"
+      ".read": false,
+      ".write": "auth != null && root.child('leagues/fr_refresh26/settings/commissioners/' + auth.uid).val() === true",
+      "$code": {
+        ".read": true,
+        ".write": "auth != null && root.child('leagues/fr_refresh26/settings/commissioners/' + auth.uid).val() === true"
+      }
     },
     "season2025": {
       ".read": true,
