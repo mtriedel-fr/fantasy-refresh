@@ -27,7 +27,7 @@ jobs:
             const repo = fs.readFileSync('main/database.rules.json', 'utf8');
             const strip = s => s.replace(/\/\/.*$/gm, '').replace(/\s+/g, '');
             ann('notice', `Deployed rules (HTTP ${live.status}) · ${strip(live.body) === strip(repo) ? 'IDENTICAL to repo' : 'DIFFERENT from repo'}`, `length ${live.body.length}`);
-            for (let i = 0, n = 0; i * 2 < Buffer.from(live.body).toString('base64').length; i += 5000, n++) ann('notice', `RULES PART ${n}`, Buffer.from(live.body).toString('base64').slice(i * 2, i * 2 + 10000));
+            for (let i = 0, n = 0; i * 2 < Buffer.from(live.body).toString('base64').length; i += 1500, n++) ann('notice', `RULES PART ${n}`, Buffer.from(live.body).toString('base64').slice(i * 2, i * 2 + 3000));
             const jc = await get('/joinCodes.json');
             const st = await get('/leagues/fr_refresh26/settings.json?shallow=true');
             const s2 = JSON.parse((await get('/leagues/fr_refresh26/settings.json')).body || '{}');
