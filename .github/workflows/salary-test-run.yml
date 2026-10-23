@@ -134,8 +134,8 @@ jobs:
           async function getTank01Projections(week, season) {
             const scoring = [
               'itemFormat=list', 'twoPointConversions=2', 'passYards=.04', 'passTD=4',
-              'passInterceptions=-1', 'pointsPerReception=1', 'rushYards=.1', 'rushTD=6',
-              'fumbles=-1', 'receivingYards=.1', 'receivingTD=6'
+              'passInterceptions=-2', 'pointsPerReception=1', 'rushYards=.1', 'rushTD=6',
+              'fumbles=-2', 'receivingYards=.1', 'receivingTD=6'
             ].join('&');
             const attempts = [
               `/getNFLProjections?week=${week}&${scoring}`,
