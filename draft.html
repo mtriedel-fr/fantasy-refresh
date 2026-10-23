@@ -545,6 +545,13 @@ function buildSlotDefsFromConfig(cfg){
 // ── STATE ─────────────────────────────────────────────────────
 var allPlayers   = [];
 var lineup       = {};   // {slotId: player}
+// Player ids in the lineup as last saved to Firebase (a real submission).
+// A player only stays "locked in" after his game starts if he was in a
+// SUBMITTED lineup at that point. A player who is only in an unsubmitted,
+// browser-saved draft when his game kicks off can't be submitted — the team
+// has to swap him out. Teams that did submit can still edit everyone else.
+var submittedIds = {};
+function setSubmittedFrom(slots){ submittedIds = {}; Object.values(slots || {}).forEach(function(p){ if(p && p.id) submittedIds[p.id] = true; }); }
 var activeSlot   = null; // currently picking for this slotId
 var activeGame   = null; // game filter: {home, away, teams:[]}
 var activeGameTeamFilter = 'both'; // 'both' | 'away' | 'home' — which side(s) of the selected game to show
@@ -1455,7 +1462,7 @@ function renderGamePreviewPickable(game){
   function playerRow(p){
     var isIn2 = !!inLineup[p.id];
     var isOut = p.status === 'O' || p.status === 'IR';
-    var locked2 = isPlayerLocked(p);
+    var locked2 = isStartedUnsubmitted(p);
     var currentOccupantSalary = (activeSlot && lineup[activeSlot]) ? (lineup[activeSlot].salary || 0) : 0;
     var spentExRepl = getSpent() - currentOccupantSalary;
     var wouldOvr2 = !isIn2 && (spentExRepl + p.salary > CAP);
@@ -1590,7 +1597,7 @@ function pickFromPreview(playerId){
   var p = allPlayers.find(function(x){ return x.id === playerId; });
   if(!p) return;
   if(p.status === 'O' || p.status === 'IR'){ showToast(p.name+' is out', true); return; }
-  if(isPlayerLocked(p)){ showToast(p.name+' is locked 🔒', true); return; }
+  if(isStartedUnsubmitted(p)){ showToast(p.name+'\'s game has started 🔒', true); return; }
 
   // If a slot is already active (selected before opening the game view),
   // replace directly in that slot — same behavior as the normal picker.
@@ -1605,7 +1612,7 @@ function pickFromPreview(playerId){
       var s = SLOT_DEFS[i];
       if(s.eligible.indexOf(p.pos) < 0) continue;
       if(!lineup[s.id]){ emptySlot = s; break; }
-      if(!filledSlot && !isPlayerLocked(lineup[s.id])) filledSlot = s;
+      if(!filledSlot && !isLockedIn(lineup[s.id])) filledSlot = s;
     }
     slot = emptySlot || filledSlot;
   }
@@ -1721,7 +1728,7 @@ function restoreDraftLocal(){
     var p = obj.slots[s.id];
     if(!p || !p.id) return;
     if(p.status === 'O' || p.status === 'IR') return;
-    if(isPlayerLocked(p)) return;                  // their game already started
+    if(isStartedUnsubmitted(p)) return;            // game started and not in the submitted lineup
     lineup[s.id] = p;
     restored++;
   });
@@ -1741,6 +1748,7 @@ function finishLineupLoad(data){
   var hasSubmitted = !!(data && data.slots);
   if(hasSubmitted){
     SLOT_DEFS.forEach(function(s){ if(data.slots[s.id]) lineup[s.id] = data.slots[s.id]; });
+    setSubmittedFrom(data.slots);
   }
   var restored = isDraftLocked() ? 0 : restoreDraftLocal();
   repriceLineup();   // sync snapshot salaries to the current week's sheet
@@ -1842,10 +1850,12 @@ function renderRoster(){
       // — matching the exact same treatment as points+status on the My
       // Team card, instead of salary alone on the header row and Remove
       // separately on the line below.
-      var locked = isPlayerLocked(p);
+      var locked = isLockedIn(p);
       var control = locked
         ? '<span class="slot-status-tag">🔒 Locked</span>'
-        : '<button class="slot-remove-btn" data-remove-slot="'+s.id+'">Remove</button>';
+        : isStartedUnsubmitted(p)
+          ? '<span class="slot-status-tag" style="color:var(--pk);">⚠️ Game started · swap out</span><button class="slot-remove-btn" data-remove-slot="'+s.id+'">Remove</button>'
+          : '<button class="slot-remove-btn" data-remove-slot="'+s.id+'">Remove</button>';
       html += '<div class="slot-right-stack">';
       html +=   '<span class="slot-player-sal">$'+(p.salary||0).toLocaleString()+'</span>';
       html +=   control;
@@ -1887,7 +1897,7 @@ function renderRoster(){
       // picker itself was a separate, unguarded route to the same
       // effect: opening it for this slot and picking someone else would
       // silently overwrite an already-started, already-scoring player.
-      if(currentPlayer && isPlayerLocked(currentPlayer)){
+      if(currentPlayer && isLockedIn(currentPlayer)){
         showToast('🔒 ' + currentPlayer.name + '\'s game has started — locked in for this week.', true);
         return;
       }
@@ -2062,7 +2072,7 @@ function renderPicker(){
     var currentOccupantSalary = (activeSlot && lineup[activeSlot]) ? (lineup[activeSlot].salary || 0) : 0;
     var spent      = getSpent() - currentOccupantSalary;
     var wouldOvr   = !isSelected && (spent + p.salary > CAP);
-    var locked     = isPlayerLocked(p);
+    var locked     = isStartedUnsubmitted(p);
     var disabled   = isOut || locked || (wouldOvr && !isSelected);
     var injBadge   = (p.status && p.status !== 'Active')
       ? '<span class="p-inj inj-'+p.status+'">'+p.status+'</span>' : '';
@@ -2169,7 +2179,7 @@ function pickPlayer(playerId){
   var p = allPlayers.find(function(x){ return x.id === playerId; });
   if(!p) return;
   if(p.status === 'O' || p.status === 'IR'){ showToast(p.name+' is out', true); return; }
-  if(isPlayerLocked(p)){ showToast(p.name+' is locked 🔒', true); return; }
+  if(isStartedUnsubmitted(p)){ showToast(p.name+'\'s game has started 🔒', true); return; }
 
   // No slot pre-selected — tapping a slot is now an optional filter, not a
   // requirement, so a direct tap on a player drafts them straight to the
@@ -2304,7 +2314,7 @@ function findNextEmptySlot(currentSlot){
 function removePlayer(slotId){
   if(Date.now() - lastPickTime < PICK_LOCK_MS) return;
   var p = lineup[slotId];
-  if(p && isPlayerLocked(p)){ showToast(p.name+' is locked — cannot remove 🔒', true); return; }
+  if(p && isLockedIn(p)){ showToast(p.name+' is locked — cannot remove 🔒', true); return; }
   lineup[slotId] = null;
   lastPickTime = Date.now();
   if(activeSlot === slotId){
@@ -2396,6 +2406,11 @@ function updateSubmitBtn(){
   } else if(filled===0){
     btn.disabled=true; btn.textContent='Build Your Lineup';
     msg.textContent='Add players to your roster'; msg.className='submit-msg';
+  } else if(Object.values(lineup).some(function(p){ return p && isStartedUnsubmitted(p); })){
+    var started = Object.values(lineup).filter(function(p){ return p && isStartedUnsubmitted(p); }).map(function(p){ return p.name; });
+    btn.disabled=true;
+    msg.textContent='⚠️ ' + started.join(', ') + ' — game started before you submitted. Swap out to submit.';
+    msg.className='submit-msg err';
   } else if(spent>CAP){
     btn.disabled=true;
     msg.textContent='Over cap by $'+(spent-CAP).toLocaleString();
@@ -2422,6 +2437,12 @@ function submitLineup(){
     return;
   }
   if(getSpent()>CAP){ showToast('Over cap',true); return; }
+  var startedUnsubmitted = SLOT_DEFS.map(function(s){ return lineup[s.id]; }).filter(function(p){ return p && isStartedUnsubmitted(p); });
+  if(startedUnsubmitted.length){
+    var who = startedUnsubmitted.map(function(p){ return p.name; }).join(', ');
+    showToast('🔒 ' + who + (startedUnsubmitted.length === 1 ? '\'s game has' : '\'s games have') + ' started and ' + (startedUnsubmitted.length === 1 ? 'he wasn\'t' : 'they weren\'t') + ' in a submitted lineup — swap ' + (startedUnsubmitted.length === 1 ? 'him' : 'them') + ' out to submit.', true);
+    return;
+  }
   var btn = document.getElementById('submit-btn');
   btn.disabled=true; btn.textContent='Checking session…';
 
@@ -2446,6 +2467,7 @@ function submitLineup(){
       msg.textContent='✓ Lineup submitted! Good luck.'; msg.className='submit-msg ok';
       btn.textContent='↑ Update Lineup'; btn.disabled=false;
       showToast('Lineup submitted! 🏈');
+      setSubmittedFrom(lineup);
       clearDraftLocal(); // it's safely in the cloud now — drop the local draft
       setTimeout(function(){ window.location.href = '/league.html'; }, 1200);
     }).catch(function(err){
@@ -2497,7 +2519,7 @@ function clearRoster(){
   var filledSlots = SLOT_DEFS.filter(function(s){ return lineup[s.id]; });
   if(!filledSlots.length){ showToast('Roster is already empty', true); return; }
 
-  var lockedSlots   = filledSlots.filter(function(s){ return isPlayerLocked(lineup[s.id]); });
+  var lockedSlots   = filledSlots.filter(function(s){ return isLockedIn(lineup[s.id]); });
   var clearableCount = filledSlots.length - lockedSlots.length;
 
   if(!clearableCount){
@@ -2512,7 +2534,7 @@ function clearRoster(){
   if(!confirm(confirmMsg)) return;
 
   SLOT_DEFS.forEach(function(s){
-    if(lineup[s.id] && !isPlayerLocked(lineup[s.id])) lineup[s.id] = null;
+    if(lineup[s.id] && !isLockedIn(lineup[s.id])) lineup[s.id] = null;
   });
 
   renderRoster();
@@ -2533,6 +2555,7 @@ function clearRoster(){
     btn.textContent = stillHasPlayers ? '↑ Update Lineup' : 'Build Your Lineup';
     btn.disabled = false;
     showToast('Roster cleared and saved');
+    setSubmittedFrom(lineup);
   }).catch(function(err){
     console.error('Clear roster save failed:', err);
     msg.textContent = 'Cleared locally but failed to save — try again';
@@ -2606,6 +2629,15 @@ function loadLocks(){
 
 function isPlayerLocked(player){
   return !!(player && player.team && teamLocks[normTeam(player.team)]);
+}
+// Game started AND he was in the submitted lineup → can't be removed/replaced.
+function isLockedIn(player){
+  return isPlayerLocked(player) && !!submittedIds[player.id];
+}
+// Game started but he's only in the unsubmitted draft → must be swapped out
+// before this lineup can be submitted. Removing him is allowed.
+function isStartedUnsubmitted(player){
+  return isPlayerLocked(player) && !submittedIds[player.id];
 }
 
 function isTeamLocked(team){
