@@ -755,15 +755,31 @@ function loadLeagues() {
   if (!user) return;
 
   var uid         = user.uid;
-  var displayName = user.displayName || user.email || 'Coach';
 
-  // Update greeting and header
-  var greet = document.getElementById('greeting-name');
-  if (greet) greet.innerHTML = displayName + '<span>\'s Leagues</span>';
-  var nameEl = document.getElementById('hdr-name');
-  var avatarEl = document.getElementById('hdr-avatar');
-  if (nameEl) nameEl.textContent = displayName;
-  if (avatarEl) avatarEl.textContent = displayName.charAt(0).toUpperCase();
+  // Greeting and header use the display name saved on the member's profile
+  // — never the email address. No name saved → "My Leagues".
+  function paintName(name){
+    name = (name || '').trim();
+    var greet = document.getElementById('greeting-name');
+    if (greet) {
+      greet.textContent = name ? name : 'My';
+      var tail = document.createElement('span');
+      tail.textContent = name ? '\'s Leagues' : ' Leagues';
+      greet.appendChild(tail);
+    }
+    var label = name || user.email || '';
+    var nameEl = document.getElementById('hdr-name');
+    var avatarEl = document.getElementById('hdr-avatar');
+    if (nameEl) nameEl.textContent = label;
+    if (avatarEl) avatarEl.textContent = (label.charAt(0) || '?').toUpperCase();
+  }
+  paintName(user.displayName);
+  // The stored sign-in copy can be older than the profile (e.g. a name set
+  // after signing in), so refresh it from the member record.
+  fetch(FB_DB_URL + '/leagues/fr_refresh26/members/' + uid + '/displayName.json')
+    .then(function(r) { return r.json(); })
+    .then(function(n) { if (typeof n === 'string' && n.trim() && n.trim() !== (user.displayName || '')) paintName(n); })
+    .catch(function() {});
 
   // Collect league IDs to check
   var leagueIds = ['fr_refresh26'];

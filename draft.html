@@ -14,8 +14,6 @@
 <title>Fantasy Refresh — Draft</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20400%20400'><defs><linearGradient%20id='tg'%20x1='100%'%20y1='0%'%20x2='0%'%20y2='100%'><stop%20offset='0%'%20stop-color='%2300E5D4'/><stop%20offset='100%'%20stop-color='%2300E5D4'%20stop-opacity='0.6'/></linearGradient><linearGradient%20id='pg'%20x1='0%'%20y1='100%'%20x2='100%'%20y2='0%'><stop%20offset='0%'%20stop-color='%23FF5FA0'/><stop%20offset='100%'%20stop-color='%23FF5FA0'%20stop-opacity='0.6'/></linearGradient></defs><rect%20x='25'%20y='25'%20width='350'%20height='350'%20rx='70'%20fill='%23050808'/><g%20transform='translate(200,200)%20scale(3.79)%20translate(-475.5,-241.6)'><path%20fill='url(%23tg)'%20d='M504.547,265.443h-9.019a30.964,30.964,0,0,0-29.042-52.733,1.5,1.5,0,1,0,.792,2.894,27.955,27.955,0,0,1,25.512,48.253l0-10.169h-.011a1.493,1.493,0,0,0-2.985,0h0v13.255a1.5,1.5,0,0,0,1.5,1.5h13.256a1.5,1.5,0,1,0,0-3Z'/><path%20fill='url(%23pg)'%20d='M485.389,267.995a27.956,27.956,0,0,1-25.561-48.213l0,10.2h.015a1.491,1.491,0,0,0,2.978,0h.007V216.791a1.484,1.484,0,0,0-1.189-1.532l-.018-.005a1.533,1.533,0,0,0-.223-.022c-.024,0-.046-.007-.07-.007H448.071a1.5,1.5,0,0,0,0,3h8.995a30.963,30.963,0,0,0,29.115,52.664,1.5,1.5,0,0,0-.792-2.894Z'/></g></svg>">
   <link rel="apple-touch-icon" href="/icons/icon.svg">
-<circle cx='50' cy='50' r='50' fill='%23050808'/><!-- Top-right arc (teal) — from ~200deg to ~20deg clockwise --><path d='M 22 62 A 32 32 0 1 1 78 62' fill='none' stroke='%2300E5D4' stroke-width='9' stroke-linecap='round'/><!-- Teal arrowhead pointing right at top --><polygon points='78,50 68,44 72,58' fill='%2300E5D4'/><!-- Bottom arc (pink) — short return arc --><path d='M 78 62 A 32 32 0 0 1 22 62' fill='none' stroke='%23FF5FA0' stroke-width='9' stroke-linecap='round'/><!-- Pink arrowhead pointing left at bottom --><polygon points='22,50 32,44 28,58' fill='%23FF5FA0'/></svg>">
-<circle cx='50' cy='50' r='50' fill='%23050808'/><path d='M80 50 C80 28 66 14 50 14 C34 14 20 28 20 50' fill='none' stroke='%2300E5D4' stroke-width='7' stroke-linecap='round'/><line x1='50' y1='14' x2='42' y2='24' stroke='%2300E5D4' stroke-width='7' stroke-linecap='round'/><line x1='50' y1='14' x2='58' y2='24' stroke='%2300E5D4' stroke-width='7' stroke-linecap='round'/><path d='M20 50 C20 72 34 86 50 86 C66 86 80 72 80 50' fill='none' stroke='%23FF5FA0' stroke-width='7' stroke-linecap='round'/><line x1='50' y1='86' x2='42' y2='76' stroke='%23FF5FA0' stroke-width='7' stroke-linecap='round'/><line x1='50' y1='86' x2='58' y2='76' stroke='%23FF5FA0' stroke-width='7' stroke-linecap='round'/><line x1='35' y1='50' x2='65' y2='50' stroke='%23F0FAFA' stroke-width='2' stroke-linecap='round'/><line x1='46' y1='44' x2='46' y2='56' stroke='%23F0FAFA' stroke-width='2' stroke-linecap='round'/><line x1='54' y1='44' x2='54' y2='56' stroke='%23F0FAFA' stroke-width='2' stroke-linecap='round'/></svg>">
 <script src="league-context.js"></script>
 <script src="/js/auth.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
@@ -91,6 +89,8 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
 .submit-btn{width:100%;padding:13px;background:linear-gradient(135deg,var(--or),var(--pk));border:none;border-radius:10px;color:#050808;font-family:var(--fd);font-size:15px;font-weight:900;text-transform:uppercase;letter-spacing:.8px;cursor:pointer;transition:opacity .15s;}
 .submit-btn:hover{opacity:.9;}
 .submit-btn:disabled{opacity:.35;cursor:not-allowed;background:var(--bg4);color:var(--ink3);border:1px solid var(--bdr);}
+/* Submitted and unchanged: a confident "done" state, not a faded "unavailable" one. */
+.submit-btn.is-submitted:disabled{opacity:1;cursor:default;background:rgba(0,229,212,.14);color:var(--or);border:1.5px solid var(--or);}
 .submit-msg{font-family:var(--fd);font-size:11px;text-align:center;margin-top:6px;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;min-height:14px;}
 .submit-msg.ok{color:var(--or);}
 .submit-msg.err{color:var(--pk);}
@@ -1754,11 +1754,7 @@ function finishLineupLoad(data){
   repriceLineup();   // sync snapshot salaries to the current week's sheet
   renderRoster();
   updateCap();
-  if(hasSubmitted){
-    document.getElementById('submit-msg').textContent = '✓ Submitted — tap any slot to update';
-    document.getElementById('submit-msg').className = 'submit-msg ok';
-    document.getElementById('submit-btn').textContent = '↑ Update Lineup';
-  }
+  updateSubmitBtn(); // shows "✓ Lineup Submitted" when the roster matches the submitted lineup
   if(restored){ showToast('Restored your in-progress lineup ✓'); }
   autosaveReady = true; // changes from here on are autosaved to this browser
 }
@@ -2400,6 +2396,7 @@ function updateSubmitBtn(){
   var spent  = getSpent();
   var btn    = document.getElementById('submit-btn');
   var msg    = document.getElementById('submit-msg');
+  btn.classList.remove('is-submitted');
   if(!currentUser){
     btn.disabled=true; btn.textContent='Build Your Lineup';
     msg.textContent='Sign in to submit your lineup'; msg.className='submit-msg';
@@ -2415,13 +2412,20 @@ function updateSubmitBtn(){
     btn.disabled=true;
     msg.textContent='Over cap by $'+(spent-CAP).toLocaleString();
     msg.className='submit-msg err';
+  } else if(lineupMatchesSubmitted()){
+    // Already submitted and nothing changed since — say so, instead of
+    // inviting a "submit" that already happened.
+    btn.disabled=true; btn.classList.add('is-submitted'); btn.textContent='✓ Lineup Submitted';
+    msg.textContent='Submitted · tap any slot to make changes';
+    msg.className='submit-msg ok';
   } else if(filled<total){
     btn.disabled=false; btn.textContent='Save Lineup →';
     msg.textContent=(total-filled)+' slot'+(total-filled===1?'':'s')+' still open · saved picks are kept';
     msg.className='submit-msg ok';
   } else {
-    btn.disabled=false; btn.textContent='Submit Lineup →';
-    msg.textContent='$'+(CAP-spent).toLocaleString()+' remaining · Ready to submit';
+    var hasPrior = Object.keys(submittedIds).length > 0;
+    btn.disabled=false; btn.textContent = hasPrior ? '↑ Update Lineup' : 'Submit Lineup →';
+    msg.textContent='$'+(CAP-spent).toLocaleString()+' remaining · ' + (hasPrior ? 'Unsaved changes — tap Update to save' : 'Ready to submit');
     msg.className='submit-msg ok';
   }
 }
@@ -2636,6 +2640,13 @@ function isLockedIn(player){
 }
 // Game started but he's only in the unsubmitted draft → must be swapped out
 // before this lineup can be submitted. Removing him is allowed.
+// True when the roster on screen is exactly the lineup last submitted.
+function lineupMatchesSubmitted(){
+  var ids = Object.keys(submittedIds);
+  if(!ids.length) return false;
+  var cur = SLOT_DEFS.map(function(s){ return lineup[s.id] && lineup[s.id].id; }).filter(Boolean);
+  return cur.length === ids.length && cur.every(function(id){ return submittedIds[id]; });
+}
 function isStartedUnsubmitted(player){
   return isPlayerLocked(player) && !submittedIds[player.id];
 }

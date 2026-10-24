@@ -89,6 +89,8 @@ html{overflow-x:hidden;}
 
 /* STATS */
 .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--bdr2);margin:0 16px 14px;border-radius:0 0 14px 14px;overflow:hidden;border:1px solid var(--bdr);border-top:none;}
+/* These bars only have two tiles — four columns left an empty teal block on desktop. */
+#stats-weekly, #stats-guillotine .stats{grid-template-columns:repeat(2,1fr);}
 .stat{background:var(--bg3);padding:16px 14px;text-align:center;}
 .stat-lbl{font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink2);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:4px;}
 .stat-val{font-family:var(--fd);font-size:30px;font-weight:800;color:var(--or);letter-spacing:-.5px;line-height:1;}
@@ -5207,7 +5209,7 @@ function renderGuillotine(){
   var finaleRanking = finaleResult;
 
   // ── HERO STATS ──
-  var heroHTML = '<div class="guill-hero" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;padding:20px 24px;">'
+  var heroHTML = '<div class="guill-hero" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;padding:20px 24px;">'
     + '<div class="guill-stat"><div class="guill-stat-lbl">Started with</div><div class="guill-stat-val">'+totalTeams+'</div><div class="guill-stat-sub">teams</div></div>'
     + '<div class="guill-stat"><div class="guill-stat-lbl">Survivors</div><div class="guill-stat-val" style="color:var(--or)">'+currentSurvivors.length+'</div><div class="guill-stat-sub">still alive</div></div>'
     + '<div class="guill-stat"><div class="guill-stat-lbl">Eliminated</div><div class="guill-stat-val" style="color:var(--pk)">'+Object.keys(eliminated).length+'</div><div class="guill-stat-sub">teams gone</div></div>'
@@ -7838,6 +7840,16 @@ function goToProfile(encodedName){
 
 
 // ── PLAYER CHART HELPERS ──────────────────────────────────────
+// A week is complete once its scores are final (or locked Tuesday). The
+// week in progress is still shown in the totals/table, but kept out of the
+// charts and the weekly average so every team's line doesn't plunge
+// mid-week while games are still being played.
+function isWeekComplete(w){
+  var arr = seasonData[String(w)] || [];
+  if(!arr.length) return false;
+  return arr.some(function(e){ return e && e.locked; }) || arr.every(function(e){ return e && e.status === 'final'; });
+}
+
 function getPlayerWeekData(name){
   var weeks = Object.keys(seasonData).filter(function(k){
     return !isNaN(Number(k)) && seasonData[k] && seasonData[k].length > 0;
@@ -8005,10 +8017,14 @@ function buildTeamSeasonHtml(displayName, isYou){
       + '<div class="myteam-empty-title">No data for "' + escapeHtmlFR(displayName || '') + '"</div>'
       + '<div class="myteam-empty-sub">No scores have been imported for this team yet.</div></div>';
   }
-  var weekData = getPlayerWeekData(resolvedName);
+  var weekDataAll = getPlayerWeekData(resolvedName);
+  weekDataAll.forEach(function(d){ d.live = !isWeekComplete(d.week); });
+  // Charts, weekly average and best week use completed weeks only; the
+  // season total still includes the live week so it matches the standings.
+  var weekData = weekDataAll.filter(function(d){ return !d.live; });
+  var total = weekDataAll.reduce(function(a,d){ return a + d.score; }, 0);
   var scores = weekData.map(function(d){ return d.score; });
-  var total = scores.reduce(function(a,b){ return a+b; }, 0);
-  var avg = scores.length ? total / scores.length : 0;
+  var avg = scores.length ? scores.reduce(function(a,b){ return a+b; }, 0) / scores.length : 0;
   var best = scores.length ? Math.max.apply(null, scores) : 0;
   var weeks = Object.keys(seasonData).filter(function(k){
     return !isNaN(Number(k)) && seasonData[k] && seasonData[k].length > 0;
@@ -8034,9 +8050,9 @@ function buildTeamSeasonHtml(displayName, isYou){
   var scoreChart = buildScoreChartInline(weekData);
   var rankChart = buildRankChartInline(weekData);
 
-  var tableRows = weekData.slice().reverse().map(function(d){
+  var tableRows = weekDataAll.slice().reverse().map(function(d){
     return '<tr>'
-      + '<td class="wk-num">Week ' + d.week + '</td>'
+      + '<td class="wk-num">Week ' + d.week + (d.live ? ' <span style="font-size:10px;color:var(--pk);letter-spacing:.5px;">LIVE</span>' : '') + '</td>'
       + '<td style="font-family:var(--fd);font-weight:700;font-size:15px;color:var(--or);text-align:right">' + fmtScore(d.score) + '</td>'
       + '<td style="text-align:center;font-family:var(--fd);font-size:14px;color:var(--pk)">#' + d.rank + ' / ' + d.total + '</td>'
       + '<td style="text-align:center;font-family:var(--fd);font-size:14px;color:var(--pu)">#' + d.cumStanding + '</td>'
