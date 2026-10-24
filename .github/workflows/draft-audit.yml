@@ -169,14 +169,20 @@ jobs:
                 .filter(r => r.id && ['QB','RB','WR','TE','DEF'].includes(r.pos) && r.proj > 0);
               const sheetIds = new Set(players.map(p => String(p.id)));
               const byPos = {}; rows.forEach(r => { byPos[r.pos] = (byPos[r.pos] || 0) + 1; });
-              const notInSheet = rows.filter(r => r.proj >= 5 && !sheetIds.has(String(r.id)) && r.pos !== 'DEF').sort((a, b) => b.proj - a.proj);
+              const normN = n => String(n || '').toLowerCase().replace(/[.'’`]/g, '').replace(/\s+(jr|sr|ii|iii|iv|v)$/, '').replace(/\s+/g, ' ').trim();
+              const sheetNames = new Set(players.map(p => normN(p.name) + '|' + nt(p.team)));
+              const locks = await get(`/leagues/${LEAGUE_ID}/locks/${season}/week${wk}.json`).catch(() => null) || {};
+              const notInSheet = rows.filter(r => r.proj >= 2 && r.pos !== 'DEF' && !sheetIds.has(String(r.id)) && !sheetNames.has(normN(r.name) + '|' + nt(r.team)) && playing.has(nt(r.team)))
+                .map(r => { const L = sleeper[r.id] || {}; return Object.assign(r, { inj: L.injury_status || '', started: !!locks[nt(r.team)] || !!locks[r.team], inPool: !!(pv.find(x => String(x.id) === String(r.id))) }); })
+                .sort((a, b) => b.proj - a.proj);
               const want = ['5859'];
               const named = rows.filter(r => want.includes(String(r.id)) || /omar cooper|ja.?kobi lane/i.test(r.name));
               const out = [];
               out.push(`Sleeper week ${wk}: ${rows.length} projected · ` + Object.entries(byPos).map(([k, v]) => `${k} ${v}`).join(', '));
               out.push(`Tank01 sheet: ${players.filter(p => parseFloat(p.proj) > 0).length} projected`);
               out.push(`A.J. Brown / Omar Cooper Jr. / Ja'Kobi Lane in Sleeper: ` + (named.map(r => `${r.name} ${r.team} ${r.proj.toFixed(1)}`).join('; ') || 'none'));
-              out.push(`Sleeper-projected (≥5) not in sheet: ${notInSheet.length} — ` + notInSheet.slice(0, 25).map(r => `${r.name} ${r.pos} ${r.team} ${r.proj.toFixed(1)}`).join('; '));
+              out.push(`Sleeper-projected (≥2 pts, team playing) NOT in the draft: ${notInSheet.length}`);
+              notInSheet.slice(0, 60).forEach(r => out.push(`   ${r.name} ${r.pos} ${r.team} · proj ${r.proj.toFixed(1)}${r.inj ? ' · ' + r.inj : ''}${r.started ? ' · GAME STARTED' : ''}${r.inPool ? '' : ' · not in player pool'}`));
               // top-10 overlap / scale comparison
               const top = rows.filter(r => r.pos !== 'DEF').sort((a, b) => b.proj - a.proj).slice(0, 12);
               out.push('Top Sleeper vs sheet: ' + top.map(r => { const s = players.find(p => String(p.id) === String(r.id)); return `${r.name} S${r.proj.toFixed(1)}/T${s ? s.proj : '-'}`; }).join('; '));
