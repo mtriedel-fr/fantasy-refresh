@@ -1,0 +1,45 @@
+name: One-off - Set commissioner display name
+
+# One-time, commissioner-requested (Oct 23 2026): set the commissioner's own
+# display name to "Mike". Finds the member record by the commissioner's
+# sign-in email, confirms that account is a league commissioner, and changes
+# only members/{uid}/displayName. Prints the old value (no emails printed —
+# this repo's run annotations are public).
+on:
+  push:
+    branches: [ops/set-commissioner-display-name]
+
+jobs:
+  set-name:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set display name
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB = process.env.FIREBASE_DB_URL, T = process.env.FIREBASE_AUTH_TOKEN;
+          const LEAGUE = '/leagues/fr_refresh26', EMAIL = 'mtriedel@gmail.com', NAME = 'Mike';
+          const req = (method, p, body) => new Promise((res, rej) => {
+            const u = new URL(`${FB}${p}${p.includes('?') ? '&' : '?'}auth=${T}`); const data = body === undefined ? null : JSON.stringify(body);
+            const r = https.request({ hostname: u.hostname, path: u.pathname + u.search, method, headers: data ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) } : {} }, rs => {
+              let d = ''; rs.on('data', c => d += c); rs.on('end', () => rs.statusCode < 300 ? res(d ? JSON.parse(d) : null) : rej(new Error(`HTTP ${rs.statusCode}`)));
+            }); r.on('error', rej); if (data) r.write(data); r.end();
+          });
+          const esc = s => String(s).replace(/%/g, '%25').replace(/\n/g, '%0A');
+          const ann = (l, t, m) => console.log(`::${l} title=${esc(t).replace(/:/g, '%3A').replace(/,/g, '%2C')}::${esc(m)}`);
+          (async () => {
+            const members = await req('GET', `${LEAGUE}/members.json`) || {};
+            const commissioners = await req('GET', `${LEAGUE}/settings/commissioners.json`) || {};
+            const matches = Object.entries(members).filter(([, m]) => m && String(m.email || '').toLowerCase() === EMAIL);
+            if (matches.length !== 1) { ann('error', 'ABORTED', `Expected exactly 1 matching member, found ${matches.length}. No change.`); process.exit(1); }
+            const [uid, m] = matches[0];
+            if (commissioners[uid] !== true) { ann('error', 'ABORTED', 'Matched account is not a commissioner. No change.'); process.exit(1); }
+            const before = m.displayName || '(none)';
+            await req('PUT', `${LEAGUE}/members/${uid}/displayName.json`, NAME);
+            const after = await req('GET', `${LEAGUE}/members/${uid}/displayName.json`);
+            ann('notice', 'Display name updated', `Account ${uid.slice(0, 6)}… (commissioner, team "${m.teamName || ''}"): "${before}" → "${after}"`);
+          })().catch(e => { ann('error', 'Failed', e.message); process.exit(1); });
+          SCRIPT
