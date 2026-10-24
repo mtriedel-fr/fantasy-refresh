@@ -1,0 +1,75 @@
+name: Injury Status Refresh
+
+# Keeps the injury tags on the open week's salary sheet current. Prices are
+# set once (Wednesday) and never change; injuries do. This updates ONLY each
+# player's `status` field from live Sleeper data — no prices change, nobody is
+# added or removed. The draft page then tags players (Q, D, IR, OUT), blocks
+# drafting players ruled Out, and warns teams that have one in their lineup.
+# Results (every change + lineups holding an Out player) are annotations on
+# the run — readable in the Actions tab and by Claude.
+on:
+  schedule:
+    - cron: '0 14 * * *'     # daily ~9am CT
+    - cron: '30 15 * * 0'    # Sunday ~10:30am CT, after the final inactives
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Refresh injury tags on the open week
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB = process.env.FIREBASE_DB_URL, T = process.env.FIREBASE_AUTH_TOKEN;
+          const LEAGUE_ID = 'fr_refresh26';
+          const req = (method, p, body) => new Promise((res, rej) => {
+            const u = new URL(`${FB}${p}${p.includes('?') ? '&' : '?'}auth=${T}`); const data = body === undefined ? null : JSON.stringify(body);
+            const r = https.request({ hostname: u.hostname, path: u.pathname + u.search, method, headers: data ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) } : {} }, rs => {
+              let d = ''; rs.on('data', c => d += c); rs.on('end', () => rs.statusCode < 300 ? res(d ? JSON.parse(d) : null) : rej(new Error(`${method} ${p} HTTP ${rs.statusCode} ${d.slice(0,150)}`)));
+            }); r.on('error', rej); if (data) r.write(data); r.end();
+          });
+          const getJSON = u => new Promise((res, rej) => https.get(u, r => { let d = ''; r.on('data', c => d += c); r.on('end', () => { try { res(JSON.parse(d)); } catch (e) { rej(e); } }); }).on('error', rej));
+          const esc = s => String(s).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+          function alert(level, title, msg) { console.log(`::${level} title=${esc(title).replace(/:/g,'%3A').replace(/,/g,'%2C')}::${esc(msg)}`); }
+          // Same rule as the draft page's isOutStatus(): only Out / Suspended block drafting.
+          function isOutStatus(s) { return !!s && /^(o|out|sus|suspended)$/i.test(String(s).trim()); }
+
+          (async () => {
+            const settings = await req('GET', `/leagues/${LEAGUE_ID}/settings.json`) || {};
+            if (!settings.active) { console.log('League not active.'); return; }
+            const season = settings.season || 2026;
+            const meta = await req('GET', `/leagues/${LEAGUE_ID}/season/${season}/meta.json`) || {};
+            const cur = typeof meta.week === 'number' ? meta.week : 1;
+            // The open draft week is the one after the last finalized week, if its sheet exists.
+            let week = cur + 1;
+            let players = await req('GET', `/leagues/${LEAGUE_ID}/salaries/${season}/week${week}/players.json`);
+            if (!players) { week = cur; players = await req('GET', `/leagues/${LEAGUE_ID}/salaries/${season}/week${week}/players.json`); }
+            if (!players) { alert('notice', 'Injury refresh: no open sheet', `No salary sheet for week ${cur + 1} or ${cur}.`); return; }
+
+            const sl = await getJSON('https://api.sleeper.app/v1/players/nfl');
+            const patch = {}, changes = [];
+            Object.entries(players).forEach(([id, p]) => {
+              if (!p || p.pos === 'DEF' || !sl[id]) return;   // defenses and Tank01-only ids have no Sleeper status
+              const live = sl[id].injury_status || null;
+              const curS = (p.status && p.status !== 'Active') ? p.status : null;
+              if (live === curS) return;
+              patch[`${id}/status`] = live;
+              changes.push(`${p.name} ${p.pos} ${p.team}: ${curS || 'healthy'} → ${live || 'healthy'}`);
+            });
+            if (Object.keys(patch).length) await req('PATCH', `/leagues/${LEAGUE_ID}/salaries/${season}/week${week}/players.json`, patch);
+            alert('notice', `Week ${week}: ${changes.length} injury tag change(s)`, changes.slice(0, 120).join('\n') || 'no changes');
+
+            const statusOf = id => (patch[`${id}/status`] !== undefined ? patch[`${id}/status`] : (players[id] || {}).status);
+            const lineups = await req('GET', `/leagues/${LEAGUE_ID}/lineups/${season}/week${week}.json`) || {};
+            const locks = await req('GET', `/leagues/${LEAGUE_ID}/locks/${season}/week${week}.json`) || {};
+            const affected = [];
+            Object.values(lineups).forEach(l => Object.values((l && l.slots) || {}).forEach(p => {
+              if (p && isOutStatus(statusOf(String(p.id))) && !locks[p.team]) affected.push(`${l.team}: ${p.name} (${p.team}) — ${statusOf(String(p.id))}`);
+            }));
+            alert(affected.length ? 'warning' : 'notice', `Week ${week}: ${affected.length} lineup slot(s) with a player ruled Out (game not started)`, affected.join('\n') || 'none');
+          })().catch(e => { alert('error', 'Injury refresh failed', (e && e.stack) || String(e)); process.exit(1); });
+          SCRIPT

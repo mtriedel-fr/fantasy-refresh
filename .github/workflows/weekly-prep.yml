@@ -456,8 +456,7 @@ jobs:
               if (!POSITIONS[p.pos]) return;
               const poolP = poolPlayers ? poolPlayers[p.id] : null; // exact id match
               if (!poolP) return;                                   // must be a real pooled player
-              const inj = poolP.status || null;
-              if (isUnavailable(inj)) return;
+              const inj = poolP.status || null;                     // projected → priced even if tagged IR/Out
               const conf = POSITIONS[p.pos];
               const mult = multByPos[p.pos] || 0;
               let sal = Math.ceil((Math.pow(p.proj, conf.exp) * mult) / SAL_ROUND) * SAL_ROUND;
@@ -539,7 +538,7 @@ jobs:
               const poolP = nameMap[normalizeNameForMatch(p.name)];
               const pid = poolP ? poolP.id : ('t01_' + p.id);
               const inj = poolP ? (poolP.status || p.status || null) : (p.status || null);
-              if (isUnavailable(inj)) return;
+              // Projected players are priced even if tagged IR/Out — tag kept.
               const conf = POSITIONS[p.pos];
               const mult = multByPos[p.pos] || 0;
               let sal = Math.ceil((Math.pow(p.proj, conf.exp) * mult) / SAL_ROUND) * SAL_ROUND;
