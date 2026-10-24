@@ -1,0 +1,57 @@
+name: Hunter Henry check (read-only)
+on:
+  push:
+    branches: [audit/draft-check]
+    paths: ['.github/workflows/henry-check.yml']
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Who has Hunter Henry in Week 7, when submitted, what scored
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB = process.env.FIREBASE_DB_URL, T = process.env.FIREBASE_AUTH_TOKEN;
+          const get = p => new Promise((res, rej) => https.get(`${FB}${p}${p.includes('?') ? '&' : '?'}auth=${T}`, r => { let d = ''; r.on('data', c => d += c); r.on('end', () => { try { res(JSON.parse(d)); } catch (e) { rej(e); } }); }).on('error', rej));
+          const esc = s => String(s).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+          const ann = (l, t, m) => console.log(`::${l} title=${esc(t).replace(/:/g,'%3A').replace(/,/g,'%2C')}::${esc(m)}`);
+          const ct = ms => ms ? new Date(ms).toLocaleString('en-US', { timeZone: 'America/Chicago', weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) + ' CT' : '—';
+          (async () => {
+            const L = '/leagues/fr_refresh26', WK = 7, S = 2026;
+            const sched = await get(`/nflSchedule/${S}/Regular.json`);
+            const games = (sched && sched.weeks && sched.weeks['week' + WK]) || [];
+            const ne = games.find(g => g.home === 'NE' || g.away === 'NE');
+            const kick = ne ? new Date(ne.time).getTime() : null;
+            const lineups = await get(`${L}/lineups/${S}/week${WK}.json`) || {};
+            const scores = await get(`${L}/season/${S}/${WK}.json`) || {};
+            const rows = [];
+            Object.entries(lineups).forEach(([uid, l]) => {
+              if (!l || !l.slots) return;
+              Object.entries(l.slots).forEach(([sid, p]) => {
+                if (!p || !/hunter henry/i.test(p.name || '')) return;
+                const sc = scores[uid] || {};
+                rows.push(`${l.team || uid} · slot ${sid} · submitted ${ct(l.submitted)}${kick && l.submitted > kick ? ' (AFTER kickoff)' : ' (before kickoff)'} · Henry pts ${sc.slotPts ? sc.slotPts[sid] : '—'} · team total ${sc.score} · locked ${!!sc.locked}`);
+              });
+            });
+            // What Henry actually scored: per-game detailed stats written by auto-scoring
+            let henry = 'not found';
+            try {
+              const gs = await get(`/gameStats/${S}.json?shallow=true`);
+              const keys = Object.keys(gs || {});
+              for (const k of keys) {
+                const g = await get(`/gameStats/${S}/${k}.json`);
+                const arr = (g && (g.players || g.stats || g)) || [];
+                const list = Array.isArray(arr) ? arr : Object.values(arr);
+                const h = list.find(x => x && /hunter henry/i.test(x.name || ''));
+                if (h) { henry = `${k}: ${h.pts} pts · ${JSON.stringify(h.breakdown || '').slice(0, 300)}`; if (/NE|CHI/.test(k) || true) break; }
+              }
+              henry = `gameStats keys: ${keys.slice(-6).join(', ')} → ${henry}`;
+            } catch (e) { henry = 'gameStats read failed: ' + e.message; }
+            ann('notice', 'NE game', ne ? `${ne.away} @ ${ne.home} kickoff ${ct(kick)}` : 'NE not found in week 7 schedule');
+            ann('notice', `Week ${WK}: ${rows.length} lineup(s) with Hunter Henry`, rows.join('\n') || 'none');
+            ann('notice', 'Hunter Henry actual stats', henry);
+          })().catch(e => { ann('error', 'Check failed', e.stack || String(e)); process.exit(1); });
+          SCRIPT
