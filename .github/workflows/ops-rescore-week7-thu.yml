@@ -1,0 +1,61 @@
+name: One-off - rescore Week 7 Thursday (NE @ CHI)
+
+# Commissioner-requested (Oct 24 2026): re-score Thursday Oct 22's game for
+# Week 7 so Brad's Team gets Hunter Henry's points (their lineup was saved
+# Friday morning, after the only scoring runs for that game). Runs the exact
+# production scoring script from auto-scoring.yml on main, with the same
+# inputs the Actions "Run workflow" form would use: week=7, game_date=
+# 20261022, league=fr_refresh26. Players in other games keep their scores.
+on:
+  push:
+    branches: [ops/rescore-week7-thursday]
+
+jobs:
+  rescore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: main }
+      - name: Extract production scoring script
+        run: |
+          python3 - << 'PY'
+          import re
+          src = open('.github/workflows/auto-scoring.yml').read()
+          m = re.search(r"node\s*<<\s*'SCRIPT'\n(.*?)\n[ \t]*SCRIPT\b", src, re.S)
+          lines = m.group(1).split('\n')
+          ind = min(len(l) - len(l.lstrip()) for l in lines if l.strip())
+          open('/tmp/score.js', 'w').write('\n'.join(l[ind:] for l in lines))
+          PY
+      - name: Re-score Thursday Oct 22 for Week 7
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+          TANK01_KEY: ${{ secrets.TANK01_KEY }}
+          FR_SEASON: "2026"
+          MANUAL_WEEK: "7"
+          MANUAL_SEASON_TYPE: ""
+          LOCK_SCORES: "false"
+          MANUAL_LEAGUE: "fr_refresh26"
+          MANUAL_GAME_DATE: "20261022"
+          GUILLOTINE_RECOMPUTE_WEEK: ""
+          GITHUB_EVENT_NAME: "workflow_dispatch"
+        run: node /tmp/score.js
+      - name: Verify Hunter Henry points per lineup
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB = process.env.FIREBASE_DB_URL, T = process.env.FIREBASE_AUTH_TOKEN;
+          const get = p => new Promise((res, rej) => https.get(`${FB}${p}?auth=${T}`, r => { let d = ''; r.on('data', c => d += c); r.on('end', () => { try { res(JSON.parse(d)); } catch (e) { rej(e); } }); }).on('error', rej));
+          (async () => {
+            const lineups = await get('/leagues/fr_refresh26/lineups/2026/week7') || {};
+            const scores = await get('/leagues/fr_refresh26/season/2026/7') || {};
+            const out = [];
+            Object.entries(lineups).forEach(([uid, l]) => Object.entries((l && l.slots) || {}).forEach(([sid, p]) => {
+              if (p && /hunter henry/i.test(p.name || '')) out.push(`${l.team}: Henry ${scores[uid] && scores[uid].slotPts ? scores[uid].slotPts[sid] : '—'} · total ${scores[uid] ? scores[uid].score : '—'}`);
+            }));
+            console.log(`::notice title=After rescore::${out.join('%0A')}`);
+          })();
+          SCRIPT
