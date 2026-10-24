@@ -750,20 +750,43 @@ function showComingSoon(){
   document.body.appendChild(div);
 }
 
+function setGreeting(name){
+  name = (name || '').trim();
+  var greet = document.getElementById('greeting-name');
+  if (greet) {
+    greet.textContent = name ? name : 'My';
+    var span = document.createElement('span');
+    span.textContent = name ? '\'s Leagues' : ' Leagues';
+    greet.appendChild(span);
+  }
+  var label = name || (user && user.teamName) || 'My account';
+  var nameEl = document.getElementById('hdr-name');
+  var avatarEl = document.getElementById('hdr-avatar');
+  if (nameEl) nameEl.textContent = label;
+  if (avatarEl) avatarEl.textContent = label.charAt(0).toUpperCase();
+}
+
 // ── LOAD LEAGUES ─────────────────────────────────────────────────
 function loadLeagues() {
   if (!user) return;
 
   var uid         = user.uid;
-  var displayName = user.displayName || user.email || 'Coach';
-
-  // Update greeting and header
-  var greet = document.getElementById('greeting-name');
-  if (greet) greet.innerHTML = displayName + '<span>\'s Leagues</span>';
-  var nameEl = document.getElementById('hdr-name');
-  var avatarEl = document.getElementById('hdr-avatar');
-  if (nameEl) nameEl.textContent = displayName;
-  if (avatarEl) avatarEl.textContent = displayName.charAt(0).toUpperCase();
+  // Greeting uses the person's display name; with none saved it reads
+  // "My Leagues" — never the email address. The name is re-read from the
+  // member record so a newly set name shows without signing out and in.
+  setGreeting(user.displayName);
+  fetch(FB_DB_URL + '/leagues/fr_refresh26/members/' + uid + '/displayName.json')
+    .then(function(r){ return r.json(); })
+    .then(function(name){
+      if (typeof name === 'string' && name.trim() && name !== user.displayName) {
+        user.displayName = name.trim();
+        try {
+          var key = Object.keys(localStorage).find(function(k){ var v = localStorage.getItem(k); return v && v.indexOf('"uid":"' + uid + '"') >= 0 && v.indexOf('"displayName"') >= 0; });
+          if (key) { var u = JSON.parse(localStorage.getItem(key)); u.displayName = user.displayName; localStorage.setItem(key, JSON.stringify(u)); }
+        } catch(e) {}
+        setGreeting(user.displayName);
+      }
+    }).catch(function(){});
 
   // Collect league IDs to check
   var leagueIds = ['fr_refresh26'];

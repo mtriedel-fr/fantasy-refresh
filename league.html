@@ -932,7 +932,13 @@ body{padding-bottom:calc(76px + env(safe-area-inset-bottom));}
 .cl-notecard .ns{font-size:13px;color:var(--ink2);line-height:1.5;max-width:40ch;margin:0 auto;}
 .cl-notecard .kick{margin-top:14px;display:inline-block;font-family:var(--fd);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:#FF9A3A;border:1px solid rgba(255,154,58,.4);border-radius:20px;padding:4px 11px;}
 .guill-hero{background:linear-gradient(135deg,var(--hdr) 0%,var(--hdr2) 100%);border-radius:14px;padding:20px 24px;border-top:3px solid var(--or);border-bottom:3px solid var(--pk);display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1px;background-blend-mode:normal;}
-.guill-stat{background:rgba(0,0,0,.3);padding:14px 16px;text-align:center;border-radius:8px;}
+.guill-stat{background:rgba(0,0,0,.3);padding:14px 16px;text-align:center;border-radius:8px;min-width:0;}
+/* Two-tile stat bars (weekly + Last One Standing) — the shared .stats grid is
+   4 columns, which left two empty teal cells on desktop. */
+#stats-weekly, #stats-guillotine .stats{grid-template-columns:repeat(2,1fr) !important;}
+/* Last One Standing hero: 4 tiles overflowed phone screens (Weeks Left cut off). */
+.guill-hero{grid-template-columns:repeat(4,minmax(0,1fr)) !important;}
+@media (max-width:560px){ .guill-hero{grid-template-columns:repeat(2,minmax(0,1fr)) !important;padding:14px !important;gap:8px !important;} }
 .guill-stat-lbl{font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;min-height:26px;display:flex;align-items:flex-end;justify-content:center;line-height:1.3;}
 .guill-stat-val{font-family:var(--fd);font-size:28px;font-weight:800;color:var(--or);}
 .guill-stat-sub{font-family:var(--fd);font-size:11px;color:var(--ink3);margin-top:2px;}
@@ -7998,6 +8004,12 @@ function renderMySeasonInline(){
 // same view for another team. Returns a self-contained HTML string, with its
 // own empty state when the team has no imported scores yet. Single source of
 // truth: renderMySeasonInline() delegates here for the viewer's own team.
+// A week is in progress while any of its score entries is still 'live'
+// and not yet locked (auto-scoring marks them final/locked when done).
+function isWeekInProgress(w){
+  return (seasonData[String(w)] || []).some(function(e){ return e && e.status === 'live' && !e.locked; });
+}
+
 function buildTeamSeasonHtml(displayName, isYou){
   var resolvedName = resolveTeamName(displayName);
   if(!resolvedName){
@@ -8007,9 +8019,16 @@ function buildTeamSeasonHtml(displayName, isYou){
   }
   var weekData = getPlayerWeekData(resolvedName);
   var scores = weekData.map(function(d){ return d.score; });
-  var total = scores.reduce(function(a,b){ return a+b; }, 0);
-  var avg = scores.length ? total / scores.length : 0;
-  var best = scores.length ? Math.max.apply(null, scores) : 0;
+  var total = scores.reduce(function(a,b){ return a+b; }, 0);   // matches the Season standings (includes the live week)
+  // The week still being played isn't a real data point yet — leaving it
+  // in made every team's chart plunge at the end and dragged the weekly
+  // average down mid-week. Charts, average and best week use finished
+  // weeks only; the week-by-week table still shows the live week, marked.
+  var doneData = weekData.filter(function(d){ return !isWeekInProgress(d.week); });
+  if(!doneData.length) doneData = weekData;
+  var doneScores = doneData.map(function(d){ return d.score; });
+  var avg = doneScores.length ? doneScores.reduce(function(a,b){ return a+b; }, 0) / doneScores.length : 0;
+  var best = doneScores.length ? Math.max.apply(null, doneScores) : 0;
   var weeks = Object.keys(seasonData).filter(function(k){
     return !isNaN(Number(k)) && seasonData[k] && seasonData[k].length > 0;
   }).map(Number).sort(function(a,b){ return a-b; });
@@ -8031,12 +8050,12 @@ function buildTeamSeasonHtml(displayName, isYou){
   var sznIdx = seasonSorted.findIndex(function(t){ return teamUid ? t.uid === teamUid : teamMatch(t.name, resolvedName); });
   var sznRank = sznIdx >= 0 ? sznIdx + 1 : (Object.keys(allTotals).sort(function(a,b){ return allTotals[b]-allTotals[a]; }).indexOf(resolvedName) + 1);
 
-  var scoreChart = buildScoreChartInline(weekData);
-  var rankChart = buildRankChartInline(weekData);
+  var scoreChart = buildScoreChartInline(doneData);
+  var rankChart = buildRankChartInline(doneData);
 
   var tableRows = weekData.slice().reverse().map(function(d){
     return '<tr>'
-      + '<td class="wk-num">Week ' + d.week + '</td>'
+      + '<td class="wk-num">Week ' + d.week + (isWeekInProgress(d.week) ? ' <span style="color:#FF9A3A;font-size:11px;">· live</span>' : '') + '</td>'
       + '<td style="font-family:var(--fd);font-weight:700;font-size:15px;color:var(--or);text-align:right">' + fmtScore(d.score) + '</td>'
       + '<td style="text-align:center;font-family:var(--fd);font-size:14px;color:var(--pk)">#' + d.rank + ' / ' + d.total + '</td>'
       + '<td style="text-align:center;font-family:var(--fd);font-size:14px;color:var(--pu)">#' + d.cumStanding + '</td>'
