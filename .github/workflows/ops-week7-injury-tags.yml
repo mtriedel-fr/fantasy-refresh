@@ -1,0 +1,54 @@
+name: One-off - Week 7 injury tags
+
+# Commissioner-requested (Oct 24 2026): refresh the injury tag (`status`) on
+# every player in the open Week 7 sheet from live Sleeper data. Changes ONLY
+# the status field — no prices, nobody added or removed. Prints every change
+# and which saved lineups contain a player now tagged Out/IR.
+on:
+  push:
+    branches: [ops/week7-injury-tags]
+
+jobs:
+  tags:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Refresh injury tags
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB = process.env.FIREBASE_DB_URL, T = process.env.FIREBASE_AUTH_TOKEN;
+          const SHEET = '/leagues/fr_refresh26/salaries/2026/week7';
+          const req = (method, p, body) => new Promise((res, rej) => {
+            const u = new URL(`${FB}${p}${p.includes('?') ? '&' : '?'}auth=${T}`); const data = body === undefined ? null : JSON.stringify(body);
+            const r = https.request({ hostname: u.hostname, path: u.pathname + u.search, method, headers: data ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) } : {} }, rs => {
+              let d = ''; rs.on('data', c => d += c); rs.on('end', () => rs.statusCode < 300 ? res(d ? JSON.parse(d) : null) : rej(new Error(`${method} ${p} HTTP ${rs.statusCode} ${d.slice(0,150)}`)));
+            }); r.on('error', rej); if (data) r.write(data); r.end();
+          });
+          const getJSON = u => new Promise((res, rej) => https.get(u, r => { let d = ''; r.on('data', c => d += c); r.on('end', () => { try { res(JSON.parse(d)); } catch (e) { rej(e); } }); }).on('error', rej));
+          const esc = s => String(s).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+          const ann = (l, t, m) => console.log(`::${l} title=${esc(t).replace(/:/g,'%3A').replace(/,/g,'%2C')}::${esc(m)}`);
+          const OUT = /^(o$|out|ir|pup|sus)/i;
+          (async () => {
+            const players = await req('GET', `${SHEET}/players.json`) || {};
+            const sl = await getJSON('https://api.sleeper.app/v1/players/nfl');
+            const patch = {}, changes = [];
+            Object.entries(players).forEach(([id, p]) => {
+              if (!p || p.pos === 'DEF' || !sl[id]) return;               // Tank01-only ids / defenses: no Sleeper status
+              const live = sl[id].injury_status || null;
+              const cur = (p.status && p.status !== 'Active') ? p.status : null;
+              if (live === cur) return;
+              patch[`${id}/status`] = live;
+              changes.push(`${p.name} ${p.pos} ${p.team}: ${cur || 'healthy'} → ${live || 'healthy'}`);
+            });
+            if (Object.keys(patch).length) await req('PATCH', `${SHEET}/players.json`, patch);
+            const lineups = await req('GET', '/leagues/fr_refresh26/lineups/2026/week7.json') || {};
+            const outIds = new Set(Object.entries(players).filter(([id, p]) => OUT.test((patch[`${id}/status`] !== undefined ? patch[`${id}/status`] : p.status) || '')).map(([id]) => id));
+            const affected = [];
+            Object.values(lineups).forEach(l => Object.values((l && l.slots) || {}).forEach(p => { if (p && outIds.has(String(p.id))) affected.push(`${l.team}: ${p.name} (${p.team})`); }));
+            ann('notice', `Week 7 injury tags updated: ${changes.length}`, changes.join('\n') || 'no changes');
+            ann(affected.length ? 'warning' : 'notice', `Saved lineups with an Out/IR player: ${affected.length}`, affected.join('\n') || 'none');
+          })().catch(e => { ann('error', 'Failed', e.stack || String(e)); process.exit(1); });
+          SCRIPT
