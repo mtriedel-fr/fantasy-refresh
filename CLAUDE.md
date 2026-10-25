@@ -69,6 +69,12 @@ locks/salaries, salary dry runs, Sleeper probes, migrations).
   on a team). Backup QBs must be on Tank01's current player list (`tank01PlayerID`).
 - **Sleeper injury statuses are words** ("Out", "IR", "PUP", "Sus") — use `isUnavailable()`,
   never compare to `'O'`.
+- **Injury tags (Oct 24, 2026):** projected players are priced *with* their tag (IR, Out,
+  Doubtful…) rather than dropped; only players off a roster are excluded, and backup QBs
+  (no projection) still exclude unavailable ones. `injury-status-refresh.yml` updates only
+  the `status` field on the open week's sheet daily (+ Sunday morning). The draft page
+  blocks only Out/Suspended (`isOutStatus`), shows tags (`injTag`), and warns teams with an
+  Out player in their lineup.
 - **The stored player pool is up to a week stale** when salaries are built; the 7am job
   reads live Sleeper status for that reason.
 - **Box scores can contain an empty duplicate row** for a player, and Tank01/Sleeper numeric

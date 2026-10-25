@@ -140,6 +140,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
 .p-inj{font-family:var(--fd);font-size:10px;font-weight:800;padding:1px 5px;border-radius:4px;text-transform:uppercase;margin-left:4px;}
 .inj-Q{background:rgba(255,154,58,.2);color:#FF9A3A;}
 .inj-D,.inj-O{background:rgba(255,95,160,.2);color:var(--pk);}
+.inj-IR{background:rgba(155,109,255,.2);color:var(--pu);}
 .p-proj{font-family:var(--fd);font-size:11px;color:var(--ink3);text-align:right;min-width:36px;}
 .p-sal{font-family:var(--fd);font-size:17px;font-weight:800;color:var(--ink2);text-align:right;min-width:68px;}
 .p-mcol{flex-shrink:0;width:38px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:2px;}
@@ -1461,14 +1462,13 @@ function renderGamePreviewPickable(game){
 
   function playerRow(p){
     var isIn2 = !!inLineup[p.id];
-    var isOut = p.status === 'O' || p.status === 'IR';
+    var isOut = isOutStatus(p.status);
     var locked2 = isStartedUnsubmitted(p);
     var currentOccupantSalary = (activeSlot && lineup[activeSlot]) ? (lineup[activeSlot].salary || 0) : 0;
     var spentExRepl = getSpent() - currentOccupantSalary;
     var wouldOvr2 = !isIn2 && (spentExRepl + p.salary > CAP);
     var disabled2 = isOut || locked2 || wouldOvr2;
-    var injBadge = (p.status && p.status !== 'Active')
-      ? '<span class="p-inj inj-'+p.status+'">'+p.status+'</span>' : '';
+    var injBadge = injTag(p.status);
     var draftLbl2 = isIn2 ? '✓ Drafted' : locked2 ? '🔒 Locked' : wouldOvr2 ? 'Over Cap' : '+ Draft';
     var draftCls2 = 'draft-btn' + (isIn2 || locked2 ? ' drafted' : '') + (wouldOvr2 ? ' overcap' : '');
     var cls = 'player-row'+(isIn2?' selected':'')+(disabled2?' disabled':'');
@@ -1596,7 +1596,7 @@ function pickFromPreview(playerId){
 
   var p = allPlayers.find(function(x){ return x.id === playerId; });
   if(!p) return;
-  if(p.status === 'O' || p.status === 'IR'){ showToast(p.name+' is out', true); return; }
+  if(isOutStatus(p.status)){ showToast(p.name+' is ruled out', true); return; }
   if(isStartedUnsubmitted(p)){ showToast(p.name+'\'s game has started 🔒', true); return; }
 
   // If a slot is already active (selected before opening the game view),
@@ -1727,7 +1727,7 @@ function restoreDraftLocal(){
     if(lineup[s.id]) return;                       // keep any submitted pick
     var p = obj.slots[s.id];
     if(!p || !p.id) return;
-    if(p.status === 'O' || p.status === 'IR') return;
+    if(isOutStatus(p.status)) return;
     if(isStartedUnsubmitted(p)) return;            // game started and not in the submitted lineup
     lineup[s.id] = p;
     restored++;
@@ -1777,9 +1777,10 @@ function repriceLineup(){
     var lp = lineup[sid];
     if(!lp || !lp.id) return;
     var cur = byId[lp.id];
-    if(cur && (cur.salary !== lp.salary || cur.proj !== lp.proj)){
+    if(cur && (cur.salary !== lp.salary || cur.proj !== lp.proj || (cur.status || null) !== (lp.status || null))){
       lp.salary = cur.salary;
       lp.proj   = cur.proj;
+      lp.status = cur.status || null;
       changed = true;
     }
   });
@@ -1838,7 +1839,7 @@ function renderRoster(){
       // (.slot-mid), so the date lines up directly under the name instead
       // of starting at the card's left edge under the badge.
       html += '<div class="slot-mid">';
-      html +=   '<div class="slot-player-name">'+p.name+(p.pos?' · '+p.pos:'')+teamTag+'</div>';
+      html +=   '<div class="slot-player-name">'+p.name+(p.pos?' · '+p.pos:'')+teamTag+injTag(p.status)+'</div>';
       if(gameLine) html += '<div class="slot-player-game">'+gameLine+'</div>';
       html += '</div>';
 
@@ -2061,7 +2062,7 @@ function renderPicker(){
   players.forEach(function(p){
     var isSelected = inLineup[p.id] === activeSlot;
     var isElsewhere= inLineup[p.id] && inLineup[p.id] !== activeSlot;
-    var isOut      = p.status === 'O' || p.status === 'IR';
+    var isOut      = isOutStatus(p.status);
     // If we're replacing whoever's currently in the active slot, their
     // salary comes back out of the budget first — otherwise it's double
     // counted and players that are actually affordable look like they're not.
@@ -2070,8 +2071,7 @@ function renderPicker(){
     var wouldOvr   = !isSelected && (spent + p.salary > CAP);
     var locked     = isStartedUnsubmitted(p);
     var disabled   = isOut || locked || (wouldOvr && !isSelected);
-    var injBadge   = (p.status && p.status !== 'Active')
-      ? '<span class="p-inj inj-'+p.status+'">'+p.status+'</span>' : '';
+    var injBadge   = injTag(p.status);
     var draftLabel = isSelected ? '✓ Drafted' : locked ? '🔒 Locked' : wouldOvr ? 'Over Cap' : '+ Draft';
     var draftCls   = 'draft-btn' + (isSelected || locked ? ' drafted' : '') + (wouldOvr ? ' overcap' : '');
     var rowCls     = 'player-row'+(isSelected?' selected':'')+(disabled?' disabled':'');
@@ -2174,7 +2174,7 @@ function pickPlayer(playerId){
 
   var p = allPlayers.find(function(x){ return x.id === playerId; });
   if(!p) return;
-  if(p.status === 'O' || p.status === 'IR'){ showToast(p.name+' is out', true); return; }
+  if(isOutStatus(p.status)){ showToast(p.name+' is ruled out', true); return; }
   if(isStartedUnsubmitted(p)){ showToast(p.name+'\'s game has started 🔒', true); return; }
 
   // No slot pre-selected — tapping a slot is now an optional filter, not a
@@ -2428,6 +2428,11 @@ function updateSubmitBtn(){
     msg.textContent='$'+(CAP-spent).toLocaleString()+' remaining · ' + (hasPrior ? 'Unsaved changes — tap Update to save' : 'Ready to submit');
     msg.className='submit-msg ok';
   }
+  var outs = Object.values(lineup).filter(function(p){ return p && isOutStatus(p.status); }).map(function(p){ return p.name; });
+  if(outs.length && filled > 0){
+    msg.textContent = '⚠️ ' + outs.join(', ') + (outs.length === 1 ? ' is' : ' are') + ' ruled OUT · ' + msg.textContent;
+    msg.className = 'submit-msg err';
+  }
 }
 
 // ── SUBMIT ─────────────────────────────────────────────────────
@@ -2631,6 +2636,17 @@ function loadLocks(){
     .catch(function(){ teamLocks = {}; });
 }
 
+// Injury tags come from Sleeper as words ("Out", "IR", "Questionable",
+// "Doubtful", "PUP", "Sus"). Only Out / Suspended block drafting; IR, PUP,
+// Doubtful and Questionable players are draftable and just carry a tag.
+function isOutStatus(s){ return !!s && /^(o|out|sus|suspended)$/i.test(String(s).trim()); }
+function injTag(s){
+  if(!s || s === 'Active') return '';
+  var t = String(s).trim();
+  var label = { Questionable:'Q', Doubtful:'D', Out:'OUT', O:'OUT', Sus:'SUS', Suspended:'SUS' }[t] || t.toUpperCase();
+  var cls = isOutStatus(t) ? 'inj-O' : /^d/i.test(t) ? 'inj-D' : /^q/i.test(t) ? 'inj-Q' : 'inj-IR';
+  return '<span class="p-inj '+cls+'">'+label+'</span>';
+}
 function isPlayerLocked(player){
   return !!(player && player.team && teamLocks[normTeam(player.team)]);
 }

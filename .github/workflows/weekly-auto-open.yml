@@ -329,11 +329,13 @@ jobs:
               console.log(`  Live Sleeper data loaded (${Object.keys(live).length} players)`);
             } catch (e) { console.log(`  Live Sleeper data unavailable (${e.message}) — using stored pool statuses`); }
             const liveFor = poolP => (live && poolP && live[poolP.id]) || null;
-            const liveOut = poolP => {
+            // Off a roster entirely (released, retired, inactive) — never priced.
+            const liveGone = poolP => {
               const L = liveFor(poolP);
               if (!L) return false;
-              return !L.active || !L.team || (L.status && /inactive|retired/i.test(L.status)) || isUnavailable(L.injury_status);
+              return !L.active || !L.team || (L.status && /inactive|retired/i.test(L.status));
             };
+            const liveOut = poolP => liveGone(poolP) || (!!liveFor(poolP) && isUnavailable(liveFor(poolP).injury_status));
             const nameMap = {};
             if (pool) Object.values(pool).forEach(p => { if (p && p.name) nameMap[normalizeNameForMatch(p.name)] = p; });
 
@@ -386,7 +388,10 @@ jobs:
               const pid = poolP ? poolP.id : (p.sleeperId || ('t01_' + p.id));
               const liveP = liveFor(poolP);
               const inj = liveP ? (liveP.injury_status || null) : (poolP ? (poolP.status || p.status || null) : (p.status || null));
-              if (isUnavailable(inj) || liveOut(poolP)) return;
+              // A player with a real projection is priced even if tagged
+              // IR/Out/Doubtful — the tag goes on the sheet, the daily injury
+              // refresh keeps it current, and the draft page blocks only Out.
+              if (liveGone(poolP)) return;
               const conf = POSITIONS[p.pos];
               const mult = multByPos[p.pos] || 0;
               let sal = Math.ceil((Math.pow(p.proj, conf.exp) * mult) / SAL_ROUND) * SAL_ROUND;
