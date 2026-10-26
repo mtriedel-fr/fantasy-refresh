@@ -95,8 +95,11 @@ locks/salaries, salary dry runs, Sleeper probes, migrations).
   open-week lineup players tagged Out/IR/Doubtful/Questionable whose game hasn't started,
   using the sheet's current tags; shown once per device per week unless the list changes.
 - **Dues pop-up** (`js/dues-alert.js`, on home/league/draft): unpaid members (not
-  commissioners) see the entry fee + `settings.duesMessage`. "I've paid" writes
-  `members/{uid}/duesClaimedAt` (trackers show "Says paid"/"Pending"); "Remind me later"
+  commissioners) see the entry fee + `settings.duesMessage`. "I've paid" asks method
+  (Venmo/PayPal/Cash/Other), date paid and optional payer name/handle (`buildClaim`), then
+  writes `members/{uid}/duesClaimedAt` + `duesClaim {method, paidOn, from}` (commissioner
+  tracker shows "Says paid · Venmo · Oct 20 · from @x", claims sorted first; public tab
+  shows "Pending"); "Remind me later"
   snoozes for the day on that device. Marking Unpaid or "not received" clears the claim.
   `settings.duesReminder === false` turns it off. Members can write their own record, so a
   claim is only a claim — `duesPaid` is the commissioner's call.

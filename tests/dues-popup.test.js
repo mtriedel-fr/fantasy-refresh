@@ -54,5 +54,24 @@ test('trackers show the claim and clearing it re-prompts', () => {
   const s = fs.readFileSync(path.join(ROOT, 'league.html'), 'utf8');
   assert.ok(s.includes('Says paid · '));
   assert.ok(s.includes('function clearDuesClaim(uid)'));
-  assert.ok(/duesPaid: false, duesClaimedAt: null/.test(s));
+  assert.ok(s.includes('duesPaid: false, duesClaimedAt: null, duesClaim: null'));
+  assert.ok(s.includes('{ duesClaimedAt: null, duesClaim: null }'));
+});
+
+test('"I\'ve paid" asks how and when, and checks the answers', () => {
+  const { buildClaim } = ctx.FRDuesAlert;
+  const ok = buildClaim({ method: 'Venmo', paidOn: '2026-10-20', from: '  @py-smith ' }, NOW);
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(ok.claim)), { method: 'Venmo', paidOn: '2026-10-20', from: '@py-smith' });
+  assert.ok(!('from' in buildClaim({ method: 'Cash', paidOn: '2026-10-26' }, NOW).claim));
+  assert.match(buildClaim({ paidOn: '2026-10-20' }, NOW).error, /how you paid/);
+  assert.match(buildClaim({ method: 'Bitcoin', paidOn: '2026-10-20' }, NOW).error, /how you paid/);
+  assert.match(buildClaim({ method: 'Venmo', paidOn: '' }, NOW).error, /date/);
+  assert.match(buildClaim({ method: 'Venmo', paidOn: '2026-10-27' }, NOW).error, /future/);
+});
+
+test('commissioner tracker reads the claim as "Venmo · Oct 20 · from @handle"', () => {
+  const { read, fn } = require('./extract.js');
+  const duesClaimText = new Function(fn(read('league.html'), 'duesClaimText') + '; return duesClaimText;')();
+  assert.strictEqual(duesClaimText({ method: 'Venmo', paidOn: '2026-10-20', from: '@py' }, 1), 'Venmo · Oct 20 · from @py');
+  assert.strictEqual(duesClaimText({ method: 'Cash', paidOn: '2026-10-05' }, 1), 'Cash · Oct 5');
 });

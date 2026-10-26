@@ -7663,8 +7663,11 @@ function renderCommDues(){
     members = members || {};
     var list = Object.keys(members).map(function(uid){
       var m = members[uid] || {};
-      return { uid: uid, teamName: m.teamName || '(no team name)', email: m.email || '', paid: !!m.duesPaid, claimedAt: m.duesPaid ? 0 : (m.duesClaimedAt || 0) };
-    }).sort(function(a, b){ return a.teamName.localeCompare(b.teamName); });
+      return { uid: uid, teamName: m.teamName || '(no team name)', email: m.email || '', paid: !!m.duesPaid, claimedAt: m.duesPaid ? 0 : (m.duesClaimedAt || 0), claim: m.duesClaim || null };
+    }).sort(function(a, b){
+      // "Says paid" first — those are the ones waiting on the commissioner.
+      return ((b.claimedAt ? 1 : 0) - (a.claimedAt ? 1 : 0)) || a.teamName.localeCompare(b.teamName);
+    });
 
     if(!list.length){ el.innerHTML = '<div style="color:var(--ink3);font-size:12px;">No members found.</div>'; return; }
 
@@ -7673,7 +7676,7 @@ function renderCommDues(){
         + '<div>'
         + '<div style="font-family:var(--fd);font-size:13px;color:var(--ink);">' + escapeHtmlFR(m.teamName) + '</div>'
         + (m.email ? '<div style="font-family:var(--fd);font-size:11px;color:var(--ink3);">' + escapeHtmlFR(m.email) + '</div>' : '')
-        + (m.claimedAt ? '<div style="font-family:var(--fd);font-size:11px;font-weight:800;color:#B26A00;">Says paid · ' + new Date(m.claimedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        + (m.claimedAt ? '<div style="font-family:var(--fd);font-size:11px;font-weight:800;color:#B26A00;">Says paid · ' + escapeHtmlFR(duesClaimText(m.claim, m.claimedAt))
             + ' <a href="#" onclick="clearDuesClaim(\'' + m.uid + '\');return false;" style="color:var(--ink3);font-weight:600;margin-left:4px;">not received</a></div>' : '')
         + '</div>'
         + '<button onclick="toggleDuesPaid(\'' + m.uid + '\',' + (!m.paid) + ')" style="font-family:var(--fd);font-size:11px;font-weight:800;border-radius:14px;padding:5px 14px;cursor:pointer;border:none;flex-shrink:0;'
@@ -7693,12 +7696,22 @@ function setDuesReminder(on){
   }).catch(function(){ showToast('Failed to update — try again', true); });
 }
 
+// "Venmo · Oct 20 · from @handle" — what the member told us in the dues pop-up.
+function duesClaimText(claim, claimedAt){
+  var day = function(d){ return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); };
+  if(!claim || !claim.method) return claimedAt ? day(new Date(claimedAt)) : '';
+  var parts = [claim.method];
+  if(claim.paidOn){ var p = claim.paidOn.split('-'); parts.push(day(new Date(+p[0], +p[1] - 1, +p[2]))); }
+  if(claim.from) parts.push('from ' + claim.from);
+  return parts.join(' · ');
+}
+
 // A member tapped "I've paid" in the dues pop-up but the money never arrived:
 // clear their claim so the pop-up asks them again.
 function clearDuesClaim(uid){
   var ctx = FRAuth.getLeagueCtx();
   var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
-  FR.fb.put('/leagues/' + leagueId + '/members/' + uid + '/duesClaimedAt', null).then(function(){
+  FR.fb.patch('/leagues/' + leagueId + '/members/' + uid, { duesClaimedAt: null, duesClaim: null }).then(function(){
     renderCommDues();
     if(document.getElementById('tab-dues') && !document.getElementById('tab-dues').classList.contains('hidden')) renderDues();
   }).catch(function(){ showToast('Failed to update — try again', true); });
@@ -7711,7 +7724,7 @@ function toggleDuesPaid(uid, newValue){
   // dues pop-up starts asking them again.
   var write = newValue
     ? FR.fb.put('/leagues/' + leagueId + '/members/' + uid + '/duesPaid', true)
-    : FR.fb.patch('/leagues/' + leagueId + '/members/' + uid, { duesPaid: false, duesClaimedAt: null });
+    : FR.fb.patch('/leagues/' + leagueId + '/members/' + uid, { duesPaid: false, duesClaimedAt: null, duesClaim: null });
   write.then(function(){
     renderCommDues();
     // Keep the public tracker in sync too, in case it's already open
