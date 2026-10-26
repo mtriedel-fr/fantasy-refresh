@@ -2862,7 +2862,7 @@ function loadLiveSeasonSchedule(p){
 // handlePlayerHistory for how points get computed from the raw stored
 // stats). Cache is checked BEFORE calling the Worker at all, so a season
 // that's already been looked up by anyone costs nothing on repeat views.
-var HISTORY_CACHE_SCHEMA = 6; // bumped when the shape of cached data changes (2 = added rank + snapPct, 3 = bye/no-stat weeks now show as real rows instead of being silently omitted, 4 = added gameDate, future weeks now show real schedule info even without stats, 5 = postseason weeks now get real dates too, matching regular season, 6 = defenses + suffix/punctuation-mismatched names now resolve — invalidates old caches that stored null-filled weeks for those players) — older cached entries are treated as a miss and recomputed, not served incomplete
+var HISTORY_CACHE_SCHEMA = 7; // bumped when the shape of cached data changes (7 = INT/fumble −2 and ranks for players with no stored position, Oct 2026; 2 = added rank + snapPct, 3 = bye/no-stat weeks now show as real rows instead of being silently omitted, 4 = added gameDate, future weeks now show real schedule info even without stats, 5 = postseason weeks now get real dates too, matching regular season, 6 = defenses + suffix/punctuation-mismatched names now resolve — invalidates old caches that stored null-filled weeks for those players) — older cached entries are treated as a miss and recomputed, not served incomplete
 function loadHistoricalSeason(p, season){
   var cacheKey = '/computedFantasyHistory/standard/' + season + '/' + sanitizeKeyClient(p.name.toLowerCase());
 
