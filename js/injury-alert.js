@@ -10,7 +10,7 @@
   'use strict';
 
   var TAGS = [
-    { re: /^(o|out|sus|suspended)$/i, label: 'OUT', note: 'won\'t play', color: 'var(--pk)', bg: 'rgba(255,95,160,.15)' },
+    { re: /^(o|out|sus|suspended)$/i, label: 'OUT', note: 'ruled out', color: 'var(--pk)', bg: 'rgba(255,95,160,.15)' },
     { re: /^(ir|pup|pup-[pr])$/i,      label: 'IR',  note: 'on injured reserve', color: 'var(--pu)', bg: 'rgba(155,109,255,.15)' },
     { re: /^d(oubtful)?$/i,            label: 'D',   note: 'doubtful', color: 'var(--pk)', bg: 'rgba(255,95,160,.12)' },
     { re: /^q(uestionable)?$/i,        label: 'Q',   note: 'questionable', color: '#E08A20', bg: 'rgba(255,154,58,.18)' }
@@ -57,9 +57,9 @@
     }).join('');
     wrap.innerHTML = '<div style="width:100%;max-width:380px;background:var(--bg2,#fff);border:1px solid var(--bdr,#ccc);border-radius:16px;padding:18px 18px 14px;box-shadow:0 12px 40px rgba(0,0,0,.4);">'
       + '<div style="font-family:var(--fd,inherit);font-weight:900;font-size:18px;letter-spacing:.4px;text-transform:uppercase;color:' + (hasOut ? 'var(--pk,#c36)' : 'var(--or,#077)') + ';">🚑 Injury check · Week ' + esc(week) + '</div>'
-      + '<div style="font-size:13px;color:var(--ink2,#355);margin:6px 0 8px;">' + (hasOut
-          ? 'Your lineup has a player who won\'t play. Swap him out before his game starts.'
-          : 'Heads up: these players in your lineup have an injury tag.') + '</div>'
+      + '<div style="font-size:13px;color:var(--ink2,#355);margin:6px 0 8px;">'
+      + (list.length === 1 ? 'Your lineup has a player who may not play.' : 'Your lineup has players who may not play.')
+      + ' You can swap ' + (list.length === 1 ? 'him' : 'them') + ' out before ' + (list.length === 1 ? 'his game starts.' : 'their games start.') + '</div>'
       + rows
       + '<div style="display:flex;gap:8px;margin-top:14px;">'
       + (onDraftPage ? '' : '<button type="button" data-act="fix" style="flex:1;padding:11px;border:0;border-radius:10px;font-family:var(--fd,inherit);font-weight:900;text-transform:uppercase;letter-spacing:.6px;cursor:pointer;color:#050808;background:linear-gradient(135deg,var(--or,#0cc),var(--pk,#c36));">Fix lineup</button>')
