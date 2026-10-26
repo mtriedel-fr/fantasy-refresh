@@ -6036,16 +6036,21 @@ function renderDues(){
   var el = document.getElementById('wdues');
   el.innerHTML = '<div style="padding:40px;text-align:center;color:var(--ink3);font-family:var(--fd);">Loading…</div>';
 
+  var myUid = (FRAuth.getUser() || {}).uid;
   Promise.all([
     FR.fb.get('/leagues/' + leagueId + '/members').catch(function(){ return {}; }),
-    FR.fb.get('/leagues/' + leagueId + '/settings').catch(function(){ return {}; })
+    FR.fb.get('/leagues/' + leagueId + '/settings').catch(function(){ return {}; }),
+    loadMemberPrivate(leagueId, myUid)
   ]).then(function(results){
     var members = results[0] || {};
     var settings = results[1] || {};
+    var priv = results[2] || {};
 
     var list = Object.keys(members).map(function(uid){
       var m = members[uid] || {};
-      return { uid: uid, teamName: m.teamName || '(no team name)', displayName: m.displayName || '', email: m.email || '', paid: !!m.duesPaid, claimed: !m.duesPaid && !!m.duesClaimedAt };
+      // "Pending" (said they paid) only shows where the viewer may see it:
+      // commissioners see everyone's, a member sees their own.
+      return { uid: uid, teamName: m.teamName || '(no team name)', displayName: m.displayName || '', paid: !!m.duesPaid, claimed: !m.duesPaid && !!claimOf(m, priv[uid]).at };
     }).filter(function(m){ return m.teamName !== '(no team name)' || m.displayName; });
 
     // Unpaid first, so outstanding dues are immediately visible.
@@ -7661,11 +7666,15 @@ function renderCommDues(){
     var t = document.getElementById('dues-reminder-toggle');
     if(t) t.checked = v !== false;
   }).catch(function(){});
-  FR.fb.get('/leagues/' + leagueId + '/members').then(function(members){
-    members = members || {};
+  Promise.all([
+    FR.fb.get('/leagues/' + leagueId + '/members'),
+    loadMemberPrivate(leagueId)
+  ]).then(function(r){
+    var members = r[0] || {}, priv = r[1] || {};
     var list = Object.keys(members).map(function(uid){
       var m = members[uid] || {};
-      return { uid: uid, teamName: m.teamName || '(no team name)', email: m.email || '', paid: !!m.duesPaid, claimedAt: m.duesPaid ? 0 : (m.duesClaimedAt || 0), claim: m.duesClaim || null };
+      var c = claimOf(m, priv[uid]);
+      return { uid: uid, teamName: m.teamName || '(no team name)', email: emailOf(m, priv[uid]), paid: !!m.duesPaid, claimedAt: m.duesPaid ? 0 : (c.at || 0), claim: c.claim };
     }).sort(function(a, b){
       // "Says paid" first — those are the ones waiting on the commissioner.
       return ((b.claimedAt ? 1 : 0) - (a.claimedAt ? 1 : 0)) || a.teamName.localeCompare(b.teamName);
@@ -7698,6 +7707,29 @@ function setDuesReminder(on){
   }).catch(function(){ showToast('Failed to update — try again', true); });
 }
 
+// ── Private member details ──────────────────────────────────────────
+// Email and dues payment claims live in /memberPrivate/{league}/{uid},
+// readable only by that member and the league's commissioners. Returns a
+// uid-keyed map: the whole league for a commissioner, just your own record
+// otherwise, {} when signed out or before the rules are published.
+function loadMemberPrivate(leagueId, myUid){
+  return FR.fb.getAuth('/memberPrivate/' + leagueId).then(function(all){
+    if(all) return all;
+    if(!myUid) return {};
+    return FR.fb.getAuth('/memberPrivate/' + leagueId + '/' + myUid).then(function(mine){
+      var o = {}; if(mine) o[myUid] = mine; return o;
+    });
+  }).catch(function(){ return {}; });
+}
+// Prefer the private record; fall back to fields still on the public
+// record until the one-time data move has run.
+function emailOf(pub, priv){ return (priv && priv.email) || (pub && pub.email) || ''; }
+function claimOf(pub, priv){
+  if(priv && priv.duesClaimedAt) return { at: priv.duesClaimedAt, claim: priv.duesClaim || null };
+  if(pub && pub.duesClaimedAt) return { at: pub.duesClaimedAt, claim: pub.duesClaim || null };
+  return { at: 0, claim: null };
+}
+
 // "Venmo · Oct 20 · from @handle" — what the member told us in the dues pop-up.
 function duesClaimText(claim, claimedAt){
   var day = function(d){ return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); };
@@ -7713,7 +7745,10 @@ function duesClaimText(claim, claimedAt){
 function clearDuesClaim(uid){
   var ctx = FRAuth.getLeagueCtx();
   var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
-  FR.fb.patch('/leagues/' + leagueId + '/members/' + uid, { duesClaimedAt: null, duesClaim: null }).then(function(){
+  Promise.all([
+    FR.fb.patch('/memberPrivate/' + leagueId + '/' + uid, { duesClaimedAt: null, duesClaim: null }),
+    FR.fb.patch('/leagues/' + leagueId + '/members/' + uid, { duesClaimedAt: null, duesClaim: null }) // pre-move leftovers
+  ]).then(function(){
     renderCommDues();
     if(document.getElementById('tab-dues') && !document.getElementById('tab-dues').classList.contains('hidden')) renderDues();
   }).catch(function(){ showToast('Failed to update — try again', true); });
@@ -7726,7 +7761,10 @@ function toggleDuesPaid(uid, newValue){
   // dues pop-up starts asking them again.
   var write = newValue
     ? FR.fb.put('/leagues/' + leagueId + '/members/' + uid + '/duesPaid', true)
-    : FR.fb.patch('/leagues/' + leagueId + '/members/' + uid, { duesPaid: false, duesClaimedAt: null, duesClaim: null });
+    : Promise.all([
+        FR.fb.patch('/leagues/' + leagueId + '/members/' + uid, { duesPaid: false, duesClaimedAt: null, duesClaim: null }),
+        FR.fb.patch('/memberPrivate/' + leagueId + '/' + uid, { duesClaimedAt: null, duesClaim: null })
+      ]);
   write.then(function(){
     renderCommDues();
     // Keep the public tracker in sync too, in case it's already open
@@ -10051,8 +10089,10 @@ function renderUserPanel(){
   var leagueId = ctx ? ctx.leagueId : 'fr_refresh26';
   var myUid = (FRAuth.getUser() || {}).uid;
 
-  FR.fb.get('/leagues/' + leagueId + '/members')
-    .then(function(data){
+  Promise.all([FR.fb.get('/leagues/' + leagueId + '/members'), loadMemberPrivate(leagueId)])
+    .then(function(r){
+      var data = r[0], priv = r[1] || {};
+      if(data) Object.keys(data).forEach(function(uid){ if(data[uid]) data[uid].email = emailOf(data[uid], priv[uid]); });
       if(!data){
         el.innerHTML = '<div style="color:var(--ink3);font-size:13px;padding:8px 0;">No registered players yet.<br><span style="font-size:11px;">Share the join code below to get started.</span></div>';
         updateUserStats(0, 0, 0);
@@ -10197,7 +10237,8 @@ function confirmRemoveChoice(uid, encodedTeamName, isHardDelete){
   // doesn't see a ghost league in their own account afterward.
   Promise.all([
     FR.fb.delete('/leagues/' + leagueId + '/members/' + uid),
-    FR.fb.delete('/users/' + uid + '/leagues/' + leagueId)
+    FR.fb.delete('/users/' + uid + '/leagues/' + leagueId),
+    FR.fb.delete('/memberPrivate/' + leagueId + '/' + uid).catch(function(){})
   ])
     .then(function(){
       showToast((teamName || 'Player') + ' permanently deleted');

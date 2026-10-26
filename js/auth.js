@@ -265,18 +265,14 @@
             dk2025:      null
           };
           setUser(user);
-          // Silent, self-healing backfill — if the member record is
-          // missing email (or has a stale one), correct it here using
-          // the real, current email Firebase Auth already just gave us
-          // above. Fixes a real, confirmed gap: joinLeague() is the
-          // only place email otherwise ever gets written, and it's
-          // never called for anyone who signed up without a join code
-          // and joined a league later through a separate flow — this
-          // fills that in the next time any of those accounts signs in
-          // normally, with no manual cleanup needed. Doesn't block or
-          // affect sign-in itself either way.
-          if (member && data.email && member.email !== data.email) {
-            dbPatch('/leagues/fr_refresh26/members/' + uid, { email: data.email }).catch(function(){});
+          // Silent, self-healing backfill of the member's email into the
+          // PRIVATE record (/memberPrivate — only the member and the
+          // commissioners can read it; the public member record no longer
+          // holds email). Keeps the commissioner's contact list current
+          // for anyone whose email changed or was never saved. Never
+          // blocks sign-in.
+          if (member && data.email) {
+            dbPatch('/memberPrivate/fr_refresh26/' + uid, { email: data.email }).catch(function(){});
           }
           return { user: user, leagueId: 'fr_refresh26' };
         })
@@ -326,9 +322,11 @@
 
   function joinLeague(leagueId, uid, email, displayName, teamName) {
     var resolvedTeamName = teamName || ((displayName || (email ? email.split('@')[0] : 'Player')).trim() + "'s Team");
+    // Email is private: it goes to /memberPrivate, never the public member
+    // record (the database rules reject an email field there).
+    if (email) dbPatch('/memberPrivate/' + leagueId + '/' + uid, { email: email }).catch(function(){});
     return dbSet('/leagues/' + leagueId + '/members/' + uid, {
       uid:         uid,
-      email:       email,
       displayName: displayName || '',
       teamName:    resolvedTeamName,
       joined:      Date.now(),

@@ -55,7 +55,13 @@ locks/salaries, salary dry runs, Sleeper probes, migrations).
 - `/leagues/{id}/salaries/{season}/week{N}` — `players` (keyed by Sleeper id, or `t01_…`
   for Tank01-only players; DEFs named by team abbreviation) and `meta`
 - `/leagues/{id}/lineups/{season}/week{N}/{uid}`, `/leagues/{id}/season/{season}/{week}`
-  (scores, uid-keyed), `/leagues/{id}/members/{uid}`
+  (scores, uid-keyed), `/leagues/{id}/members/{uid}` (public: team name, display name,
+  `duesPaid` — only commissioners may set it)
+- `/memberPrivate/{id}/{uid}` — `email`, `duesClaimedAt`, `duesClaim`. Outside `/leagues`
+  on purpose (everything under `/leagues/{id}` is publicly readable and child rules can't
+  take that back). Readable by the member + that league's commissioners. Pages read it with
+  `FR.fb.getAuth` / `loadMemberPrivate()` (`league.html`); `emailOf`/`claimOf` fall back to
+  old public fields. The public member record rejects email/claims (rules).
 - `/playerPool/{season}/players` (Sleeper ids; `tank01PlayerID` when on Tank01's roster
   list), `/nflSchedule/{season}/Regular` (`weeks.week{N}` = games with `home`/`away`/`time`)
 - Live security rules = `database.rules.json` (synced Oct 23, 2026). The commissioner
@@ -100,12 +106,12 @@ locks/salaries, salary dry runs, Sleeper probes, migrations).
 - **Dues pop-up** (`js/dues-alert.js`, on home/league/draft): unpaid members (not
   commissioners) see the entry fee + `settings.duesMessage`. "I've paid" asks method
   (Venmo/PayPal/Cash/Other), date paid and optional payer name/handle (`buildClaim`), then
-  writes `members/{uid}/duesClaimedAt` + `duesClaim {method, paidOn, from}` (commissioner
+  writes `memberPrivate/{league}/{uid}` `duesClaimedAt` + `duesClaim {method, paidOn, from}` (commissioner
   tracker shows "Says paid · Venmo · Oct 20 · from @x", claims sorted first; public tab
   shows "Pending"); "Remind me later"
   snoozes for the day on that device. Marking Unpaid or "not received" clears the claim.
-  `settings.duesReminder === false` turns it off. Members can write their own record, so a
-  claim is only a claim — `duesPaid` is the commissioner's call.
+  `settings.duesReminder === false` turns it off. A claim is only a claim — `duesPaid` is
+  the commissioner's call, and the rules stop members from setting it.
 - **Cloudflare Worker** source is `cloudflare/worker.js` (added Oct 26, 2026). It is NOT
   auto-deployed: after a change merges, the commissioner pastes the file into the
   Cloudflare dashboard (Workers & Pages → fantasy-refresh-news → Edit code → Deploy). The
@@ -130,8 +136,13 @@ locks/salaries, salary dry runs, Sleeper probes, migrations).
   rules page in `league.html` already reads those and shows the rows when non-zero). Also
   update `cloudflare/worker.js` card scoring and the Tank01 projection request to match.
 
-- **Member privacy fix pending:** private member fields should move out of the public
-  member records into a commissioner/self-only path (code in `js/auth.js` and Commissioner
-  Tools, a data migration, and a rules update). Needs commissioner approval.
+- **This repo is public** — so are workflow annotations. Never print emails, payment details
+  or other private values in an annotation; print counts, and put backups in Firebase
+  under `/backups/...` (not publicly readable).
+- **Rules tests** (`tests/rules/`) run in the Firebase emulator in CI (`rules-tests.yml`)
+  whenever `database.rules.json` changes; they can't run in Claude's workspace (emulator
+  download is blocked).
+- Known gap: `computedFantasyHistory` (player-card cache) is commissioner-write-only in the
+  rules, so other members' cache writes fail silently and their views recompute.
 - `preseason.html` / `archive2025.html` use a `COMM_PW` constant visible in page source — a
   soft gate only.

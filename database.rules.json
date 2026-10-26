@@ -15,7 +15,19 @@
         "members": {
           ".read": true,
           "$uid": {
-            ".write": "auth != null && (auth.uid === $uid || root.child('leagues/' + $leagueId + '/settings/commissioners/' + auth.uid).val() === true || root.child('leagues/' + $leagueId + '/settings/createdBy').val() === auth.uid)"
+            ".write": "auth != null && (auth.uid === $uid || root.child('leagues/' + $leagueId + '/settings/commissioners/' + auth.uid).val() === true || root.child('leagues/' + $leagueId + '/settings/createdBy').val() === auth.uid)",
+            "email": {
+              ".validate": "false"
+            },
+            "duesClaim": {
+              ".validate": "false"
+            },
+            "duesClaimedAt": {
+              ".validate": "false"
+            },
+            "duesPaid": {
+              ".validate": "newData.val() === data.val() || root.child('leagues/' + $leagueId + '/settings/commissioners/' + auth.uid).val() === true || root.child('leagues/' + $leagueId + '/settings/createdBy').val() === auth.uid"
+            }
           }
         },
         "season": {
@@ -54,6 +66,39 @@
         "matchups": {
           ".read": true,
           ".write": "auth != null && root.child('leagues/' + $leagueId + '/settings/commissioners/' + auth.uid).val() === true"
+        }
+      }
+    },
+    "memberPrivate": {
+      "$leagueId": {
+        ".read": "auth != null && (root.child('leagues/' + $leagueId + '/settings/commissioners/' + auth.uid).val() === true || root.child('leagues/' + $leagueId + '/settings/createdBy').val() === auth.uid)",
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid",
+          ".write": "auth != null && (auth.uid === $uid || root.child('leagues/' + $leagueId + '/settings/commissioners/' + auth.uid).val() === true || root.child('leagues/' + $leagueId + '/settings/createdBy').val() === auth.uid)",
+          "email": {
+            ".validate": "newData.isString() && newData.val().length < 200"
+          },
+          "duesClaimedAt": {
+            ".validate": "newData.isNumber()"
+          },
+          "duesClaim": {
+            ".validate": "newData.hasChildren(['method', 'paidOn'])",
+            "method": {
+              ".validate": "newData.isString() && newData.val().length <= 20"
+            },
+            "paidOn": {
+              ".validate": "newData.isString() && newData.val().length === 10"
+            },
+            "from": {
+              ".validate": "newData.isString() && newData.val().length <= 80"
+            },
+            "$other": {
+              ".validate": "false"
+            }
+          },
+          "$other": {
+            ".validate": "false"
+          }
         }
       }
     },
@@ -96,7 +141,10 @@
       ".read": false,
       "$uid": {
         ".read": true,
-        ".write": "auth != null && auth.uid === $uid"
+        ".write": "auth != null && auth.uid === $uid",
+        "email": {
+          ".validate": "false"
+        }
       }
     },
     "teamNames2026": {

@@ -93,6 +93,11 @@
     commissioner:   function(uid)    { return paths.commissioners() + '/' + uid; },
     members:        function()       { return paths.league() + '/members'; },
     member:         function(uid)    { return paths.members() + '/' + uid; },
+    // Private member details (email, dues payment claims). Lives OUTSIDE
+    // /leagues so the league's public read doesn't cover it — readable only
+    // by that member and the league's commissioners (database.rules.json).
+    membersPrivate: function()       { return '/memberPrivate/' + ctx().leagueId; },
+    memberPrivate:  function(uid)    { return paths.membersPrivate() + '/' + uid; },
     season:         function()       { return paths.league() + '/season/' + seasonKey(); },
     week:           function(w)      { return paths.season() + '/' + w; },
     weekEntry:      function(w, uid) { return paths.week(w) + '/' + uid; },
@@ -144,6 +149,17 @@
     get: function(path) {
       return fetch(FB_DB_URL + path + '.json')
         .then(function(r) { return r.json(); });
+    },
+
+    // GET with the signed-in user's token — for paths that aren't public
+    // (memberPrivate). Resolves null instead of an error object when the
+    // rules say no, so callers can just treat it as "nothing to show".
+    getAuth: function(path) {
+      return getToken().then(function(token) {
+        return fetch(authUrl(path, token)).then(function(r) { return r.json(); });
+      }).then(function(d) {
+        return (d && typeof d === 'object' && d.error) ? null : d;
+      }).catch(function() { return null; });
     },
 
     // PUT — authenticated write
