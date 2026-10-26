@@ -1,0 +1,37 @@
+name: Privacy verify (read-only)
+on:
+  push:
+    branches: [audit/draft-check]
+    paths: ['.github/workflows/privacy-verify.yml']
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: What can a stranger read?
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB = process.env.FIREBASE_DB_URL, T = process.env.FIREBASE_AUTH_TOKEN;
+          const raw = u => new Promise((res, rej) => https.get(u, r => { let d = ''; r.on('data', c => d += c); r.on('end', () => res({ status: r.statusCode, body: d })); }).on('error', rej));
+          const esc = s => String(s).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+          const ann = (l, t, m) => console.log(`::${l} title=${esc(t).replace(/:/g,'%3A').replace(/,/g,'%2C')}::${esc(m)}`);
+          (async () => {
+            const lines = [];
+            // No auth token = what anyone on the internet gets.
+            const pub = await raw(`${FB}/leagues/fr_refresh26/members.json`);
+            lines.push(`Public member list: HTTP ${pub.status}, ${Object.keys(JSON.parse(pub.body) || {}).length} members, contains an @-address: ${/@/.test(pub.body)}`);
+            const priv = await raw(`${FB}/memberPrivate/fr_refresh26.json`);
+            lines.push(`Private records, no sign-in: HTTP ${priv.status} (${priv.status === 401 ? 'blocked ✓' : 'NOT BLOCKED'})`);
+            const users = await raw(`${FB}/users.json`);
+            lines.push(`All /users, no sign-in: HTTP ${users.status}`);
+            // Admin view: counts only.
+            const adm = JSON.parse((await raw(`${FB}/memberPrivate/fr_refresh26.json?auth=${T}`)).body) || {};
+            lines.push(`Private records holding an email (admin count): ${Object.values(adm).filter(p => p && p.email).length}`);
+            const s = JSON.parse((await raw(`${FB}/leagues/fr_refresh26/settings.json`)).body) || {};
+            lines.push(`League settings still public (as intended): ${!!s.name}`);
+            ann('notice', 'Privacy check', lines.join('\n'));
+          })().catch(e => { ann('error', 'verify failed', e.message); process.exit(1); });
+          SCRIPT
