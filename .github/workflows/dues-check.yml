@@ -1,0 +1,32 @@
+name: Dues check (read-only)
+on:
+  push:
+    branches: [audit/draft-check]
+    paths: ['.github/workflows/dues-check.yml']
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dues settings and unpaid members
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB = process.env.FIREBASE_DB_URL, T = process.env.FIREBASE_AUTH_TOKEN;
+          const get = p => new Promise((res, rej) => https.get(`${FB}${p}?auth=${T}`, r => { let d = ''; r.on('data', c => d += c); r.on('end', () => { try { res(JSON.parse(d)); } catch (e) { rej(e); } }); }).on('error', rej));
+          const esc = s => String(s).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+          const ann = (l, t, m) => console.log(`::${l} title=${esc(t).replace(/:/g,'%3A').replace(/,/g,'%2C')}::${esc(m)}`);
+          (async () => {
+            const L = '/leagues/fr_refresh26';
+            const s = await get(`${L}/settings.json`) || {};
+            ann('notice', 'Dues settings', JSON.stringify({ entryFee: s.entryFee, prizePool: s.prizePool, duesReminder: s.duesReminder, duesMessage: s.duesMessage == null ? null : s.duesMessage }));
+            const m = await get(`${L}/members.json`) || {};
+            const comm = s.commissioners || {};
+            const rows = Object.entries(m).filter(([u, v]) => v && (v.teamName || v.displayName)).map(([u, v]) =>
+              `${v.teamName || '(no team)'} · ${v.displayName || '(no name)'} · ${v.duesPaid === true ? 'PAID' : 'unpaid'}${v.duesClaimedAt ? ' · claimed' : ''}${(comm[u] === true || s.createdBy === u) ? ' · COMMISSIONER' : ''}`);
+            const unpaid = rows.filter(r => /unpaid/.test(r) && !/COMMISSIONER/.test(r));
+            ann('notice', `Members ${rows.length} · would see pop-up ${unpaid.length}`, rows.sort().join('\n'));
+          })().catch(e => { ann('error', 'dues check failed', e.message); process.exit(1); });
+          SCRIPT
