@@ -128,7 +128,15 @@
     },
     "computedFantasyHistory": {
       ".read": true,
-      ".write": "auth != null && root.child('leagues/fr_refresh26/settings/commissioners/' + auth.uid).val() === true"
+      ".write": "auth != null && root.child('leagues/fr_refresh26/settings/commissioners/' + auth.uid).val() === true",
+      "$profile": {
+        "$season": {
+          "$player": {
+            ".write": "auth != null && (!data.exists() || !data.child('schemaVersion').exists() || data.child('schemaVersion').val() < newData.child('schemaVersion').val())",
+            ".validate": "newData.hasChildren(['weeks', 'cachedAt', 'schemaVersion']) && newData.child('schemaVersion').isNumber() && newData.child('cachedAt').isNumber()"
+          }
+        }
+      }
     },
     "waitlist": {
       ".read": "auth != null && root.child('leagues/fr_refresh26/settings/commissioners/' + auth.uid).val() === true",

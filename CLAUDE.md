@@ -146,7 +146,8 @@ locks/salaries, salary dry runs, Sleeper probes, migrations).
 - **Rules tests** (`tests/rules/`) run in the Firebase emulator in CI (`rules-tests.yml`)
   whenever `database.rules.json` changes; they can't run in Claude's workspace (emulator
   download is blocked).
-- Known gap: `computedFantasyHistory` (player-card cache) is commissioner-write-only in the
-  rules, so other members' cache writes fail silently and their views recompute.
+- `computedFantasyHistory` (player-card cache for past seasons): any signed-in member may
+  write an entry that's missing or has an older `schemaVersion`, never overwrite a current
+  one or delete; commissioners can always overwrite.
 - `preseason.html` / `archive2025.html` use a `COMM_PW` constant visible in page source — a
   soft gate only.
