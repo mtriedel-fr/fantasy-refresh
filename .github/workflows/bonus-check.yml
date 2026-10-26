@@ -1,0 +1,112 @@
+name: Yardage bonus what-if (read-only)
+on:
+  push:
+    branches: [audit/draft-check]
+    paths: ['.github/workflows/bonus-check.yml']
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Replay weeks 1-7 with +3 yardage bonuses
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB = process.env.FIREBASE_DB_URL, T = process.env.FIREBASE_AUTH_TOKEN;
+          const get = p => new Promise((res, rej) => https.get(`${FB}${p}?auth=${T}`, r => { let d = ''; r.on('data', c => d += c); r.on('end', () => { try { res(JSON.parse(d)); } catch (e) { rej(e); } }); }).on('error', rej));
+          const esc = s => String(s).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+          const ann = (l, t, m) => { const s = String(m); for (let i = 0, n = 1; i < s.length || i === 0; i += 3500, n++) console.log(`::${l} title=${esc(t + (s.length > 3500 ? ' #' + n : '')).replace(/:/g,'%3A').replace(/,/g,'%2C')}::${esc(s.slice(i, i + 3500))}`); };
+          const norm = n => String(n || '').toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\b(jr|sr|ii|iii|iv|v)\b/g, '').replace(/\s+/g, ' ').trim();
+          const r2 = x => Math.round(x * 100) / 100;
+          function buildElimSchedule(totalTeams, totalWeeks) {
+            const finaleWeek = 17, weeksToElim = finaleWeek - 1, toElim = totalTeams - 3;
+            const base = Math.floor(toElim / weeksToElim), extra = toElim % weeksToElim;
+            const schedule = []; let remaining = totalTeams;
+            for (let w = 1; w <= totalWeeks; w++) {
+              if (w < finaleWeek) { const elim = base + (w <= extra ? 1 : 0); remaining -= elim; schedule.push({ week: w, eliminate: elim, remaining }); }
+              else schedule.push({ week: w, eliminate: 0, remaining });
+            }
+            return schedule;
+          }
+          function replay(weekScores, weeks) { // weekScores[w] = [{uid, score}]
+            const schedule = buildElimSchedule(weekScores[weeks[0]].length, 18);
+            let stillIn = weekScores[weeks[0]].map(e => e.uid); const out = {};
+            weeks.forEach(w => {
+              const by = {}; weekScores[w].forEach(e => by[e.uid] = e);
+              const entries = stillIn.map(uid => by[uid] ? { uid, score: by[uid].score } : { uid, score: 0 });
+              const sched = schedule.find(s => s.week === w);
+              const elim = [...entries].sort((a, b) => a.score - b.score).slice(0, sched ? sched.eliminate : 0);
+              elim.forEach(e => { stillIn.splice(stillIn.indexOf(e.uid), 1); out[e.uid] = { week: w, score: r2(e.score) }; });
+            });
+            return { out, stillIn };
+          }
+          (async () => {
+            const L = '/leagues/fr_refresh26', S = 2026;
+            const [settings, members, meta, gStatus] = await Promise.all([get(`${L}/settings.json`), get(`${L}/members.json`), get(`${L}/season/${S}/meta.json`), get(`${L}/guillotineStatus/${S}.json`)]);
+            const active = new Set(Object.entries(members || {}).filter(([, m]) => m && m.teamName && m.active !== false).map(([u]) => u));
+            const name = u => (members[u] && members[u].teamName) || u;
+            const lastWeek = (meta && meta.week) || 7;
+            const oldW = {}, newW = {}, weeks = [], bonusLines = [], weekLines = [];
+            const totals = {}, totalsNew = {};
+            for (let w = 1; w <= lastWeek; w++) {
+              const [sc, lu, ar] = await Promise.all([get(`${L}/season/${S}/${w}.json`), get(`${L}/lineups/${S}/week${w}.json`), get(`/nflStatsArchive/${S}/Regular_wk${w}.json`)]);
+              if (!sc || !Object.keys(sc).length) continue;
+              const arch = {}; Object.values((ar && ar.players) || {}).forEach(p => { if (p && p.pos !== 'DEF') (arch[norm(p.name)] = arch[norm(p.name)] || []).push(p); });
+              // Every player who earned a bonus this week, and how many lineups had him.
+              const earned = {};
+              Object.values((ar && ar.players) || {}).forEach(p => { if (!p || p.pos === 'DEF') return; const b = (p.passYds >= 300 ? 3 : 0) + (p.rushYds >= 100 ? 3 : 0) + (p.recYds >= 100 ? 3 : 0); if (b) earned[norm(p.name)] = { name: p.name, b, used: 0, py: p.passYds, ry: p.rushYds, rcy: p.recYds }; });
+              const olds = [], news = [];
+              Object.entries(sc).forEach(([uid, e]) => {
+                if (!e || !e.team || !active.has(uid)) return;
+                let bonus = 0; const who = [];
+                const slots = (lu && lu[uid] && lu[uid].slots) || {};
+                Object.values(slots).forEach(p => {
+                  if (!p || p.pos === 'DEF') return;
+                  const k = norm(p.name); if (!earned[k]) return;
+                  const cands = arch[k] || []; const st = cands.find(c => String(c.team).toUpperCase() === String(p.team).toUpperCase()) || cands[0];
+                  if (!st) return;
+                  const b = (st.passYds >= 300 ? 3 : 0) + (st.rushYds >= 100 ? 3 : 0) + (st.recYds >= 100 ? 3 : 0);
+                  if (b) { bonus += b; who.push(`${p.name} +${b}`); earned[k].used++; }
+                });
+                olds.push({ uid, score: e.score || 0 }); news.push({ uid, score: (e.score || 0) + bonus, bonus, who });
+                totals[uid] = (totals[uid] || 0) + (e.score || 0); totalsNew[uid] = (totalsNew[uid] || 0) + (e.score || 0) + bonus;
+              });
+              oldW[w] = olds; newW[w] = news; weeks.push(w);
+              const rankOf = arr => { const s = [...arr].sort((a, b) => b.score - a.score); const m = {}; s.forEach((e, i) => m[e.uid] = i + 1); return m; };
+              const ro = rankOf(olds), rn = rankOf(news);
+              const top = arr => [...arr].sort((a, b) => b.score - a.score).slice(0, 3).map(e => `${name(e.uid)} ${r2(e.score)}`).join(', ');
+              const withB = news.filter(e => e.bonus);
+              weekLines.push(`Week ${w}: ${withB.length} of ${news.length} teams gain points (avg +${withB.length ? r2(withB.reduce((a, e) => a + e.bonus, 0) / withB.length) : 0}, max +${Math.max(0, ...news.map(e => e.bonus))}). Top 3 now: ${top(olds)} | with bonus: ${top(news)}. Teams whose weekly rank moves 5+: ${news.filter(e => Math.abs(ro[e.uid] - rn[e.uid]) >= 5).length}`);
+              bonusLines.push(`Week ${w} bonus players: ` + Object.values(earned).map(x => `${x.name} +${x.b} (in ${x.used} lineups)`).join('; '));
+            }
+            ann('notice', 'Weekly summary', weekLines.join('\n'));
+            ann('notice', 'Bonus players by week', bonusLines.join('\n'));
+            // Season standings
+            const order = t => Object.keys(t).sort((a, b) => t[b] - t[a]);
+            const so = order(totals), sn = order(totalsNew);
+            const posO = {}; so.forEach((u, i) => posO[u] = i + 1);
+            ann('notice', 'Season standings top 15 (now -> with bonus)', sn.slice(0, 15).map((u, i) => `${i + 1}. ${name(u)} ${r2(totalsNew[u])} (now #${posO[u]}, ${r2(totals[u])}, +${r2(totalsNew[u] - totals[u])})`).join('\n'));
+            const moved = sn.map((u, i) => [u, posO[u] - (i + 1)]).filter(([, d]) => Math.abs(d) >= 5).map(([u, d]) => `${name(u)} ${d > 0 ? 'up' : 'down'} ${Math.abs(d)} (#${posO[u]} -> #${sn.indexOf(u) + 1})`);
+            ann('notice', 'Season rank moves of 5+', moved.join('\n') || 'none');
+            // Last One Standing
+            ann('notice', 'Guillotine setting', `settings.guillotine=${JSON.stringify(settings && settings.guillotine)}; stored status asOfWeek ${gStatus && gStatus.asOfWeek}`);
+            const A = replay(oldW, weeks), B = replay(newW, weeks);
+            const storedElim = {}; Object.entries((gStatus && gStatus.teams) || {}).forEach(([u, t]) => { if (t.status === 'eliminated') storedElim[u] = t.eliminatedWeek; });
+            const agree = Object.keys(A.out).filter(u => storedElim[u] === A.out[u].week).length;
+            const lines = [`Replay check vs site: ${agree} of ${Object.keys(A.out).length} eliminations match (site has ${Object.keys(storedElim).length})`];
+            weeks.forEach(w => {
+              const a = Object.entries(A.out).filter(([, x]) => x.week === w).map(([u, x]) => `${name(u)} (${x.score})`).sort();
+              const b = Object.entries(B.out).filter(([, x]) => x.week === w).map(([u, x]) => `${name(u)} (${x.score})`).sort();
+              const same = JSON.stringify(a.map(s => s.replace(/ \(.*/, ''))) === JSON.stringify(b.map(s => s.replace(/ \(.*/, '')));
+              lines.push(`Week ${w}: ${same ? 'SAME' : 'CHANGES'}\n   now: ${a.join(', ')}\n   with bonus: ${b.join(', ')}`);
+            });
+            const saved = A.stillIn.length ? Object.keys(A.out).filter(u => !B.out[u]) : [];
+            const cut = Object.keys(B.out).filter(u => !A.out[u]);
+            lines.push(`Alive now: ${A.stillIn.length}; with bonus: ${B.stillIn.length}`);
+            lines.push(`Would be ALIVE with bonus (currently out): ${saved.map(u => `${name(u)} (out wk${A.out[u].week})`).join(', ') || 'none'}`);
+            lines.push(`Would be OUT with bonus (currently alive): ${cut.map(u => `${name(u)} (wk${B.out[u].week})`).join(', ') || 'none'}`);
+            ann('notice', 'Last One Standing', lines.join('\n'));
+          })().catch(e => { ann('error', 'bonus check failed', e.stack || e.message); process.exit(1); });
+          SCRIPT
