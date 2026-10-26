@@ -64,7 +64,8 @@ locks/salaries, salary dry runs, Sleeper probes, migrations).
   old public fields. The public member record rejects email/claims (rules).
 - `/playerPool/{season}/players` (Sleeper ids; `tank01PlayerID` when on Tank01's roster
   list), `/nflSchedule/{season}/Regular` (`weeks.week{N}` = games with `home`/`away`/`time`)
-- Live security rules = `database.rules.json` (synced Oct 23, 2026). The commissioner
+- Live security rules = `database.rules.json` (published by the commissioner and verified
+  identical to live Oct 26, 2026 — `rules-compare.yml` on `audit/draft-check` checks this). The commissioner
   publishes rules in the Firebase console; keep the file in sync with what's live.
 
 ## Hard-won quirks (each was a real bug)
@@ -136,6 +137,9 @@ locks/salaries, salary dry runs, Sleeper probes, migrations).
   rules page in `league.html` already reads those and shows the rows when non-zero). Also
   update `cloudflare/worker.js` card scoring and the Tank01 projection request to match.
 
+- **Member privacy move done Oct 26, 2026:** all 76 `fr_refresh26` emails copied to
+  `/memberPrivate` and removed from public records (plus 2 stray `/users` emails); backup at
+  `/backups/memberPrivacyMove_1793036697597`. Verified a signed-out read gets no emails.
 - **This repo is public** — so are workflow annotations. Never print emails, payment details
   or other private values in an annotation; print counts, and put backups in Firebase
   under `/backups/...` (not publicly readable).
