@@ -7,45 +7,20 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - name: Snap counts + points formula
-        env:
-          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
-          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
-          TANK01_KEY: ${{ secrets.TANK01_KEY }}
+      - name: Is the new Worker live?
         run: |
           node << 'SCRIPT'
           const https = require('https');
-          const FB = process.env.FIREBASE_DB_URL, T = process.env.FIREBASE_AUTH_TOKEN;
-          const getUrl = (u, h) => new Promise((res, rej) => https.get(u, { headers: h || {} }, r => { let d = ''; r.on('data', c => d += c); r.on('end', () => { try { res(JSON.parse(d)); } catch (e) { rej(new Error(d.slice(0, 200))); } }); }).on('error', rej));
-          const get = p => getUrl(`${FB}${p}?auth=${T}`);
-          const H = 'tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com';
-          const t01 = p => getUrl(`https://${H}${p}`, { 'X-RapidAPI-Key': process.env.TANK01_KEY, 'X-RapidAPI-Host': H });
+          const getUrl = u => new Promise((res, rej) => https.get(u, r => { let d = ''; r.on('data', c => d += c); r.on('end', () => { try { res(JSON.parse(d)); } catch (e) { rej(new Error(d.slice(0, 200))); } }); }).on('error', rej));
           const esc = s => String(s).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
           const ann = (l, t, m) => console.log(`::${l} title=${esc(t).replace(/:/g,'%3A').replace(/,/g,'%2C')}::${esc(m)}`);
-          const base = s => s.passYds*.04 + s.passTD*4 + s.passInt*-2 + s.rushYds*.1 + s.rushTD*6 + s.recYds*.1 + s.recTD*6 + s.rec + s.fumbLost*-2 + (s.twoPt||0)*2;
-          const bonus = s => (s.passYds >= 300 ? 3 : 0) + (s.rushYds >= 100 ? 3 : 0) + (s.recYds >= 100 ? 3 : 0);
+          const W = 'https://fantasy-refresh-news.mtriedel.workers.dev';
           (async () => {
-            const lines = [], mism = [];
-            let games6 = null;
-            for (let w = 1; w <= 7; w++) {
-              const a = await get(`/nflStatsArchive/2026/Regular_wk${w}.json`) || {};
-              if (w === 6) games6 = a.games;
-              const pl = Object.values(a.players || {}).filter(p => p.pos !== 'DEF' && (p.rushYds || p.recYds || p.passYds));
-              const withSnap = pl.filter(p => p.snapPct != null).length;
-              let okBase = 0, okBonus = 0, n = 0;
-              pl.forEach(p => { if (typeof p.pts !== 'number') return; n++; const b = Math.round(base(p)*100)/100, bb = Math.round((base(p)+bonus(p))*100)/100, st = Math.round(p.pts*100)/100;
-                if (Math.abs(b - st) < .02) okBase++; if (Math.abs(bb - st) < .02) okBonus++;
-                if (Math.abs(bb - st) >= .02 && mism.length < 25) mism.push(`wk${w} ${p.name} stored=${st} base=${b} withBonus=${bb} py=${p.passYds} ry=${p.rushYds} rcy=${p.recYds} 2pt=${p.twoPt}`); });
-              lines.push(`wk${w}: offensive ${pl.length}, snap present ${withSnap}; pts match base ${okBase}/${n}, base+yardage bonus ${okBonus}/${n}; archivedAt ${a.archivedAt ? new Date(a.archivedAt).toISOString() : '-'}`);
+            for (const [n, t, p] of [['Harold Fannin','CLE','TE'],['Kenneth Walker','KC','RB'],['Marvin Harrison','HOU','WR'],['Justin Jefferson','MIN','WR']]) {
+              const r = await getUrl(`${W}/playerhistory?name=${encodeURIComponent(n)}&team=${t}&pos=${p}&season=2026&currentWeek=8`);
+              ann('notice', `worker ${n}`, (r.weeks || []).filter(w => w.seasonType === 'Regular' && w.week >= 4 && w.week <= 7).map(w => `wk${w.week} ${w.opp} pts=${w.pts} rank=${w.rank} snp=${w.snapPct}`).join('\n'));
             }
-            ann('notice', 'archive by week', lines.join('\n'));
-            ann('notice', 'pts mismatches (with bonus)', mism.join('\n') || 'none');
-            const g = (games6 || [])[0];
-            if (g) {
-              const bs = await t01(`/getNFLBoxScore?gameID=${g.gameId}&fantasyPoints=true&PPRScoring=true`);
-              const ps = Object.values((bs.body && bs.body.playerStats) || {});
-              const withSc = ps.filter(p => p.snapCounts);
-              ann('notice', `Tank01 box score now ${g.gameId}`, `players ${ps.length}, with snapCounts ${withSc.length}; sample ${JSON.stringify(withSc.slice(0, 2).map(p => ({ n: p.longName, sc: p.snapCounts })))}; keys of first ${Object.keys(ps[0] || {}).join(',')}; bonus keys ${JSON.stringify(ps.filter(p => p.pass300 || p.rush100 || p.rec100).slice(0,2).map(p=>p.longName))}`);
-            }
-          })().catch(e => { ann('error', 'card check failed', e.message); process.exit(1); });
+            const pj = await getUrl(`${W}/projections?week=8&season=2026`);
+            ann('notice', 'worker projections', `count ${pj.count}; ${pj.error || 'ok'}`);
+          })().catch(e => { ann('error', 'worker check failed', e.message); process.exit(1); });
           SCRIPT
