@@ -23,4 +23,19 @@ jobs:
       - name: Run rules tests in the emulator
         run: |
           echo '{ "emulators": { "database": { "port": 9000 } } }' > firebase.json
-          npx firebase emulators:exec --only database --project fr-rules-test "node --test tests/rules/"
+          set +e
+          npx firebase emulators:exec --only database --project fr-rules-test "node --test --test-reporter=tap tests/rules/" > rules-out.txt 2>&1
+          code=$?
+          # Run logs aren't readable everywhere, so report results as annotations.
+          node -e '
+            const s = require("fs").readFileSync("rules-out.txt", "utf8").replace(/\x1b\[[0-9;]*m/g, "");
+            const esc = t => t.replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
+            const fails = s.split("\n").filter(l => /^\s*not ok/.test(l));
+            const summary = s.split("\n").filter(l => /^# (tests|pass|fail)/.test(l)).join("  ");
+            console.log(`::notice title=Rules tests::${esc(summary || "no summary")}`);
+            if (process.argv[1] !== "0") {
+              const tail = s.slice(-3500);
+              console.log(`::error title=Rules tests failed::${esc((fails.join("\n") + "\n---\n" + tail).slice(-3800))}`);
+            }
+          ' "$code"
+          exit $code
