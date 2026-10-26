@@ -37,7 +37,8 @@ beforeEach(async () => {
         alice: { email: 'alice@x.com', duesClaimedAt: 1, duesClaim: { method: 'Venmo', paidOn: '2026-10-20' } },
         bob: { email: 'bob@x.com' }
       } },
-      users: { alice: { leagues: { [L]: { teamName: 'A' } } } }
+      users: { alice: { leagues: { [L]: { teamName: 'A' } } } },
+      computedFantasyHistory: { standard: { 2025: { 'old player': { weeks: [1], cachedAt: 1, schemaVersion: 6 }, 'current player': { weeks: [1], cachedAt: 1, schemaVersion: 7 } } } }
     });
   });
 });
@@ -95,4 +96,16 @@ test('normal member edits still work (even before old emails are moved)', async 
 test('/users never holds email', async () => {
   await assertFails(update(ref(db('alice'), 'users/alice'), { email: 'a@x.com' }));
   await assertSucceeds(update(ref(db('alice'), `users/alice/leagues/${L}`), { teamName: 'A2' }));
+});
+
+test('player-card cache: any member can fill a miss or upgrade an old entry, not overwrite a current one', async () => {
+  const C = 'computedFantasyHistory/standard/2025/';
+  const entry = v => ({ weeks: [{ week: 1, pts: 10 }], cachedAt: 2, schemaVersion: v });
+  await assertSucceeds(set(ref(db('bob'), C + 'new player'), entry(7)));      // cache miss
+  await assertSucceeds(set(ref(db('bob'), C + 'old player'), entry(7)));      // older schema → refresh
+  await assertFails(set(ref(db('bob'), C + 'current player'), entry(7)));     // already current → no overwrite
+  await assertFails(set(ref(db('bob'), C + 'current player'), null));         // can't delete
+  await assertFails(set(ref(db(null), C + 'another'), entry(7)));             // must be signed in
+  await assertFails(set(ref(db('bob'), C + 'junk'), { hello: 'x' }));         // must look like a cache entry
+  await assertSucceeds(set(ref(db('comm'), C + 'current player'), entry(7))); // commissioners can always fix
 });
