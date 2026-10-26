@@ -218,17 +218,18 @@ jobs:
               pts += contributed;
               breakdown.push({ label, stat: formatStat ? formatStat(val) : val, points: contributed });
             }
+            // No yardage bonuses in 2026 (commissioner, Oct 26, 2026). The old
+            // 300/100-yard lines read flags Tank01 never sends, so they never
+            // scored. Planned for 2027 + the playoff game: compute from the
+            // yards themselves — see the open item in CLAUDE.md.
             add('Passing Yards',  pass.passYds,       0.04);
             add('Passing TD',     pass.passTD,         4);
             add('Interception',   pass.int,            -2);
-            add('300+ Yard Game', p.pass300,           3);
             add('Rushing Yards',  rush.rushYds,        0.1);
             add('Rushing TD',     rush.rushTD,         6);
-            add('100+ Yard Game (Rush)', p.rush100,    3);
             add('Reception',      recv.receptions,     1);
             add('Receiving Yards',recv.recYds,         0.1);
             add('Receiving TD',   recv.recTD,          6);
-            add('100+ Yard Game (Rec)',  p.rec100,     3);
             add('Fumble Lost',    def.fumblesLost,     -2);
             add('2-Point Conversion', p.twoPt,         2);
             if (pos === 'DEF') {

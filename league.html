@@ -6351,14 +6351,16 @@ function renderLeague(){
       var passTD       = sc.passTD       !== undefined ? sc.passTD       : 4;
       var passInt      = sc.passInt      !== undefined ? sc.passInt      : -2;
       var passYds      = sc.passYds      !== undefined ? sc.passYds      : 0.04;
-      var pass300Bonus = sc.pass300Bonus !== undefined ? sc.pass300Bonus : 3;
+      // Yardage bonuses: none in 2026 (rows hidden at 0). A league can set
+      // settings.scoring.*Bonus to show them — scoring must support it first.
+      var pass300Bonus = sc.pass300Bonus !== undefined ? sc.pass300Bonus : 0;
       var rushTD       = sc.rushTD       !== undefined ? sc.rushTD       : 6;
       var rushYds      = sc.rushYds      !== undefined ? sc.rushYds      : 0.1;
-      var rush100Bonus = sc.rush100Bonus !== undefined ? sc.rush100Bonus : 3;
+      var rush100Bonus = sc.rush100Bonus !== undefined ? sc.rush100Bonus : 0;
       var rec          = sc.rec          !== undefined ? sc.rec          : 1;
       var recTD        = sc.recTD        !== undefined ? sc.recTD        : 6;
       var recYds       = sc.recYds       !== undefined ? sc.recYds       : 0.1;
-      var rec100Bonus  = sc.rec100Bonus  !== undefined ? sc.rec100Bonus  : 3;
+      var rec100Bonus  = sc.rec100Bonus  !== undefined ? sc.rec100Bonus  : 0;
       var fumbLost     = sc.fumbLost     !== undefined ? sc.fumbLost     : -2;
       var twoPt        = sc.twoPt        !== undefined ? sc.twoPt        : 2;
       var defSack      = sc.defSack      !== undefined ? sc.defSack      : 1;
@@ -6486,16 +6488,16 @@ function renderLeague(){
             + row('Passing Touchdown', pts(passTD))
             + row('Interception', pts(passInt))
             + row('Passing Yards', yds(passYds))
-            + row('300+ Yard Bonus', pts(pass300Bonus))
+            + (pass300Bonus ? row('300+ Yard Bonus', pts(pass300Bonus)) : '')
             + sectionHdr('Rushing')
             + row('Rushing Touchdown', pts(rushTD))
             + row('Rushing Yards', yds(rushYds))
-            + row('100+ Yard Bonus', pts(rush100Bonus))
+            + (rush100Bonus ? row('100+ Yard Bonus', pts(rush100Bonus)) : '')
             + sectionHdr('Receiving')
             + row('Receiving Touchdown', pts(recTD))
             + row('Reception (PPR)', pts(rec))
             + row('Receiving Yards', yds(recYds))
-            + row('100+ Yard Bonus', pts(rec100Bonus))
+            + (rec100Bonus ? row('100+ Yard Bonus', pts(rec100Bonus)) : '')
             + sectionHdr('Misc')
             + row('Fumble Lost', pts(fumbLost))
             + row('2-Point Conversion', pts(twoPt))

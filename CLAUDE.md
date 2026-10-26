@@ -83,7 +83,10 @@ locks/salaries, salary dry runs, Sleeper probes, migrations).
   ids can collide. Scoring resolves players through `resolvePlayerStats()` (name-verified,
   same team first, most points wins) — Week 5 Justin Jefferson scored 0.00 before this.
 - **Scoring:** INT thrown −2 and fumble lost −2 (confirmed by the commissioner Oct 23, 2026);
-  Tank01 projection requests must use the same values.
+  Tank01 projection requests must use the same values. **No yardage bonuses in 2026**
+  (commissioner, Oct 26, 2026): they were in the code but never scored (Tank01 doesn't send
+  `pass300`/`rush100`/`rec100`), so they were removed rather than applied retroactively —
+  a what-if showed they'd have changed Last One Standing eliminations and the season #1.
 - **Names:** match with suffixes (Jr./Sr./II/III) and punctuation stripped.
 - **Season standings** must group by uid, not team name (renames split a team in two).
   The team page rank uses `computeSeasonStandings()`, same as the Season table.
@@ -109,6 +112,12 @@ locks/salaries, salary dry runs, Sleeper probes, migrations).
   harness page or a signed-in session.
 
 ## Open items (as of Oct 23, 2026)
+
+- **Yardage bonuses for 2027 and the playoff game** (commissioner wants them back): +3 for
+  300+ passing, 100+ rushing, 100+ receiving yards, computed from the yards in
+  `calcDKPoints` (not Tank01 flags), ideally per league via `settings.scoring.*Bonus` (the
+  rules page in `league.html` already reads those and shows the rows when non-zero). Also
+  update `cloudflare/worker.js` card scoring and the Tank01 projection request to match.
 
 - **Member privacy fix pending:** private member fields should move out of the public
   member records into a commissioner/self-only path (code in `js/auth.js` and Commissioner
