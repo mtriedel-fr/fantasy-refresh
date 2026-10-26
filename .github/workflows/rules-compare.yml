@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Compare live rules with the repo's pre-#19 copy
+      - name: Compare live rules with the repo's current copy
         env:
           FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
           FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
@@ -36,3 +36,4 @@ jobs:
             ann(diffs.length ? 'warning' : 'notice', diffs.length ? `Live rules differ in ${diffs.length} place(s)` : 'Live rules match the repo file', diffs.join('\n').slice(0, 3800) || 'identical');
           }); }).on('error', e => ann('error', 'read failed', e.message));
           SCRIPT
+# rerun 1793036663
