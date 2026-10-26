@@ -1,0 +1,43 @@
+name: Privacy inventory (read-only)
+on:
+  push:
+    branches: [audit/draft-check]
+    paths: ['.github/workflows/privacy-inventory.yml']
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Field names only (no values)
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB = process.env.FIREBASE_DB_URL, T = process.env.FIREBASE_AUTH_TOKEN;
+          const get = p => new Promise((res, rej) => https.get(`${FB}${p}${p.includes('?') ? '&' : '?'}auth=${T}`, r => { let d = ''; r.on('data', c => d += c); r.on('end', () => { try { res(JSON.parse(d)); } catch (e) { rej(new Error(d.slice(0,200))); } }); }).on('error', rej));
+          const esc = s => String(s).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+          const ann = (l, t, m) => console.log(`::${l} title=${esc(t).replace(/:/g,'%3A').replace(/,/g,'%2C')}::${esc(m)}`);
+          const fieldCounts = obj => { const c = {}; Object.values(obj || {}).forEach(r => { if (r && typeof r === 'object') Object.keys(r).forEach(k => c[k] = (c[k] || 0) + 1); }); return c; };
+          (async () => {
+            const leagues = await get('/leagues.json?shallow=true') || {};
+            const out = [];
+            for (const id of Object.keys(leagues)) {
+              const m = await get(`/leagues/${id}/members.json`) || {};
+              out.push(`${id}: ${Object.keys(m).length} members; fields ${JSON.stringify(fieldCounts(m))}`);
+            }
+            ann('notice', 'Member record fields by league', out.join('\n'));
+            const users = await get('/users.json') || {};
+            const uf = fieldCounts(users);
+            const lf = {}; Object.values(users).forEach(u => Object.values((u && u.leagues) || {}).forEach(l => { if (l && typeof l === 'object') Object.keys(l).forEach(k => lf[k] = (lf[k] || 0) + 1); }));
+            ann('notice', '/users fields', `${Object.keys(users).length} users; fields ${JSON.stringify(uf)}; leagues-entry fields ${JSON.stringify(lf)}`);
+            const top = await get('/.json?shallow=true') || {};
+            ann('notice', 'Top-level paths', Object.keys(top).join(', '));
+            const wl = await get('/waitlist.json?shallow=true');
+            ann('notice', 'waitlist', `${wl ? Object.keys(wl).length : 0} entries`);
+            const t26 = await get('/teamNames2026.json');
+            ann('notice', 'teamNames2026 sample shape', JSON.stringify(Object.values(t26 || {}).slice(0, 1)).replace(/[\w.+-]+@[\w.-]+/g, '<email>').slice(0, 400) + ` (${Object.keys(t26 || {}).length} entries)`);
+            const s25 = await get('/season2025.json?shallow=true');
+            ann('notice', 'season2025 keys', Object.keys(s25 || {}).slice(0, 30).join(', '));
+          })().catch(e => { ann('error', 'inventory failed', e.message); process.exit(1); });
+          SCRIPT
