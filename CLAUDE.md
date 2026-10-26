@@ -72,7 +72,9 @@ locks/salaries, salary dry runs, Sleeper probes, migrations).
 - **Injury tags (Oct 24, 2026):** projected players are priced *with* their tag (IR, Out,
   Doubtful…) rather than dropped; only players off a roster are excluded, and backup QBs
   (no projection) still exclude unavailable ones. `injury-status-refresh.yml` updates only
-  the `status` field on the open week's sheet daily (+ Sunday morning). The draft page
+  the `status` field on the open week's sheet daily (+ Sunday morning backup) and, when
+  cron-job.org calls it every 30 min, on game days from 4h before the first kickoff to the
+  last kickoff (`gameDayWindow`; other times it exits immediately). The draft page
   blocks only Out/Suspended (`isOutStatus`), shows tags (`injTag`), and warns teams with an
   Out player in their lineup.
 - **The stored player pool is up to a week stale** when salaries are built; the 7am job

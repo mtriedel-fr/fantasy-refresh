@@ -7,11 +7,25 @@ name: Injury Status Refresh
 # drafting players ruled Out, and warns teams that have one in their lineup.
 # Results (every change + lineups holding an Out player) are annotations on
 # the run — readable in the Actions tab and by Claude.
+#
+# When it runs:
+# - GitHub's own schedule: once a day (~9am CT) so tags are fresh for drafting.
+# - cron-job.org (workflow_dispatch) every 30 minutes, all week. On those runs
+#   the job only does real work on GAME DAYS, from 4 hours before the day's
+#   first kickoff until its last kickoff; otherwise it exits in seconds.
+#   Game days come from the week's schedule, so Thursdays, Mondays, London
+#   games and late-season Saturdays are all covered automatically.
+# - "Run workflow" by hand with force = true runs regardless of the time.
 on:
   schedule:
     - cron: '0 14 * * *'     # daily ~9am CT
-    - cron: '30 15 * * 0'    # Sunday ~10:30am CT, after the final inactives
+    - cron: '30 15 * * 0'    # Sunday ~10:30am CT backup, in case cron-job.org misses
   workflow_dispatch:
+    inputs:
+      force:
+        description: 'Run now even outside game-day hours'
+        required: false
+        default: 'false'
 
 jobs:
   refresh:
@@ -21,6 +35,8 @@ jobs:
         env:
           FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
           FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          FORCE: ${{ inputs.force }}
         run: |
           node << 'SCRIPT'
           const https = require('https');
@@ -38,6 +54,18 @@ jobs:
           // Same rule as the draft page's isOutStatus(): only Out / Suspended block drafting.
           function isOutStatus(s) { return !!s && /^(o|out|sus|suspended)$/i.test(String(s).trim()); }
 
+          // Is `nowMs` inside today's game-day window (US Eastern calendar day)?
+          // Window = 4h before the day's first kickoff → the day's last kickoff.
+          const WINDOW_BEFORE_MS = 4 * 60 * 60 * 1000;
+          function etDay(ms) { return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ms)); }
+          function gameDayWindow(nowMs, games) {
+            const today = etDay(nowMs);
+            const kicks = (games || []).filter(g => g && g.time).map(g => new Date(g.time).getTime()).filter(t => etDay(t) === today).sort((a, b) => a - b);
+            if (!kicks.length) return { gameDay: false, inWindow: false };
+            const start = kicks[0] - WINDOW_BEFORE_MS, end = kicks[kicks.length - 1];
+            return { gameDay: true, inWindow: nowMs >= start && nowMs <= end, start, end };
+          }
+
           (async () => {
             const settings = await req('GET', `/leagues/${LEAGUE_ID}/settings.json`) || {};
             if (!settings.active) { console.log('League not active.'); return; }
@@ -49,6 +77,14 @@ jobs:
             let players = await req('GET', `/leagues/${LEAGUE_ID}/salaries/${season}/week${week}/players.json`);
             if (!players) { week = cur; players = await req('GET', `/leagues/${LEAGUE_ID}/salaries/${season}/week${week}/players.json`); }
             if (!players) { alert('notice', 'Injury refresh: no open sheet', `No salary sheet for week ${cur + 1} or ${cur}.`); return; }
+
+            // cron-job.org runs every 30 min all week; only act on game days.
+            const forced = String(process.env.FORCE || '').toLowerCase() === 'true';
+            if (process.env.GITHUB_EVENT_NAME === 'workflow_dispatch' && !forced) {
+              const sched = await req('GET', `/nflSchedule/${season}/Regular.json`) || {};
+              const w = gameDayWindow(Date.now(), sched.weeks && sched.weeks[`week${week}`]);
+              if (!w.inWindow) { console.log(w.gameDay ? 'Game day, but outside the update window — nothing to do.' : 'Not a game day — nothing to do.'); return; }
+            }
 
             const sl = await getJSON('https://api.sleeper.app/v1/players/nfl');
             const patch = {}, changes = [];
