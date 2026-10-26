@@ -26,7 +26,7 @@ beforeEach(async () => {
   await env.clearDatabase();
   await env.withSecurityRulesDisabled(async ctx => {
     await set(ref(ctx.database(), '/'), {
-      leagues: { [L]: {
+      leagues: { fr_refresh26: { settings: { commissioners: { comm: true } } }, [L]: { // shared caches use the main league's commissioners
         settings: { commissioners: { comm: true }, createdBy: 'owner', name: 'Test' },
         members: {
           alice: { uid: 'alice', teamName: 'A', duesPaid: false, email: 'legacy@x.com' }, // legacy email still public until the move
