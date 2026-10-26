@@ -654,6 +654,19 @@ var STADIUM_TYPE = {
 // the numeric case should ever get a "Q" prefix; a status string
 // already describes itself clearly and reads oddly with "Q" glued onto
 // the front of it ("QHalftime", "QDelayed").
+// Kickoff time in the viewer's own time zone, with its short name
+// ("1:00 PM EDT", "12:00 PM CDT"). Tested in tests/local-times.test.js.
+function localKickoffTime(d){
+  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
+}
+// Day of week (0=Sun) and hour (0-23) of a moment in US Eastern time.
+function etDayHour(d){
+  var parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'short', hour: 'numeric', hourCycle: 'h23' }).formatToParts(d);
+  var wd = '', hr = 0;
+  parts.forEach(function(p){ if(p.type === 'weekday') wd = p.value; if(p.type === 'hour') hr = parseInt(p.value, 10) % 24; });
+  return { day: ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].indexOf(wd), hour: hr };
+}
+
 function formatQuarterLabel(quarter){
   if(quarter == null || quarter === '') return 'Live';
   return /^\d+$/.test(String(quarter)) ? 'Q' + quarter : String(quarter);
@@ -1265,9 +1278,15 @@ function buildGamesBar(games){
       sub = '<div style="font-size:9px;margin-top:2px;font-weight:800;color:#04342C;">'+q+clk+liveScoreLine+'</div>';
     } else if(g.time){
       var d        = new Date(g.time);
-      var day      = d.getDay();
-      var hr       = d.getHours();
-      var timeStr  = d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})+' ET';
+      // TNF/SNF/MNF are defined by Eastern time (an 8:20pm ET kickoff is
+      // 5:20pm in California), so pick the label from ET, not the viewer's
+      // clock. The time itself shows in the VIEWER's own zone, with its
+      // abbreviation (e.g. "12:00 PM CDT") — it used to show local time
+      // labeled "ET", which was wrong for anyone outside Eastern.
+      var et       = etDayHour(d);
+      var day      = et.day;
+      var hr       = et.hour;
+      var timeStr  = localKickoffTime(d);
       var days     = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
       var dayLabel;
       // MNF/SNF/TNF are specific, official NFL prime-time broadcast
