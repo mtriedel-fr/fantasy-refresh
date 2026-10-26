@@ -1,0 +1,38 @@
+name: Live rules compare (read-only)
+on:
+  push:
+    branches: [audit/draft-check]
+    paths: ['.github/workflows/rules-compare.yml']
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compare live rules with the repo's pre-#19 copy
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https'), fs = require('fs');
+          const FB = process.env.FIREBASE_DB_URL, T = process.env.FIREBASE_AUTH_TOKEN;
+          const esc = s => String(s).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+          const ann = (l, t, m) => console.log(`::${l} title=${esc(t).replace(/:/g,'%3A').replace(/,/g,'%2C')}::${esc(m)}`);
+          https.get(`${FB}/.settings/rules.json?auth=${T}`, r => { let d = ''; r.on('data', c => d += c); r.on('end', () => {
+            if (r.statusCode !== 200) return ann('error', 'Could not read live rules', `HTTP ${r.statusCode}`);
+            // Live rules may contain comments; strip them before parsing.
+            const strip = s => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+            let live; try { live = JSON.parse(strip(d)); } catch (e) { return ann('warning', 'Live rules not plain JSON', e.message + ' — length ' + d.length); }
+            const file = JSON.parse(fs.readFileSync('.github/rules-before-19.json', 'utf8'));
+            const diffs = [];
+            (function walk(a, b, p) {
+              const keys = new Set([...Object.keys(a || {}), ...Object.keys(b || {})]);
+              for (const k of keys) {
+                const x = a ? a[k] : undefined, y = b ? b[k] : undefined;
+                if (typeof x === 'object' && typeof y === 'object' && x && y) walk(x, y, p + '/' + k);
+                else if (JSON.stringify(x) !== JSON.stringify(y)) diffs.push(`${p}/${k}: live=${JSON.stringify(x)} file=${JSON.stringify(y)}`);
+              }
+            })(live, file, '');
+            ann(diffs.length ? 'warning' : 'notice', diffs.length ? `Live rules differ in ${diffs.length} place(s)` : 'Live rules match the repo file', diffs.join('\n').slice(0, 3800) || 'identical');
+          }); }).on('error', e => ann('error', 'read failed', e.message));
+          SCRIPT
