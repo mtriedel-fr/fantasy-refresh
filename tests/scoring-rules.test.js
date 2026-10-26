@@ -26,3 +26,18 @@ test('Runbook shows -2 for both', () => {
   assert.match(r, /Interception \(thrown\)<\/td><td[^>]*>-2</);
   assert.match(r, /Fumble lost<\/td><td[^>]*>-2</);
 });
+
+test('no yardage bonuses in 2026: 300+ passing / 100+ rushing or receiving score only their yards', () => {
+  const S = { calcDKPoints };
+  // Even if a feed someday sends bonus flags, 2026 scoring ignores them.
+  const qb = { Passing: { passYds: '350' }, pass300: 1 };
+  assert.strictEqual(S.calcDKPoints(qb, 'QB').pts, 14);
+  const rb = { Rushing: { rushYds: '120' }, Receiving: { recYds: '100', receptions: '0' }, rush100: 1, rec100: 1 };
+  assert.strictEqual(S.calcDKPoints(rb, 'RB').pts, 22);
+});
+
+test('league rules page hides yardage bonus rows unless a league sets them', () => {
+  const s = read('league.html');
+  assert.ok(s.includes("sc.pass300Bonus : 0;") && s.includes("sc.rush100Bonus : 0;") && s.includes("sc.rec100Bonus  : 0;"));
+  assert.ok(s.includes("(pass300Bonus ? row('300+ Yard Bonus'"));
+});

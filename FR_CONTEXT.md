@@ -148,11 +148,9 @@ var CAP_PER_PLAYER = 6667;  // $60k / 9 players
 | Pass yard | 0.04 |
 | Pass TD | 4 |
 | INT thrown | -2 |
-| 300+ pass yd bonus | +3 |
 | Rush/Rec yard | 0.1 |
 | Rush/Rec TD | 6 |
 | Reception | 1 |
-| 100+ rush/rec bonus | +3 |
 | Fumble lost | -2 |
 | 2pt conversion | +2 |
 | DEF sack/INT/FR | +1/+2/+2 |
