@@ -22,12 +22,13 @@ jobs:
             const L = '/leagues/fr_refresh26';
             const s = await get(`${L}/settings.json`) || {};
             ann('notice', 'Scoring settings', JSON.stringify(s.scoring || null));
-            ann('notice', 'Dues settings', JSON.stringify({ entryFee: s.entryFee, prizePool: s.prizePool, duesReminder: s.duesReminder, duesMessage: s.duesMessage == null ? null : s.duesMessage }));
+            ann('notice', 'Dues settings', JSON.stringify({ entryFee: s.entryFee, prizePool: s.prizePool, duesReminder: s.duesReminder, hasDuesMessage: !!s.duesMessage }));
             const m = await get(`${L}/members.json`) || {};
             const comm = s.commissioners || {};
             const rows = Object.entries(m).filter(([u, v]) => v && (v.teamName || v.displayName)).map(([u, v]) =>
               `${v.teamName || '(no team)'} · ${v.displayName || '(no name)'} · ${v.duesPaid === true ? 'PAID' : 'unpaid'}${v.duesClaimedAt ? ' · claimed' : ''}${(comm[u] === true || s.createdBy === u) ? ' · COMMISSIONER' : ''}`);
             const unpaid = rows.filter(r => /unpaid/.test(r) && !/COMMISSIONER/.test(r));
-            ann('notice', `Members ${rows.length} · would see pop-up ${unpaid.length}`, rows.sort().join('\n'));
+            // Public repo: counts only — never names, emails or payment status per person.
+            ann('notice', 'Dues counts', `Members ${rows.length} · unpaid (would see pop-up) ${unpaid.length}`);
           })().catch(e => { ann('error', 'dues check failed', e.message); process.exit(1); });
           SCRIPT
