@@ -94,6 +94,12 @@ locks/salaries, salary dry runs, Sleeper probes, migrations).
 - **Injury check pop-up** (`js/injury-alert.js`, on home/league/draft): lists the team's
   open-week lineup players tagged Out/IR/Doubtful/Questionable whose game hasn't started,
   using the sheet's current tags; shown once per device per week unless the list changes.
+- **Dues pop-up** (`js/dues-alert.js`, on home/league/draft): unpaid members (not
+  commissioners) see the entry fee + `settings.duesMessage`. "I've paid" writes
+  `members/{uid}/duesClaimedAt` (trackers show "Says paid"/"Pending"); "Remind me later"
+  snoozes for the day on that device. Marking Unpaid or "not received" clears the claim.
+  `settings.duesReminder === false` turns it off. Members can write their own record, so a
+  claim is only a claim — `duesPaid` is the commissioner's call.
 - GitHub's own cron runs late and unreliably; anything time-critical is triggered by
   cron-job.org via `workflow_dispatch`.
 - The draft page redirects signed-out visitors, so browser tests of draft UI need a
