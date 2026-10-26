@@ -24,7 +24,7 @@ jobs:
         run: |
           echo '{ "emulators": { "database": { "port": 9000 } } }' > firebase.json
           set +e
-          npx firebase emulators:exec --only database --project fr-rules-test "node --test --test-reporter=tap tests/rules/" > rules-out.txt 2>&1
+          npx firebase emulators:exec --only database --project fr-rules-test "node --test --test-reporter=tap tests/rules/rules.test.mjs" > rules-out.txt 2>&1
           code=$?
           # Run logs aren't readable everywhere, so report results as annotations.
           node -e '
