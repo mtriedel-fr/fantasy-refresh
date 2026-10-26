@@ -91,6 +91,9 @@ locks/salaries, salary dry runs, Sleeper probes, migrations).
   *submitted* lineup (`submittedIds` in `draft.html`). In an unsubmitted, browser-saved
   draft he must be swapped out before submitting (`isStartedUnsubmitted`); submitted
   started players stay locked (`isLockedIn`) while the rest of the roster stays editable.
+- **Injury check pop-up** (`js/injury-alert.js`, on home/league/draft): lists the team's
+  open-week lineup players tagged Out/IR/Doubtful/Questionable whose game hasn't started,
+  using the sheet's current tags; shown once per device per week unless the list changes.
 - GitHub's own cron runs late and unreliably; anything time-critical is triggered by
   cron-job.org via `workflow_dispatch`.
 - The draft page redirects signed-out visitors, so browser tests of draft UI need a
