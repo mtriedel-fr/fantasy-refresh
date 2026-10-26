@@ -24,7 +24,7 @@ jobs:
         env:
           FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
           FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
-          DRY_RUN: 'true'
+          DRY_RUN: 'false'
         run: |
           node << 'SCRIPT'
           const https = require('https');
@@ -71,7 +71,7 @@ jobs:
             const counts = {};
             plan.forEach(x => { const c = counts[x.L] = counts[x.L] || { records: 0, emailsCopied: 0, claimsCopied: 0, alreadyPrivate: 0 };
               c.records++; if (x.privPatch.email) c.emailsCopied++; else c.alreadyPrivate++; if (x.privPatch.duesClaimedAt) c.claimsCopied++; });
-            ann('notice', DRY ? 'DRY RUN — plan' : 'Plan', Object.entries(counts).map(([L, c]) => `${L}: ${c.records} public records with private fields; ${c.emailsCopied} emails to copy (${c.alreadyPrivate} already private); ${c.claimsCopied} dues claims to copy`).join('\n') + `\n/users records with an email to remove: ${userClears.length}`);
+            ann('notice', DRY ? 'DRY RUN — plan' : 'Plan', Object.entries(counts).map(([L, c]) => `${L}: ${c.records} public records with private fields; ${c.emailsCopied} emails to copy (${c.alreadyPrivate} already private or blank); ${c.claimsCopied} dues claims to copy`).join('\n') + `\n/users records with an email to remove: ${userClears.length}`);
             if (DRY) return;
 
             const backupKey = `/backups/memberPrivacyMove_${backup.at}`;
