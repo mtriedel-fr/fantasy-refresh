@@ -1,0 +1,43 @@
+name: Player card check (read-only)
+on:
+  push:
+    branches: [audit/draft-check]
+    paths: ['.github/workflows/card-check.yml']
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Archive + worker player-card data
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB = process.env.FIREBASE_DB_URL, T = process.env.FIREBASE_AUTH_TOKEN;
+          const getUrl = u => new Promise((res, rej) => https.get(u, r => { let d = ''; r.on('data', c => d += c); r.on('end', () => { try { res(JSON.parse(d)); } catch (e) { rej(new Error(d.slice(0, 200))); } }); }).on('error', rej));
+          const get = p => getUrl(`${FB}${p}?auth=${T}`);
+          const esc = s => String(s).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+          const ann = (l, t, m) => console.log(`::${l} title=${esc(t).replace(/:/g,'%3A').replace(/,/g,'%2C')}::${esc(m)}`);
+          const W = 'https://fantasy-refresh-news.mtriedel.workers.dev';
+          (async () => {
+            const arch = await get('/nflStatsArchive/2026/Regular_wk7.json') || {};
+            const pl = Object.entries(arch.players || {});
+            const byPos = {}; pl.forEach(([k, p]) => { byPos[p.pos || '(empty)'] = (byPos[p.pos || '(empty)'] || 0) + 1; });
+            const snaps = pl.map(([k, p]) => p.snapPct).filter(v => v != null);
+            const emptyPos = pl.filter(([k, p]) => !p.pos && (p.rushYds || p.recYds || p.passYds)).map(([k, p]) => `${p.name} ${p.team} pts=${p.pts}`);
+            const zeroSnap = pl.filter(([k, p]) => p.snapPct === 0 && (p.rushYds || p.recYds || p.passYds)).length;
+            const nullSnap = pl.filter(([k, p]) => p.snapPct == null).length;
+            ann('notice', 'wk7 archive', `players ${pl.length}; byPos ${JSON.stringify(byPos)}; snap sample ${JSON.stringify(snaps.slice(0, 15))}; zero-snap-with-yards ${zeroSnap}; null snap ${nullSnap}\nEmpty pos with yards (${emptyPos.length}): ${emptyPos.slice(0, 60).join('; ')}`);
+            const samp = ['justin jefferson', 'aj brown', 'marvin harrison jr', 'kenneth walker iii', 'harold fannin jr', 'travis kelce'].map(k => `${k}: ${JSON.stringify(arch.players && arch.players[k])}`);
+            ann('notice', 'wk7 sample rows', samp.join('\n').slice(0, 3800));
+            const who = [['Justin Jefferson','MIN','WR'],['Marvin Harrison','ARI','WR'],['Marvin Harrison Jr.','ARI','WR'],['Kenneth Walker','SEA','RB'],['Harold Fannin','CLE','TE'],['Travis Kelce','KC','TE'],['A.J. Brown','NE','WR']];
+            for (const [n, t, p] of who) {
+              try {
+                const r = await getUrl(`${W}/playerhistory?name=${encodeURIComponent(n)}&team=${t}&pos=${p}&season=2026&currentWeek=8`);
+                const rows = (r.weeks || []).filter(w => w.week >= 4 && w.week <= 8 && w.seasonType === 'Regular').map(w => `wk${w.week} ${w.opp} pts=${w.pts} rank=${w.rank} snp=${w.snapPct}${w.isProjection ? ' proj' : ''}`);
+                ann('notice', `worker ${n}`, rows.join('\n') || JSON.stringify(r).slice(0, 500));
+              } catch (e) { ann('warning', `worker ${n}`, e.message); }
+            }
+          })().catch(e => { ann('error', 'card check failed', e.message); process.exit(1); });
+          SCRIPT
