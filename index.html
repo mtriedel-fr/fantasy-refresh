@@ -4673,7 +4673,6 @@ submitSignUp: function(){
     Promise.all([
       frDbSet('/leagues/'+targetLeague+'/members/'+uid, {
         uid:        uid,
-        email:      email,
         teamName:   teamName,
         displayName: frAuth.user.displayName || '',
         joined:     Date.now(),
@@ -4683,6 +4682,8 @@ submitSignUp: function(){
       }),
       frDbSet('/teamNames2026/'+encodeURIComponent(teamName.toLowerCase()),
               {uid:uid, team:teamName})
+      // (Email is private and no longer stored on the public member record;
+      // the next sign-in saves it to /memberPrivate — see js/auth.js signIn.)
     ]).then(function(){
       frAuth.user.teamName = teamName;
       frAuth.user.team2026 = teamName;

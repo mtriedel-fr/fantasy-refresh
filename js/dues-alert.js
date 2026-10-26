@@ -5,7 +5,8 @@
 // payment instructions (Commissioner Tools → Dues message). Two choices:
 //   • "I've paid"        → asks how (Venmo/PayPal/Cash/Other), the date and
 //                           optionally the name/handle it came from, then saves
-//                           members/{uid}/duesClaimedAt + duesClaim so the
+//                           duesClaimedAt + duesClaim to the member's PRIVATE
+//                           record (/memberPrivate/{league}/{uid}) so the
 //                           commissioner sees "Says paid" in the dues tracker
 //                           and can confirm with the Paid toggle. The pop-up
 //                           stops for that member.
@@ -159,20 +160,30 @@
       var snoozed = null;
       try { snoozed = localStorage.getItem(snoozeKey); } catch (e) {}
       if (snoozed === dayKey(Date.now())) return; // skip the reads entirely
+      // The claim lives in the member's private record (only they and the
+      // commissioners can read it); older claims may still be on the public
+      // record until the one-time move runs, so either one counts.
+      var privPath = FR.paths.memberPrivate ? FR.paths.memberPrivate(user.uid) : null;
       Promise.all([
         FR.fb.get(FR.paths.member(user.uid)),
-        FR.fb.get(FR.paths.settings())
+        FR.fb.get(FR.paths.settings()),
+        privPath && FR.fb.getAuth ? FR.fb.getAuth(privPath) : null
       ]).then(function (r) {
-        var member = r[0], settings = r[1] || {};
+        var member = r[0], settings = r[1] || {}, priv = r[2];
+        if (member && priv && priv.duesClaimedAt) member = Object.assign({}, member, { duesClaimedAt: priv.duesClaimedAt });
         if (!shouldShow(member, user.uid, settings, snoozed, Date.now())) return;
         show({
           settings: settings,
           name: member.displayName || '',
           onLater: function () { try { localStorage.setItem(snoozeKey, dayKey(Date.now())); } catch (e) {} },
           onPaid: function (claim) {
-            return FR.fb.patch(FR.paths.member(user.uid), { duesClaimedAt: Date.now(), duesClaim: claim }).then(function (res) {
-              if (res && res.error) throw new Error(res.error);
-            });
+            var body = { duesClaimedAt: Date.now(), duesClaim: claim };
+            var ok = function (res) { if (res && res.error) throw new Error(res.error); };
+            // Private record first. If the database rules for it aren't
+            // published yet, fall back to the public record (the move picks
+            // it up later) so the member never sees an error.
+            var first = privPath ? FR.fb.patch(privPath, body).then(ok) : Promise.reject(new Error('no private path'));
+            return first.catch(function () { return FR.fb.patch(FR.paths.member(user.uid), body).then(ok); });
           }
         });
       }).catch(function () {});
