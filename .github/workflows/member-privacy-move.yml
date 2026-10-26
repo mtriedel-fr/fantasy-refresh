@@ -1,0 +1,102 @@
+name: Member privacy — one-time move
+
+# ONE-TIME data move (commissioner-approved, Oct 2026): copies each member's
+# email and dues payment claim from the PUBLIC member record
+# (/leagues/{id}/members/{uid}) into the PRIVATE record
+# (/memberPrivate/{id}/{uid}), verifies the copy, and only then deletes those
+# fields from the public record. Also removes the 2 stray emails in /users.
+#
+# This repo is public, so nothing private is printed: annotations show counts
+# only. A full backup of every field it touches is saved first to
+# /backups/memberPrivacyMove_<time> (not publicly readable).
+#
+# DRY_RUN=true reports what it would do without writing anything.
+on:
+  push:
+    branches: [ops/member-privacy-move]
+    paths: ['.github/workflows/member-privacy-move.yml']
+
+jobs:
+  move:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Move private member fields
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+          DRY_RUN: 'true'
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB = process.env.FIREBASE_DB_URL, T = process.env.FIREBASE_AUTH_TOKEN;
+          const DRY = process.env.DRY_RUN === 'true';
+          function req(method, p, body) {
+            return new Promise((res, rej) => {
+              const u = new URL(`${FB}${p}${p.includes('?') ? '&' : '?'}auth=${T}`);
+              const data = body === undefined ? null : JSON.stringify(body);
+              const r = https.request({ hostname: u.hostname, path: u.pathname + u.search, method,
+                headers: data ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) } : {} }, resp => {
+                let d = ''; resp.on('data', c => d += c);
+                resp.on('end', () => { if (resp.statusCode >= 300) return rej(new Error(`${method} ${p.split('?')[0]} HTTP ${resp.statusCode}`)); try { res(JSON.parse(d)); } catch (e) { res(null); } });
+              });
+              r.on('error', rej); if (data) r.write(data); r.end();
+            });
+          }
+          const get = p => req('GET', p), patch = (p, b) => req('PATCH', p, b), put = (p, b) => req('PUT', p, b);
+          const esc = s => String(s).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+          const ann = (l, t, m) => console.log(`::${l} title=${esc(t).replace(/:/g,'%3A').replace(/,/g,'%2C')}::${esc(m)}`);
+          const FIELDS = ['email', 'duesClaimedAt', 'duesClaim'];
+          (async () => {
+            const leagues = Object.keys(await get('/leagues.json?shallow=true') || {});
+            const backup = { at: Date.now(), leagues: {}, users: {} };
+            const plan = []; // { league, uid, privPatch, pubClear }
+            for (const L of leagues) {
+              const members = await get(`/leagues/${L}/members.json`) || {};
+              const priv = await get(`/memberPrivate/${L}.json`) || {};
+              for (const [uid, m] of Object.entries(members)) {
+                if (!m || typeof m !== 'object') continue;
+                const present = FIELDS.filter(f => m[f] !== undefined && m[f] !== null);
+                if (!present.length) continue;
+                (backup.leagues[L] = backup.leagues[L] || {})[uid] = Object.fromEntries(present.map(f => [f, m[f]]));
+                const p = priv[uid] || {};
+                const privPatch = {};
+                if (m.email && !p.email) privPatch.email = m.email;
+                if (m.duesClaimedAt && !p.duesClaimedAt) { privPatch.duesClaimedAt = m.duesClaimedAt; if (m.duesClaim) privPatch.duesClaim = m.duesClaim; }
+                plan.push({ L, uid, privPatch, pubClear: Object.fromEntries(present.map(f => [f, null])) });
+              }
+            }
+            const users = await get('/users.json') || {};
+            const userClears = Object.entries(users).filter(([, u]) => u && u.email).map(([uid, u]) => { backup.users[uid] = { email: u.email }; return uid; });
+
+            const counts = {};
+            plan.forEach(x => { const c = counts[x.L] = counts[x.L] || { records: 0, emailsCopied: 0, claimsCopied: 0, alreadyPrivate: 0 };
+              c.records++; if (x.privPatch.email) c.emailsCopied++; else c.alreadyPrivate++; if (x.privPatch.duesClaimedAt) c.claimsCopied++; });
+            ann('notice', DRY ? 'DRY RUN — plan' : 'Plan', Object.entries(counts).map(([L, c]) => `${L}: ${c.records} public records with private fields; ${c.emailsCopied} emails to copy (${c.alreadyPrivate} already private); ${c.claimsCopied} dues claims to copy`).join('\n') + `\n/users records with an email to remove: ${userClears.length}`);
+            if (DRY) return;
+
+            const backupKey = `/backups/memberPrivacyMove_${backup.at}`;
+            await put(`${backupKey}.json`, backup);
+            const check = await get(`${backupKey}/at.json`);
+            if (check !== backup.at) throw new Error('Backup did not save — stopping before any change');
+            ann('notice', 'Backup saved', `${backupKey} (${plan.length} member records, ${userClears.length} user records). Not publicly readable.`);
+
+            let copied = 0, cleared = 0, skipped = 0;
+            for (const x of plan) {
+              if (Object.keys(x.privPatch).length) { await patch(`/memberPrivate/${x.L}/${x.uid}.json`, x.privPatch); copied++; }
+              // Verify the private copy before touching the public record.
+              const now = await get(`/memberPrivate/${x.L}/${x.uid}.json`) || {};
+              const pubNow = await get(`/leagues/${x.L}/members/${x.uid}.json`) || {};
+              const ok = (!pubNow.email || now.email) && (!pubNow.duesClaimedAt || now.duesClaimedAt);
+              if (!ok) { skipped++; continue; }
+              await patch(`/leagues/${x.L}/members/${x.uid}.json`, x.pubClear); cleared++;
+            }
+            for (const uid of userClears) await patch(`/users/${uid}.json`, { email: null });
+
+            // Final check: no public member record or /users record still has an email.
+            let left = 0;
+            for (const L of leagues) { const mm = await get(`/leagues/${L}/members.json`) || {}; left += Object.values(mm).filter(m => m && (m.email || m.duesClaimedAt || m.duesClaim)).length; }
+            const uLeft = Object.values(await get('/users.json') || {}).filter(u => u && u.email).length;
+            ann(left || uLeft || skipped ? 'warning' : 'notice', 'Move finished',
+              `Private copies written: ${copied}. Public records cleaned: ${cleared}. Skipped (copy didn't verify): ${skipped}. /users emails removed: ${userClears.length}.\nStill public afterwards: ${left} member records, ${uLeft} user records (should both be 0).`);
+          })().catch(e => { ann('error', 'Move failed', e.message); process.exit(1); });
+          SCRIPT
