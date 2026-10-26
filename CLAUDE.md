@@ -103,6 +103,17 @@ locks/salaries, salary dry runs, Sleeper probes, migrations).
   snoozes for the day on that device. Marking Unpaid or "not received" clears the claim.
   `settings.duesReminder === false` turns it off. Members can write their own record, so a
   claim is only a claim — `duesPaid` is the commissioner's call.
+- **Cloudflare Worker** source is `cloudflare/worker.js` (added Oct 26, 2026). It is NOT
+  auto-deployed: after a change merges, the commissioner pastes the file into the
+  Cloudflare dashboard (Workers & Pages → fantasy-refresh-news → Edit code → Deploy). The
+  Tank01 key is the `TANK01_API_KEY` binding, never in the file. Its scoring must match
+  `calcDKPoints` (INT/fumble −2; no yardage bonuses are actually applied — Tank01 never
+  sends `pass300`/`rush100`/`rec100`). Bump `HISTORY_CACHE_SCHEMA` in `draft.html` when
+  `/playerhistory` output changes, and deploy the worker *before* merging that bump.
+- **Player-card archive** (`/nflStatsArchive/{season}/Regular_wk{N}`): snap counts aren't in
+  Tank01 box scores the night a game ends, so the Tuesday lock run
+  (`refreshArchiveDetails`) re-fetches finished weeks that lack snap % or positions.
+  Positions come from `posForStats` (Sleeper id → Tank01 id → name → suffix-free name).
 - GitHub's own cron runs late and unreliably; anything time-critical is triggered by
   cron-job.org via `workflow_dispatch`.
 - The draft page redirects signed-out visitors, so browser tests of draft UI need a
@@ -113,7 +124,5 @@ locks/salaries, salary dry runs, Sleeper probes, migrations).
 - **Member privacy fix pending:** private member fields should move out of the public
   member records into a commissioner/self-only path (code in `js/auth.js` and Commissioner
   Tools, a data migration, and a rules update). Needs commissioner approval.
-- Cloudflare Worker source isn't in the repo yet (player-card rank/SNP%/suffix issues live
-  there).
 - `preseason.html` / `archive2025.html` use a `COMM_PW` constant visible in page source — a
   soft gate only.

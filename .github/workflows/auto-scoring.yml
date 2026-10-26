@@ -1032,6 +1032,11 @@ jobs:
               for (const leagueId of leagues) {
                 await lockLeague(leagueId, week);
               }
+              // Player-card data: snap counts aren't in Tank01's box scores
+              // yet when the archive is first written (the night a game
+              // ends), so fill them in now, plus any missing positions.
+              try { await refreshArchiveDetails(seasonType, week); }
+              catch (e) { alert('warning', 'Player-card archive refresh failed', e.message); }
               return;
             }
 
@@ -1334,7 +1339,7 @@ jobs:
                 // of whether their exact position is confirmed.
                 const result = calcDKPoints(stats, null);
                 if (result.pts !== 0 || result.breakdown.length) {
-                  const realPos = name ? realPosLookup[name] : null;
+                  const realPos = name ? (posForStats(realPosLookup, stats) || null) : null;
                   thisGameStats.push({
                     name: stats.longName || stats.playerName || 'Unknown',
                     team: stats.team || stats.teamAbv || '',
@@ -1529,11 +1534,104 @@ jobs:
               // silently make this lookup always fail to find the real
               // pool during exactly the runs that most need it.
               const pool = await firebaseGet(`/playerPool/${BASE_SEASON}/players.json`);
-              Object.values(pool || {}).forEach(p => {
-                if (p && p.name) playerPosLookup[p.name.toLowerCase()] = p.pos || '';
+              // Indexed several ways (see posForStats): by Sleeper id, by
+              // Tank01 id, by exact lowercased name, and by suffix/punctuation-
+              // stripped name. Exact-name only left every "Jr."/"III" player
+              // (Tank01 "Harold Fannin Jr." vs Sleeper "Harold Fannin") with
+              // no position — 26 scoring players in Week 7 — so the player
+              // card couldn't rank them.
+              const bySleeper = {}, byT01 = {}, byNorm = {};
+              Object.entries(pool || {}).forEach(([sid, p]) => {
+                if (!p || !p.pos) return;
+                bySleeper[sid] = p.pos;
+                if (p.tank01PlayerID) byT01[String(p.tank01PlayerID)] = p.pos;
+                if (p.name) {
+                  playerPosLookup[p.name.toLowerCase()] = p.pos;
+                  const nk = normPlayerName(p.name);
+                  (byNorm[nk] = byNorm[nk] || []).push({ pos: p.pos, team: normTeamSC(p.team) });
+                }
               });
+              Object.defineProperty(playerPosLookup, '_ids', { value: { bySleeper, byT01, byNorm } });
             } catch(e) { console.error('  Could not load player pool for position lookup:', e.message); }
             return playerPosLookup;
+          }
+
+          // Position for one box-score entry: Sleeper id, then Tank01 id, then
+          // exact name, then suffix-stripped name (same team preferred when
+          // two players share a name). '' when nothing matches.
+          function posForStats(lookup, stats) {
+            if (!lookup || !stats) return '';
+            const ids = lookup._ids || {};
+            if (stats.sleeperBotID && ids.bySleeper && ids.bySleeper[stats.sleeperBotID]) return ids.bySleeper[stats.sleeperBotID];
+            if (stats.playerID && ids.byT01 && ids.byT01[String(stats.playerID)]) return ids.byT01[String(stats.playerID)];
+            const name = String(stats.longName || stats.playerName || '').toLowerCase();
+            if (name && lookup[name]) return lookup[name];
+            const cands = (ids.byNorm && ids.byNorm[normPlayerName(name)]) || [];
+            if (!cands.length) return '';
+            const team = normTeamSC(stats.team || stats.teamAbv);
+            const same = cands.find(c => c.team === team);
+            return (same || cands[0]).pos || '';
+          }
+
+          // Which archive entries need a snap % or a position, given a fresh
+          // box score. Pure (tests/player-card.test.js). Returns a multi-path
+          // PATCH body for .../players — only for entries already archived.
+          function archiveDetailUpdates(archivedPlayers, boxPlayerStats, lookup) {
+            const updates = {};
+            const seen = new Set();
+            Object.values(boxPlayerStats || {}).forEach(st => {
+              const display = st && (st.longName || st.playerName);
+              if (!display) return;
+              const key = sanitizeFirebaseKey(display.toLowerCase());
+              if (seen.has(key)) return;
+              const cur = archivedPlayers && archivedPlayers[key];
+              if (!cur) return;
+              seen.add(key);
+              if (cur.snapPct == null && st.snapCounts && st.snapCounts.offSnapPct != null) {
+                const v = parseFloat(st.snapCounts.offSnapPct);
+                if (!isNaN(v)) updates[`${key}/snapPct`] = v;
+              }
+              if (!cur.pos) {
+                const pos = posForStats(lookup, st);
+                if (pos) updates[`${key}/pos`] = pos;
+              }
+            });
+            return updates;
+          }
+
+          // Fill snap % and missing positions for every finished week of the
+          // season whose archive still lacks them. The first run catches up
+          // all earlier weeks (~15 box scores each); after that it's one week.
+          async function refreshArchiveDetails(seasonType, throughWeek) {
+            const lookup = await getPlayerPosLookup();
+            const report = [];
+            for (let w = 1; w <= throughWeek; w++) {
+              const archiveKey = `${seasonType}_wk${w}`;
+              const arch = await firebaseGet(`/nflStatsArchive/${SEASON}/${archiveKey}.json`).catch(() => null);
+              if (!arch || !arch.players) continue;
+              const offense = Object.values(arch.players).filter(p => p && p.pos !== 'DEF' && (p.rushYds || p.recYds || p.passYds));
+              const needSnaps = offense.filter(p => p.snapPct == null).length;
+              const needPos = offense.filter(p => !p.pos).length;
+              if (!needSnaps && !needPos) continue;
+              let snaps = 0, pos = 0, fetched = 0;
+              for (const g of (arch.games || [])) {
+                if (!g || !g.gameId) continue;
+                const bs = await t01(`/getNFLBoxScore?gameID=${g.gameId}&fantasyPoints=true&PPRScoring=true`).catch(() => null);
+                const body = bs && (bs.body || bs);
+                if (!body || !body.playerStats) continue;
+                fetched++;
+                const upd = archiveDetailUpdates(arch.players, body.playerStats, lookup);
+                const n = Object.keys(upd).length;
+                if (!n) continue;
+                await firebasePatch(`/nflStatsArchive/${SEASON}/${archiveKey}/players.json`, upd);
+                Object.keys(upd).forEach(k => { if (k.endsWith('/snapPct')) snaps++; else pos++; });
+                // Keep the in-memory copy current so a player listed in two
+                // box scores isn't counted twice.
+                Object.entries(upd).forEach(([k, v]) => { const [pk, f] = k.split('/'); arch.players[pk][f] = v; });
+              }
+              report.push(`Week ${w}: ${fetched} box scores, ${snaps} snap % and ${pos} positions filled (had ${needSnaps} / ${needPos} missing)`);
+            }
+            if (report.length) alert('notice', 'Player-card archive refreshed', report.join('\n'));
           }
 
           async function archiveWeekStats(games, playerStats, seasonType, week) {
@@ -1616,7 +1714,7 @@ jobs:
               // pos empty and skipping the entire DEF-specific scoring
               // block in calcDKPoints. ptsAllowed only ever exists on a
               // DST-merged entry, so its presence is a reliable signal.
-              const posForScoring = (stats.ptsAllowed !== undefined) ? 'DEF' : (posLookup[name] || '');
+              const posForScoring = (stats.ptsAllowed !== undefined) ? 'DEF' : posForStats(posLookup, stats);
               players[sanitizeFirebaseKey(name)] = {
                 name:    displayName,
                 team,

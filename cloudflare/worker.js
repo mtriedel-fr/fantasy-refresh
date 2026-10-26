@@ -258,10 +258,10 @@ async function handleScore(url) {
   if (!gameId) return new Response(JSON.stringify({ error: 'gameId required' }), { status: 400, headers: CORS });
 
   const scoring = [
-    'passYds=0.04','passTD=4','passInt=-1',
+    'passYds=0.04','passTD=4','passInt=-2',
     'rushYds=0.1','rushTD=6',
     'recYds=0.1','recTD=6','rec=1',
-    'fumbLost=-1','twoPt=2',
+    'fumbLost=-2','twoPt=2',
     'defSack=1','defInt=2','defFR=2','defTD=6','defSafety=2','defBlkKick=2',
     'defPA0=10','defPA1_6=7','defPA7_13=4','defPA14_20=1',
     'defPA21_27=0','defPA28_34=-1','defPA35plus=-4',
@@ -329,11 +329,14 @@ async function handleNews(url) {
       // being ABOUT them specifically. Keeping only items whose title
       // genuinely leads with this player's name (full or last name)
       // filters that generic content back out.
-      const lastName = name.trim().split(/\s+/).pop() || name;
-      const nameLower = name.toLowerCase();
+      // Last name without a suffix — "Marvin Harrison Jr." → "harrison",
+      // not "jr." (which matched no headline, so suffix players got no news).
+      const plain = normNameKey(name);
+      const lastName = plain.split(' ').pop() || name;
+      const nameLower = plain;
       const lastLower = lastName.toLowerCase();
       const onTopic = raw.filter(n => {
-        const t = (n.title || '').toLowerCase();
+        const t = normNameKey(n.title || '');
         return t.startsWith(nameLower) || t.startsWith(lastLower + ':') || t.startsWith(lastLower + ' ');
       });
 
@@ -361,9 +364,9 @@ async function handleNews(url) {
     const data = await res.json();
     const raw  = Array.isArray(data.body) ? data.body : [];
 
-    const nameLower = name.toLowerCase();
+    const nameLower = normNameKey(name);
     const matched = raw.filter(n => {
-      const text = ((n.title||'') + ' ' + (n.headline||'')).toLowerCase();
+      const text = normNameKey((n.title||'') + ' ' + (n.headline||''));
       return text.includes(nameLower);
     });
 
@@ -406,10 +409,10 @@ async function handlePlayerSchedule(url) {
   // Fantasy Refresh's exact scoring — matches the league scoring table
   // (see SALARY_METHODOLOGY.md / ARCHITECTURE.md), not generic PPR.
   const scoring = [
-    'passYds=0.04','passTD=4','passInt=-1',
+    'passYds=0.04','passTD=4','passInt=-2',
     'rushYds=0.1','rushTD=6',
     'recYds=0.1','recTD=6','rec=1',
-    'fumbLost=-1','twoPt=2',
+    'fumbLost=-2','twoPt=2',
     'fantasyPoints=true','PPRScoring=true'
   ].join('&');
 
@@ -438,7 +441,7 @@ async function handlePlayerSchedule(url) {
         if (!data) return null;
         const stats = (data.body && data.body.playerStats) || {};
         const match = Object.values(stats).find(s =>
-          (s.longName || s.playerName || '').toLowerCase() === name.toLowerCase()
+          normNameKey(s.longName || s.playerName) === normNameKey(name)
         );
         return match ? parseFloat(match.fantasyPoints || 0) : null;
       })
@@ -459,6 +462,18 @@ async function handlePlayerSchedule(url) {
   return new Response(JSON.stringify({ name, team, season, schedule }), { headers: CORS });
 }
 
+// Canonical name for matching across Sleeper and Tank01: lowercase, no
+// punctuation, no generational suffix (Jr/Sr/II/III/IV/V). "Harold Fannin"
+// (Sleeper, how the site asks) = "Harold Fannin Jr." (Tank01, how stats are
+// stored).
+function normNameKey(s) {
+  return (s || '').toLowerCase()
+    .replace(/[^a-z0-9\s]/g, '')
+    .replace(/\b(jr|sr|ii|iii|iv|v)\b/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 // Firebase RTDB keys can't contain . $ # [ ] / — same sanitization used
 // when this archive was written (see backfill-historical-stats.yml /
 // auto-scoring.yml), needed here too so lookups actually match the keys
@@ -467,6 +482,10 @@ function sanitizeFirebaseKey(name) {
   return (name || '').replace(/[.$#\[\]\/]/g, '');
 }
 
+// League scoring: INT thrown and fumble lost are −2 (confirmed by the
+// commissioner Oct 23, 2026) — must match calcDKPoints in auto-scoring.yml.
+// Checked against every archived 2026 stat line for weeks 2–7: identical.
+//
 // Fantasy Refresh's standard scoring, computed fresh from raw stat
 // components rather than trusting the archive's stored "pts" convenience
 // field — that field showed a real, confirmed discrepancy against a hand
@@ -478,13 +497,13 @@ function sanitizeFirebaseKey(name) {
 function computeFantasyPoints(s) {
   return (s.passYds  || 0) * 0.04
        + (s.passTD   || 0) * 4
-       + (s.passInt  || 0) * -1
+       + (s.passInt  || 0) * -2
        + (s.rushYds  || 0) * 0.1
        + (s.rushTD   || 0) * 6
        + (s.recYds   || 0) * 0.1
        + (s.recTD    || 0) * 6
        + (s.rec      || 0) * 1
-       + (s.fumbLost || 0) * -1
+       + (s.fumbLost || 0) * -2
        + (s.twoPt    || 0) * 2;
 }
 
@@ -514,20 +533,6 @@ async function handlePlayerHistory(url) {
   // local — this is the one known divergence.
   const TEAM_ALIAS = { WAS: 'WSH' };
   function aliasTeam(t) { t = (t || '').toUpperCase(); return TEAM_ALIAS[t] || t; }
-
-  // Canonical name for fuzzy matching: lowercase, drop punctuation and
-  // apostrophes/periods, drop generational suffixes (Jr/Sr/II/III/IV/V),
-  // collapse whitespace. This is what lets "Harold Fannin" (Sleeper's
-  // spelling, how the draft page asks) match the archive's "Harold Fannin
-  // Jr." (Tank01's spelling, how it was stored) — and covers the whole
-  // class of suffix/punctuation mismatches, not just this one player.
-  function normNameKey(s) {
-    return (s || '').toLowerCase()
-      .replace(/[^a-z0-9\s]/g, '')
-      .replace(/\b(jr|sr|ii|iii|iv|v)\b/g, '')
-      .replace(/\s+/g, ' ')
-      .trim();
-  }
 
   const isDef    = pos === 'DEF';
   // A team defense is archived under its team abbreviation (Tank01's
@@ -606,9 +611,13 @@ async function handlePlayerHistory(url) {
       // additional Firebase reads, no Tank01 calls at all. Ties broken by
       // whoever happens to come first in the object — acceptable for a
       // ranking display, not something that needs to be perfectly stable.
+      // Older archive rows have no position for many Jr./III players (fixed
+      // going forward in auto-scoring.yml) — use the position the site
+      // asked about so they still get ranked.
+      const myPos = stats.pos || (isDef ? 'DEF' : pos);
       let rank = null;
-      if (stats.pos) {
-        const samePos = Object.values(data.players).filter(p => p.pos === stats.pos);
+      if (myPos) {
+        const samePos = Object.values(data.players).filter(p => p === stats || p.pos === myPos);
         const ranked = samePos
           .map(p => ({ p, pts: scoreOf(p) }))
           .sort((a, b) => b.pts - a.pts);
@@ -619,7 +628,7 @@ async function handlePlayerHistory(url) {
       weeks.push({
         seasonType, week,
         team:   stats.team || team,
-        pos:    stats.pos || '',
+        pos:    myPos || '',
         opp:    stats.opp || scheduleOpp || '',
         isHome: stats.isHome != null ? stats.isHome : scheduleIsHome,
         gameDate: scheduleDate,
@@ -739,11 +748,11 @@ async function getProjectionsForWeek(week, season) {
     'twoPointConversions=2',
     'passYards=.04',
     'passTD=4',
-    'passInterceptions=-1',
+    'passInterceptions=-2',
     'pointsPerReception=1',
     'rushYards=.1',
     'rushTD=6',
-    'fumbles=-1',
+    'fumbles=-2',
     'receivingYards=.1',
     'receivingTD=6'
   ].join('&');
