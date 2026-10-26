@@ -978,6 +978,9 @@ if ('serviceWorker' in navigator) {
 }
 </script>
 
+<!-- League dues pop-up: asks unpaid members to pay or confirm they've paid (js/dues-alert.js) -->
+<script src="/js/dues-alert.js"></script>
+<script>window.addEventListener('load', function(){ setTimeout(function(){ if (window.FRDuesAlert) FRDuesAlert.check(); }, 1200); });</script>
 <!-- Injury check pop-up: lists lineup players tagged Out/IR/Doubtful/Questionable (js/injury-alert.js) -->
 <script src="/js/injury-alert.js"></script>
 <script>window.addEventListener('load', function(){ setTimeout(function(){ if (window.FRInjuryAlert) FRInjuryAlert.check({ onDraftPage: false }); }, 1500); });</script>
