@@ -3240,5 +3240,9 @@ function goBack(){
   el.classList.add('on');
 })();
 </script>
+
+<!-- Injury check pop-up: lists lineup players tagged Out/IR/Doubtful/Questionable (js/injury-alert.js) -->
+<script src="/js/injury-alert.js"></script>
+<script>window.addEventListener('load', function(){ setTimeout(function(){ if (window.FRInjuryAlert) FRInjuryAlert.check({ onDraftPage: true }); }, 1500); });</script>
 </body>
 </html>
