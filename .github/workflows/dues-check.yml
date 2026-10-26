@@ -21,6 +21,7 @@ jobs:
           (async () => {
             const L = '/leagues/fr_refresh26';
             const s = await get(`${L}/settings.json`) || {};
+            ann('notice', 'Scoring settings', JSON.stringify(s.scoring || null));
             ann('notice', 'Dues settings', JSON.stringify({ entryFee: s.entryFee, prizePool: s.prizePool, duesReminder: s.duesReminder, duesMessage: s.duesMessage == null ? null : s.duesMessage }));
             const m = await get(`${L}/members.json`) || {};
             const comm = s.commissioners || {};
