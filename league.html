@@ -833,6 +833,15 @@ body{padding-bottom:calc(76px + env(safe-area-inset-bottom));}
 .st-table th .mh-pill{display:inline-flex;gap:0;padding:2px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:14px;vertical-align:middle;}
 .st-table th .mh-pill-seg{font-family:var(--fd);font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.3px;padding:3px 9px;border:none;background:none;color:var(--ink3);border-radius:12px;cursor:pointer;line-height:1.4;-webkit-user-select:none;user-select:none;}
 .st-table th .mh-pill-seg.on{background:linear-gradient(135deg,var(--or),var(--pk));color:#050808;box-shadow:0 1px 4px rgba(0,0,0,.28);}
+/* Phones: the standings table was ~50px wider than its card, so the Move
+   column (↑/↓) got cut off. Tighter cell padding, a slimmer Total/Avg pill,
+   and long one-word team names allowed to wrap keep it inside the card. */
+@media (max-width:480px){
+  .st-table th,.st-table td{padding-left:6px !important;padding-right:6px !important;}
+  .st-table td:nth-child(2){overflow-wrap:anywhere;}
+  .st-table th .mh-pill-seg{padding:3px 6px;}
+  .st-table .move-col{width:44px;min-width:44px;max-width:44px;}
+}
 /* Beta landing recap card (Season view) */
 .frecap{background:var(--bg2);border:1px solid var(--bdr2);border-radius:12px;overflow:hidden;margin:0 auto 12px;width:fit-content;max-width:92%;}
 .frecap.open{min-width:230px;}
@@ -1085,7 +1094,7 @@ body{padding-bottom:calc(76px + env(safe-area-inset-bottom));}
 <body>
 <div class="wrap">
 <div id="install-guide-banner" style="background:linear-gradient(135deg,#0D1515,#101C1C);border-bottom:2px solid #00E5D4;padding:10px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
-  <div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;color:#6ABFBF;text-transform:uppercase;letter-spacing:.5px;">📱 Add Fantasy Refresh to your home screen for the best experience</div>
+  <div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;color:#6ABFBF;text-transform:uppercase;letter-spacing:.5px;">📱 Add to your home screen</div>
   <div style="display:flex;gap:8px;flex-shrink:0;">
     <a href="/install-guide" style="font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:800;color:#050808;background:#00E5D4;padding:6px 14px;border-radius:8px;text-decoration:none;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;">How to Install</a>
     <button onclick="document.getElementById('install-guide-banner').style.display='none';try{localStorage.setItem('fr_install_dismissed','1')}catch(e){}" style="background:none;border:1px solid #0D3535;border-radius:8px;color:#3A8888;font-size:16px;padding:4px 10px;cursor:pointer;line-height:1;">✕</button>
@@ -4105,10 +4114,14 @@ function renderMyWeek(wrap){
   var vsAvg = myScore - seasonAvg;
 
   function pctPos(v){ return high <= low ? 50 : Math.max(0, Math.min(100, (v-low)/(high-low)*100)); }
+  // Keep a marker's label inside the card: near the right end it hangs to
+  // the left of the marker, near the left end to the right (the top scorer's
+  // "You 177.4" used to run off the edge of the card).
+  function lblShift(p){ return p > 80 ? 'transform:translateX(-100%);' : p < 20 ? 'transform:translateX(0);' : ''; }
   var railHtml = (scored.length >= 2)
     ? '<div class="ytw-plc"><div class="rail"></div>'
-      + '<div class="avg" style="left:' + pctPos(avg).toFixed(1) + '%"><div class="tick"></div><div class="lbl">Lg avg ' + avg.toFixed(0) + '</div></div>'
-      + '<div class="you" style="left:' + pctPos(myScore).toFixed(1) + '%"><div class="lbl">You ' + myScore.toFixed(1) + '</div><div class="dot"></div></div>'
+      + '<div class="avg" style="left:' + pctPos(avg).toFixed(1) + '%"><div class="tick"></div><div class="lbl" style="' + lblShift(pctPos(avg)) + '">Lg avg ' + avg.toFixed(0) + '</div></div>'
+      + '<div class="you" style="left:' + pctPos(myScore).toFixed(1) + '%"><div class="lbl" style="' + lblShift(pctPos(myScore)) + '">You ' + myScore.toFixed(1) + '</div><div class="dot"></div></div>'
       + '<div class="ends"><span>' + low.toFixed(0) + '</span><span>' + high.toFixed(0) + '</span></div></div>'
     : '<div class="ytw-pct" style="padding:12px 0;">The board fills in once more teams have scores this week.</div>';
   var beat = Math.max(0, of - rank), pctile = of > 1 ? Math.round(beat/(of-1)*100) : 100;
@@ -4581,8 +4594,12 @@ function renderAll(){
   }
 
   // Update Season tab label based on completion
+  // Only on the classic nav, where this button IS the Season tab. On the
+  // beta nav (main league) applyBetaNav() makes it "Last One Standing" with
+  // the 🪓 icon — relabeling it "Season" here left an axe labeled Season
+  // that opened Last One Standing.
   var bnSeason = document.getElementById('bn-season');
-  if(bnSeason){ var lbl = bnSeason.querySelector('.bn-label'); if(lbl) lbl.textContent = weeks.length >= WEEKS ? 'Wrap' : 'Season'; }
+  if(bnSeason && !isBetaLeague()){ var lbl = bnSeason.querySelector('.bn-label'); if(lbl) lbl.textContent = weeks.length >= WEEKS ? 'Wrap' : 'Season'; }
 
   // Cumulative totals — filtered against the real, active member list
   // before anything sums by name. Confirmed directly: without this,
@@ -4700,7 +4717,8 @@ function renderAll(){
   if(el('s-myscore')){
     el('s-myscore').textContent = myEntry ? fmtScore(myEntry.score) : (myTeam ? '—' : 'Set team ↑');
     el('s-myscore').style.color = myEntry ? 'var(--or)' : 'var(--ink3)';
-    el('s-myscore-sub').textContent = myEntry ? (myTeam || '') : '';
+    // The card's title already shows the team name — say which week instead.
+    el('s-myscore-sub').textContent = myEntry ? ('Week ' + currentWeek) : '';
   }
   if(el('s-myfinish')){
     el('s-myfinish').textContent = myWkRank ? '#' + myWkRank : '—';
@@ -5222,7 +5240,7 @@ function renderGuillotine(){
   var progressHTML = '<div class="guill-section">'
     + '<div class="guill-section-hdr">⚔️ Last One Standing Progress</div>'
     + '<div style="padding:14px 18px;">'
-    + '<div style="display:flex;justify-content:space-between;font-family:var(--fd);font-size:11px;color:var(--ink2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">'
+    + '<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px 12px;font-family:var(--fd);font-size:11px;color:var(--ink2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">'
     + '<span>'+Object.keys(eliminated).length+' eliminated</span><span>'+progressPct+'% complete</span><span>'+(totalTeams-3)+' total to eliminate</span></div>'
     + '<div class="guill-progress-bar"><div class="guill-progress-fill" style="width:'+progressPct+'%"></div></div>'
     + '</div></div>';
@@ -9006,7 +9024,7 @@ function handleNav(val){
       renderSeasonWrap();
       // Update bottom nav label
       var bnSeason = document.getElementById('bn-season');
-      if(bnSeason){ var lbl = bnSeason.querySelector('.bn-label'); if(lbl) lbl.textContent = 'Wrap'; }
+      if(bnSeason && !isBetaLeague()){ var lbl = bnSeason.querySelector('.bn-label'); if(lbl) lbl.textContent = 'Wrap'; }
       return;
     }
     // Season in progress — show normal season view
