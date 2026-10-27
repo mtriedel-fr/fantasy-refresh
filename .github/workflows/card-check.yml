@@ -18,9 +18,10 @@ jobs:
           (async () => {
             for (const [n, t, p] of [['Harold Fannin','CLE','TE'],['Kenneth Walker','KC','RB'],['Marvin Harrison','HOU','WR'],['Justin Jefferson','MIN','WR']]) {
               const r = await getUrl(`${W}/playerhistory?name=${encodeURIComponent(n)}&team=${t}&pos=${p}&season=2026&currentWeek=8`);
-              ann('notice', `worker ${n}`, (r.weeks || []).filter(w => w.seasonType === 'Regular' && w.week >= 4 && w.week <= 7).map(w => `wk${w.week} ${w.opp} pts=${w.pts} rank=${w.rank} snp=${w.snapPct}`).join('\n'));
+              ann('notice', `worker ${n}`, (r.weeks || []).filter(w => w.seasonType === 'Regular' && w.week >= 1 && w.week <= 7).map(w => `wk${w.week} ${w.opp} pts=${w.pts} rank=${w.rank} snp=${w.snapPct}`).join('\n'));
             }
             const pj = await getUrl(`${W}/projections?week=8&season=2026`);
             ann('notice', 'worker projections', `count ${pj.count}; ${pj.error || 'ok'}`);
           })().catch(e => { ann('error', 'worker check failed', e.message); process.exit(1); });
           SCRIPT
+# rerun 1793133053
