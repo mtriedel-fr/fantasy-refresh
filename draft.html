@@ -27,10 +27,20 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
 
 /* ── HEADER ── */
 .hdr{background:var(--hdr);border-top:3px solid var(--or);border-bottom:1px solid var(--bdr);padding:10px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-shrink:0;}
-.hdr-logo{font-family:var(--fd);font-size:20px;font-weight:900;color:var(--or);text-decoration:none;letter-spacing:.5px;}
+.hdr-logo{font-family:var(--fd);font-size:20px;font-weight:800;color:var(--ink);text-decoration:none;letter-spacing:.5px;text-transform:uppercase;line-height:.95;}
 .hdr-logo span{color:var(--pk);}
-.hdr-week{font-family:var(--fd);font-size:13px;font-weight:700;color:var(--ink2);text-transform:uppercase;letter-spacing:.8px;}
-.hdr-back{font-family:var(--fd);font-size:12px;font-weight:700;color:var(--ink3);text-decoration:none;text-transform:uppercase;letter-spacing:.5px;padding:5px 10px;border:1px solid var(--bdr);border-radius:6px;}
+.hdr-week{font-family:var(--fd);font-size:13px;font-weight:700;color:var(--ink2);text-transform:uppercase;letter-spacing:.8px;white-space:nowrap;}
+/* Phones: the header used to be wider than the screen — "Week 6 Draft"
+   wrapped onto three lines and the "← League" button was cut off. */
+@media (max-width:480px){
+  .hdr{gap:6px;padding:10px 10px;}
+  .hdr-logo{font-size:15px;}
+  .hdr-logo svg{width:26px;height:26px;}
+  #theme-btn{padding:4px 7px !important;font-size:13px !important;}
+  .hdr-week{font-size:12px;letter-spacing:.4px;margin-left:auto;}
+  .hdr-back{padding:5px 8px;}
+}
+.hdr-back{font-family:var(--fd);font-size:12px;font-weight:700;color:var(--ink3);text-decoration:none;text-transform:uppercase;letter-spacing:.5px;padding:5px 10px;border:1px solid var(--bdr);border-radius:6px;background:transparent;white-space:nowrap;cursor:pointer;}
 .hdr-back:hover{color:var(--or);border-color:var(--or);}
 
 /* ── CAP BAR ── */
@@ -287,7 +297,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
         <path fill="url(#plg)" d="M485.389,267.995a27.956,27.956,0,0,1-25.561-48.213l0,10.2h.015a1.491,1.491,0,0,0,2.978,0h.007V216.791a1.484,1.484,0,0,0-1.189-1.532l-.018-.005a1.533,1.533,0,0,0-.223-.022c-.024,0-.046-.007-.07-.007H448.071a1.5,1.5,0,0,0,0,3h8.995a30.963,30.963,0,0,0,29.115,52.664,1.5,1.5,0,0,0-.792-2.894Z"/>
       </g>
     </svg>
-    <span>Fantasy<span style="color:var(--pk);">Refresh</span></span>
+    <span style="display:inline-flex;flex-direction:column;color:var(--ink);">Fantasy<span style="color:var(--pk);">Refresh</span></span>
   </a>
   <button onclick="showMyWelcomeTour()" title="Show the welcome tour again" style="width:22px;height:22px;border-radius:50%;border:1px solid var(--bdr);background:transparent;color:var(--ink3);font-family:var(--fd);font-size:12px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">?</button>
   <div class="hdr-week" id="hdr-week">Loading…</div>

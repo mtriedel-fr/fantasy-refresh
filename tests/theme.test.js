@@ -44,3 +44,16 @@ test('theme loader: saved choice first, then the phone setting', () => {
   const s = read('js/theme.js');
   assert.ok(s.includes("localStorage.getItem('fr_theme')") && s.includes("prefers-color-scheme: light"));
 });
+
+test('every ☀️/🌙 button shows the current mode, kept in step by the shared loader', () => {
+  const s = read('js/theme.js');
+  assert.ok(s.includes('MutationObserver(syncButtons)') && s.includes("'#theme-btn, [data-theme-btn]'"));
+});
+
+test('draft page header fits a phone and uses the same stacked logo', () => {
+  const s = read('draft.html');
+  assert.ok(/@media \(max-width:480px\)\{\s*\.hdr\{gap:6px/.test(s));
+  assert.ok(s.includes('.hdr-week{') && /\.hdr-week\{[^}]*white-space:nowrap/.test(s));
+  assert.ok(/\.hdr-back\{[^}]*white-space:nowrap/.test(s));
+  assert.ok(s.includes('flex-direction:column;color:var(--ink);">Fantasy<span style="color:var(--pk);">Refresh</span>'));
+});

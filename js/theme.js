@@ -20,4 +20,16 @@
       if (!saved) document.documentElement.setAttribute('data-theme', pick());
     });
   } catch (e) {}
+  // Every page's ☀️/🌙 button shows the CURRENT mode (☀️ = light, 🌙 = dark),
+  // kept in step whenever any page switches the theme. Some pages used to
+  // show the opposite icon until they were tapped.
+  function syncButtons() {
+    var light = document.documentElement.getAttribute('data-theme') === 'light';
+    var btns = document.querySelectorAll('#theme-btn, [data-theme-btn]');
+    for (var i = 0; i < btns.length; i++) btns[i].textContent = light ? '\u2600\ufe0f' : '\ud83c\udf19';
+  }
+  try {
+    new MutationObserver(syncButtons).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    document.addEventListener('DOMContentLoaded', syncButtons);
+  } catch (e) {}
 })();
