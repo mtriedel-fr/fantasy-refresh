@@ -12,7 +12,7 @@ test('every page loads the shared theme loader early and the shared colors', () 
     const s = read(f);
     const head = s.slice(0, s.indexOf('</head>'));
     assert.ok(head.includes('<script src="/js/theme.js"></script>'), `${f}: theme.js in <head>`);
-    assert.ok(head.includes('/css/theme.css'), `${f}: theme.css in <head>`);
+    assert.ok(head.includes('<link rel="stylesheet" href="/css/theme.css">'), `${f}: theme.css linked in <head>`);
   }
 });
 
@@ -68,4 +68,8 @@ test('player card and Playoffs use the same top bar as the league page', () => {
   }
   assert.ok(!read('playoffs.html').includes('2025 Playoffs'), 'stale year removed');
   assert.ok(read('player.html').includes('class="back-btn">← League</a>'));
+});
+
+test('welcome page follows the same theme rule (no forced dark)', () => {
+  assert.ok(!read('welcome.html').includes("var t = saved || 'dark';"));
 });
