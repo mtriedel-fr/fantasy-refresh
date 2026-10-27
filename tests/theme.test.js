@@ -57,3 +57,15 @@ test('draft page header fits a phone and uses the same stacked logo', () => {
   assert.ok(/\.hdr-back\{[^}]*white-space:nowrap/.test(s));
   assert.ok(s.includes('flex-direction:column;color:var(--ink);">Fantasy<span style="color:var(--pk);">Refresh</span>'));
 });
+
+test('player card and Playoffs use the same top bar as the league page', () => {
+  for (const f of ['player.html', 'playoffs.html']) {
+    const s = read(f);
+    assert.ok(s.includes('<a class="logo" href="/league.html"'), f);
+    assert.ok(s.includes('rx="70" fill="#050808"'), `${f}: app logo`);
+    assert.ok(!s.includes('<div class="logo-box">'), `${f}: old boxed logo gone`);
+    assert.ok(/@media \(max-width:600px\)\{\s*body\{padding-left:0/.test(s), `${f}: edge-to-edge on phones`);
+  }
+  assert.ok(!read('playoffs.html').includes('2025 Playoffs'), 'stale year removed');
+  assert.ok(read('player.html').includes('class="back-btn">← League</a>'));
+});
