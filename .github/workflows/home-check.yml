@@ -1,0 +1,55 @@
+name: My Leagues check (read-only)
+on:
+  push:
+    branches: [audit/draft-check]
+    paths: ['.github/workflows/home-check.yml']
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Replay the My Leagues page's reads, signed out, for each commissioner
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB = process.env.FIREBASE_DB_URL, T = process.env.FIREBASE_AUTH_TOKEN;
+          const raw = u => new Promise((res, rej) => https.get(u, r => { let d = ''; r.on('data', c => d += c); r.on('end', () => res({ status: r.statusCode, body: d })); }).on('error', rej));
+          const esc = s => String(s).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+          const ann = (l, t, m) => console.log(`::${l} title=${esc(t).replace(/:/g,'%3A').replace(/,/g,'%2C')}::${esc(m)}`);
+          (async () => {
+            const lines = [];
+            const settings = JSON.parse((await raw(`${FB}/leagues/fr_refresh26/settings.json`)).body) || {};
+            const uids = Object.keys(settings.commissioners || {});
+            const L = 'fr_refresh26', S = '2026';
+            for (const [i, uid] of uids.entries()) {
+              const tag = `commissioner #${i + 1}`;
+              const checks = {
+                settings: `/leagues/${L}/settings.json`,
+                member: `/leagues/${L}/members/${uid}.json`,
+                commFlag: `/leagues/${L}/settings/commissioners/${uid}.json`,
+                season: `/leagues/${L}/season/${S}.json`,
+                guillotine: `/leagues/${L}/guillotineStatus/${S}.json`,
+                meta: `/leagues/${L}/season/${S}/meta.json`,
+                members: `/leagues/${L}/members.json`,
+                profile: `/users/${uid}.json`,
+                lineupWk8: `/leagues/${L}/lineups/${S}/week8/${uid}.json`,
+                salWk8: `/leagues/${L}/salaries/${S}/week8/meta.json`,
+              };
+              const out = [];
+              for (const [k, p] of Object.entries(checks)) {
+                const r = await raw(`${FB}${p}`);
+                let shape = '';
+                try { const j = JSON.parse(r.body); shape = j === null ? 'null' : (typeof j === 'object' ? (j.error ? 'ERROR ' + j.error : Object.keys(j).length + ' keys') : typeof j); } catch (e) { shape = 'not JSON (' + r.body.length + ' bytes)'; }
+                out.push(`${k}: HTTP ${r.status} ${shape} ${r.body.length}b`);
+              }
+              const m = JSON.parse((await raw(`${FB}/leagues/${L}/members/${uid}.json`)).body) || {};
+              out.push(`member fields: ${Object.keys(m).join(',')}`);
+              const prof = JSON.parse((await raw(`${FB}/users/${uid}.json?auth=${T}`)).body) || {};
+              out.push(`profile leagues: ${Object.keys(prof.leagues || {}).join(',')}`);
+              lines.push(`${tag}:\n  ` + out.join('\n  '));
+            }
+            ann('notice', 'My Leagues reads', lines.join('\n').slice(0, 3900));
+          })().catch(e => { ann('error', 'check failed', e.message); process.exit(1); });
+          SCRIPT
