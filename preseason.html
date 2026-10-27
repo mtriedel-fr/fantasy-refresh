@@ -127,6 +127,12 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--bg2);border:1px solid var(--or);border-radius:10px;padding:10px 20px;font-family:var(--fd);font-size:14px;font-weight:700;color:var(--or);z-index:9999;pointer-events:none;opacity:0;transition:opacity .2s;white-space:nowrap;}
 .toast.show{opacity:1;}
 .toast.err{border-color:var(--pk);color:var(--pk);}
+
+/* Phones: header was wider than the screen (the season picker was cut off). */
+@media (max-width:480px){
+  .hdr{gap:8px;padding:10px 12px;}
+  .hdr-ps-badge{display:none;}
+}
 </style>
 </head>
 <body>
@@ -151,6 +157,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
 </svg>Fantasy<span>Refresh</span></a>
   <div class="hdr-ps-badge">⚡ Preseason</div>
   <div class="hdr-right">
+    <a href="/league.html" class="ps-back" style="font-family:var(--fd);font-size:12px;font-weight:700;color:var(--ink3);text-decoration:none;text-transform:uppercase;letter-spacing:.5px;padding:5px 10px;border:1px solid var(--bdr);border-radius:6px;white-space:nowrap;">← League</a>
     <select class="season-select" onchange="switchSeason(this.value)">
       <option value="2026">2026</option>
       <option value="PS26" selected>PS'26</option>

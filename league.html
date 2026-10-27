@@ -1436,7 +1436,7 @@ setTimeout(function(){
   <div class="tab-overlay-close-bar">
     <div class="tab-overlay-close-bar-row">
       <span class="tab-overlay-close-bar-title">💰 Financials</span>
-      <button class="tab-overlay-close-btn" onclick="handleNav('yourweek');renderCumHome()">← Back to League</button>
+      <button class="tab-overlay-close-btn" onclick="backToLeagueFromDues()">← Back to League</button>
     </div>
   </div>
   <div id="wpayouts"></div>
@@ -11985,6 +11985,7 @@ function removeCommissioner(uid){
 <!-- PROFILE DRAWER -->
 <div id="profile-overlay" onclick="closeProfileDrawer()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:570;"></div>
 <div id="profile-drawer" style="display:none;position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-radius:20px 20px 0 0;border-top:3px solid var(--or);z-index:571;padding:0 0 env(safe-area-inset-bottom);max-height:90vh;overflow-y:auto;transform:translateY(100%);transition:transform .3s ease;">
+  <button type="button" onclick="closeProfileDrawer()" aria-label="Close" style="position:absolute;top:10px;right:12px;background:none;border:1px solid var(--bdr2);border-radius:8px;color:var(--ink3);font-family:var(--fd);font-size:12px;font-weight:700;padding:4px 10px;cursor:pointer;">✕ Close</button>
 
   <!-- Handle -->
   <div style="display:flex;justify-content:center;padding:12px 0 4px;">
@@ -12275,6 +12276,13 @@ function isAtLeagueLanding(){
   return !anyTab && !!cumHome && !cumHome.classList.contains('hidden');
 }
 // Return to the league landing from inside any tab, in-app (no navigation).
+// Financials' "← Back to League". On the main league's nav it used to open the
+// classic "This Week" view on top of Financials (closing that showed
+// Financials again), so it now returns to the league's landing page.
+function backToLeagueFromDues(){
+  if(isBetaLeague()){ showLeagueLanding(); return; }
+  handleNav('yourweek'); renderCumHome();
+}
 function showLeagueLanding(){
   document.body.style.overflow = '';
   document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); });
@@ -12575,6 +12583,33 @@ if('serviceWorker' in navigator){
 }
 </script>
 
+<!-- Phone Back closes whatever is open (js/back-closes.js) -->
+<script src="/js/back-closes.js"></script>
+<script>
+(function(){
+  if(!window.FRBackCloses) return;
+  function byId(id){ return document.getElementById(id); }
+  function shown(el){ return !!el && getComputedStyle(el).display !== 'none' && getComputedStyle(el).visibility !== 'hidden'; }
+  function hasOpen(id){ var e = byId(id); return !!e && e.classList.contains('open'); }
+  FRBackCloses.watch([
+    { isOpen: function(){ return !!byId('fr-dues-alert') || !!byId('fr-injury-alert'); },
+      close: function(){ ['fr-dues-alert','fr-injury-alert'].forEach(function(id){ var e = byId(id); if(!e) return; var b = e.querySelector('[data-act="later"],[data-act="ok"],[data-act="done"]'); if(b) b.click(); else e.remove(); }); } },
+    { isOpen: function(){ return shown(byId('team-name-modal')); }, close: function(){ byId('team-name-modal').style.display = 'none'; } },
+    { isOpen: function(){ return shown(byId('share-overlay')); },    close: function(){ closeShare(); } },
+    { isOpen: function(){ return hasOpen('fbs-overlay'); },          close: function(){ closeFullBoardStats(); } },
+    { isOpen: function(){ return hasOpen('myteam-news-overlay'); },  close: function(){ closeMyTeamNews(); } },
+    { isOpen: function(){ return hasOpen('team-season-overlay'); },  close: function(){ closeTeamSeason(); } },
+    { isOpen: function(){ return hasOpen('recap-overlay'); },        close: function(){ closeRecap(); } },
+    { isOpen: function(){ var c = byId('cmp-modal'); return !!c && !c.classList.contains('hidden'); }, close: function(){ closeCompare(); } },
+    { isOpen: function(){ return shown(byId('profile-drawer')); },   close: function(){ closeProfileDrawer(); } },
+    { isOpen: function(){ return shown(byId('more-menu')); },        close: function(){ closeMoreMenu(); } },
+    { isOpen: function(){ return typeof chatPanelOpen !== 'undefined' && chatPanelOpen; }, close: function(){ toggleChatPanel(); } },
+    { isOpen: function(){ var p = byId('comm-panel'); return !!p && !p.classList.contains('hidden'); }, close: function(){ toggleComm(); } },
+    { isOpen: function(){ var d = byId('tab-dues'); return !!d && !d.classList.contains('hidden'); }, close: function(){ backToLeagueFromDues(); } },
+    { isOpen: function(){ return !!document.querySelector('.tab-overlay:not(.hidden)'); }, close: function(){ closeH2HTabOverlay(); } }
+  ]);
+})();
+</script>
 <!-- League dues pop-up: asks unpaid members to pay or confirm they've paid (js/dues-alert.js) -->
 <script src="/js/dues-alert.js"></script>
 <script>window.addEventListener('load', function(){ setTimeout(function(){ if (window.FRDuesAlert) FRDuesAlert.check(); }, 1200); });</script>
