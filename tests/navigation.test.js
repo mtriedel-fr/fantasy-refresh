@@ -68,3 +68,9 @@ test('back-closes: Back closes the topmost open item, then normal Back works aga
   open = false; ctx.FRBackCloses._sync();
   assert.strictEqual(stack.length, 1, '✕ removed the extra entry');
 });
+
+test('My Leagues says "Couldn\'t load" with a Try again button instead of "No leagues yet" when loading fails', () => {
+  const s = read('home.html');
+  assert.ok(s.includes(".catch(function() { return { loadFailed: true, leagueId: leagueId }; });"));
+  assert.ok(s.includes("if (!mine.length && failed.length) {") && s.includes('onclick="loadLeagues()"'));
+});

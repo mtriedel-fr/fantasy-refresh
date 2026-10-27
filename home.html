@@ -919,7 +919,7 @@ function renderCards(leagueIds, uid) {
           realActiveMemberUids: realActiveMemberUids,
           myDraftLineup: res[9]
         };
-      }).catch(function() { return null; });
+      }).catch(function() { return { loadFailed: true, leagueId: leagueId }; });
   }))
   .then(function(all) {
     // Only show leagues where this user is a member
@@ -927,6 +927,19 @@ function renderCards(leagueIds, uid) {
       return l && l.settings && !l.settings.error && l.member && !l.member.error;
     });
 
+    // A league whose data didn't load (weak signal, airplane Wi-Fi…) used to
+    // be dropped silently, so a member could be told "No leagues yet". If
+    // the main league failed to load, say so and offer a retry instead.
+    var failed = all.filter(function(l) { return l && l.loadFailed; });
+    if (!mine.length && failed.length) {
+      wrap.innerHTML = '<div class="empty-state">'
+        + '<div class="empty-icon">📡</div>'
+        + '<div class="empty-title">Couldn\'t load your leagues</div>'
+        + '<div class="empty-sub">Check your connection and try again.</div>'
+        + '<button type="button" onclick="loadLeagues()" style="margin-top:14px;padding:10px 22px;border:none;border-radius:10px;font-family:var(--fd);font-weight:800;text-transform:uppercase;letter-spacing:.5px;cursor:pointer;color:#050808;background:linear-gradient(135deg,var(--or),var(--pk));">Try again</button>'
+        + '</div>';
+      return;
+    }
     if (!mine.length) {
       wrap.innerHTML = '<div class="empty-state">'
         + '<div class="empty-icon">🏈</div>'
