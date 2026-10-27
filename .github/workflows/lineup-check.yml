@@ -1,0 +1,41 @@
+name: Lineup read check (read-only)
+on:
+  push:
+    branches: [audit/draft-check]
+    paths: ['.github/workflows/lineup-check.yml']
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Can a signed-out visitor read past lineups?
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB = process.env.FIREBASE_DB_URL, T = process.env.FIREBASE_AUTH_TOKEN;
+          const raw = u => new Promise((res, rej) => https.get(u, r => { let d = ''; r.on('data', c => d += c); r.on('end', () => res({ status: r.statusCode, body: d })); }).on('error', rej));
+          const esc = s => String(s).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+          const ann = (l, t, m) => console.log(`::${l} title=${esc(t).replace(/:/g,'%3A').replace(/,/g,'%2C')}::${esc(m)}`);
+          (async () => {
+            const lines = [];
+            const meta = JSON.parse((await raw(`${FB}/leagues/fr_refresh26/season/2026/meta.json`)).body);
+            lines.push(`season meta: ${JSON.stringify(meta)}`);
+            for (let w = 1; w <= 8; w++) {
+              const pub = await raw(`${FB}/leagues/fr_refresh26/lineups/2026/week${w}.json?shallow=true`);
+              const adm = await raw(`${FB}/leagues/fr_refresh26/lineups/2026/week${w}.json?shallow=true&auth=${T}`);
+              const pc = pub.status === 200 ? Object.keys(JSON.parse(pub.body) || {}).length : '-';
+              const ac = adm.status === 200 ? Object.keys(JSON.parse(adm.body) || {}).length : '-';
+              const sc = await raw(`${FB}/leagues/fr_refresh26/season/2026/${w}.json?shallow=true`);
+              lines.push(`week ${w}: lineups public HTTP ${pub.status} (${pc} teams), admin ${ac} teams; scores HTTP ${sc.status} (${sc.status === 200 ? Object.keys(JSON.parse(sc.body) || {}).length : '-'})`);
+            }
+            // one lineup's shape (field names only)
+            const one = JSON.parse((await raw(`${FB}/leagues/fr_refresh26/lineups/2026/week6.json?auth=${T}`)).body) || {};
+            const first = Object.values(one)[0] || {};
+            lines.push(`week6 lineup fields: ${Object.keys(first).join(',')}; slot keys: ${Object.keys(first.slots || {}).join(',')}`);
+            const backups = JSON.parse((await raw(`${FB}/backups.json?shallow=true&auth=${T}`)).body) || {};
+            lines.push(`backups: ${Object.keys(backups).sort().slice(-6).join(', ')}`);
+            ann('notice', 'Lineup check', lines.join('\n'));
+          })().catch(e => { ann('error', 'check failed', e.message); process.exit(1); });
+          SCRIPT
