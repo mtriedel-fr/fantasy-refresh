@@ -16,4 +16,35 @@
   --bdr:#0D3535;--bdr2:#104040;--red:#FF5FA0;--grn:#00E5D4;
   --ps:#FF9A3A; /* preseason orange accent — only used by preseason.html, harmless elsewhere */
   --fd:'Barlow Condensed',sans-serif;--fb:'Barlow',sans-serif;
+  /* Surfaces that used to be hard-coded dark on the league, player and
+     playoffs pages (so they stayed dark in light mode): */
+  --page:#040A0A;       /* behind the page card */
+  --frame:#0A2A2A;      /* page card outline */
+  --field:#060E0E;      /* dropdowns, inputs, small chips */
+  --field-bdr:#0A3A3A;
+  --field-ink:#E8F8F8;
+  --pop:#091414;        /* menus, pop-ups, dialogs */
+  --pop-hover:#0E2020;
+  --logo-ink:#E8F8F8;   /* "FANTASY" in the logo */
 }
+
+/* LIGHT MODE — one set for every page (Oct 27, 2026). Pages used to carry
+   their own light colors, which drifted: the league page had a dark top bar,
+   lighter teal and brighter pink than My Leagues and the draft page. These
+   are the darker, easier-to-read shades (teal and pink pass contrast for
+   text on white). Don't redefine these in a page. */
+html[data-theme="light"]{ /* "html" so it beats any page-level :root block */
+  --hdr:#F0F8F8;--hdr2:#E6F4F4;
+  --bg:#F5FAFA;--bg2:#E8F5F5;--bg3:#DCF0F0;--bg4:#D0EEEE;
+  --or:#007A70;--or2:#00968A;--or4:#CCF0ED;
+  --pk:#CC3070;--pk2:#E0457F;--pk4:#FFD6E8;
+  --pu:#6030CC;--pu2:#7A50E0;--pu4:#EAE0FF;
+  --ink:#0A1818;--ink2:#1A6060;--ink3:#3A8888;
+  --bdr:#B0DEDE;--bdr2:#80CCCC;--red:#CC3070;--grn:#007A70;
+  --ps:#C8660A;
+  --page:#F0F8F8;--frame:#B0DEDE;
+  --field:#FFFFFF;--field-bdr:#80CCCC;--field-ink:#0A1818;
+  --pop:#FFFFFF;--pop-hover:#E8F5F5;
+  --logo-ink:#0A1818;
+}
+

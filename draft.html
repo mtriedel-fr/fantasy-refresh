@@ -2,6 +2,7 @@
 <!-- LAST FIX: Sep 18 2026 ~22:35 UTC — .draft-btn now a fixed 84px width for all four states (Draft/Drafted/Locked/Over Cap), so the row no longer reflows per player; "Can't Afford" shortened to "Over Cap" (new .overcap style) to fit. The "?" info dot moved off as its own flex item (which pushed it out into empty space via a margin/transform hack) and nested inside .picker-list-hdr-mcol as a real position:absolute badge, sitting to the right of "Def Rank", vertically centered on it, with a small ~4px gap. Header trailing spacer simplified to a plain 84px match for .draft-btn's width (no more magic-number compensation) now that the dot isn't a flex sibling anymore. All verified via rendered screenshot comparison. -->
 <html lang="en">
 <head>
+<script src="/js/theme.js"></script>
 <meta charset="UTF-8">
   <!-- PWA -->
   <link rel="manifest" href="/manifest.json">
@@ -260,12 +261,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
 .draft-btn.drafted{background:rgba(255,95,160,.1);border-color:rgba(255,95,160,.3);color:var(--pk);}
 
 
-[data-theme="light"]{
-  --hdr:#F0F8F8;--bg:#F5FAFA;--bg2:#EAFAFF;--bg3:#E0F4F4;--bg4:#D0EEEE;
-  --or:#007A70;--pk:#CC3070;--pu:#6030CC;
-  --ink:#0A1818;--ink2:#1A6060;--ink3:#3A8888;
-  --bdr:#B0DEDE;--bdr2:#80CCCC;
-}
+/* light-mode colors: /css/theme.css */
 [data-theme="light"] .hdr{border-bottom:1px solid var(--bdr);}
 [data-theme="light"] .player-row:hover{background:var(--bg3);}
 [data-theme="light"] .draft-btn{background:rgba(0,122,112,.12);border-color:rgba(0,122,112,.3);color:var(--or);}
