@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script src="/js/theme.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Fantasy Refresh — Player Profile</title>
@@ -10,35 +11,27 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 /* :root variables now live in /css/theme.css — removed from here to stop the per-file drift the review flagged */
-[data-theme="light"]{
-  --hdr:#050808;--hdr2:#080E0E;
-  --bg:#F0FAFA;--bg2:#E0F5F5;--bg3:#FFFFFF;--bg4:#F5FEFE;
-  --or:#00A898;--or2:#00C4B4;--or4:#CCF0ED;
-  --pk:#E8337A;--pk2:#F05590;--pk4:#FFD6E8;
-  --pu:#7040E0;--pu2:#9068F8;--pu4:#EAE0FF;
-  --ink:#0A1818;--ink2:#1A6060;--ink3:#3A8888;
-  --bdr:#B8E8E0;--bdr2:#90D8D0;--red:#E8337A;--grn:#00A898;
-}
-body{background:#091414;min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:24px 16px;font-family:var(--fb);}
-.wrap{width:100%;max-width:960px;border-radius:16px;overflow:hidden;border:1px solid #0A2A2A;box-shadow:0 24px 80px rgba(0,0,0,.6);}
+/* light-mode colors: /css/theme.css */
+body{background:var(--pop);min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:24px 16px;font-family:var(--fb);}
+.wrap{width:100%;max-width:960px;border-radius:16px;overflow:hidden;border:1px solid var(--frame);box-shadow:0 24px 80px rgba(0,0,0,.6);}
 
 /* HEADER */
 .hdr{background:var(--hdr);padding:22px 28px;display:flex;justify-content:space-between;align-items:center;border-top:3px solid var(--or);border-bottom:3px solid var(--pk);}
 .logo{display:flex;align-items:center;gap:12px;}
 .logo-box{width:40px;height:40px;background:linear-gradient(135deg,var(--or),var(--pk));border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .logo-box svg{width:22px;height:22px;stroke:#060E0E;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;}
-.logo-txt{font-family:var(--fd);font-size:28px;font-weight:800;color:#E8F8F8;text-transform:uppercase;letter-spacing:.5px;line-height:1;}
+.logo-txt{font-family:var(--fd);font-size:28px;font-weight:800;color:var(--logo-ink);text-transform:uppercase;letter-spacing:.5px;line-height:1;}
 .logo-txt span{color:var(--pk);}
 .hdr-r{display:flex;flex-direction:column;align-items:flex-end;gap:6px;}
-.back-btn{background:transparent;border:1px solid #0A2A2A;color:#1A5A5A;font-family:var(--fd);font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;padding:4px 12px;border-radius:6px;cursor:pointer;transition:all .15s;text-decoration:none;display:inline-block;}
+.back-btn{background:transparent;border:1px solid var(--field-bdr);color:#1A5A5A;font-family:var(--fd);font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;padding:4px 12px;border-radius:6px;cursor:pointer;transition:all .15s;text-decoration:none;display:inline-block;}
 .back-btn:hover{border-color:var(--or);color:var(--or);}
 
 /* HERO */
 .hero{background:linear-gradient(135deg,var(--hdr) 0%,var(--hdr2) 100%);padding:28px;border-bottom:2px solid var(--bg2);}
-.hero-name{font-family:var(--fd);font-size:36px;font-weight:800;color:#E8F8F8;text-transform:uppercase;letter-spacing:.5px;line-height:1;}
+.hero-name{font-family:var(--fd);font-size:36px;font-weight:800;color:var(--field-ink);text-transform:uppercase;letter-spacing:.5px;line-height:1;}
 .hero-sub{font-family:var(--fd);font-size:13px;font-weight:600;color:#1A5A5A;letter-spacing:1px;text-transform:uppercase;margin-top:4px;}
 .hero-stats{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;margin-top:20px;background:var(--bdr2);border-radius:10px;overflow:hidden;border:1px solid var(--bdr2);}
-.hero-stat{background:#091414;padding:14px 12px;text-align:center;}
+.hero-stat{background:var(--pop);padding:14px 12px;text-align:center;}
 .hero-stat-lbl{font-family:var(--fd);font-size:10px;font-weight:700;color:#1A5A5A;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;}
 .hero-stat-val{font-family:var(--fd);font-size:24px;font-weight:800;color:var(--or);letter-spacing:-.5px;line-height:1;}
 .hero-stat-sub{font-family:var(--fd);font-size:10px;color:#4A3020;margin-top:3px;letter-spacing:.3px;}
