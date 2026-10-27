@@ -188,6 +188,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
 <!-- PROFILE DRAWER -->
 <div id="profile-overlay" onclick="closeProfileDrawer()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:500;"></div>
 <div id="profile-drawer" style="display:none;position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-radius:20px 20px 0 0;border-top:3px solid var(--or);z-index:501;padding:0 0 env(safe-area-inset-bottom);max-height:85vh;overflow-y:auto;transform:translateY(100%);transition:transform .3s ease;">
+  <button type="button" onclick="closeProfileDrawer()" aria-label="Close" style="position:absolute;top:10px;right:12px;background:none;border:1px solid var(--bdr2);border-radius:8px;color:var(--ink3);font-family:var(--fd);font-size:12px;font-weight:700;padding:4px 10px;cursor:pointer;">✕ Close</button>
   <div style="display:flex;justify-content:center;padding:12px 0 4px;">
     <div style="width:36px;height:4px;border-radius:2px;background:var(--bdr2);"></div>
   </div>
@@ -974,6 +975,15 @@ if ('serviceWorker' in navigator) {
 }
 </script>
 
+<!-- Phone Back closes whatever is open (js/back-closes.js) -->
+<script src="/js/back-closes.js"></script>
+<script>
+if (window.FRBackCloses) FRBackCloses.watch([
+    { isOpen: function(){ return !!document.getElementById('fr-dues-alert') || !!document.getElementById('fr-injury-alert'); },
+      close: function(){ ['fr-dues-alert','fr-injury-alert'].forEach(function(id){ var e = document.getElementById(id); if(!e) return; var b = e.querySelector('[data-act="later"],[data-act="ok"],[data-act="done"]'); if(b) b.click(); else e.remove(); }); } },
+    { isOpen: function(){ var d = document.getElementById('profile-drawer'); return !!d && d.style.display !== 'none'; }, close: function(){ closeProfileDrawer(); } }
+]);
+</script>
 <!-- League dues pop-up: asks unpaid members to pay or confirm they've paid (js/dues-alert.js) -->
 <script src="/js/dues-alert.js"></script>
 <script>window.addEventListener('load', function(){ setTimeout(function(){ if (window.FRDuesAlert) FRDuesAlert.check(); }, 1200); });</script>

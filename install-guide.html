@@ -139,6 +139,7 @@ body::after{
 
 <!-- HEADER -->
 <div class="header">
+  <button type="button" onclick="if(history.length>1&&document.referrer.indexOf(location.host)>=0){history.back()}else{location.href='/home.html'}" style="position:absolute;top:14px;left:14px;background:transparent;border:1px solid var(--bdr2,#80CCCC);border-radius:8px;color:var(--ink3,#3A8888);font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:5px 10px;cursor:pointer;z-index:5;">← Back</button>
   <div class="logo">
     <svg class="logo-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
       <defs>
