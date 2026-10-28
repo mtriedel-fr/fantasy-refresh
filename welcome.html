@@ -443,11 +443,8 @@ function toggleTheme() {
   document.getElementById('theme-toggle').textContent = next === 'light' ? '☀️' : '🌙';
 }
 (function() {
-  // Default to dark — only respect saved preference if explicitly set
-  var saved = null;
-  try { saved = localStorage.getItem('fr_theme'); } catch(e) {}
-  var t = saved || 'dark';
-  document.documentElement.setAttribute('data-theme', t);
+  // Same rule as every page (js/theme.js): saved choice, else the phone's setting.
+  var t = document.documentElement.getAttribute('data-theme') || 'dark';
   window.addEventListener('DOMContentLoaded', function() {
     var btn = document.getElementById('theme-toggle');
     if (btn) btn.textContent = t === 'light' ? '☀️' : '🌙';
