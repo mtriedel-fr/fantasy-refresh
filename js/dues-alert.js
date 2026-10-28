@@ -149,6 +149,25 @@
     document.body.appendChild(wrap);
   }
 
+  // Pop-ups take turns: wait until no other pop-up (welcome tips, the
+  // other alert, Halloween, "drafting opens") is on screen, then show.
+  // Gives up after two minutes rather than surprising someone later.
+  function whenClear(fn) {
+    var started = Date.now();
+    (function tick() {
+      var busy = ['welcome-tour-overlay', 'fr-dues-alert', 'fr-injury-alert', 'draft-lock-overlay', 'firstrun-modal', 'boo'].some(function (id) {
+        var el = document.getElementById(id);
+        if (!el) return false;
+        var cs = getComputedStyle(el);
+        return cs.display !== 'none' && cs.visibility !== 'hidden' && !el.classList.contains('hidden') && el.getClientRects().length > 0;
+      });
+      // Another pop-up may have just claimed the screen but not drawn yet.
+      if (!busy && global.__frPopupAt && Date.now() - global.__frPopupAt < 1500) busy = true;
+      if (!busy) { global.__frPopupAt = Date.now(); return fn(); }
+      if (Date.now() - started < 120000) setTimeout(tick, 700);
+    })();
+  }
+
   function check() {
     try {
       var FR = global.FR, FRAuth = global.FRAuth;
@@ -172,7 +191,7 @@
         var member = r[0], settings = r[1] || {}, priv = r[2];
         if (member && priv && priv.duesClaimedAt) member = Object.assign({}, member, { duesClaimedAt: priv.duesClaimedAt });
         if (!shouldShow(member, user.uid, settings, snoozed, Date.now())) return;
-        show({
+        whenClear(function () { show({
           settings: settings,
           name: member.displayName || '',
           onLater: function () { try { localStorage.setItem(snoozeKey, dayKey(Date.now())); } catch (e) {} },
@@ -185,7 +204,7 @@
             var first = privPath ? FR.fb.patch(privPath, body).then(ok) : Promise.reject(new Error('no private path'));
             return first.catch(function () { return FR.fb.patch(FR.paths.member(user.uid), body).then(ok); });
           }
-        });
+        }); });
       }).catch(function () {});
     } catch (e) {}
   }

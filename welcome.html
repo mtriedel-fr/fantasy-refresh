@@ -193,6 +193,19 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
 @media(max-width:380px){
   .nav-btn{font-size:11px;padding:7px 4px;}
 }
+
+/* Phones: shorter page (Oct 2026) — compact "How it works" steps. */
+@media (max-width:600px){
+  .section{padding:40px 18px;}
+  .steps{gap:10px;}
+  .step{padding:14px 16px;display:grid;grid-template-columns:auto 1fr;column-gap:12px;align-items:start;}
+  .step-n{font-size:28px;margin:0;grid-row:span 2;}
+  .step-title{font-size:15px;margin-bottom:3px;}
+  .step-desc{font-size:13px;line-height:1.5;}
+  /* the demo phone screen is a teaser — show the top of it, faded out */
+  .preview-screen{max-height:400px;position:relative;}
+  .preview-screen::after{content:'';position:absolute;left:0;right:0;bottom:0;height:70px;background:linear-gradient(to bottom,transparent,var(--bg2));pointer-events:none;}
+}
 </style>
 </head>
 <body>
@@ -396,35 +409,12 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
       <div class="step-desc">Points update automatically as your players perform. Standings shift live all day. Scores finalize Tuesday. Next week — you do it again.</div>
     </div>
   </div>
-</section>
-
-<!-- WHY -->
-<div class="why-wrap">
-  <div class="why-box">
-    <div class="why-label">Why We Built This</div>
-    <div class="why-row">
-      <div class="why-icon">🩹</div>
-      <div>
-        <div class="why-title">One injury shouldn't ruin 5 months</div>
-        <div class="why-desc">Traditional fantasy: one bad September wrecks everything. Here it's a one-week problem. Next week you just pick someone else.</div>
-      </div>
-    </div>
-    <div class="why-row">
-      <div class="why-icon">🧠</div>
-      <div>
-        <div class="why-title">18 chances to prove you're better</div>
-        <div class="why-desc">Traditional leagues are half decided by who gets lucky in a draft. Here your decisions happen every single week.</div>
-      </div>
-    </div>
-    <div class="why-row">
-      <div class="why-icon">📅</div>
-      <div>
-        <div class="why-title">Every week feels like it matters</div>
-        <div class="why-desc">No dead teams in November. Every week is a reset. You're always in contention.</div>
-      </div>
-    </div>
+  <!-- End of the page: sign up right here instead of scrolling back to the top -->
+  <div style="display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:28px;">
+    <a href="/auth.html?mode=signup" class="btn-primary" style="text-decoration:none;">Create account →</a>
+    <a href="/auth.html" style="font-family:var(--fd);font-weight:700;color:var(--ink2);text-decoration:none;">Already playing? Sign in</a>
   </div>
-</div>
+</section>
 
 <!-- FOOTER -->
 <footer class="footer">

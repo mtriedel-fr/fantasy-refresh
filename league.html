@@ -1424,9 +1424,9 @@ setTimeout(function(){
   </div>
   <!-- Playoff round pills -->
   <div style="display:flex;gap:8px;padding:12px 16px;background:var(--bg2);border-bottom:1px solid var(--bdr);overflow-x:auto;">
-    <div id="po-pill-16" class="round-pill upcoming">Wk 16</div>
-    <div id="po-pill-17" class="round-pill upcoming">Wk 17</div>
-    <div id="po-pill-18" class="round-pill upcoming">Wk 18</div>
+    <div id="po-pill-r1" class="round-pill upcoming">Wk 15</div>
+    <div id="po-pill-r2" class="round-pill upcoming">Wk 16</div>
+    <div id="po-pill-r3" class="round-pill upcoming">Wk 17</div>
     <div id="po-status-note" style="margin-left:auto;font-family:var(--fd);font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;align-self:center;"></div>
   </div>
   <div id="wplayoffs"></div>
@@ -4010,7 +4010,9 @@ function renderCumSeasonTable(){
       + '</tr>';
   }).join('');
 
-  wrap.innerHTML = buildLandingRecapCard()
+  // (The "Week N Wrap" quick card used to sit here too — the same wrap is
+  // already one tap away from the Week N Wrap button above the standings.)
+  wrap.innerHTML = ''
     + '<table class="st-table"><thead><tr>'
     + '<th class="rk sortable" onclick="setSeasonSort(\'rank\')">#' + rankCaret + '</th><th>Team</th>'
     + '<th style="text-align:right;white-space:nowrap;">' + metricHead + '</th>'
@@ -6113,6 +6115,8 @@ function renderPlayoffs(){
 
   var weeks = Object.keys(seasonData).filter(function(k){ return seasonData[k] && seasonData[k].length; }).map(Number);
   var maxWeek = weeks.length ? Math.max.apply(null, weeks) : 0;
+  // Season scores not loaded yet → fall back to the week being shown, never "Week 0".
+  if(!maxWeek && typeof currentWeek === 'number') maxWeek = currentWeek;
   var tiersLocked = maxWeek >= TIER_LOCK_WEEK;
   var weeksLeft = Math.max(0, TIER_LOCK_WEEK - maxWeek);
 
@@ -6191,30 +6195,32 @@ function renderPlayoffs(){
     return;
   }
 
-  // Build tiers from week 15 totals
+  // Build tiers from cumulative totals through TIER_LOCK_WEEK
   var totals = getCumulativeTotals(TIER_LOCK_WEEK);
   var sorted = Object.keys(totals).map(function(name){ return { name: name, total: totals[name] }; })
     .sort(function(a,b){ return b.total - a.total; });
   var tiers = splitTiers(sorted);
 
   // Get weekly scores for playoff weeks
-  var wk16 = getWeeklyScores(16);
-  var wk17 = getWeeklyScores(17);
-  var wk18 = getWeeklyScores(18);
+  var wkR1 = getWeeklyScores(PLAYOFF_WEEKS[0]);
+  var wkR2 = getWeeklyScores(PLAYOFF_WEEKS[1]);
+  var wkR3 = getWeeklyScores(PLAYOFF_WEEKS[2]);
 
-  var hasWk16 = Object.keys(wk16).length > 0;
-  var hasWk17 = Object.keys(wk17).length > 0;
-  var hasWk18 = Object.keys(wk18).length > 0;
+  var hasR1 = Object.keys(wkR1).length > 0;
+  var hasR2 = Object.keys(wkR2).length > 0;
+  var hasR3 = Object.keys(wkR3).length > 0;
 
   // Update round pills
-  ['16','17','18'].forEach(function(w){
-    var pill = document.getElementById('po-pill-' + w);
-    var has = w === '16' ? hasWk16 : w === '17' ? hasWk17 : hasWk18;
-    var isCurrent = maxWeek === Number(w);
+  PLAYOFF_WEEKS.forEach(function(w, i){
+    var pill = document.getElementById('po-pill-r' + (i+1));
+    if(!pill) return;
+    pill.textContent = ['Wk {w}','Wk {w}','Wk {w}'][i].replace('{w}', w);
+    var has = [hasR1, hasR2, hasR3][i];
+    var isCurrent = maxWeek === w;
     pill.className = 'round-pill' + (has ? ' done' : isCurrent ? ' active' : ' upcoming');
   });
 
-  var statusText = hasWk18 ? 'Season Complete' : hasWk17 ? 'Championship — Wk 18' : hasWk16 ? 'Round 2 — Wk 17' : 'Round 1 — Wk 16';
+  var statusText = hasR3 ? 'Season Complete' : hasR2 ? 'Championship — Wk ' + PLAYOFF_WEEKS[2] : hasR1 ? 'Round 2 — Wk ' + PLAYOFF_WEEKS[1] : 'Round 1 — Wk ' + PLAYOFF_WEEKS[0];
   var _sn = document.getElementById('po-status-note'); if(_sn) _sn.textContent = statusText;
   var _hdrSub = document.getElementById('hdr-sub'); if(_hdrSub) _hdrSub.textContent = sorted.length + ' teams · 3 tiers';
 
@@ -6230,26 +6236,26 @@ function renderPlayoffs(){
     var tierTeams = tiers[td.key];
 
     // Run rounds
-    var r1 = applyRound(tierTeams, hasWk16 ? wk16 : null);
-    var r2 = applyRound(r1.advanced, hasWk17 ? wk17 : null);
-    var r3 = applyRound(r2.advanced, hasWk18 ? wk18 : null);
+    var r1 = applyRound(tierTeams, hasR1 ? wkR1 : null);
+    var r2 = applyRound(r1.advanced, hasR2 ? wkR2 : null);
+    var r3 = applyRound(r2.advanced, hasR3 ? wkR3 : null);
 
     html += '<div class="tier-block">';
 
     // Tier header
     html += '<div class="tier-hdr ' + td.key + '">'
       + '<div><div class="tier-title ' + td.key + '">' + td.label + '</div>'
-      + '<div class="tier-sub">' + tierTeams.length + ' teams · Survival format · Weeks 16–18</div></div>'
-      + '<div class="tier-count">' + (hasWk18 ? 'Complete' : hasWk16 ? (r1.advanced.length + ' remaining') : tierTeams.length + ' competing') + '</div>'
+      + '<div class="tier-sub">' + tierTeams.length + ' teams · Survival format · Weeks ' + PLAYOFF_WEEKS[0] + '–' + PLAYOFF_WEEKS[2] + '</div></div>'
+      + '<div class="tier-count">' + (hasR3 ? 'Complete' : hasR1 ? (r1.advanced.length + ' remaining') : tierTeams.length + ' competing') + '</div>'
       + '</div>';
 
     // Rounds columns — wrapped for horizontal scroll on mobile
     html += '<div class="rounds-scroll"><div class="rounds-inner">';
 
-    // Round 1 — Week 16
+    // Round 1
     html += '<div class="round-col">';
-    html += '<div class="round-label">Round 1 — Week 16</div>';
-    if(!hasWk16){
+    html += '<div class="round-label">Round 1 — Week ' + PLAYOFF_WEEKS[0] + '</div>';
+    if(!hasR1){
       html += '<div class="round-empty">Pending</div>';
       tierTeams.forEach(function(t, i){
         html += '<div class="team-row"><span class="t-rank">' + (i+1) + '</span><span class="t-name">' + teamLink(t.name) + '</span></div>';
@@ -6269,12 +6275,12 @@ function renderPlayoffs(){
     }
     html += '</div>';
 
-    // Round 2 — Week 17
+    // Round 2
     html += '<div class="round-col mid-col">';
-    html += '<div class="round-label">Round 2 — Week 17</div>';
-    if(!hasWk16){
-      html += '<div class="round-empty">After Wk 16</div>';
-    } else if(!hasWk17){
+    html += '<div class="round-label">Round 2 — Week ' + PLAYOFF_WEEKS[1] + '</div>';
+    if(!hasR1){
+      html += '<div class="round-empty">After Wk ' + PLAYOFF_WEEKS[0] + '</div>';
+    } else if(!hasR2){
       r1.advanced.forEach(function(t, i){
         var isMe = myTeam && t.name.toLowerCase() === myTeam.toLowerCase();
         html += '<div class="team-row' + (isMe ? ' is-me' : '') + '"><span class="t-rank">' + (i+1) + '</span><span class="t-name">' + teamLink(t.name) + '</span></div>';
@@ -6294,12 +6300,12 @@ function renderPlayoffs(){
     }
     html += '</div>';
 
-    // Championship — Week 18
+    // Championship
     html += '<div class="round-col">';
-    html += '<div class="round-label">Championship — Week 18</div>';
-    if(!hasWk17){
-      html += '<div class="round-empty">After Wk 17</div>';
-    } else if(!hasWk18){
+    html += '<div class="round-label">Championship — Week ' + PLAYOFF_WEEKS[2] + '</div>';
+    if(!hasR2){
+      html += '<div class="round-empty">After Wk ' + PLAYOFF_WEEKS[1] + '</div>';
+    } else if(!hasR3){
       r2.advanced.forEach(function(t, i){
         var isMe = myTeam && t.name.toLowerCase() === myTeam.toLowerCase();
         html += '<div class="team-row' + (isMe ? ' is-me' : '') + '"><span class="t-rank">' + (i+1) + '</span><span class="t-name">' + teamLink(t.name) + '</span></div>';
@@ -6783,6 +6789,9 @@ function getTopPlayers(name, limit){
 // ── TIER LOGIC ─────────────────────────────────────────────────
 // 2025: tiers lock after week 15. 2026+: after week 14
 var TIER_LOCK_WEEK = 14; // confirmed with the user - tiers lock after Week 14, so the bracket's first round (Week 15) has real tiers to work with
+// Playoff rounds (commissioner, Oct 27, 2026: groups set after Week 14, playoffs Weeks 15–17).
+// Every playoff screen reads these — playoffs.html has the same two values.
+var PLAYOFF_WEEKS = [15, 16, 17];
 
 function getTiers(sorted){
   var n = sorted.length;

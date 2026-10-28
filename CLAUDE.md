@@ -124,6 +124,14 @@ locks/salaries, salary dry runs, Sleeper probes, migrations).
   Tank01 box scores the night a game ends, so the Tuesday lock run
   (`refreshArchiveDetails`) re-fetches finished weeks that lack snap % or positions.
   Positions come from `posForStats` (Sleeper id → Tank01 id → name → suffix-free name).
+- **Playoffs (2026 on):** groups (tiers) set after Week 14, playoffs Weeks 15–17 (commissioner,
+  Oct 27, 2026). `TIER_LOCK_WEEK`/`PLAYOFF_WEEKS` in `league.html` and `playoffs.html` must
+  match; `playoffs.html?season=2025` keeps 2025's after-15 / Weeks 16–18. Scores are stored
+  uid-keyed per week — `playoffs.html` converts them with `normalizeSeason()`.
+- **Pop-ups take turns:** dues and injury alerts wait (`whenClear`) until no other pop-up
+  (welcome tips, the other alert, Halloween, "drafting opens") is on screen.
+- **Phone Back** closes pop-ups on league/home/draft (`js/back-closes.js`, each page lists its
+  pop-ups in `FRBackCloses.watch`). Add new pop-ups to that list.
 - GitHub's own cron runs late and unreliably; anything time-critical is triggered by
   cron-job.org via `workflow_dispatch`.
 - The draft page redirects signed-out visitors, so browser tests of draft UI need a
