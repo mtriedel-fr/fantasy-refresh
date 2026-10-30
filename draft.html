@@ -330,6 +330,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
         style="background:none;border:1px solid var(--bdr2);border-radius:7px;color:var(--ink3);font-family:var(--fd);font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;padding:5px 9px;cursor:pointer;white-space:nowrap;">🗑 Clear</button>
     </div>
     <button id="browse-players-btn" onclick="openPickerPanel()" style="display:none;align-items:center;justify-content:center;gap:6px;margin:0 14px 10px;padding:10px;background:rgba(0,229,212,.1);border:1px solid rgba(0,229,212,.3);border-radius:8px;color:var(--or);font-family:var(--fd);font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;cursor:pointer;">🔍 Browse Players</button>
+    <div id="roster-hint" style="display:none;margin:0 14px 10px;padding:10px 12px;border-radius:10px;background:var(--bg2);border:1px dashed var(--bdr2);font-family:var(--fd);font-size:13px;color:var(--ink2);text-align:center;">👇 Tap any position below to see players and add them. You have <b>$60,000</b> to spend on 9 spots.</div>
     <div class="roster-slots" id="roster-slots"></div>
     <div class="submit-area">
       <button class="submit-btn" id="submit-btn" onclick="submitLineup()" disabled>Build Your Lineup</button>
@@ -1814,6 +1815,14 @@ function repriceLineup(){
 
 // ── ROSTER RENDER ──────────────────────────────────────────────
 function renderRoster(){
+  // First-timer hint: with nothing picked yet, nine "— empty —" rows and a
+  // greyed-out button didn't say how to start.
+  var hint = document.getElementById('roster-hint');
+  if(hint){
+    var anyPicked = SLOT_DEFS.some(function(s){ return !!lineup[s.id]; });
+    hint.style.display = anyPicked ? 'none' : 'block';
+    if(!anyPicked) hint.innerHTML = '👇 Tap any position below to see players and add them. You have <b>$' + CAP.toLocaleString() + '</b> to spend on ' + SLOT_DEFS.length + ' spots.';
+  }
   var teamGameMap = buildDraftTeamGameMap();
   var html = '';
   SLOT_DEFS.forEach(function(s){
@@ -2427,7 +2436,7 @@ function updateSubmitBtn(){
     msg.textContent='Sign in to submit your lineup'; msg.className='submit-msg';
   } else if(filled===0){
     btn.disabled=true; btn.textContent='Build Your Lineup';
-    msg.textContent='Add players to your roster'; msg.className='submit-msg';
+    msg.textContent='Tap a position above to pick a player'; msg.className='submit-msg';
   } else if(Object.values(lineup).some(function(p){ return p && isStartedUnsubmitted(p); })){
     var started = Object.values(lineup).filter(function(p){ return p && isStartedUnsubmitted(p); }).map(function(p){ return p.name; });
     btn.disabled=true;

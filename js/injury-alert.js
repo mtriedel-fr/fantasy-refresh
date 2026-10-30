@@ -76,6 +76,25 @@
     document.body.appendChild(wrap);
   }
 
+  // Pop-ups take turns: wait until no other pop-up (welcome tips, the
+  // other alert, Halloween, "drafting opens") is on screen, then show.
+  // Gives up after two minutes rather than surprising someone later.
+  function whenClear(fn) {
+    var started = Date.now();
+    (function tick() {
+      var busy = ['welcome-tour-overlay', 'fr-dues-alert', 'fr-injury-alert', 'draft-lock-overlay', 'firstrun-modal', 'boo'].some(function (id) {
+        var el = document.getElementById(id);
+        if (!el) return false;
+        var cs = getComputedStyle(el);
+        return cs.display !== 'none' && cs.visibility !== 'hidden' && !el.classList.contains('hidden') && el.getClientRects().length > 0;
+      });
+      // Another pop-up may have just claimed the screen but not drawn yet.
+      if (!busy && global.__frPopupAt && Date.now() - global.__frPopupAt < 1500) busy = true;
+      if (!busy) { global.__frPopupAt = Date.now(); return fn(); }
+      if (Date.now() - started < 120000) setTimeout(tick, 700);
+    })();
+  }
+
   function check(opts) {
     opts = opts || {};
     try {
@@ -102,7 +121,7 @@
           var sig = list.map(function (p) { return p.id + ':' + p.tag.label; }).sort().join(',');
           var key = 'fr_injury_alert_' + sheet.week + '_' + user.uid;
           try { if (localStorage.getItem(key) === sig) return; localStorage.setItem(key, sig); } catch (e) {}
-          show(list, sheet.week, !!opts.onDraftPage);
+          whenClear(function () { show(list, sheet.week, !!opts.onDraftPage); });
         });
       }).catch(function () {});
     } catch (e) {}

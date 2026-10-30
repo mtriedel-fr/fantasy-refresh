@@ -4,7 +4,7 @@
 <script src="/js/theme.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fantasy Refresh — Playoffs 2025</title>
+<title>Fantasy Refresh — Playoffs</title>
 <script src="/js/auth.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@400;500&display=swap" rel="stylesheet">
@@ -153,9 +153,9 @@ html[data-theme="light"] body{background:#D8F0EE;}
 
 <div class="status-bar" id="status-bar">
   <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;width:100%;"><div class="playoff-badge">🏆 Playoffs</div><div class="hdr-sub" id="hdr-sub">Loading...</div></div>
-  <div class="round-pill" id="pill-16">Wk 16 — Round 1</div>
-  <div class="round-pill" id="pill-17">Wk 17 — Round 2</div>
-  <div class="round-pill" id="pill-18">Wk 18 — Championship</div>
+  <div class="round-pill" id="pill-r1">Wk 15 — Round 1</div>
+  <div class="round-pill" id="pill-r2">Wk 16 — Round 2</div>
+  <div class="round-pill" id="pill-r3">Wk 17 — Championship</div>
   <div class="status-note" id="status-note"></div>
 </div>
 
@@ -174,8 +174,12 @@ document.addEventListener('DOMContentLoaded', function(){
 
 // ── FIREBASE CONFIG ────────────────────────────────────────────
 var FB_DB_URL   = 'https://fantasy-refresh-default-rtdb.firebaseio.com';
-var TIER_LOCK_WEEK = 15;
-var PLAYOFF_WEEKS = [16, 17, 18];
+// Playoff schedule by season. 2026 on (commissioner, Oct 27, 2026): groups set
+// after Week 14, playoffs Weeks 15–17 — same as league.html. The 2025 archive
+// (?season=2025) keeps the 2025 schedule: groups after Week 15, playoffs Weeks 16 to 18.
+var PO_SEASON = (new URLSearchParams(window.location.search)).get('season') || '2026';
+var TIER_LOCK_WEEK = PO_SEASON === '2025' ? 15 : 14;
+var PLAYOFF_WEEKS = PO_SEASON === '2025' ? [16, 17, 18] : [15, 16, 17];
 var seasonData = {};
 var myTeam = '';
 try{ myTeam = localStorage.getItem('fr_myteam') || ''; }catch(e){}
@@ -203,7 +207,7 @@ function loadFromCloud(){
     .then(function(data){
       console.log('playoffs data received, null?', data === null, 'keys:', data ? Object.keys(data).length : 0);
       if(data && typeof data === 'object' && !data.error){
-        seasonData = data;
+        seasonData = normalizeSeason(data);
       } else if(data === null){
         // Empty season — try localStorage backup
         try{ var d = localStorage.getItem('fr_'+urlSeason+'_backup'); if(d) seasonData = JSON.parse(d); }catch(e){}
@@ -215,6 +219,24 @@ function loadFromCloud(){
       try{ var d = localStorage.getItem('fr_'+urlSeason+'_backup'); if(d) seasonData = JSON.parse(d); }catch(e){}
       render();
     });
+}
+
+// Scores are saved per week as { uid: { team, score, … } } (plus a "meta"
+// entry); the bracket code below expects each week as a list of
+// { name, score }. Without this the page saw no weeks at all — it said
+// "Currently through Week 0" and would never have shown the bracket.
+function normalizeSeason(data){
+  var out = {};
+  Object.keys(data || {}).forEach(function(w){
+    if(isNaN(Number(w))) return;                       // skip "meta" etc.
+    var wk = data[w];
+    if(Array.isArray(wk)){ out[w] = wk; return; }      // old format already a list
+    out[w] = Object.keys(wk || {}).map(function(uid){
+      var e = wk[uid] || {};
+      return { uid: e.uid || uid, name: e.team || e.name || '', score: parseFloat(e.score) || 0 };
+    }).filter(function(e){ return e.name; });
+  });
+  return out;
 }
 
 // ── TIER CALCULATION ───────────────────────────────────────────
@@ -279,30 +301,32 @@ function render(){
     return;
   }
 
-  // Build tiers from week 15 totals
+  // Build tiers from cumulative totals through TIER_LOCK_WEEK
   var totals = getCumulativeTotals(TIER_LOCK_WEEK);
   var sorted = Object.keys(totals).map(function(name){ return { name: name, total: totals[name] }; })
     .sort(function(a,b){ return b.total - a.total; });
   var tiers = splitTiers(sorted);
 
   // Get weekly scores for playoff weeks
-  var wk16 = getWeeklyScores(16);
-  var wk17 = getWeeklyScores(17);
-  var wk18 = getWeeklyScores(18);
+  var wkR1 = getWeeklyScores(PLAYOFF_WEEKS[0]);
+  var wkR2 = getWeeklyScores(PLAYOFF_WEEKS[1]);
+  var wkR3 = getWeeklyScores(PLAYOFF_WEEKS[2]);
 
-  var hasWk16 = Object.keys(wk16).length > 0;
-  var hasWk17 = Object.keys(wk17).length > 0;
-  var hasWk18 = Object.keys(wk18).length > 0;
+  var hasR1 = Object.keys(wkR1).length > 0;
+  var hasR2 = Object.keys(wkR2).length > 0;
+  var hasR3 = Object.keys(wkR3).length > 0;
 
   // Update round pills
-  ['16','17','18'].forEach(function(w){
-    var pill = document.getElementById('pill-' + w);
-    var has = w === '16' ? hasWk16 : w === '17' ? hasWk17 : hasWk18;
-    var isCurrent = maxWeek === Number(w);
+  PLAYOFF_WEEKS.forEach(function(w, i){
+    var pill = document.getElementById('pill-r' + (i+1));
+    if(!pill) return;
+    pill.textContent = ['Wk {w} — Round 1','Wk {w} — Round 2','Wk {w} — Championship'][i].replace('{w}', w);
+    var has = [hasR1, hasR2, hasR3][i];
+    var isCurrent = maxWeek === w;
     pill.className = 'round-pill' + (has ? ' done' : isCurrent ? ' active' : ' upcoming');
   });
 
-  var statusText = hasWk18 ? 'Season Complete' : hasWk17 ? 'Championship — Wk 18' : hasWk16 ? 'Round 2 — Wk 17' : 'Round 1 — Wk 16';
+  var statusText = hasR3 ? 'Season Complete' : hasR2 ? 'Championship — Wk ' + PLAYOFF_WEEKS[2] : hasR1 ? 'Round 2 — Wk ' + PLAYOFF_WEEKS[1] : 'Round 1 — Wk ' + PLAYOFF_WEEKS[0];
   document.getElementById('status-note').textContent = statusText;
   document.getElementById('hdr-sub').textContent = sorted.length + ' teams · 3 tiers';
 
@@ -318,26 +342,26 @@ function render(){
     var tierTeams = tiers[td.key];
 
     // Run rounds
-    var r1 = applyRound(tierTeams, hasWk16 ? wk16 : null);
-    var r2 = applyRound(r1.advanced, hasWk17 ? wk17 : null);
-    var r3 = applyRound(r2.advanced, hasWk18 ? wk18 : null);
+    var r1 = applyRound(tierTeams, hasR1 ? wkR1 : null);
+    var r2 = applyRound(r1.advanced, hasR2 ? wkR2 : null);
+    var r3 = applyRound(r2.advanced, hasR3 ? wkR3 : null);
 
     html += '<div class="tier-block">';
 
     // Tier header
     html += '<div class="tier-hdr ' + td.key + '">'
       + '<div><div class="tier-title ' + td.key + '">' + td.label + '</div>'
-      + '<div class="tier-sub">' + tierTeams.length + ' teams · Survival format · Weeks 16–18</div></div>'
-      + '<div class="tier-count">' + (hasWk18 ? 'Complete' : hasWk16 ? (r1.advanced.length + ' remaining') : tierTeams.length + ' competing') + '</div>'
+      + '<div class="tier-sub">' + tierTeams.length + ' teams · Survival format · Weeks ' + PLAYOFF_WEEKS[0] + '–' + PLAYOFF_WEEKS[2] + '</div></div>'
+      + '<div class="tier-count">' + (hasR3 ? 'Complete' : hasR1 ? (r1.advanced.length + ' remaining') : tierTeams.length + ' competing') + '</div>'
       + '</div>';
 
     // Rounds columns — wrapped for horizontal scroll on mobile
     html += '<div class="rounds-scroll"><div class="rounds-inner">';
 
-    // Round 1 — Week 16
+    // Round 1
     html += '<div class="round-col">';
-    html += '<div class="round-label">Round 1 — Week 16</div>';
-    if(!hasWk16){
+    html += '<div class="round-label">Round 1 — Week ' + PLAYOFF_WEEKS[0] + '</div>';
+    if(!hasR1){
       html += '<div class="round-empty">Pending</div>';
       tierTeams.forEach(function(t, i){
         html += '<div class="team-row"><span class="t-rank">' + (i+1) + '</span><span class="t-name">' + teamLink(t.name) + '</span></div>';
@@ -357,12 +381,12 @@ function render(){
     }
     html += '</div>';
 
-    // Round 2 — Week 17
+    // Round 2
     html += '<div class="round-col mid-col">';
-    html += '<div class="round-label">Round 2 — Week 17</div>';
-    if(!hasWk16){
-      html += '<div class="round-empty">After Wk 16</div>';
-    } else if(!hasWk17){
+    html += '<div class="round-label">Round 2 — Week ' + PLAYOFF_WEEKS[1] + '</div>';
+    if(!hasR1){
+      html += '<div class="round-empty">After Wk ' + PLAYOFF_WEEKS[0] + '</div>';
+    } else if(!hasR2){
       r1.advanced.forEach(function(t, i){
         var isMe = myTeam && t.name.toLowerCase() === myTeam.toLowerCase();
         html += '<div class="team-row' + (isMe ? ' is-me' : '') + '"><span class="t-rank">' + (i+1) + '</span><span class="t-name">' + teamLink(t.name) + '</span></div>';
@@ -382,12 +406,12 @@ function render(){
     }
     html += '</div>';
 
-    // Championship — Week 18
+    // Championship
     html += '<div class="round-col">';
-    html += '<div class="round-label">Championship — Week 18</div>';
-    if(!hasWk17){
-      html += '<div class="round-empty">After Wk 17</div>';
-    } else if(!hasWk18){
+    html += '<div class="round-label">Championship — Week ' + PLAYOFF_WEEKS[2] + '</div>';
+    if(!hasR2){
+      html += '<div class="round-empty">After Wk ' + PLAYOFF_WEEKS[1] + '</div>';
+    } else if(!hasR3){
       r2.advanced.forEach(function(t, i){
         var isMe = myTeam && t.name.toLowerCase() === myTeam.toLowerCase();
         html += '<div class="team-row' + (isMe ? ' is-me' : '') + '"><span class="t-rank">' + (i+1) + '</span><span class="t-name">' + teamLink(t.name) + '</span></div>';
