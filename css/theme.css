@@ -11,9 +11,11 @@
   --bg:#0A0F0F;--bg2:#0D1515;--bg3:#101C1C;--bg4:#142020;
   --or:#00E5D4;--or2:#33EDE0;--or4:#003A38;
   --pk:#FF5FA0;--pk2:#FF85B8;--pk4:#3A0020;
-  --pu:#9B6DFF;--pu2:#B899FF;--pu4:#1A0A3A;
-  --ink:#F0FAFA;--ink2:#6ABFBF;--ink3:#3A8888;
+  --pu:#A57DFF;--pu2:#B899FF;--pu4:#1A0A3A;
+  --ink:#F0FAFA;--ink2:#6ABFBF;--ink3:#4E9E9E; /* ink3 lifted from #3A8888 so small muted text stays readable */
   --bdr:#0D3535;--bdr2:#104040;--red:#FF5FA0;--grn:#00E5D4;
+  --gold:#E8B84B;--orange:#FF9A3A;--green:#69BE28;
+  --on-accent:#050808; /* text on teal/pink buttons */
   --ps:#FF9A3A; /* preseason orange accent — only used by preseason.html, harmless elsewhere */
   --fd:'Barlow Condensed',sans-serif;--fb:'Barlow',sans-serif;
   /* Surfaces that used to be hard-coded dark on the league, player and
@@ -36,11 +38,12 @@
 html[data-theme="light"]{ /* "html" so it beats any page-level :root block */
   --hdr:#F0F8F8;--hdr2:#E6F4F4;
   --bg:#F5FAFA;--bg2:#E8F5F5;--bg3:#DCF0F0;--bg4:#D0EEEE;
-  --or:#007A70;--or2:#00968A;--or4:#CCF0ED;
-  --pk:#CC3070;--pk2:#E0457F;--pk4:#FFD6E8;
+  --or:#006B63;--or2:#00857A;--or4:#CCF0ED;
+  --pk:#B8285F;--pk2:#CC3570;--pk4:#FFD6E8;
   --pu:#6030CC;--pu2:#7A50E0;--pu4:#EAE0FF;
-  --ink:#0A1818;--ink2:#1A6060;--ink3:#3A8888;
-  --bdr:#B0DEDE;--bdr2:#80CCCC;--red:#CC3070;--grn:#007A70;
+  --ink:#0A1818;--ink2:#1A6060;--ink3:#2A6868;
+  --bdr:#B0DEDE;--bdr2:#80CCCC;--red:#B8285F;--grn:#006B63;
+  --gold:#7F5A00;--on-accent:#FFFFFF;--orange:#9A4D00;--green:#3A7510;
   --ps:#C8660A;
   --page:#F0F8F8;--frame:#B0DEDE;
   --field:#FFFFFF;--field-bdr:#80CCCC;--field-ink:#0A1818;
@@ -48,3 +51,11 @@ html[data-theme="light"]{ /* "html" so it beats any page-level :root block */
   --logo-ink:#0A1818;
 }
 
+
+/* Comfortable tap targets for small header controls (phones). Visual style
+   is set per page; this only guarantees a ~32px touch height. */
+.back-btn,.hdr-back,.hdr-btn,#theme-btn,#theme-toggle,.nav-theme,.chat-dock-x,
+.tab-overlay-close-btn,.share-btn,.nav-signout{min-height:32px;}
+.chat-dock-x{min-width:32px;}
+a.back-btn,a.hdr-back{display:inline-flex;align-items:center;}
+.text-link{display:inline-block;padding:8px 2px;margin:-8px -2px;}

@@ -49,7 +49,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
 .cap-label{font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;}
 .picker-cap-lbl{font-family:var(--fd);font-size:9.5px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:2px;}
 .cap-amount{font-family:var(--fd);font-size:26px;font-weight:900;color:var(--or);line-height:1;}
-.cap-amount.tight{color:#FF9A3A;}
+.cap-amount.tight{color:var(--orange);}
 .cap-amount.over{color:var(--pk);text-shadow:0 0 12px rgba(255,60,120,.6);animation:capOverPulse 1.4s ease-in-out infinite;}
 @keyframes capOverPulse{0%,100%{opacity:1;}50%{opacity:.55;}}
 .cap-slots-info{font-family:var(--fd);font-size:13px;font-weight:700;color:var(--ink2);}
@@ -93,11 +93,11 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
 .slot-player-sal{font-family:var(--fd);font-size:17px;font-weight:800;color:var(--or);}
 .slot-status-tag{font-size:10px;font-weight:700;color:var(--ink3);background:var(--bg2);border:1px solid var(--bdr2);border-radius:5px;padding:1px 6px;text-transform:uppercase;letter-spacing:.3px;flex-shrink:0;}
 .slot-remove-btn{background:rgba(255,95,160,.1);border:1.5px solid rgba(255,95,160,.3);color:var(--pk);font-family:var(--fd);font-size:12.5px;font-weight:800;cursor:pointer;padding:6px 10px;border-radius:7px;text-transform:uppercase;letter-spacing:.3px;transition:all .15s;flex-shrink:0;}
-.slot-remove-btn:hover{background:var(--pk);color:#fff;border-color:var(--pk);}
+.slot-remove-btn:hover{background:var(--pk);color:var(--on-accent);border-color:var(--pk);}
 
 /* ── SUBMIT ── */
 .submit-area{position:sticky;bottom:0;padding:12px 14px;border-top:1px solid var(--bdr);background:var(--bg2);flex-shrink:0;}
-.submit-btn{width:100%;padding:13px;background:linear-gradient(135deg,var(--or),var(--pk));border:none;border-radius:10px;color:#050808;font-family:var(--fd);font-size:15px;font-weight:900;text-transform:uppercase;letter-spacing:.8px;cursor:pointer;transition:opacity .15s;}
+.submit-btn{width:100%;padding:13px;background:linear-gradient(135deg,var(--or),var(--pk));border:none;border-radius:10px;color:var(--on-accent);font-family:var(--fd);font-size:15px;font-weight:900;text-transform:uppercase;letter-spacing:.8px;cursor:pointer;transition:opacity .15s;}
 .submit-btn:hover{opacity:.9;}
 .submit-btn:disabled{opacity:.35;cursor:not-allowed;background:var(--bg4);color:var(--ink3);border:1px solid var(--bdr);}
 /* Submitted and unchanged: a confident "done" state, not a faded "unavailable" one. */
@@ -120,7 +120,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
 .picker-game-filter{font-family:var(--fd);font-size:12px;color:var(--pk);background:rgba(255,95,160,.1);border:1px solid rgba(255,95,160,.3);padding:3px 10px;border-radius:12px;}
 .picker-clear-btn{margin-left:auto;background:none;border:none;font-family:var(--fd);font-size:12px;color:var(--ink3);cursor:pointer;text-transform:uppercase;letter-spacing:.5px;padding:4px 8px;border-radius:6px;border:1px solid var(--bdr);}
 .picker-clear-btn:hover{color:var(--or);border-color:var(--or);}
-.picker-clear-btn.way-out{color:#fff;background:var(--pk);border-color:var(--pk);box-shadow:0 0 14px rgba(255,60,120,.7);animation:wayOutPulse 1.4s ease-in-out infinite;}
+.picker-clear-btn.way-out{color:var(--on-accent);background:var(--pk);border-color:var(--pk);box-shadow:0 0 14px rgba(255,60,120,.7);animation:wayOutPulse 1.4s ease-in-out infinite;}
 @keyframes wayOutPulse{0%,100%{box-shadow:0 0 8px rgba(255,60,120,.5);}50%{box-shadow:0 0 20px rgba(255,60,120,.9);}}
 .picker-search-bar{padding:10px 16px;border-bottom:1px solid var(--bdr);background:var(--bg2);flex-shrink:0;position:relative;}
 .picker-search{width:100%;padding:8px 12px 8px 36px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:8px;color:var(--or);font-family:var(--fb);font-size:14px;outline:none;}
@@ -149,7 +149,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
 .p-name{font-family:var(--fd);font-size:17px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .p-meta{font-family:var(--fd);font-size:12.5px;color:var(--ink3);text-transform:uppercase;letter-spacing:.3px;}
 .p-inj{font-family:var(--fd);font-size:10px;font-weight:800;padding:1px 5px;border-radius:4px;text-transform:uppercase;margin-left:4px;}
-.inj-Q{background:rgba(255,154,58,.2);color:#FF9A3A;}
+.inj-Q{background:rgba(255,154,58,.2);color:var(--orange);}
 .inj-D,.inj-O{background:rgba(255,95,160,.2);color:var(--pk);}
 .inj-IR{background:rgba(155,109,255,.2);color:var(--pu);}
 .p-proj{font-family:var(--fd);font-size:11px;color:var(--ink3);text-align:right;min-width:36px;}
@@ -264,8 +264,8 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
    in pickPlayer()/removePlayer(), which prevents the harmful OUTCOME even
    if the visual confusion still occurs for any other reason. */
 @media (hover: hover) and (pointer: fine){
-  .draft-btn:hover{background:var(--or);color:#050808;border-color:var(--or);}
-  .draft-btn.drafted:hover{background:var(--pk);color:#fff;border-color:var(--pk);}
+  .draft-btn:hover{background:var(--or);color:var(--on-accent);border-color:var(--or);}
+  .draft-btn.drafted:hover{background:var(--pk);color:var(--on-accent);border-color:var(--pk);}
   [data-theme="light"] .draft-btn:hover{background:var(--or);color:#fff;}
 }
 .draft-btn.drafted{background:rgba(255,95,160,.1);border-color:rgba(255,95,160,.3);color:var(--pk);}
@@ -299,10 +299,10 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
     </svg>
     <span style="display:inline-flex;flex-direction:column;color:var(--ink);">Fantasy<span style="color:var(--pk);">Refresh</span></span>
   </a>
-  <button onclick="showMyWelcomeTour()" title="Show the welcome tour again" style="width:22px;height:22px;border-radius:50%;border:1px solid var(--bdr);background:transparent;color:var(--ink3);font-family:var(--fd);font-size:12px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">?</button>
+  <button onclick="showMyWelcomeTour()" title="Show the welcome tour again" style="width:28px;height:28px;border-radius:50%;border:1px solid var(--bdr);background:transparent;color:var(--ink3);font-family:var(--fd);font-size:12px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">?</button>
   <div class="hdr-week" id="hdr-week">Loading…</div>
   <div id="test-banner" style="display:none;background:rgba(155,109,255,.15);border:1px solid var(--pu);color:var(--pu);font-family:var(--fd);font-size:10px;font-weight:800;padding:3px 10px;border-radius:10px;text-transform:uppercase;letter-spacing:.5px;">🧪 Test Mode</div>
-  <div id="flat-sal-banner" style="display:none;background:rgba(255,150,50,.15);border:1px solid #FF9A3A;color:#FF9A3A;font-family:var(--fd);font-size:10px;font-weight:800;padding:3px 10px;border-radius:10px;text-transform:uppercase;letter-spacing:.5px;">⚠️ Salaries Not Ready — Flat Pricing</div>
+  <div id="flat-sal-banner" style="display:none;background:rgba(255,150,50,.15);border:1px solid #FF9A3A;color:var(--orange);font-family:var(--fd);font-size:10px;font-weight:800;padding:3px 10px;border-radius:10px;text-transform:uppercase;letter-spacing:.5px;">⚠️ Salaries Not Ready — Flat Pricing</div>
   <button onclick="toggleTheme()" id="theme-btn" style="background:none;border:1px solid var(--bdr);border-radius:6px;padding:5px 10px;cursor:pointer;font-size:14px;" title="Toggle theme">🌙</button>
   <button onclick="window.location.href='/league.html'" class="hdr-back">← League</button>
 </div>
@@ -1044,7 +1044,7 @@ function showDraftLockPopup(){
     + '<div style="font-size:36px;margin-bottom:8px;">🔒</div>'
     + '<div style="font-family:var(--fd);font-size:19px;font-weight:900;color:var(--ink);">Drafting opens in ' + daysRemaining + ' ' + dayWord + '</div>'
     + '<div style="font-family:var(--fd);font-size:13px;color:var(--ink3);margin-top:8px;line-height:1.5;">Player prices are still settling as real projections come in — drafting opens 1 day before the season kicks off. Feel free to look around and see where prices land.</div>'
-    + '<button onclick="document.getElementById(\'draft-lock-overlay\').remove()" style="width:100%;margin-top:20px;padding:12px;border-radius:10px;border:none;background:var(--pk);color:#fff;font-family:var(--fd);font-size:14px;font-weight:800;cursor:pointer;">Got it, just browsing</button>'
+    + '<button onclick="document.getElementById(\'draft-lock-overlay\').remove()" style="width:100%;margin-top:20px;padding:12px;border-radius:10px;border:none;background:var(--pk);color:var(--on-accent);font-family:var(--fd);font-size:14px;font-weight:800;cursor:pointer;">Got it, just browsing</button>'
     + '</div>'
     + '</div>';
   document.body.insertAdjacentHTML('beforeend', html);
@@ -1306,7 +1306,7 @@ function buildGamesBar(games){
       } else if(!PS_MODE && day===4&&hr>=18){ dayLabel = 'TNF';
       } else {                                dayLabel = days[day]; }
       var intlBadge = g.international
-        ? '<div style="font-size:9px;font-weight:800;color:#FF9A3A;margin-top:1px;">INT&#39;L</div>' : '';
+        ? '<div style="font-size:9px;font-weight:800;color:var(--orange);margin-top:1px;">INT&#39;L</div>' : '';
       // O/U badge — look up by gameId
       var ouBadge = '';
       if(g.gameId && gameOdds[g.gameId] && gameOdds[g.gameId].overUnder){
@@ -1567,7 +1567,7 @@ function renderGameTeamToggle(game){
       + 'flex:1;padding:7px 8px;border-radius:8px;font-family:var(--fd);font-size:11.5px;font-weight:800;'
       + 'text-transform:uppercase;letter-spacing:.4px;cursor:pointer;'
       + (active
-          ? 'background:linear-gradient(135deg,var(--or),var(--pk));border:1.5px solid transparent;color:#050808;'
+          ? 'background:linear-gradient(135deg,var(--or),var(--pk));border:1.5px solid transparent;color:var(--on-accent);'
           : 'background:var(--bg);border:1.5px solid var(--bdr2);color:var(--ink2);')
       + '">' + label + '</button>';
   }
@@ -1603,7 +1603,7 @@ function renderFlexPosToggle(slot){
       + 'flex:1;padding:7px 8px;border-radius:8px;font-family:var(--fd);font-size:11.5px;font-weight:800;'
       + 'text-transform:uppercase;letter-spacing:.4px;cursor:pointer;'
       + (active
-          ? 'background:linear-gradient(135deg,var(--or),var(--pk));border:1.5px solid transparent;color:#050808;'
+          ? 'background:linear-gradient(135deg,var(--or),var(--pk));border:1.5px solid transparent;color:var(--on-accent);'
           : 'background:var(--bg);border:1.5px solid var(--bdr2);color:var(--ink2);')
       + '">' + label + '</button>';
   }
@@ -2396,7 +2396,7 @@ function updateCap(){
     } else {
       var avg = Math.floor(remaining / slotsLeft);
       avgEl.textContent = (avg < 0 ? '-$' : '$') + Math.abs(avg).toLocaleString();
-      var avgColor = avg < 4000 ? 'var(--pk)' : avg < 5500 ? '#FF9A3A' : 'var(--ink2)';
+      var avgColor = avg < 4000 ? 'var(--pk)' : avg < 5500 ? 'var(--orange)' : 'var(--ink2)';
       var avgGlow  = avg < 4000 ? '0 0 10px rgba(255,60,120,.6)' : 'none';
       avgEl.style.color = avgColor;
       avgEl.style.textShadow = avgGlow;
@@ -2851,7 +2851,7 @@ function buildSeasonSelectorHtml(){
     return '<button onclick="selectHistorySeason(\''+s+'\')" style="'
       + 'flex-shrink:0;padding:6px 12px;border-radius:8px;font-family:var(--fd);font-size:12px;font-weight:800;cursor:pointer;'
       + (active
-          ? 'background:linear-gradient(135deg,var(--or),var(--pk));border:1.5px solid transparent;color:#050808;'
+          ? 'background:linear-gradient(135deg,var(--or),var(--pk));border:1.5px solid transparent;color:var(--on-accent);'
           : 'background:var(--bg2);border:1.5px solid var(--bdr2);color:var(--ink2);')
       + '">' + label + '</button>';
   }).join('') + '</div>';

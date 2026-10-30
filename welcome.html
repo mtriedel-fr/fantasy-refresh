@@ -35,7 +35,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
 .nav-theme:hover{border-color:var(--or);}
 .nav-row2{display:flex;align-items:center;gap:8px;padding:8px 18px 10px;}
 .nav-btn{flex:1;font-family:var(--fd);font-size:13px;font-weight:800;padding:9px 10px;border-radius:9px;border:none;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;transition:all .15s;text-align:center;}
-.nav-create{background:linear-gradient(135deg,var(--or),var(--pk));color:#050808;}
+.nav-create{background:linear-gradient(135deg,var(--or),var(--pk));color:var(--on-accent);}
 .nav-create:hover{opacity:.85;}
 .nav-signin{background:transparent;border:1.5px solid var(--bdr2);color:var(--ink2);}
 .nav-signin:hover{border-color:var(--or);color:var(--or);}
@@ -47,7 +47,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
 .hero-title .pk{color:var(--pk);}
 .hero-sub{font-size:clamp(15px,2.5vw,18px);color:var(--ink2);max-width:520px;line-height:1.6;margin-bottom:36px;}
 .hero-btns{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:56px;}
-.btn-primary{font-family:var(--fd);font-size:16px;font-weight:900;padding:14px 34px;background:linear-gradient(135deg,var(--or),var(--pk));border:none;border-radius:12px;color:#050808;cursor:pointer;text-transform:uppercase;letter-spacing:.8px;transition:opacity .15s;}
+.btn-primary{font-family:var(--fd);font-size:16px;font-weight:900;padding:14px 34px;background:linear-gradient(135deg,var(--or),var(--pk));border:none;border-radius:12px;color:var(--on-accent);cursor:pointer;text-transform:uppercase;letter-spacing:.8px;transition:opacity .15s;}
 .btn-primary:hover{opacity:.85;}
 .btn-secondary{font-family:var(--fd);font-size:15px;font-weight:800;padding:14px 30px;background:transparent;border:1.5px solid var(--bdr2);border-radius:12px;color:var(--ink2);cursor:pointer;text-transform:uppercase;letter-spacing:.5px;transition:all .15s;}
 .btn-secondary:hover{border-color:var(--or);color:var(--or);}
@@ -74,13 +74,13 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
 .preview-logo span{color:var(--pk);}
 .preview-week{font-family:var(--fd);font-size:11px;color:var(--ink2);text-transform:uppercase;letter-spacing:.8px;margin-left:auto;}
 .preview-cap{background:var(--bg2);border-bottom:1px solid var(--bdr);padding:10px 16px;display:flex;align-items:center;justify-content:space-between;}
-.preview-cap-label{font-family:var(--fd);font-size:9px;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;}
+.preview-cap-label{font-family:var(--fd);font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;}
 .preview-cap-val{font-family:var(--fd);font-size:22px;font-weight:900;color:var(--or);}
 .preview-cap-avg{font-family:var(--fd);font-size:13px;font-weight:700;color:var(--ink2);}
 .preview-games{background:var(--hdr);border-bottom:2px solid var(--pk);padding:8px 12px;display:flex;gap:8px;overflow:hidden;}
 .preview-game{flex-shrink:0;padding:5px 10px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:16px;font-family:var(--fd);font-size:11px;font-weight:700;color:var(--ink2);text-align:center;}
 .preview-game.active{background:rgba(255,95,160,.15);border-color:var(--pk);color:var(--pk);}
-.preview-game-sub{font-size:9px;color:var(--ink3);margin-top:1px;}
+.preview-game-sub{font-size:10px;color:var(--ink3);margin-top:1px;}
 .preview-main{display:grid;grid-template-columns:1fr 1fr;height:280px;}
 .preview-roster{border-right:1px solid var(--bdr);overflow:auto;padding:8px 0;}
 .preview-slot{display:flex;align-items:center;padding:7px 14px;gap:8px;border-bottom:1px solid var(--bdr);}
@@ -88,15 +88,15 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
 .preview-slot-pos{font-family:var(--fd);font-size:10px;font-weight:800;padding:2px 6px;border-radius:4px;text-transform:uppercase;min-width:36px;text-align:center;}
 .preview-slot-name{font-family:var(--fd);font-size:13px;font-weight:700;color:var(--ink);flex:1;}
 .preview-slot-sal{font-family:var(--fd);font-size:12px;color:var(--or);}
-.preview-slot-empty{font-family:var(--fd);font-size:12px;color:var(--bdr2);flex:1;}
+.preview-slot-empty{font-family:var(--fd);font-size:12px;color:var(--ink3);flex:1;}
 .preview-players{overflow:auto;}
 .preview-teams{display:grid;grid-template-columns:1fr 1fr;height:100%;}
 .preview-team-hdr{font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;padding:8px 12px;background:var(--bg2);border-bottom:1px solid var(--bdr);}
 .preview-player-row{display:flex;align-items:center;gap:6px;padding:7px 10px;border-bottom:1px solid var(--bdr);}
-.preview-player-pos{font-family:var(--fd);font-size:9px;font-weight:800;padding:2px 5px;border-radius:3px;text-transform:uppercase;}
+.preview-player-pos{font-family:var(--fd);font-size:10px;font-weight:800;padding:2px 5px;border-radius:3px;text-transform:uppercase;}
 .preview-player-name{font-family:var(--fd);font-size:12px;font-weight:700;color:var(--ink);flex:1;}
 .preview-player-sal{font-family:var(--fd);font-size:11px;color:var(--ink3);margin-right:4px;}
-.preview-draft-btn{font-family:var(--fd);font-size:9px;font-weight:800;padding:2px 7px;background:rgba(0,229,212,.15);border:1px solid rgba(0,229,212,.3);border-radius:6px;color:var(--or);cursor:pointer;white-space:nowrap;}
+.preview-draft-btn{font-family:var(--fd);font-size:10px;font-weight:800;padding:4px 8px;background:rgba(0,229,212,.15);border:1px solid rgba(0,229,212,.3);border-radius:6px;color:var(--or);cursor:pointer;white-space:nowrap;}
 
 /* LIVE SCORES */
 .live-scores-grid{padding:0;}
@@ -107,7 +107,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
 .lm-pts{font-family:var(--fd);font-size:26px;font-weight:900;letter-spacing:-1px;line-height:1;padding:0 4px;}
 .lm-pts.winning{color:var(--or);}
 .lm-pts.losing{color:var(--ink3);}
-.lm-vs{font-family:var(--fd);font-size:11px;font-weight:700;color:var(--bdr2);text-transform:uppercase;letter-spacing:1px;}
+.lm-vs{font-family:var(--fd);font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;}
 .lm-status{font-family:var(--fd);font-size:10px;font-weight:700;color:var(--pk);text-transform:uppercase;letter-spacing:.5px;margin-top:2px;display:flex;align-items:center;gap:4px;}
 .lm-proj{font-family:var(--fd);font-size:11px;color:var(--ink3);margin-top:2px;}
 .lm-bar-bg{height:3px;background:var(--bdr);border-radius:2px;margin-top:6px;}
@@ -142,7 +142,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
 .step:nth-child(1)::before{background:var(--or);}
 .step:nth-child(2)::before{background:var(--pk);}
 .step:nth-child(3)::before{background:var(--pu);}
-.step-n{font-family:var(--fd);font-size:46px;font-weight:900;color:var(--bdr2);margin-bottom:10px;line-height:1;}
+.step-n{font-family:var(--fd);font-size:46px;font-weight:900;color:var(--ink3);opacity:.7;margin-bottom:10px;line-height:1;}
 .step-title{font-family:var(--fd);font-size:17px;font-weight:800;color:var(--ink);text-transform:uppercase;margin-bottom:7px;}
 .step-desc{font-size:14px;color:var(--ink3);line-height:1.7;}
 
@@ -174,8 +174,8 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
 .pos-QB{background:rgba(0,229,212,.15);color:var(--or);}
 .pos-RB{background:rgba(255,95,160,.15);color:var(--pk);}
 .pos-WR{background:rgba(155,109,255,.15);color:var(--pu);}
-.pos-TE{background:rgba(255,154,58,.15);color:#FF9A3A;}
-.pos-DEF{background:rgba(105,190,40,.15);color:#69BE28;}
+.pos-TE{background:rgba(255,154,58,.15);color:var(--orange);}
+.pos-DEF{background:rgba(105,190,40,.15);color:var(--green);}
 
 /* MOBILE */
 @media(max-width:600px){
@@ -216,7 +216,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
     <div style="font-family:var(--fd);font-size:14px;font-weight:800;color:var(--ink);text-transform:uppercase;">Add to Home Screen</div>
     <div style="font-size:12px;color:var(--ink3);">Install Fantasy Refresh for quick access all season</div>
   </div>
-  <button id="install-btn" style="background:var(--or);border:none;border-radius:8px;padding:8px 16px;font-family:var(--fd);font-size:13px;font-weight:800;color:#050808;cursor:pointer;text-transform:uppercase;flex-shrink:0;">Install</button>
+  <button id="install-btn" style="background:var(--or);border:none;border-radius:8px;padding:8px 16px;font-family:var(--fd);font-size:13px;font-weight:800;color:var(--on-accent);cursor:pointer;text-transform:uppercase;flex-shrink:0;">Install</button>
   <button onclick="document.getElementById('install-banner').style.display='none'" style="background:none;border:none;color:var(--ink3);font-size:18px;cursor:pointer;flex-shrink:0;">✕</button>
 </div>
 
@@ -296,9 +296,9 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
             <div id="prev-slot-wr1" class="preview-slot"><span class="preview-slot-pos pos-WR" style="color:var(--pu);">WR</span><span class="preview-slot-empty">— empty —</span></div>
             <div class="preview-slot"><span class="preview-slot-pos pos-WR" style="color:var(--pu);">WR</span><span class="preview-slot-empty">— empty —</span></div>
             <div class="preview-slot"><span class="preview-slot-pos pos-WR" style="color:var(--pu);">WR</span><span class="preview-slot-empty">— empty —</span></div>
-            <div class="preview-slot"><span class="preview-slot-pos pos-TE" style="color:#FF9A3A;">TE</span><span class="preview-slot-empty">— empty —</span></div>
+            <div class="preview-slot"><span class="preview-slot-pos pos-TE" style="color:var(--orange);">TE</span><span class="preview-slot-empty">— empty —</span></div>
             <div class="preview-slot"><span class="preview-slot-pos pos-WR" style="color:var(--pu);">FLEX</span><span class="preview-slot-empty">— empty —</span></div>
-            <div class="preview-slot"><span class="preview-slot-pos pos-DEF" style="color:#69BE28;">DEF</span><span class="preview-slot-empty">— empty —</span></div>
+            <div class="preview-slot"><span class="preview-slot-pos pos-DEF" style="color:var(--green);">DEF</span><span class="preview-slot-empty">— empty —</span></div>
           </div>
           <div class="preview-players">
             <div class="preview-teams">
@@ -412,7 +412,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
   <!-- End of the page: sign up right here instead of scrolling back to the top -->
   <div style="display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:28px;">
     <a href="/auth.html?mode=signup" class="btn-primary" style="text-decoration:none;">Create account →</a>
-    <a href="/auth.html" style="font-family:var(--fd);font-weight:700;color:var(--ink2);text-decoration:none;">Already playing? Sign in</a>
+    <a href="/auth.html" style="font-family:var(--fd);font-weight:700;color:var(--ink2);text-decoration:none;display:inline-block;padding:8px 6px;">Already playing? Sign in</a>
   </div>
 </section>
 
