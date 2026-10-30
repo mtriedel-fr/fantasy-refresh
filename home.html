@@ -38,7 +38,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
 /* PROFILE BTN */
 .profile-btn{display:flex;align-items:center;gap:7px;background:rgba(0,229,212,.08);border:1px solid rgba(0,229,212,.2);border-radius:20px;padding:5px 12px 5px 5px;cursor:pointer;transition:all .15s;-webkit-tap-highlight-color:transparent;}
 .profile-btn:hover{background:rgba(0,229,212,.15);}
-.profile-avatar{width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--or),var(--pk));display:flex;align-items:center;justify-content:center;font-family:var(--fd);font-size:12px;font-weight:800;color:#050808;flex-shrink:0;}
+.profile-avatar{width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--or),var(--pk));display:flex;align-items:center;justify-content:center;font-family:var(--fd);font-size:12px;font-weight:800;color:var(--on-accent);flex-shrink:0;}
 .profile-btn span:last-child{font-family:var(--fd);font-size:13px;font-weight:700;color:var(--or);white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis;}
 
 /* GREETING */
@@ -71,7 +71,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
 .gear-btn{background:rgba(0,229,212,.08);border:1px solid rgba(0,229,212,.2);color:var(--or);width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s;flex-shrink:0;}
 .gear-btn:hover{background:rgba(0,229,212,.15);}
 .gear-btn svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
-.enter-btn{background:var(--or);color:#050808;width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .15s;}
+.enter-btn{background:var(--or);color:var(--on-accent);width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .15s;}
 .enter-btn:hover{background:var(--or2,#33EDE0);}
 .enter-btn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;}
 .card-team-row{display:flex;align-items:center;gap:6px;margin-bottom:11px;}
@@ -79,7 +79,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
 .card-team-name{font-family:var(--fd);font-size:14px;font-weight:700;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .card-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--bdr);border-radius:10px;overflow:hidden;}
 .stat{background:var(--bg3);padding:10px 0;text-align:center;}
-.stat-label{font-family:var(--fd);font-size:9px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;}
+.stat-label{font-family:var(--fd);font-size:10.5px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;}
 .stat-val{font-family:var(--fd);font-size:20px;font-weight:800;line-height:1;}
 .stat-val.rank{color:var(--pk);}
 .stat-val.score{color:var(--or);}
@@ -118,14 +118,14 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
 .bottom-nav{position:fixed;bottom:0;left:0;right:0;background:var(--hdr);border-top:1px solid var(--bdr);display:flex;align-items:center;z-index:100;padding-bottom:env(safe-area-inset-bottom);}
 .bn-item{flex:1;display:flex;flex-direction:column;align-items:center;padding:10px 0 8px;gap:3px;cursor:pointer;-webkit-tap-highlight-color:transparent;border:none;background:transparent;}
 .bn-icon{font-size:20px;line-height:1;}
-.bn-label{font-family:var(--fd);font-size:9px;text-transform:uppercase;letter-spacing:.5px;font-weight:700;}
+.bn-label{font-family:var(--fd);font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;font-weight:700;}
 .bn-item.active .bn-label{color:var(--or);}
 .bn-item.active .bn-icon{filter:drop-shadow(0 0 3px var(--or));}
 .bn-item:not(.active) .bn-label{color:var(--ink3);}
 .bn-item:not(.active) .bn-icon{opacity:.6;}
 
 /* TOAST */
-.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--or);color:#050808;font-family:var(--fd);font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:12px 24px;border-radius:10px;opacity:0;transition:all .3s;z-index:9999;pointer-events:none;white-space:nowrap;}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--or);color:var(--on-accent);font-family:var(--fd);font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:12px 24px;border-radius:10px;opacity:0;transition:all .3s;z-index:9999;pointer-events:none;white-space:nowrap;}
 .toast.show{transform:translateX(-50%) translateY(0);opacity:1;}
 .toast.err{background:var(--pk);}
 
@@ -155,7 +155,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
       </g>
     </svg>
     <div class="hdr-logo-text">Fantasy <span>Refresh</span></div>
-    <button onclick="showMyWelcomeTour()" title="Show the welcome tour again" style="margin-left:4px;width:22px;height:22px;border-radius:50%;border:1px solid var(--bdr);background:transparent;color:var(--ink3);font-family:var(--fd);font-size:12px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">?</button>
+    <button onclick="showMyWelcomeTour()" title="Show the welcome tour again" style="margin-left:4px;width:28px;height:28px;border-radius:50%;border:1px solid var(--bdr);background:transparent;color:var(--ink3);font-family:var(--fd);font-size:12px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">?</button>
   </div>
   <div class="hdr-right">
     <button class="profile-btn" id="hdr-user" onclick="openProfileDrawer()">
@@ -194,7 +194,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
   </div>
   <div style="padding:16px 24px 20px;border-bottom:1px solid var(--bdr);">
     <div style="display:flex;align-items:center;gap:14px;">
-      <div id="pd-avatar" style="width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,var(--or),var(--pk));display:flex;align-items:center;justify-content:center;font-family:var(--fd);font-size:22px;font-weight:900;color:#050808;flex-shrink:0;">—</div>
+      <div id="pd-avatar" style="width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,var(--or),var(--pk));display:flex;align-items:center;justify-content:center;font-family:var(--fd);font-size:22px;font-weight:900;color:var(--on-accent);flex-shrink:0;">—</div>
       <div style="flex:1;min-width:0;">
         <div id="pd-name" style="font-family:var(--fd);font-size:20px;font-weight:900;color:var(--ink);text-transform:uppercase;letter-spacing:.3px;">—</div>
         <div id="pd-email" style="font-size:12px;color:var(--ink3);margin-top:2px;">—</div>
@@ -565,8 +565,8 @@ function buildCard(l) {
   // view instead of also triggering the card's own navigation into the
   // league (the whole card is clickable via its own onclick).
   var toggleRow = '<div style="display:flex;gap:6px;margin:8px 0 4px;" onclick="event.stopPropagation();">'
-    + '<button id="' + toggleWkId + '" onclick="switchCardView(\'' + cardIdSuffix + '\',\'week\')" style="flex:1;padding:6px;border-radius:8px;border:1px solid var(--bdr);background:var(--pk);color:#fff;font-family:var(--fd);font-size:11px;font-weight:800;cursor:pointer;">WEEK</button>'
-    + '<button id="' + toggleSznId + '" onclick="switchCardView(\'' + cardIdSuffix + '\',\'season\')" style="flex:1;padding:6px;border-radius:8px;border:1px solid var(--bdr);background:transparent;color:var(--ink2);font-family:var(--fd);font-size:11px;font-weight:800;cursor:pointer;">SEASON</button>'
+    + '<button id="' + toggleWkId + '" onclick="switchCardView(\'' + cardIdSuffix + '\',\'week\')" style="flex:1;padding:9px 6px;border-radius:8px;border:1px solid var(--bdr);background:var(--pk);color:var(--on-accent);font-family:var(--fd);font-size:11px;font-weight:800;cursor:pointer;">WEEK</button>'
+    + '<button id="' + toggleSznId + '" onclick="switchCardView(\'' + cardIdSuffix + '\',\'season\')" style="flex:1;padding:9px 6px;border-radius:8px;border:1px solid var(--bdr);background:transparent;color:var(--ink2);font-family:var(--fd);font-size:11px;font-weight:800;cursor:pointer;">SEASON</button>'
     + '</div>';
 
   var weekStatsBlock = '<div id="' + weekStatsId + '">'
@@ -602,12 +602,12 @@ function buildCard(l) {
     if (hasDrafted) {
       // Already drafted → "Edit Team" + a chevron that expands the roster inline.
       weeklyActionBtn = '<div style="display:flex;gap:6px;margin-top:8px;align-items:stretch;" onclick="event.stopPropagation();">'
-        + '<button onclick="event.stopPropagation();goToWeeklyAction(\'' + l.leagueId + '\',\'draft\');" style="flex:1;padding:10px;border-radius:10px;border:none;background:var(--pk,#FF5FA0);color:#fff;font-family:var(--fd);font-size:13px;font-weight:800;letter-spacing:.3px;cursor:pointer;">✏️ EDIT TEAM</button>'
+        + '<button onclick="event.stopPropagation();goToWeeklyAction(\'' + l.leagueId + '\',\'draft\');" style="flex:1;padding:10px;border-radius:10px;border:none;background:var(--pk,#FF5FA0);color:var(--on-accent);font-family:var(--fd);font-size:13px;font-weight:800;letter-spacing:.3px;cursor:pointer;">✏️ EDIT TEAM</button>'
         + '<button onclick="event.stopPropagation();toggleHomeRoster(\'' + rosterPanelId + '\',this);" title="View your roster" style="width:44px;flex-shrink:0;border-radius:10px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--ink2);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .2s;">▾</button>'
         + '</div>'
         + '<div id="' + rosterPanelId + '" style="display:none;margin-top:8px;background:var(--bg3);border:1px solid var(--bdr);border-radius:10px;padding:6px 12px 10px;" onclick="event.stopPropagation();">' + buildHomeRoster(l.myDraftLineup) + '</div>';
     } else {
-      weeklyActionBtn = '<button onclick="event.stopPropagation();goToWeeklyAction(\'' + l.leagueId + '\',\'draft\');" style="width:100%;margin-top:8px;padding:10px;border-radius:10px;border:none;background:var(--pk,#FF5FA0);color:#fff;font-family:var(--fd);font-size:13px;font-weight:800;letter-spacing:.3px;cursor:pointer;">🏈 DRAFT NOW</button>';
+      weeklyActionBtn = '<button onclick="event.stopPropagation();goToWeeklyAction(\'' + l.leagueId + '\',\'draft\');" style="width:100%;margin-top:8px;padding:10px;border-radius:10px;border:none;background:var(--pk,#FF5FA0);color:var(--on-accent);font-family:var(--fd);font-size:13px;font-weight:800;letter-spacing:.3px;cursor:pointer;">🏈 DRAFT NOW</button>';
     }
   } else if (weekComplete) {
     weeklyActionBtn = '<button onclick="event.stopPropagation();goToWeeklyAction(\'' + l.leagueId + '\',\'recap\',' + latest + ');" style="width:100%;margin-top:8px;padding:10px;border-radius:10px;border:1px solid var(--bdr);background:transparent;color:var(--ink2);font-family:var(--fd);font-size:13px;font-weight:800;letter-spacing:.3px;cursor:pointer;">📰 WEEKLY REVIEW</button>';
@@ -742,7 +742,7 @@ function showComingSoon(){
     + '<div style="font-size:40px;margin-bottom:12px;">🚧</div>'
     + '<div style="font-family:var(--fd);font-size:22px;font-weight:900;color:var(--or);text-transform:uppercase;letter-spacing:.3px;margin-bottom:8px;">Coming Soon</div>'
     + '<div style="font-size:14px;color:var(--ink2);line-height:1.6;margin-bottom:20px;">League creation is still being tested. Self-serve leagues open up soon \u2014 stay tuned!</div>'
-    + '<button onclick="document.getElementById(\'coming-soon-overlay\').style.display=\'none\'" style="width:100%;padding:12px;background:linear-gradient(135deg,var(--or),var(--pk));border:none;border-radius:10px;color:#050808;font-family:var(--fd);font-size:14px;font-weight:800;text-transform:uppercase;cursor:pointer;">Got It</button>'
+    + '<button onclick="document.getElementById(\'coming-soon-overlay\').style.display=\'none\'" style="width:100%;padding:12px;background:linear-gradient(135deg,var(--or),var(--pk));border:none;border-radius:10px;color:var(--on-accent);font-family:var(--fd);font-size:14px;font-weight:800;text-transform:uppercase;cursor:pointer;">Got It</button>'
     + '</div>';
   document.body.appendChild(div);
 }

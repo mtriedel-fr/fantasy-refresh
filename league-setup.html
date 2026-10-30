@@ -63,7 +63,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
 .league-item{display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--bdr);cursor:pointer;transition:all .15s;}
 .league-item:last-child{border-bottom:none;}
 .league-item:hover .league-name{color:var(--or);}
-.league-badge{width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,var(--or),var(--pk));display:flex;align-items:center;justify-content:center;font-family:var(--fd);font-size:18px;font-weight:900;color:#050808;flex-shrink:0;}
+.league-badge{width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,var(--or),var(--pk));display:flex;align-items:center;justify-content:center;font-family:var(--fd);font-size:18px;font-weight:900;color:var(--on-accent);flex-shrink:0;}
 .league-name{font-family:var(--fd);font-size:16px;font-weight:700;color:var(--ink);}
 .league-meta{font-size:12px;color:var(--ink3);}
 .league-role{font-family:var(--fd);font-size:10px;font-weight:800;padding:2px 8px;border-radius:10px;margin-left:auto;flex-shrink:0;}
@@ -103,7 +103,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
 
 /* ── BUTTONS ── */
 .btn{font-family:var(--fd);font-size:14px;font-weight:800;padding:12px 24px;border-radius:10px;border:none;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;transition:all .15s;}
-.btn-primary{background:linear-gradient(135deg,var(--or),var(--pk));color:#050808;width:100%;}
+.btn-primary{background:linear-gradient(135deg,var(--or),var(--pk));color:var(--on-accent);width:100%;}
 .btn-primary:hover{opacity:.9;}
 .btn-primary:disabled{opacity:.4;cursor:not-allowed;}
 .btn-outline{background:transparent;border:1px solid var(--bdr2);color:var(--ink3);}
@@ -543,7 +543,7 @@ function showComingSoon(){
     + '<div style="font-size:40px;margin-bottom:12px;">🚧</div>'
     + '<div style="font-family:var(--fd);font-size:22px;font-weight:900;color:var(--or);text-transform:uppercase;letter-spacing:.3px;margin-bottom:8px;">Coming Soon</div>'
     + '<div style="font-size:14px;color:var(--ink2);line-height:1.6;margin-bottom:20px;">League creation is still being tested. Self-serve leagues open up soon \u2014 stay tuned!</div>'
-    + '<button onclick="document.getElementById(\'coming-soon-overlay\').style.display=\'none\';window.location.href=\'/home.html\'" style="width:100%;padding:12px;background:linear-gradient(135deg,var(--or),var(--pk));border:none;border-radius:10px;color:#050808;font-family:var(--fd);font-size:14px;font-weight:800;text-transform:uppercase;cursor:pointer;">Got It</button>'
+    + '<button onclick="document.getElementById(\'coming-soon-overlay\').style.display=\'none\';window.location.href=\'/home.html\'" style="width:100%;padding:12px;background:linear-gradient(135deg,var(--or),var(--pk));border:none;border-radius:10px;color:var(--on-accent);font-family:var(--fd);font-size:14px;font-weight:800;text-transform:uppercase;cursor:pointer;">Got It</button>'
     + '</div>';
   document.body.appendChild(div);
 }

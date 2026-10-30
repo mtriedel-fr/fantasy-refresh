@@ -428,7 +428,7 @@
   // page's own styling system, different calling conventions), not
   // arbitrary duplication, so unifying those fully would need riskier
   // parameterization for marginal benefit.
-  global.POS_COLORS = {QB:'var(--or)', RB:'var(--pk)', WR:'var(--pu)', TE:'#FF9A3A', FLEX:'var(--ink2)', DEF:'#69BE28', SUPERFLEX:'#FFD23F'};
+  global.POS_COLORS = {QB:'var(--or)', RB:'var(--pk)', WR:'var(--pu)', TE:'var(--orange)', FLEX:'var(--ink2)', DEF:'var(--green)', SUPERFLEX:'#FFD23F'};
 
   // ── SHARED KICKOFF TIME FORMATTER ────────────────────────────────
   // Confirmed byte-for-byte identical between league.html and
