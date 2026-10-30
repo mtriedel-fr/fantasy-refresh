@@ -1,0 +1,53 @@
+name: Thursday lock check (read-only)
+on:
+  push:
+    branches: [audit/draft-check]
+    paths: ['.github/workflows/tnf-check.yml']
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Lineups with players from tonight's game
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB = process.env.FIREBASE_DB_URL, T = process.env.FIREBASE_AUTH_TOKEN;
+          const get = p => new Promise((res, rej) => https.get(`${FB}${p}${p.includes('?') ? '&' : '?'}auth=${T}`, r => { let d = ''; r.on('data', c => d += c); r.on('end', () => { try { res(JSON.parse(d)); } catch (e) { rej(e); } }); }).on('error', rej));
+          const esc = s => String(s).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+          const ann = (l, t, m) => console.log(`::${l} title=${esc(t).replace(/:/g,'%3A').replace(/,/g,'%2C')}::${esc(m)}`);
+          const ct = ms => ms ? new Date(ms).toLocaleString('en-US', { timeZone: 'America/Chicago', weekday: 'short', hour: 'numeric', minute: '2-digit' }) + ' CT' : '—';
+          const ALIAS = { WSH: 'WAS', JAC: 'JAX', LA: 'LAR' }; const nt = t => { const u = String(t || '').toUpperCase(); return ALIAS[u] || u; };
+          (async () => {
+            const L = '/leagues/fr_refresh26', S = 2026;
+            const meta = await get(`${L}/season/${S}/meta.json`) || {};
+            const WK = (meta.week || 0) + 1;
+            const settings = await get(`${L}/settings.json`) || {};
+            const sched = await get(`/nflSchedule/${S}/Regular.json`);
+            const games = (sched && sched.weeks && sched.weeks['week' + WK]) || [];
+            const now = Date.now();
+            const started = games.filter(g => g.time && new Date(g.time).getTime() <= now);
+            const startTeams = {}; started.forEach(g => { const k = new Date(g.time).getTime(); startTeams[nt(g.home)] = k; startTeams[nt(g.away)] = k; });
+            const locks = await get(`${L}/locks/${S}/week${WK}.json`) || {};
+            const lineups = await get(`${L}/lineups/${S}/week${WK}.json`) || {};
+            const fields = {}; Object.values(lineups).forEach(l => l && Object.keys(l).forEach(k => fields[k] = (fields[k] || 0) + 1));
+            let withStarted = 0, okBefore = 0; const problems = [];
+            Object.entries(lineups).forEach(([uid, l]) => {
+              if (!l || !l.slots) return;
+              const ps = Object.values(l.slots).filter(p => p && startTeams[nt(p.team)]);
+              if (!ps.length) return;
+              withStarted++;
+              const kick = Math.min(...ps.map(p => startTeams[nt(p.team)]));
+              const sub = l.submitted || 0;
+              const filled = Object.values(l.slots).filter(Boolean).length;
+              if (sub && sub <= kick && filled >= 9) okBefore++;
+              else problems.push(`${l.team || '(team)'}: ${ps.map(p => p.name).join(', ')} · submitted ${sub ? ct(sub) : 'never'} · ${filled}/9 filled`);
+            });
+            ann('notice', `Week ${WK} — games started`, started.map(g => `${g.away} @ ${g.home} kickoff ${ct(new Date(g.time).getTime())}`).join('\n') || 'none yet');
+            ann('notice', 'Locks', `locked teams: ${Object.keys(locks).join(', ') || 'none'} · draft locked until ${ct(settings.draftLockedUntil)}`);
+            ann(problems.length ? 'warning' : 'notice', `${withStarted} lineups have a player from a started game`, `${okBefore} submitted (full) before kickoff\n${problems.length} not submitted before kickoff:\n` + (problems.join('\n') || 'none'));
+            ann('notice', 'lineup record fields', JSON.stringify(fields) + ` · total lineups ${Object.keys(lineups).length}`);
+          })().catch(e => { ann('error', 'Check failed', e.stack || String(e)); process.exit(1); });
+          SCRIPT
