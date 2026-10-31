@@ -1,0 +1,93 @@
+name: Password reset email diagnosis (read-only)
+# Diagnoses why Firebase password-reset emails aren't arriving, WITHOUT sending
+# any member a reset email. This repo (and these annotations) are public, so it
+# prints NO email addresses — only a domain, a length, and shape flags.
+on:
+  push:
+    branches: [audit/draft-check]
+    paths: ['.github/workflows/reset-email-check.yml']
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe reset path
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB = process.env.FIREBASE_DB_URL, T = process.env.FIREBASE_AUTH_TOKEN;
+          const API_KEY = 'AIzaSyA-2hcf2hzThk7MuEm9DAvRICK95koE9gM'; // public web key (in page source)
+          const esc = s => String(s).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+          const ann = (l, t, m) => console.log(`::${l} title=${esc(t).replace(/:/g,'%3A').replace(/,/g,'%2C')}::${esc(m)}`);
+          const dbGet = p => new Promise((res, rej) => https.get(`${FB}${p}?auth=${T}`, r => { let d=''; r.on('data',c=>d+=c); r.on('end',()=>{try{res(JSON.parse(d))}catch(e){rej(e)}}); }).on('error', rej));
+          function idToolkit(endpoint, body) {
+            const data = JSON.stringify(body);
+            return new Promise((res, rej) => {
+              const r = https.request(`https://identitytoolkit.googleapis.com/v1/accounts:${endpoint}?key=${API_KEY}`,
+                { method:'POST', headers:{'Content-Type':'application/json','Content-Length':Buffer.byteLength(data)} }, resp => {
+                  let d=''; resp.on('data',c=>d+=c); resp.on('end',()=>{ let j={}; try{j=JSON.parse(d)}catch(e){} res({status:resp.statusCode, body:j}); }); });
+              r.on('error', rej); r.write(data); r.end();
+            });
+          }
+          // Describe an email without revealing it: domain + local length + shape flags.
+          function shape(e) {
+            if (!e || typeof e !== 'string') return 'MISSING';
+            const flags = [];
+            if (/\s/.test(e)) flags.push('has-space');
+            if (/\.\./.test(e)) flags.push('double-dot');
+            if (/[^\x00-\x7F]/.test(e)) flags.push('non-ascii');
+            if (e !== e.trim()) flags.push('leading/trailing-space');
+            const at = e.split('@');
+            if (at.length !== 2) return `malformed (no single @) ${flags.join(',')}`;
+            const [loc, dom] = at;
+            if (!/\./.test(dom)) flags.push('domain-has-no-dot');
+            if (/^\./.test(dom) || /\.$/.test(dom)) flags.push('domain-dot-edge');
+            return `domain=${dom} · local-len=${loc.length} · ${flags.length ? 'FLAGS: '+flags.join(',') : 'looks well-formed'}`;
+          }
+          (async () => {
+            const L = 'fr_refresh26';
+            // 1) Find the member by name (teamName / displayName contains "lindstrom").
+            const members = await dbGet(`/leagues/${L}/members.json`) || {};
+            const priv = await dbGet(`/memberPrivate/${L}.json`) || {};
+            const hits = Object.entries(members).filter(([uid, m]) =>
+              m && /lindstrom/i.test((m.teamName||'') + ' ' + (m.displayName||'') + ' ' + (m.name||'')));
+            if (!hits.length) { ann('warning', 'Member not found', 'No member whose team/display name contains "lindstrom". Check the exact spelling.'); return; }
+            ann('notice', `Matched ${hits.length} member(s) named like "Lindstrom"`, hits.map(([uid,m]) => `uid ${uid.slice(0,6)}… · team "${m.teamName||'—'}" · active=${m.active!==false}`).join('\n'));
+
+            for (const [uid, m] of hits) {
+              const p = priv[uid] || {};
+              const email = p.email || m.email || null; // memberPrivate first, then legacy public
+              const src = p.email ? 'memberPrivate' : (m.email ? 'public member record' : 'none');
+              ann('notice', `Email on file (${(m.teamName||uid.slice(0,6))})`, `source: ${src}\nshape: ${shape(email)}`);
+              if (!email) { ann('warning', 'No email stored for this member', 'Nothing to reset against — set an email in the Firebase console Users tab.'); continue; }
+
+              // 2) Is it registered in Auth, and with which sign-in method? (createAuthUri does NOT send email)
+              const au = await idToolkit('createAuthUri', { identifier: email, continueUri: 'https://fantasyrefresh.com' });
+              if (au.status >= 300) {
+                ann('warning', 'Auth lookup error', `createAuthUri HTTP ${au.status}: ${au.body.error ? au.body.error.message : 'unknown'}`);
+              } else {
+                const methods = au.body.signinMethods || [];
+                ann(au.body.registered ? 'notice' : 'warning', 'Account status in Firebase Auth',
+                  `registered: ${!!au.body.registered}\nsign-in methods: ${methods.length ? methods.join(', ') : '(none returned)'}\n` +
+                  (methods.length && !methods.includes('password') ? '⚠️ NO PASSWORD METHOD — this account signs in with ' + methods.join('/') + ', so a password reset does not apply.' :
+                   !au.body.registered ? '⚠️ This exact email has NO account — reset emails go nowhere. Likely a typo at signup.' :
+                   'Has a password login — reset should apply if the email is deliverable.'));
+              }
+            }
+
+            // 3) Enumeration-protection probe with a made-up address (sends nothing real).
+            const fake = `zz-no-such-user-${Date.now()}@example.com`;
+            const probe = await idToolkit('sendOobCode', { requestType: 'PASSWORD_RESET', email: fake });
+            if (probe.status < 300) {
+              ann('warning', 'Email-enumeration protection is likely ON',
+                'Firebase returned SUCCESS for a made-up address. That means your "✓ Reset email sent" message shows even when the address has no account — so a wrong email on file looks like success but never sends. Verify the real email above.');
+            } else {
+              const code = probe.body.error ? probe.body.error.message : `HTTP ${probe.status}`;
+              ann('notice', 'Email-enumeration protection is OFF',
+                `Firebase rejected a made-up address with "${code}" — so a real "✓ sent" means the address exists and Firebase accepted it. If it still doesn't arrive, the cause is deliverability (spam filtering of the default sender, or sender/domain not configured in Authentication → Templates).`);
+            }
+            ann('notice', 'Note', 'No reset email was sent to any member by this check. API key shown is the public web key already in the site source.');
+          })().catch(e => { ann('error', 'Diagnosis failed', e.stack || String(e)); process.exit(1); });
+          SCRIPT
