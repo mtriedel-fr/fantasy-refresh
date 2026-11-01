@@ -136,8 +136,33 @@ locks/salaries, salary dry runs, Sleeper probes, migrations).
   cron-job.org via `workflow_dispatch`.
 - The draft page redirects signed-out visitors, so browser tests of draft UI need a
   harness page or a signed-in session.
+- **Accounts & password reset (Oct 31, 2026):** the login email lives in **Firebase
+  Authentication**, not the database — the Firebase console can only disable/delete/send-reset,
+  it **cannot edit an email**. Resets work and deliver (confirmed); past "failures" were a
+  wrong email on the account (a member's was saved `…@gmail.con`) or spam filtering. The
+  project has **email-enumeration protection ON**, so `sendOobCode`/`createAuthUri` return
+  success even for an address with no account — an on-screen "✓ sent" can lie, and account
+  existence can't be probed from the client. `js/email-check.js` (shared) flags known typos
+  (`.con`, `gmial.com`, …) at signup and in the commissioner dues view; the pages re-save the
+  Auth email into `/memberPrivate` on every sign-in, so fixing Auth self-heals the DB copy.
+  TODO (console, commissioner): customize the sender in Authentication → Templates (less spam)
+  and point the action link at `fantasyrefresh.com`.
+- **Admin service account (Oct 31, 2026):** `FIREBASE_SERVICE_ACCOUNT` secret (full-admin
+  JSON) exists for admin ops the legacy DB token can't do — e.g. changing a user's login
+  email (`admin.auth().updateUser`). Use it only from an `ops/*`/`audit/draft-check` workflow,
+  verify current state before writing, print no PII or key. **Gotcha:** `firebase-admin` keeps
+  the Realtime DB socket open, so a Node script that only `await`s then returns will hang the
+  job forever — always end with `process.exit(0)` (and `process.exit(1)` on error).
+- **Shared theme tokens (readability pass, Oct 30, 2026):** colors live only in `css/theme.css`
+  (`:root` dark + `html[data-theme="light"]`). Use the tokens — `--ink/ink2/ink3`, `--or/pk/pu`,
+  `--gold`, `--orange`, `--green`, `--on-accent` (text on teal/pink buttons) — never hard-coded
+  hex, so both themes stay readable. `tests/readability.test.js` enforces WCAG-AA contrast and
+  that pages don't drift back to fixed colors.
+- **Preseason page (Nov 1, 2026):** `preseason.html` forces `?mode=preseason` on load so every
+  `FR.paths.*` lands in the isolated `<season>P` namespace (e.g. `/leagues/{id}/season/2026P`),
+  never the live season. It's dormant until 2027 and wants a proper rebuild then.
 
-## Open items (as of Oct 23, 2026)
+## Open items (as of Nov 1, 2026)
 
 - **Yardage bonuses for 2027 and the playoff game** (commissioner wants them back): +3 for
   300+ passing, 100+ rushing, 100+ receiving yards, computed from the yards in
@@ -159,3 +184,36 @@ locks/salaries, salary dry runs, Sleeper probes, migrations).
   one or delete; commissioners can always overwrite.
 - `preseason.html` / `archive2025.html` use a `COMM_PW` constant visible in page source — a
   soft gate only.
+
+## Roadmap (commissioner's plan)
+
+Launch stages: **2027 lite launch** → **2027 playoffs full launch** → **2028 full-full launch**.
+Order the work below against those dates.
+
+**Before 2027 lite launch (other commissioners run their own leagues):**
+- **De-hardcode single-league assumptions.** Places assume `fr_refresh26` / season 2026;
+  setup, rules, dues and scoring settings must all work per league.
+- **Staging environment** — a separate test Firebase + preview site so changes are tried on
+  realistic data before real leagues see them (today the only real test is live).
+- **Split `league.html`** (~12.6k lines: standings, playoffs, chat, dues, commissioner tools)
+  into pieces, gradually, with tests — biggest engineering item for scaling.
+- **Commissioner tool, Worker-backed:** "fix a member's email / resend reset" from the league
+  page, using the admin service account behind the Cloudflare Worker with commissioner-only
+  auth (verify the caller's Firebase ID token + commissioner status). Needs a careful security
+  review — do not wire the admin key into a public client surface.
+
+**Before 2027 playoffs / 2028 full launch:**
+- **Yardage bonuses** come back for 2027 + the playoff game (see first open item).
+- **Security:** rotate the legacy all-access DB secret to scoped credentials; remove the
+  `COMM_PW` soft gate on preseason/archive pages; review `database.rules.json` for many leagues.
+- **Load & cost:** check Tank01 limits, DB usage and the scoring cadence against many leagues
+  before it bites mid-game.
+- **Payments:** if real entry fees run through the site, that needs a payment provider and a
+  legal review — commissioner's decision.
+
+**Efficiency (my tooling, do early — mostly behind the scenes):**
+- Put the Playwright harness (`scratchpad/*.py`: page walk, contrast audit, nav check) into the
+  repo so every PR gets light/dark phone screenshots; stop rebuilding it each session.
+- Routine read-only checks on a schedule (Wed salaries/open, Thu post-kickoff locks, Tue final
+  scores + Last One Standing, weekly dues counts), reporting only when something's off —
+  pending the commissioner's call on cadence and whether they notify or stay silent.
