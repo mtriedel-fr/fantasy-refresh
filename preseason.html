@@ -384,6 +384,17 @@ function setGameFilter(gameIdx, btn){
 
 
 window.addEventListener('DOMContentLoaded', function(){
+  // This page only ever operates on preseason data. Force preseason mode in
+  // the URL so every FR.paths.* builder resolves to the isolated "<season>P"
+  // namespace (via seasonKey()), never the live regular season. isPreseasonTestMode()
+  // re-reads the URL on each call, so this must run before any path is used.
+  try {
+    var u = new URL(location.href);
+    if (u.searchParams.get('mode') !== 'preseason') {
+      u.searchParams.set('mode', 'preseason');
+      history.replaceState(null, '', u);
+    }
+  } catch (e) {}
   loadPreseasonData();
   loadSchedule(0);
   updateDraftLink();
@@ -417,7 +428,7 @@ function setWeek(w, btn){
 
 // ── LOAD DATA ─────────────────────────────────────────────────
 function loadPreseasonData(){
-  fetch(FR.paths.url(FR.paths.preseason()))
+  fetch(FR.paths.url(FR.paths.season()))
     .then(function(r){ return r.json(); })
     .then(function(d){
       preseasonData = d || {};
@@ -749,7 +760,7 @@ function generatePreseasonSalaries(){
         players: salaries,
         meta:    { week:week, count:count, generated:Date.now(), locked:false, cap:60000, flat:true }
       };
-      return fetch(FB_DB_URL+'/salariespreseason2026/week'+week+'.json',{
+      return fetch(FR.paths.url(FR.paths.weekSalaries(week)),{
         method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)
       }).then(function(){
         status.textContent = '✓ ' + count + ' players · PS Week ' + week + ' salaries saved';
@@ -787,7 +798,7 @@ function wipePreseason(){
 
 // ── SAVE ──────────────────────────────────────────────────────
 function savePreseasonData(){
-  return fetch(FR.paths.url(FR.paths.preseason()), {
+  return fetch(FR.paths.url(FR.paths.season()), {
     method:'PUT',
     headers:{'Content-Type':'application/json'},
     body: JSON.stringify(preseasonData)
