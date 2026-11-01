@@ -1,0 +1,70 @@
+name: One-time — fix member email typo (admin)
+# Commissioner-approved one-off (Oct 31 2026): corrects Lindstrom22's login
+# email, which was saved as "...@gmail.con" (invalid domain) so password-reset
+# emails never reached him. Uses the Firebase Admin service account to:
+#   1) find the member by name, 2) confirm the current email ends in ".con"
+#      (abort otherwise — never guess), 3) change .con -> .com, 4) verify,
+#   5) also correct the /memberPrivate copy so the dues view matches now.
+# Public repo: prints NO email address and NEVER the key — only domains/shape.
+on:
+  push:
+    branches: [ops/fix-lindstrom-email]
+    paths: ['.github/workflows/fix-lindstrom-email.yml']
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Correct the email
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          npm install firebase-admin@12 --no-audit --no-fund --silent
+          node << 'SCRIPT'
+          const admin = require('firebase-admin');
+          const esc = s => String(s).replace(/%/g,'%25').replace(/\r/g,'%0D').replace(/\n/g,'%0A');
+          const ann = (l,t,m) => console.log(`::${l} title=${esc(t).replace(/:/g,'%3A').replace(/,/g,'%2C')}::${esc(m)}`);
+          const dom = e => { if(!e) return 'MISSING'; const a=String(e).split('@'); return a.length===2?`domain=${a[1].toLowerCase()} · local-len=${a[0].length}`:'malformed'; };
+          (async () => {
+            let sa;
+            try { sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT); }
+            catch(e){ ann('error','Bad service account secret','FIREBASE_SERVICE_ACCOUNT is not valid JSON.'); process.exit(1); }
+            admin.initializeApp({ credential: admin.credential.cert(sa), databaseURL: process.env.FIREBASE_DB_URL });
+            const db = admin.database(), auth = admin.auth();
+            const L = 'fr_refresh26';
+            const members = (await db.ref(`/leagues/${L}/members`).get()).val() || {};
+            const hits = Object.entries(members).filter(([u,m]) => m && /lindstrom/i.test((m.teamName||'')+' '+(m.displayName||'')+' '+(m.name||'')));
+            if(hits.length !== 1){ ann('warning','Expected exactly one match', `Found ${hits.length} members like "lindstrom" — aborting to be safe.`); process.exit(1); }
+            const [uid, m] = hits[0];
+            ann('notice','Member', `uid ${uid.slice(0,6)}… · team "${m.teamName||'—'}"`);
+
+            let user;
+            try { user = await auth.getUser(uid); }
+            catch(e){ ann('error','No Auth account for this uid', e.message); process.exit(1); }
+            const cur = user.email || '';
+            ann('notice','Current login email', dom(cur));
+            if(!/\.con$/i.test(cur)){
+              ann('warning','Not the expected typo — no change made', `Current email does not end in ".con", so this one-off does not apply. (${dom(cur)})`);
+              process.exit(1);
+            }
+            const fixed = cur.replace(/\.con$/i, '.com');
+
+            try { await auth.updateUser(uid, { email: fixed }); }
+            catch(e){ ann('error','Update failed', e.code === 'auth/email-already-exists' ? 'An account with the corrected email already exists.' : e.message); process.exit(1); }
+
+            const after = await auth.getUser(uid);
+            const ok = (after.email||'').toLowerCase() === fixed.toLowerCase();
+            // Keep the private DB copy in sync immediately (self-heals on next
+            // sign-in anyway, but this makes the dues view correct now).
+            let dbNote = 'not changed';
+            try {
+              const pRef = db.ref(`/memberPrivate/${L}/${uid}/email`);
+              const old = (await pRef.get()).val();
+              if(old && /\.con$/i.test(old)){ await pRef.set(old.replace(/\.con$/i,'.com')); dbNote = 'corrected (.con -> .com)'; }
+              else dbNote = old ? 'already fine' : 'none stored';
+            } catch(e){ dbNote = 'copy update skipped: ' + e.message; }
+
+            ann(ok?'notice':'warning','Done', `Login email changed from ...${'.con'} to ...${'.com'} (${dom(after.email)}). Verified: ${ok}.\nmemberPrivate copy: ${dbNote}.\nNext: have the member tap "Forgot password?" — the reset will now reach him (check spam too).`);
+            ann('notice','Reminder','No email address or key was printed. Delete this ops branch after.');
+          })().catch(e => { ann('error','Run failed', e.stack||String(e)); process.exit(1); });
+          SCRIPT
