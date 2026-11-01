@@ -11,6 +11,7 @@
 <title>Fantasy Refresh — Sign In</title>
 <link rel="manifest" href="/manifest.json">
 <link rel="apple-touch-icon" href="/icons/icon.svg">
+<script src="/js/email-check.js"></script>
 <script src="/js/auth.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/css/theme.css">
@@ -359,6 +360,14 @@ function doSignUp() {
   err.textContent = '';
   if (!name)  { err.textContent = 'Enter your name'; return; }
   if (!email) { err.textContent = 'Enter your email'; return; }
+  if (typeof FREmailCheck === 'function') {
+    var ec = FREmailCheck(email);
+    if (!ec.ok) {
+      err.textContent = ec.suggestion ? (ec.reason + ' ' + ec.suggestion + '?') : ec.reason;
+      if (ec.suggestion) { document.getElementById('su-email').value = ec.suggestion; }
+      return;
+    }
+  }
   if (pass.length < 6) { err.textContent = 'Password must be at least 6 characters'; return; }
   if (code && !pendingLeagueId) { err.textContent = 'Invalid join code — check and try again'; return; }
 
