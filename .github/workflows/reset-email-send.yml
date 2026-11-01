@@ -1,0 +1,55 @@
+name: Password reset email live send test (commissioner only)
+# Sends a REAL password-reset email to the commissioner's own account and
+# reports exactly what Firebase's API returns, so we can tell an API failure
+# apart from a delivery (spam/sender) failure. Public repo: prints NO address,
+# only a domain + shape. Targets only the commissioner account on file.
+on:
+  push:
+    branches: [audit/draft-check]
+    paths: ['.github/workflows/reset-email-send.yml']
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send reset to commissioner
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB = process.env.FIREBASE_DB_URL, T = process.env.FIREBASE_AUTH_TOKEN;
+          const API_KEY = 'AIzaSyA-2hcf2hzThk7MuEm9DAvRICK95koE9gM';
+          const esc = s => String(s).replace(/%/g,'%25').replace(/\r/g,'%0D').replace(/\n/g,'%0A');
+          const ann = (l,t,m) => console.log(`::${l} title=${esc(t).replace(/:/g,'%3A').replace(/,/g,'%2C')}::${esc(m)}`);
+          const dbGet = p => new Promise((res,rej)=>https.get(`${FB}${p}?auth=${T}`,r=>{let d='';r.on('data',c=>d+=c);r.on('end',()=>{try{res(JSON.parse(d))}catch(e){rej(e)}})}).on('error',rej));
+          function idt(endpoint, body){ const data=JSON.stringify(body); return new Promise((res,rej)=>{const r=https.request(`https://identitytoolkit.googleapis.com/v1/accounts:${endpoint}?key=${API_KEY}`,{method:'POST',headers:{'Content-Type':'application/json','Content-Length':Buffer.byteLength(data)}},resp=>{let d='';resp.on('data',c=>d+=c);resp.on('end',()=>{let j={};try{j=JSON.parse(d)}catch(e){}res({status:resp.statusCode,body:j})})});r.on('error',rej);r.write(data);r.end();});}
+          const dom = e => { if(!e) return 'MISSING'; const a=e.split('@'); return a.length===2 ? `domain=${a[1].toLowerCase()} · local-len=${a[0].length}` : 'malformed'; };
+          (async () => {
+            const L='fr_refresh26';
+            const comms = await dbGet(`/leagues/${L}/settings/commissioners.json`) || {};
+            const uids = Object.keys(comms).filter(u => comms[u]);
+            if(!uids.length){ ann('warning','No commissioner found','settings/commissioners is empty.'); return; }
+            const priv = await dbGet(`/memberPrivate/${L}.json`) || {};
+            const members = await dbGet(`/leagues/${L}/members.json`) || {};
+            // Prefer a commissioner whose email is on a real mailbox domain.
+            let picked=null, email=null;
+            for(const u of uids){ const e=(priv[u]&&priv[u].email)||(members[u]&&members[u].email); if(e){picked=u;email=e;break;} }
+            if(!email){ ann('warning','No commissioner email on file','Set one in the Firebase console.'); return; }
+            ann('notice','Target (commissioner account)',`uid ${picked.slice(0,6)}… · ${dom(email)}`);
+
+            const au = await idt('createAuthUri',{identifier:email,continueUri:'https://fantasyrefresh.com'});
+            const methods=(au.body&&au.body.signinMethods)||[];
+            ann(au.body&&au.body.registered?'notice':'warning','Account check',
+              `registered: ${!!(au.body&&au.body.registered)} · methods: ${methods.join(', ')||'(none returned — enumeration protection may hide these)'}`);
+
+            const r = await idt('sendOobCode',{requestType:'PASSWORD_RESET',email:email});
+            if(r.status<300){
+              ann('notice','Firebase ACCEPTED the reset send',
+                `API returned success (HTTP ${r.status}, email=${r.body.email?'echoed':'not echoed'}).\nA real email was just sent to the commissioner address above.\n>>> Check that inbox now — and Spam, and Gmail's Promotions/Updates tabs. <<<\nIf it arrives: reset works, earlier failures were delivery/spam.\nIf nothing in ~5 min: the API works but DELIVERY is the problem (sender/template in Authentication → Templates, or the default firebaseapp.com sender being filtered).`);
+            } else {
+              ann('warning','Firebase REJECTED the reset send',
+                `HTTP ${r.status}: ${r.body.error?r.body.error.message:'unknown'}\nThis is an API/config problem, not delivery. Common: OPERATION_NOT_ALLOWED (Email/Password provider disabled), INVALID_EMAIL, or a missing template.`);
+            }
+          })().catch(e=>{ann('error','Send test failed',e.stack||String(e));process.exit(1);});
+          SCRIPT
