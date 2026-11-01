@@ -136,8 +136,33 @@ locks/salaries, salary dry runs, Sleeper probes, migrations).
   cron-job.org via `workflow_dispatch`.
 - The draft page redirects signed-out visitors, so browser tests of draft UI need a
   harness page or a signed-in session.
+- **Accounts / password reset (confirmed Nov 1, 2026):** reset emails *do* work and deliver
+  — a live send to the commissioner arrived fine. The login email lives in **Firebase Auth**,
+  not the DB; the Firebase console can only disable/delete/send-reset a user, it **cannot edit
+  an email** (that needs the Admin SDK). **Email-enumeration protection is ON**, so
+  `sendOobCode` (and the "✓ sent" message) returns success even for an address with no account
+  — a wrong email looks like success but sends nothing, which is how a `gmail.con` typo hid for
+  weeks. `js/email-check.js` now guards signup typos (#31) and the commissioner dues list flags
+  bad member emails + offers "send reset" (#33). The `/memberPrivate` email copy self-heals
+  from Auth on each sign-in (`js/auth.js` signIn writes `data.email`).
+- **Admin service account:** `FIREBASE_SERVICE_ACCOUNT` secret added to GitHub Actions
+  (Oct 31, 2026) — full-admin JSON key, lets workflows use `firebase-admin` for Auth user
+  management (e.g. `auth().updateUser`). NEVER print it or commit it. **Gotcha:** `firebase-admin`
+  keeps the RTDB connection open, so any workflow using it must call `process.exit(0)` at the
+  end or the job hangs until timeout.
 
-## Open items (as of Oct 23, 2026)
+## Open items (as of Nov 1, 2026) — see ROADMAP.md for the launch plan
+
+- **Commissioner "fix a member's email" button (next build):** editing a member's login email
+  needs the admin key, which can't sit in a static page — it belongs in `cloudflare/worker.js`
+  (mint a Google OAuth token from the service account, verify the caller is a commissioner via
+  their Firebase ID token + `/settings/commissioners`, then call Identity Toolkit admin). #33
+  added the flag + send-reset; this closes the loop. Needs a Worker secret binding + deploy +
+  joint testing.
+- **Customize the reset email** in Firebase console → Authentication → Templates (friendly
+  sender/reply-to to cut spam filtering), and optionally point the action link at
+  `fantasyrefresh.com` instead of the default `firebaseapp.com` (commissioner-side, console only).
+
 
 - **Yardage bonuses for 2027 and the playoff game** (commissioner wants them back): +3 for
   300+ passing, 100+ rushing, 100+ receiving yards, computed from the yards in
