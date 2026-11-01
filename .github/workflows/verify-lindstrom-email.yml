@@ -1,0 +1,37 @@
+name: Verify member login email (read-only)
+on:
+  push:
+    branches: [audit/draft-check]
+    paths: ['.github/workflows/verify-lindstrom-email.yml']
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Read current login email
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          npm install firebase-admin@12 --no-audit --no-fund --silent
+          node << 'SCRIPT'
+          const admin = require('firebase-admin');
+          const esc = s => String(s).replace(/%/g,'%25').replace(/\r/g,'%0D').replace(/\n/g,'%0A');
+          const ann = (l,t,m) => console.log(`::${l} title=${esc(t).replace(/:/g,'%3A').replace(/,/g,'%2C')}::${esc(m)}`);
+          const dom = e => { if(!e) return 'MISSING'; const a=String(e).split('@'); return a.length===2?`domain=${a[1].toLowerCase()} · local-len=${a[0].length}`:'malformed'; };
+          (async () => {
+            const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+            admin.initializeApp({ credential: admin.credential.cert(sa), databaseURL: process.env.FIREBASE_DB_URL });
+            const L='fr_refresh26';
+            const members = (await admin.database().ref(`/leagues/${L}/members`).get()).val() || {};
+            const hits = Object.entries(members).filter(([u,m]) => m && /lindstrom/i.test((m.teamName||'')+' '+(m.displayName||'')+' '+(m.name||'')));
+            if(hits.length!==1){ ann('warning','Match count', `found ${hits.length}`); return; }
+            const [uid,m] = hits[0];
+            const user = await admin.auth().getUser(uid);
+            const e = user.email||'';
+            ann(/\.con$/i.test(e)?'warning':'notice', 'Lindstrom22 login email now',
+              `${dom(e)} · ends-in-.con: ${/\.con$/i.test(e)} · emailVerified: ${user.emailVerified}\n` +
+              (/\.con$/i.test(e) ? 'Still the typo — the fix did NOT apply.' : '✓ Corrected. He can now use "Forgot password?" and the reset will reach him (check spam).'));
+            const priv = (await admin.database().ref(`/memberPrivate/${L}/${uid}/email`).get()).val();
+            ann('notice','memberPrivate copy', dom(priv));
+          })().then(()=>process.exit(0)).catch(e => { ann('error','Verify failed', e.message); process.exit(1); });
+          SCRIPT
