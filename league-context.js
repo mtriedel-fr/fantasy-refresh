@@ -121,6 +121,10 @@
     // splitting this into two copies would be unnecessary.
     playerPool:     function()       { return '/playerPool/' + ctx().season; },
     players:        function()       { return paths.playerPool() + '/players'; },
+    // Standalone August preseason-testing tool (preseason.html) keeps its own
+    // top-level blob at /preseason{season}, e.g. /preseason2026. Isolated on
+    // purpose — it's a throwaway validation sandbox, not league data.
+    preseason:      function()       { return '/preseason' + ctx().season; },
     user:           function(uid)    { return '/users/' + uid; },
     url:            function(p)      { return FB_DB_URL + p + '.json'; }
   };
