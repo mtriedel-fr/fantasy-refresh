@@ -18,6 +18,7 @@
 <title>Fantasy Refresh — League</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20400%20400'><defs><linearGradient%20id='tg'%20x1='100%'%20y1='0%'%20x2='0%'%20y2='100%'><stop%20offset='0%'%20stop-color='%2300E5D4'/><stop%20offset='100%'%20stop-color='%2300E5D4'%20stop-opacity='0.6'/></linearGradient><linearGradient%20id='pg'%20x1='0%'%20y1='100%'%20x2='100%'%20y2='0%'><stop%20offset='0%'%20stop-color='%23FF5FA0'/><stop%20offset='100%'%20stop-color='%23FF5FA0'%20stop-opacity='0.6'/></linearGradient></defs><rect%20x='25'%20y='25'%20width='350'%20height='350'%20rx='70'%20fill='%23050808'/><g%20transform='translate(200,200)%20scale(3.79)%20translate(-475.5,-241.6)'><path%20fill='url(%23tg)'%20d='M504.547,265.443h-9.019a30.964,30.964,0,0,0-29.042-52.733,1.5,1.5,0,1,0,.792,2.894,27.955,27.955,0,0,1,25.512,48.253l0-10.169h-.011a1.493,1.493,0,0,0-2.985,0h0v13.255a1.5,1.5,0,0,0,1.5,1.5h13.256a1.5,1.5,0,1,0,0-3Z'/><path%20fill='url(%23pg)'%20d='M485.389,267.995a27.956,27.956,0,0,1-25.561-48.213l0,10.2h.015a1.491,1.491,0,0,0,2.978,0h.007V216.791a1.484,1.484,0,0,0-1.189-1.532l-.018-.005a1.533,1.533,0,0,0-.223-.022c-.024,0-.046-.007-.07-.007H448.071a1.5,1.5,0,0,0,0,3h8.995a30.963,30.963,0,0,0,29.115,52.664,1.5,1.5,0,0,0-.792-2.894Z'/></g></svg>">
   <link rel="apple-touch-icon" href="/icons/icon.svg">
+<script src="/js/email-check.js"></script>
 <script src="/js/auth.js"></script>
 <script src="/league-context.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@400;500&display=swap" rel="stylesheet">
@@ -7704,13 +7705,32 @@ function renderCommDues(){
 
     if(!list.length){ el.innerHTML = '<div style="color:var(--ink3);font-size:12px;">No members found.</div>'; return; }
 
+    // Keep emails out of inline onclick (avoids quoting/injection); actions look them up by uid.
+    commMemberEmails = {};
+    list.forEach(function(m){ commMemberEmails[m.uid] = m.email || ''; });
+
     el.innerHTML = list.map(function(m){
-      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--bdr2);">'
-        + '<div>'
+      // Flag an obviously-broken address (e.g. "gmail.con") so a locked-out
+      // member's dead email is visible instead of silently eating resets.
+      var badEmail = m.email && typeof FREmailCheck === 'function' && !FREmailCheck(m.email).ok;
+      var suggestion = badEmail ? FREmailCheck(m.email).suggestion : '';
+      var emailLine = !m.email
+        ? '<div style="font-family:var(--fd);font-size:11px;color:var(--ink3);">No email on file</div>'
+        : '<div style="font-family:var(--fd);font-size:11px;color:' + (badEmail ? 'var(--pk)' : 'var(--ink3)') + ';">'
+            + (badEmail ? '⚠ ' : '') + escapeHtmlFR(m.email) + '</div>'
+            + (badEmail ? '<div style="font-family:var(--fd);font-size:10.5px;color:var(--pk);">Looks invalid — resets won\'t arrive'
+                + (suggestion ? '. Did you mean ' + escapeHtmlFR(suggestion) + '?' : '') + '</div>' : '');
+      // Only offer "send reset" when the address is usable.
+      var resetLink = (m.email && !badEmail)
+        ? '<a href="#" onclick="sendMemberReset(\'' + m.uid + '\');return false;" style="font-family:var(--fd);font-size:11px;font-weight:700;color:var(--or);">✉ Send password reset</a>'
+        : '';
+      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--bdr2);gap:10px;">'
+        + '<div style="min-width:0;">'
         + '<div style="font-family:var(--fd);font-size:13px;color:var(--ink);">' + escapeHtmlFR(m.teamName) + '</div>'
-        + (m.email ? '<div style="font-family:var(--fd);font-size:11px;color:var(--ink3);">' + escapeHtmlFR(m.email) + '</div>' : '')
+        + emailLine
         + (m.claimedAt ? '<div style="font-family:var(--fd);font-size:11px;font-weight:800;color:#B26A00;">Says paid · ' + escapeHtmlFR(duesClaimText(m.claim, m.claimedAt))
             + ' <a href="#" onclick="clearDuesClaim(\'' + m.uid + '\');return false;" style="color:var(--ink3);font-weight:600;margin-left:4px;">not received</a></div>' : '')
+        + (resetLink ? '<div style="margin-top:3px;">' + resetLink + '</div>' : '')
         + '</div>'
         + '<button onclick="toggleDuesPaid(\'' + m.uid + '\',' + (!m.paid) + ')" style="font-family:var(--fd);font-size:11px;font-weight:800;border-radius:14px;padding:5px 14px;cursor:pointer;border:none;flex-shrink:0;'
         + (m.paid ? 'color:#173404;background:#EAF3DE;' : 'color:#501313;background:#FCEBEB;')
@@ -7718,6 +7738,22 @@ function renderCommDues(){
         + '</div>';
     }).join('');
   }).catch(function(){ el.innerHTML = '<div style="color:var(--ink3);font-size:12px;">Failed to load members.</div>'; });
+}
+
+// Emails for the commissioner dues list, keyed by uid (filled on render).
+var commMemberEmails = {};
+
+// Commissioner sends a member their password-reset email. Firebase has email
+// enumeration protection on, so a send to a wrong address silently does
+// nothing — that's why the list flags bad emails and only shows this for
+// well-formed ones.
+function sendMemberReset(uid){
+  var email = commMemberEmails[uid];
+  if(!email) return;
+  if(!window.confirm('Send a password reset email to ' + email + '?')) return;
+  FRAuth.resetPassword(email)
+    .then(function(){ showToast('Reset sent to ' + email + ' — tell them to check spam'); })
+    .catch(function(e){ showToast('Could not send: ' + (e.message || 'error'), true); });
 }
 
 // Commissioner switch for the dues pop-up (js/dues-alert.js). On unless set false.
