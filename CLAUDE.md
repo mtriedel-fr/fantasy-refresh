@@ -163,8 +163,12 @@ locks/salaries, salary dry runs, Sleeper probes, migrations).
   Open-Meteo (free, no key, CORS) called **client-side** in `js/weather.js`; stadium coords +
   roof type are in `js/stadiums.js`. Outdoor stadiums get a live kickoff-hour forecast (matched
   in UTC, `timezone=GMT`); dome/retractable/fixed roofs show as sheltered. Cached ~30 min so it
-  refreshes through game day; pure logic is in `tests/weather.test.js`. Per-player chips were
-  deferred (commissioner chose the all-games panel first).
+  refreshes through game day; pure logic is in `tests/weather.test.js`. The **injury pop-up**
+  (`js/injury-alert.js`) also flags severe weather for a lineup's games — strong wind, heavy
+  rain, snow/blizzard, thunderstorms (`FRWeather.isSevere`/`severeReasons`, `weatherFlags`);
+  it now shows for weather alone (title becomes "Weather check") as well as injuries, so
+  `js/stadiums.js` + `js/weather.js` load before `js/injury-alert.js` on home/draft/league.
+  Per-player chips on the roster are still deferred (commissioner chose the all-games panel first).
 - **Preseason page (Nov 1, 2026):** `preseason.html` forces `?mode=preseason` on load so every
   `FR.paths.*` lands in the isolated `<season>P` namespace (e.g. `/leagues/{id}/season/2026P`),
   never the live season. It's dormant until 2027 and wants a proper rebuild then.

@@ -66,3 +66,22 @@ test('isNotable: calm clear day is not flagged', () => {
   assert.equal(W.isNotable({ windMph: 18, precipPct: 0, code: 1 }), true);
   assert.equal(W.isNotable({ indoor: true }), false);
 });
+
+test('isSevere flags blizzard/heavy-rain/wind/storm, not calm or indoor', () => {
+  assert.equal(W.isSevere({ windMph: 24, precipPct: 10, code: 2 }), true);  // wind
+  assert.equal(W.isSevere({ windMph: 8, precipPct: 80, code: 63 }), true);  // heavy rain chance
+  assert.equal(W.isSevere({ windMph: 8, precipPct: 30, code: 73 }), true);  // snow
+  assert.equal(W.isSevere({ windMph: 8, precipPct: 20, code: 95 }), true);  // thunderstorm
+  assert.equal(W.isSevere({ windMph: 10, precipPct: 20, code: 2 }), false); // calm
+  assert.equal(W.isSevere({ indoor: true }), false);
+  assert.equal(W.isSevere({ pending: true }), false);
+});
+
+test('severeReasons describes the conditions', () => {
+  assert.deepEqual(W.severeReasons({ windMph: 25, precipPct: 40, code: 75 }).phrases, ['Blizzard conditions']); // heavy snow (wind folded in)
+  const storm = W.severeReasons({ windMph: 10, precipPct: 80, code: 95 });
+  assert.ok(storm.phrases.indexOf('Thunderstorms') >= 0);
+  assert.equal(storm.icon, '⛈️');
+  const wind = W.severeReasons({ windMph: 22, precipPct: 10, code: 2 });
+  assert.equal(wind.phrases[0], 'High winds (22 mph)');
+});

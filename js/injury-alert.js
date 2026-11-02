@@ -40,10 +40,54 @@
     return out.sort(function (a, b) { return order[a.tag.label] - order[b.tag.label]; });
   }
 
+  // Pure: which of the lineup's games have severe weather (and whose game
+  // hasn't started)? Groups the team's players by game. (Exported for tests.)
+  // teamGameMap: {TEAM: {home,away,time}}, wx: FRWeather map keyed by home team.
+  function weatherFlags(lineupSlots, teamGameMap, wx, locks, normTeam) {
+    var norm = normTeam || function (t) { return t; };
+    var W = global.FRWeather;
+    if (!W || !wx || !teamGameMap) return [];
+    var byGame = {};
+    Object.keys(lineupSlots || {}).forEach(function (sid) {
+      var p = lineupSlots[sid];
+      if (!p || !p.team) return;
+      var t = norm(p.team);
+      if (locks && (locks[t] || locks[p.team])) return; // game already started
+      var g = teamGameMap[t] || teamGameMap[p.team];
+      if (!g) return;
+      var w = wx[g.home];
+      if (!W.isSevere(w)) return;
+      if (!byGame[g.home]) {
+        var r = W.severeReasons(w);
+        byGame[g.home] = { matchup: g.away + ' @ ' + g.home, icon: r.icon, reason: r.phrases.join(' · '), wx: w, players: [] };
+      }
+      byGame[g.home].players.push(p.name || p.team);
+    });
+    return Object.keys(byGame).map(function (k) { return byGame[k]; });
+  }
+
+  // Best-effort: load the week's games + weather and return the severe ones for
+  // this lineup. Never rejects — weather must not block the injury alert.
+  function loadWeatherList(week, slots, locks, normTeam) {
+    var FR = global.FR, W = global.FRWeather, S = global.FR_STADIUMS;
+    if (!FR || !FR.fb || !W || !S) return Promise.resolve([]);
+    var ctx = global.FRAuth && FRAuth.getLeagueCtx && FRAuth.getLeagueCtx();
+    var season = (ctx && ctx.season) || FR.FR_SEASON || 2026;
+    return FR.fb.get('/nflSchedule/' + season + '/Regular').then(function (sched) {
+      var games = (sched && sched.weeks && sched.weeks['week' + week]) || [];
+      games = games.filter(function (g) { return g && g.home && g.away && g.time; });
+      if (!games.length) return [];
+      var teamGameMap = {};
+      games.forEach(function (g) { teamGameMap[g.home] = g; teamGameMap[g.away] = g; });
+      return W.load(games).then(function (wx) { return weatherFlags(slots, teamGameMap, wx, locks, normTeam); });
+    }).catch(function () { return []; });
+  }
+
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 
-  function show(list, week, onDraftPage) {
+  function show(list, weatherList, week, onDraftPage) {
     var hasOut = list.some(function (p) { return p.tag.label === 'OUT'; });
+    var hasInj = list.length > 0;
     var wrap = document.createElement('div');
     wrap.id = 'fr-injury-alert';
     wrap.setAttribute('role', 'dialog');
@@ -55,12 +99,24 @@
         + '<div style="flex:1;min-width:0;"><div style="font-family:var(--fd,inherit);font-weight:800;font-size:15px;color:var(--ink,#111);">' + esc(p.name) + '</div>'
         + '<div style="font-size:12px;color:var(--ink3,#667);">' + esc(p.pos) + ' · ' + esc(p.team) + ' · ' + p.tag.note + '</div></div></div>';
     }).join('');
+    var weatherRows = (weatherList || []).map(function (g) {
+      return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--bdr,#2a3a3a);">'
+        + '<span style="min-width:38px;text-align:center;font-size:20px;">' + (g.icon || '🌧️') + '</span>'
+        + '<div style="flex:1;min-width:0;"><div style="font-family:var(--fd,inherit);font-weight:800;font-size:15px;color:var(--ink,#111);">' + esc(g.reason || 'Rough weather') + '</div>'
+        + '<div style="font-size:12px;color:var(--ink3,#667);">' + esc(g.matchup) + ' · ' + esc(g.players.join(', ')) + '</div></div></div>';
+    }).join('');
+    var weatherSection = (weatherList && weatherList.length)
+      ? (hasInj ? '<div style="font-family:var(--fd,inherit);font-weight:900;font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--ink3,#667);margin-top:12px;">⛈️ Weather watch</div>' : '') + weatherRows
+      : '';
     wrap.innerHTML = '<div style="width:100%;max-width:380px;background:var(--bg2,#fff);border:1px solid var(--bdr,#ccc);border-radius:16px;padding:18px 18px 14px;box-shadow:0 12px 40px rgba(0,0,0,.4);">'
-      + '<div style="font-family:var(--fd,inherit);font-weight:900;font-size:18px;letter-spacing:.4px;text-transform:uppercase;color:' + (hasOut ? 'var(--pk,#c36)' : 'var(--or,#077)') + ';">🚑 Injury check · Week ' + esc(week) + '</div>'
+      + '<div style="font-family:var(--fd,inherit);font-weight:900;font-size:18px;letter-spacing:.4px;text-transform:uppercase;color:' + (hasInj ? (hasOut ? 'var(--pk,#c36)' : 'var(--or,#077)') : 'var(--or,#077)') + ';">' + (hasInj ? '🚑 Injury check' : '🌦️ Weather check') + ' · Week ' + esc(week) + '</div>'
       + '<div style="font-size:13px;color:var(--ink2,#355);margin:6px 0 8px;">'
-      + (list.length === 1 ? 'Your lineup has a player who may not play.' : 'Your lineup has players who may not play.')
-      + ' You can swap ' + (list.length === 1 ? 'him' : 'them') + ' out before ' + (list.length === 1 ? 'his game starts.' : 'their games start.') + '</div>'
+      + (hasInj
+          ? ((list.length === 1 ? 'Your lineup has a player who may not play.' : 'Your lineup has players who may not play.') + ' You can swap ' + (list.length === 1 ? 'him' : 'them') + ' out before ' + (list.length === 1 ? 'his game starts.' : 'their games start.'))
+          : 'Rough weather is expected where your players are this week — worth a look before kickoff.')
+      + '</div>'
       + rows
+      + weatherSection
       + '<div style="display:flex;gap:8px;margin-top:14px;">'
       + (onDraftPage ? '' : '<button type="button" data-act="fix" style="flex:1;padding:11px;border:0;border-radius:10px;font-family:var(--fd,inherit);font-weight:900;text-transform:uppercase;letter-spacing:.6px;cursor:pointer;color:#050808;background:linear-gradient(135deg,var(--or,#0cc),var(--pk,#c36));">Fix lineup</button>')
       + '<button type="button" data-act="ok" style="flex:1;padding:11px;border-radius:10px;font-family:var(--fd,inherit);font-weight:800;text-transform:uppercase;letter-spacing:.6px;cursor:pointer;background:transparent;color:var(--ink2,#355);border:1px solid var(--bdr2,#9cc);">' + (onDraftPage ? 'Got it' : 'Not now') + '</button>'
@@ -117,15 +173,19 @@
           var lineup = r[0], locks = r[1] || {};
           if (!lineup || !lineup.slots) return;
           var list = flaggedPlayers(lineup.slots, sheet.players, locks, normTeam);
-          if (!list.length) return;
-          var sig = list.map(function (p) { return p.id + ':' + p.tag.label; }).sort().join(',');
-          var key = 'fr_injury_alert_' + sheet.week + '_' + user.uid;
-          try { if (localStorage.getItem(key) === sig) return; localStorage.setItem(key, sig); } catch (e) {}
-          whenClear(function () { show(list, sheet.week, !!opts.onDraftPage); });
+          return loadWeatherList(sheet.week, lineup.slots, locks, normTeam).then(function (weatherList) {
+            if (!list.length && !(weatherList && weatherList.length)) return;
+            var sig = list.map(function (p) { return p.id + ':' + p.tag.label; })
+              .concat((weatherList || []).map(function (g) { return 'wx:' + g.matchup + ':' + (g.wx ? g.wx.code : '') + ':' + (g.wx ? Math.round(g.wx.windMph / 5) * 5 : ''); }))
+              .sort().join(',');
+            var key = 'fr_injury_alert_' + sheet.week + '_' + user.uid;
+            try { if (localStorage.getItem(key) === sig) return; localStorage.setItem(key, sig); } catch (e) {}
+            whenClear(function () { show(list, weatherList, sheet.week, !!opts.onDraftPage); });
+          });
         });
       }).catch(function () {});
     } catch (e) {}
   }
 
-  global.FRInjuryAlert = { check: check, flaggedPlayers: flaggedPlayers, tagFor: tagFor };
+  global.FRInjuryAlert = { check: check, flaggedPlayers: flaggedPlayers, weatherFlags: weatherFlags, tagFor: tagFor };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -987,6 +987,9 @@ if (window.FRBackCloses) FRBackCloses.watch([
 <!-- League dues pop-up: asks unpaid members to pay or confirm they've paid (js/dues-alert.js) -->
 <script src="/js/dues-alert.js"></script>
 <script>window.addEventListener('load', function(){ setTimeout(function(){ if (window.FRDuesAlert) FRDuesAlert.check(); }, 1200); });</script>
+<!-- Stadium + weather data (shared) — loaded before the injury pop-up, which flags severe game-day weather too -->
+<script src="/js/stadiums.js"></script>
+<script src="/js/weather.js"></script>
 <!-- Injury check pop-up: lists lineup players tagged Out/IR/Doubtful/Questionable (js/injury-alert.js) -->
 <script src="/js/injury-alert.js"></script>
 <script>window.addEventListener('load', function(){ setTimeout(function(){ if (window.FRInjuryAlert) FRInjuryAlert.check({ onDraftPage: false }); }, 1500); });</script>

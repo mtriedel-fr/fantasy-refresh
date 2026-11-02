@@ -37,6 +37,36 @@
     return !!w && !w.indoor && (w.windMph >= 15 || w.precipPct >= 50 || (w.code >= 71 && w.code <= 86) || w.code >= 95);
   }
 
+  // Severe = worth a lineup warning: strong wind, likely heavy rain, any snow,
+  // or thunderstorms. Higher bar than isNotable. Indoor/pending/unknown never.
+  function isSevere(w) {
+    if (!w || w.indoor || w.pending || w.unknown) return false;
+    return w.windMph >= 20
+      || w.precipPct >= 70
+      || w.code === 65 || w.code === 67 || w.code === 82     // heavy rain / showers
+      || (w.code >= 71 && w.code <= 77)                      // snow
+      || (w.code >= 85 && w.code <= 86)                      // snow showers
+      || w.code >= 95;                                       // thunderstorm
+  }
+
+  // Short plain-English reasons a game is severe, e.g. "Blizzard conditions",
+  // "High winds (24 mph)". Returns { icon, phrases:[...] }.
+  function severeReasons(w) {
+    var out = [];
+    if (!isSevere(w)) return { icon: w && w.icon, phrases: out };
+    var snow = (w.code >= 71 && w.code <= 77) || (w.code >= 85 && w.code <= 86);
+    var heavySnow = w.code === 75 || w.code === 86;
+    var storm = w.code >= 95;
+    var heavyRain = w.code === 65 || w.code === 67 || w.code === 82 || w.precipPct >= 70;
+    var blizzard = snow && (heavySnow || w.windMph >= 20);
+    if (snow) out.push(blizzard ? 'Blizzard conditions' : 'Snow expected');
+    if (storm) out.push('Thunderstorms');
+    if (heavyRain && !snow && !storm) out.push('Heavy rain likely' + (w.precipPct ? ' (' + w.precipPct + '%)' : ''));
+    if (w.windMph >= 20 && !blizzard) out.push('High winds (' + w.windMph + ' mph)');
+    var icon = storm ? '⛈️' : snow ? '🌨️' : heavyRain ? '🌧️' : w.windMph >= 20 ? '💨' : (w.icon || '🌡️');
+    return { icon: icon, phrases: out };
+  }
+
   // Build the per-game result from already-fetched hourly data (pure — tested).
   // byStadium: { "lat,lon": { time:[...], temperature_2m:[...], ... } }
   function assemble(games, byStadium) {
@@ -115,6 +145,6 @@
     });
   }
 
-  global.FRWeather = { load: load, codeInfo: codeInfo, assemble: assemble, isNotable: isNotable, utcHourKey: utcHourKey };
+  global.FRWeather = { load: load, codeInfo: codeInfo, assemble: assemble, isNotable: isNotable, isSevere: isSevere, severeReasons: severeReasons, utcHourKey: utcHourKey };
   if (typeof module !== 'undefined' && module.exports) module.exports = global.FRWeather;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
