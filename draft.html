@@ -1316,11 +1316,16 @@ function buildGamesBar(games){
       // stadium type, since that's whose venue the game is actually played at.
       var domeBadge = draftStadiumIcon(g.home)
         ? '<div style="font-size:9px;font-weight:800;color:var(--ink3);margin-top:1px;">'+draftStadiumIcon(g.home)+' Dome</div>' : '';
+      // Weather badge — outdoor stadiums only (roofed games already show 🏟️).
+      // Filled in asynchronously by applyDraftWeather() once forecasts load.
+      var wxBadge = (draftStadiumIcon(g.home) || !g.home)
+        ? ''
+        : '<div class="wx-badge" data-wx="'+(g.home||'')+'" style="font-size:9px;font-weight:800;color:var(--ink3);margin-top:1px;"></div>';
       sub = '<div style="font-size:9px;margin-top:2px;display:flex;gap:4px;justify-content:center;">'
           + '<span style="color:var(--pk);font-weight:800;">'+dayLabel+'</span>'
           + '<span style="color:var(--ink3);">'+timeStr+'</span>'
           + '</div>'
-          + intlBadge + ouBadge + domeBadge;
+          + intlBadge + ouBadge + domeBadge + wxBadge;
     }
     var labelHtml = labelColor ? '<span style="color:'+labelColor+';">'+label+'</span>' : label;
     var gameKey = normTeam(g.home||'') + '@' + normTeam(g.away||'');
@@ -1328,6 +1333,29 @@ function buildGamesBar(games){
   });
   bar.innerHTML = html;
   if(pickerBar) pickerBar.innerHTML = html;
+  applyDraftWeather(games);
+}
+
+// Fill the outdoor game chips with a small weather symbol + temp once the
+// forecast loads (js/weather.js). Severe conditions turn the badge pink.
+// Best-effort and cached — safe to call on every games-bar rebuild.
+function applyDraftWeather(games){
+  if(typeof FRWeather === 'undefined' || typeof FR_STADIUMS === 'undefined') return;
+  var list = (games || []).filter(function(g){ return g && g.home && g.time; });
+  if(!list.some(function(g){ return FR_STADIUMS.isOutdoor(g.home); })) return;
+  FRWeather.load(list).then(function(wx){
+    Object.keys(wx || {}).forEach(function(home){
+      var w = wx[home];
+      if(!w || w.indoor || w.unknown || w.pending) return;
+      var sev = FRWeather.isSevere(w);
+      var txt = (w.icon || '') + ' ' + w.tempF + '°' + (w.windMph >= 15 ? ' · 💨' + w.windMph : '');
+      document.querySelectorAll('.wx-badge[data-wx="' + String(home).replace(/"/g, '') + '"]').forEach(function(elm){
+        elm.textContent = txt;
+        elm.style.color = sev ? 'var(--pk)' : 'var(--ink3)';
+        elm.title = (w.label || '') + ' · ' + w.tempF + '°F · wind ' + w.windMph + ' mph · ' + w.precipPct + '% precip';
+      });
+    });
+  }).catch(function(){});
 }
 
 function buildGamesBarFromPlayers(){

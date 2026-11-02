@@ -168,6 +168,8 @@ locks/salaries, salary dry runs, Sleeper probes, migrations).
   rain, snow/blizzard, thunderstorms (`FRWeather.isSevere`/`severeReasons`, `weatherFlags`);
   it now shows for weather alone (title becomes "Weather check") as well as injuries, so
   `js/stadiums.js` + `js/weather.js` load before `js/injury-alert.js` on home/draft/league.
+  The **draft games bar** shows a small weather symbol + temp per outdoor game chip
+  (`applyDraftWeather` in `draft.html`, `.wx-badge[data-wx=HOME]`; severe → pink; roofed skipped).
   Per-player chips on the roster are still deferred (commissioner chose the all-games panel first).
 - **Preseason page (Nov 1, 2026):** `preseason.html` forces `?mode=preseason` on load so every
   `FR.paths.*` lands in the isolated `<season>P` namespace (e.g. `/leagues/{id}/season/2026P`),
