@@ -2655,8 +2655,14 @@ function buildLineupPlayerCard(p, pts, hasStarted, gameMap, showNotStartedTag, s
       // the home team's stadium, regardless of which side p.team is on.
       var hostTeam = game.isHome ? p.team : game.opp;
       var venueIcon = stadiumIcon(hostTeam);
+      // Weather symbol for outdoor stadiums (roofed ones already show the venue
+      // icon). Empty placeholder filled by fillWeatherBadges() after render; it
+      // only gets filled where that's called (the My Team page), so it stays
+      // invisible in other lineup views.
+      var wxSpan = (!venueIcon && hostTeam && typeof FR_STADIUMS !== 'undefined' && FR_STADIUMS.isOutdoor(hostTeam))
+        ? ' <span class="wx-badge" data-wx="' + escapeHtmlFR(normTeam(hostTeam)) + '" style="font-weight:800;"></span>' : '';
       gameLine = '<div class="lineup-card-game">' + (kickoff ? kickoff + ' · ' : '') + vsAt + ' ' + escapeHtmlFR(game.opp)
-        + (venueIcon ? ' ' + venueIcon : '') + '</div>';
+        + (venueIcon ? ' ' + venueIcon : '') + wxSpan + '</div>';
     }
   }
 
@@ -4168,7 +4174,7 @@ function loadMyWeekDetail(uid, mine){
     var slotPts = (scoreEntry && scoreEntry.slotPts) || {};
 
     var lu = document.getElementById('ytw-lineup');
-    if(lu) lu.innerHTML = rosterColumn(lineup, scoreEntry, locks, true, gameMap);
+    if(lu){ lu.innerHTML = rosterColumn(lineup, scoreEntry, locks, true, gameMap); fillWeatherBadges(lu, gameMap); }
 
     var pl = countPlayersLeft(lineup, gameMap);
     var leftEl = document.getElementById('ytw-left'); if(leftEl) leftEl.textContent = pl ? (pl.left + '/' + pl.total) : '—';
@@ -12377,6 +12383,37 @@ function paintWeather(el, week, games, wx){
   html += '<div style="padding:14px 16px;font-family:var(--fb);font-size:11px;color:var(--ink3);">'
     + 'Forecasts from Open-Meteo. <a href="#" onclick="renderWeather();return false;" style="color:var(--or);text-decoration:none;font-weight:700;">↻ Refresh</a></div>';
   el.innerHTML = html;
+}
+
+// Fill .wx-badge placeholders inside `container` with a small weather symbol +
+// temp, from the week's games (built off the lineup's gameMap). Outdoor games
+// only; severe conditions turn the badge pink. Best-effort and cached.
+function fillWeatherBadges(container, gameMap){
+  if(typeof FRWeather === 'undefined' || typeof FR_STADIUMS === 'undefined' || !gameMap) return;
+  var seen = {}, games = [];
+  Object.keys(gameMap).forEach(function(t){
+    var e = gameMap[t];
+    if(!e || !e.time || e.opp == null) return;
+    var home = normTeam(e.isHome ? t : e.opp);
+    var away = normTeam(e.isHome ? e.opp : t);
+    if(!home || seen[home]) return;
+    seen[home] = true;
+    games.push({ home: home, away: away, time: e.time });
+  });
+  if(!games.some(function(g){ return FR_STADIUMS.isOutdoor(g.home); })) return;
+  FRWeather.load(games).then(function(wx){
+    Object.keys(wx || {}).forEach(function(home){
+      var w = wx[home];
+      if(!w || w.indoor || w.unknown || w.pending) return;
+      var sev = FRWeather.isSevere(w);
+      var txt = (w.icon || '') + ' ' + w.tempF + '°' + (w.windMph >= 15 ? ' · 💨' + w.windMph : '');
+      (container || document).querySelectorAll('.wx-badge[data-wx="' + String(home).replace(/"/g, '') + '"]').forEach(function(elm){
+        elm.textContent = txt;
+        elm.style.color = sev ? 'var(--pk)' : 'var(--ink3)';
+        elm.title = (w.label || '') + ' · ' + w.tempF + '°F · wind ' + w.windMph + ' mph · ' + w.precipPct + '% precip';
+      });
+    });
+  }).catch(function(){});
 }
 
 // ── BOTTOM NAV ─────────────────────────────────────────────────────

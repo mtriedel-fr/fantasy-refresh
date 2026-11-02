@@ -170,7 +170,8 @@ locks/salaries, salary dry runs, Sleeper probes, migrations).
   `js/stadiums.js` + `js/weather.js` load before `js/injury-alert.js` on home/draft/league.
   The **draft games bar** shows a small weather symbol + temp per outdoor game chip
   (`applyDraftWeather` in `draft.html`, `.wx-badge[data-wx=HOME]`; severe → pink; roofed skipped).
-  Per-player chips on the roster are still deferred (commissioner chose the all-games panel first).
+  The **My Team page** player cards show a weather symbol + temp on each outdoor player's game
+  line (`fillWeatherBadges` in `league.html`, `.wx-badge` emitted by `buildLineupPlayerCard`).
 - **Preseason page (Nov 1, 2026):** `preseason.html` forces `?mode=preseason` on load so every
   `FR.paths.*` lands in the isolated `<season>P` namespace (e.g. `/leagues/{id}/season/2026P`),
   never the live season. It's dormant until 2027 and wants a proper rebuild then.
