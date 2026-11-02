@@ -20,6 +20,8 @@
   <link rel="apple-touch-icon" href="/icons/icon.svg">
 <script src="/js/auth.js"></script>
 <script src="/js/email-check.js"></script>
+<script src="/js/stadiums.js"></script>
+<script src="/js/weather.js"></script>
 <script src="/league-context.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/css/theme.css">
@@ -1436,6 +1438,15 @@ setTimeout(function(){
     <div id="po-status-note" style="margin-left:auto;font-family:var(--fd);font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;align-self:center;"></div>
   </div>
   <div id="wplayoffs"></div>
+</div>
+<div id="tab-weather" class="content hidden">
+  <div class="tab-overlay-close-bar hidden">
+    <div class="tab-overlay-close-bar-row">
+      <span class="tab-overlay-close-bar-title">🌦️ Weather</span>
+      <button class="tab-overlay-close-btn" onclick="closeH2HTabOverlay()">✕ Close</button>
+    </div>
+  </div>
+  <div id="wweather"></div>
 </div>
 
 <div id="tab-dues" class="content hidden">
@@ -9027,6 +9038,7 @@ function handleNav(val){
   if(val === 'league'){ document.body.style.overflow = 'hidden'; document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); }); document.getElementById('tab-league').classList.remove('hidden'); document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); }); document.getElementById('navtab-league').classList.add('active'); setStatBoxes('hidden'); renderLeague(); return; }
   if(val === 'playoffs'){ document.body.style.overflow = 'hidden'; document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); }); document.getElementById('tab-playoffs').classList.remove('hidden'); document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); }); document.getElementById('navtab-playoffs').classList.add('active'); setStatBoxes('hidden'); renderPlayoffs(); return; }
   if(val === 'dues'){ document.body.style.overflow = 'hidden'; document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); }); document.getElementById('tab-dues').classList.remove('hidden'); document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); }); setStatBoxes('hidden'); var cumHomeEl = document.getElementById('cum-home'); if(cumHomeEl) cumHomeEl.classList.add('hidden'); renderPayouts(); renderDues(); return; }
+  if(val === 'weather'){ document.body.style.overflow = 'hidden'; document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); }); document.getElementById('tab-weather').classList.remove('hidden'); document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); }); setStatBoxes('hidden'); renderWeather(); return; }
   if(val === 'yourteam'){ document.body.style.overflow = 'hidden'; document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); }); var ytEl = document.getElementById('tab-yourteam'); if(ytEl) ytEl.classList.remove('hidden'); document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); }); setStatBoxes('hidden'); renderMyTeamTab(); return; }
   if(val === 'guillotine'){ document.body.style.overflow = 'hidden'; document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); }); document.getElementById('tab-guillotine').classList.remove('hidden'); document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); }); document.getElementById('navtab-guillotine').classList.add('active'); setStatBoxes('guillotine'); renderGuillotine(); return; }
   if(val === 'yourseason'){
@@ -12287,6 +12299,86 @@ function clearDuesMessage(){
     }).catch(function(){});
 }
 
+// ── WEATHER ────────────────────────────────────────────────────────
+// All of the week's games with game-day conditions (Open-Meteo, via
+// js/weather.js). Outdoor stadiums get a live forecast; roofed ones show as
+// sheltered. Grouped by day, in the viewer's local time.
+function renderWeather(){
+  var el = document.getElementById('wweather');
+  if(!el) return;
+  if(typeof FRWeather === 'undefined' || typeof FR_STADIUMS === 'undefined'){
+    el.innerHTML = '<div style="padding:20px;color:var(--ink3);font-family:var(--fd);">Weather unavailable right now.</div>';
+    return;
+  }
+  var ctx = (typeof FRAuth !== 'undefined' && FRAuth.getLeagueCtx) ? FRAuth.getLeagueCtx() : null;
+  var season = (ctx && ctx.season) || 2026;
+  var week = (typeof currentWeek === 'number' && currentWeek) || 1;
+  el.innerHTML = '<div style="padding:20px;color:var(--ink3);font-family:var(--fd);font-size:13px;">Loading this week’s forecasts…</div>';
+
+  fetch(FB_DB_URL + '/nflSchedule/' + season + '/Regular.json').then(function(r){ return r.json(); }).then(function(sched){
+    var games = (sched && sched.weeks && sched.weeks['week' + week]) || [];
+    games = games.filter(function(g){ return g && g.home && g.away && g.time; });
+    if(!games.length){
+      el.innerHTML = '<div style="padding:20px;color:var(--ink3);font-family:var(--fd);">No schedule found for Week ' + week + ' yet.</div>';
+      return;
+    }
+    FRWeather.load(games).then(function(wx){ paintWeather(el, week, games, wx); });
+  }).catch(function(){
+    el.innerHTML = '<div style="padding:20px;color:var(--ink3);font-family:var(--fd);">Couldn’t load the schedule. <a href="#" onclick="renderWeather();return false;" style="color:var(--or);">Try again</a></div>';
+  });
+}
+
+function paintWeather(el, week, games, wx){
+  var ROOF = { dome: 'Indoor · dome', retractable: 'Roofed · retractable', fixed: 'Roofed' };
+  var dayFmt = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+  var timeFmt = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
+  // Group games by local calendar day, each day sorted by kickoff.
+  var byDay = {};
+  games.forEach(function(g){
+    var d = new Date(g.time);
+    var key = d.getFullYear() + '-' + d.getMonth() + '-' + d.getDate();
+    (byDay[key] = byDay[key] || { ts: d.getTime(), label: dayFmt.format(d), games: [] }).games.push(g);
+    if(d.getTime() < byDay[key].ts) byDay[key].ts = d.getTime();
+  });
+  var days = Object.keys(byDay).map(function(k){ return byDay[k]; }).sort(function(a,b){ return a.ts - b.ts; });
+
+  function cell(w){
+    if(!w || w.unknown) return '<span style="color:var(--ink3);">—</span>';
+    if(w.indoor) return '<span style="color:var(--ink2);">🏟️ ' + (ROOF[w.roof] || 'Indoor') + '</span>';
+    if(w.pending) return '<span style="color:var(--ink3);">⏳ Forecast soon</span>';
+    var hot = w.notable;
+    var bits = '<span style="font-weight:800;color:' + (hot ? 'var(--pk)' : 'var(--ink)') + ';">' + w.icon + ' ' + w.tempF + '°F</span>';
+    bits += '<span style="color:' + (w.windMph >= 15 ? 'var(--pk)' : 'var(--ink3)') + ';margin-left:10px;">💨 ' + w.windMph + ' mph</span>';
+    if(w.precipPct >= 20) bits += '<span style="color:' + (w.precipPct >= 50 ? 'var(--pk)' : 'var(--ink3)') + ';margin-left:10px;">🌧️ ' + w.precipPct + '%</span>';
+    return bits;
+  }
+
+  var html = '<div style="padding:14px 16px;">'
+    + '<div style="font-family:var(--fd);font-size:18px;font-weight:800;color:var(--ink);">Week ' + week + ' weather</div>'
+    + '<div style="font-family:var(--fb);font-size:12px;color:var(--ink3);margin-top:2px;">Conditions at kickoff for each game, refreshed on game day. Roofed stadiums are shielded from weather.</div>'
+    + '</div>';
+
+  days.forEach(function(day){
+    html += '<div style="font-family:var(--fd);font-size:12px;font-weight:800;color:var(--or);text-transform:uppercase;letter-spacing:1px;padding:10px 16px 4px;">' + day.label + '</div>';
+    day.games.sort(function(a,b){ return new Date(a.time) - new Date(b.time); }).forEach(function(g){
+      var st = FR_STADIUMS.get(g.home);
+      html += '<div style="padding:10px 16px;border-bottom:1px solid var(--bdr2);">'
+        + '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;">'
+        + '<div style="font-family:var(--fd);font-size:14px;font-weight:800;color:var(--ink);">' + g.away + ' <span style="color:var(--ink3);font-weight:600;">@</span> ' + g.home + '</div>'
+        + '<div style="font-family:var(--fd);font-size:11px;color:var(--ink3);white-space:nowrap;">' + timeFmt.format(new Date(g.time)) + '</div>'
+        + '</div>'
+        + '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-top:3px;font-family:var(--fb);font-size:12.5px;">'
+        + '<div>' + cell(wx[g.home]) + '</div>'
+        + '<div style="font-size:10.5px;color:var(--ink3);text-align:right;white-space:nowrap;">' + (st ? st.name : '') + '</div>'
+        + '</div></div>';
+    });
+  });
+
+  html += '<div style="padding:14px 16px;font-family:var(--fb);font-size:11px;color:var(--ink3);">'
+    + 'Forecasts from Open-Meteo. <a href="#" onclick="renderWeather();return false;" style="color:var(--or);text-decoration:none;font-weight:700;">↻ Refresh</a></div>';
+  el.innerHTML = html;
+}
+
 // ── BOTTOM NAV ─────────────────────────────────────────────────────
 function switchBottomNav(tabName, btnId, subTab){
   // Close more menu first
@@ -12610,6 +12702,10 @@ document.addEventListener('DOMContentLoaded', function(){
     <button id="more-playoffs-btn" onclick="closeMoreMenu();switchBottomNav('playoffs','bn-more')" style="background:var(--bg3);border:1px solid var(--bdr2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;">
       <div style="font-size:20px;margin-bottom:4px;">🎯</div>
       <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink2);text-transform:uppercase;">Playoffs</div>
+    </button>
+    <button id="more-weather-btn" onclick="closeMoreMenu();switchBottomNav('weather','bn-more')" style="background:var(--bg3);border:1px solid var(--bdr2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;">
+      <div style="font-size:20px;margin-bottom:4px;">🌦️</div>
+      <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink2);text-transform:uppercase;">Weather</div>
     </button>
   </div>
 </div>
