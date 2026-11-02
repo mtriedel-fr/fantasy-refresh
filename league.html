@@ -4569,6 +4569,7 @@ function loadMyTeamLineupForWeek(drop, leagueId, season, seasonType, user, targe
     });
 
     drop.innerHTML = rosterColumn(lineup, scoreEntry, locks, true, gameMap, ownership);
+    fillWeatherBadges(drop, gameMap);
   }).catch(function(){
     drop.innerHTML = '<div class="myteam-empty"><div class="myteam-empty-icon">⚠️</div><div class="myteam-empty-title">Could not load lineup</div></div>';
   });
