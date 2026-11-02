@@ -1892,7 +1892,11 @@ function renderRoster(){
           var hostTeam = game.isHome ? p.team : game.opp;
           var venueIcon = draftStadiumIcon(hostTeam);
           var kickoff = fmtKickoff(game.time);
-          gameLine = (kickoff ? kickoff + ' · ' : '') + vsAt + ' ' + game.opp + (venueIcon ? ' ' + venueIcon : '');
+          // Weather placeholder for outdoor games (roofed show the venue icon);
+          // filled by applyDraftWeather() after render.
+          var wxSpan = (!venueIcon && hostTeam && typeof FR_STADIUMS !== 'undefined' && FR_STADIUMS.isOutdoor(hostTeam))
+            ? ' <span class="wx-badge" data-wx="'+hostTeam+'"></span>' : '';
+          gameLine = (kickoff ? kickoff + ' · ' : '') + vsAt + ' ' + game.opp + (venueIcon ? ' ' + venueIcon : '') + wxSpan;
         }
       }
       if(p.proj != null && !gameIsLiveOrFinal) gameLine += (gameLine ? ' · ' : '') + p.proj + ' proj';
@@ -1926,6 +1930,9 @@ function renderRoster(){
   });
   document.getElementById('roster-slots').innerHTML = html;
   updateSubmitBtn();
+  // Fill weather on the just-rendered roster slots (and refresh the games bar's
+  // badges). Uses the same schedule the games bar does; cached, best-effort.
+  if(typeof applyDraftWeather === 'function') applyDraftWeather(schedule);
 }
 
 // ── EVENT DELEGATION FOR ROSTER SLOTS ──────────────────────────
