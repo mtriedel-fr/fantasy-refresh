@@ -19,3 +19,10 @@ test('games bar renders a weather badge for outdoor games and fills it', () => {
   assert.match(html, /FR_STADIUMS\.isOutdoor\(g\.home\)/);    // outdoor-only
   assert.match(html, /applyDraftWeather\(games\);/);          // called after render
 });
+
+test('roster slots also get a weather badge, filled after render', () => {
+  // the slot game line emits an outdoor-only placeholder...
+  assert.match(html, /!venueIcon && hostTeam && typeof FR_STADIUMS !== 'undefined' && FR_STADIUMS\.isOutdoor\(hostTeam\)/);
+  // ...and renderRoster fills the page's badges from the schedule
+  assert.match(html, /applyDraftWeather\(schedule\)/);
+});
