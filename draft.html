@@ -1425,7 +1425,13 @@ function setGameFilter(gameKey, btn){
     document.getElementById('picker-slot-label').style.color = activeSlot
       ? (POS_COLORS[SLOT_DEFS.find(function(s){ return s.id===activeSlot; }).pos] || 'var(--or)')
       : 'var(--ink2)';
-    document.getElementById('picker-panel').classList.remove('open');
+    // Clearing the game filter should drop back to the active position's full
+    // player list — NOT close the picker. Only collapse the panel when there's
+    // no position selected (i.e. you were just browsing games), otherwise
+    // "All Games" bounced you out of the position back to the roster.
+    if(!activeSlot){
+      document.getElementById('picker-panel').classList.remove('open');
+    }
     renderPicker();
   }
 }
