@@ -120,6 +120,12 @@ locks/salaries, salary dry runs, Sleeper probes, migrations).
   `calcDKPoints` (INT/fumble −2; no yardage bonuses are actually applied — Tank01 never
   sends `pass300`/`rush100`/`rec100`). Bump `HISTORY_CACHE_SCHEMA` in `draft.html` when
   `/playerhistory` output changes, and deploy the worker *before* merging that bump.
+- **Projection consistency (Nov 4, 2026):** the draft/roster shows the salary-sheet `proj`
+  (built from Sleeper projections), while the Worker's `/playerhistory` computes its own
+  upcoming-week projection. They differed on the player card. Fix: the card's projection row
+  shows the league proj — `renderHistoricalWeeks(weeks, '2026', p.proj)` in `draft.html`
+  overrides the Worker's `g.pts` with `p.proj` on the `isProjection` row (current season only;
+  historical seasons still use the Worker's). The salary sheet is the single source of truth.
 - **Player-card archive** (`/nflStatsArchive/{season}/Regular_wk{N}`): snap counts aren't in
   Tank01 box scores the night a game ends, so the Tuesday lock run
   (`refreshArchiveDetails`) re-fetches finished weeks that lack snap % or positions.
