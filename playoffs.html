@@ -6,6 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Fantasy Refresh — Playoffs</title>
 <script src="/js/auth.js"></script>
+<script src="/js/playoff-config.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/css/theme.css">
@@ -178,8 +179,14 @@ var FB_DB_URL   = 'https://fantasy-refresh-default-rtdb.firebaseio.com';
 // after Week 14, playoffs Weeks 15–17 — same as league.html. The 2025 archive
 // (?season=2025) keeps the 2025 schedule: groups after Week 15, playoffs Weeks 16 to 18.
 var PO_SEASON = (new URLSearchParams(window.location.search)).get('season') || '2026';
-var TIER_LOCK_WEEK = PO_SEASON === '2025' ? 15 : 14;
-var PLAYOFF_WEEKS = PO_SEASON === '2025' ? [16, 17, 18] : [15, 16, 17];
+// Tier timing is per league now (js/playoff-config.js). Defaults preserve the
+// original league (lock Week 14) and the 2025 archive (lock Week 15). render()
+// recomputes from the live context; these are the safe initial values.
+var _poCfg0 = (typeof FRPlayoffs !== 'undefined')
+  ? FRPlayoffs.config(FRAuth.getLeagueCtx() || {}, PO_SEASON)
+  : null;
+var TIER_LOCK_WEEK = _poCfg0 ? _poCfg0.lockWeek : (PO_SEASON === '2025' ? 15 : 14);
+var PLAYOFF_WEEKS  = _poCfg0 ? _poCfg0.weeks   : (PO_SEASON === '2025' ? [16, 17, 18] : [15, 16, 17]);
 var seasonData = {};
 var myTeam = '';
 try{ myTeam = localStorage.getItem('fr_myteam') || ''; }catch(e){}
@@ -285,6 +292,20 @@ function applyRound(teams, weekScores){
 
 // ── RENDER ─────────────────────────────────────────────────────
 function render(){
+  // Refresh per-league tier config (lock week + on/off) before rendering.
+  var _cfg = (typeof FRPlayoffs !== 'undefined') ? FRPlayoffs.config(FRAuth.getLeagueCtx() || {}, PO_SEASON) : { enabled:true, lockWeek:TIER_LOCK_WEEK, weeks:PLAYOFF_WEEKS };
+  TIER_LOCK_WEEK = _cfg.lockWeek != null ? _cfg.lockWeek : TIER_LOCK_WEEK;
+  PLAYOFF_WEEKS  = (_cfg.weeks && _cfg.weeks.length) ? _cfg.weeks : PLAYOFF_WEEKS;
+  if(!_cfg.enabled){
+    document.getElementById('main').innerHTML = '<div class="empty">'
+      + '<div class="empty-icon">🏁</div>'
+      + '<div class="empty-title">No playoffs in this league</div>'
+      + '<div class="empty-sub">This is a season-long Points Race — the highest cumulative total wins.<br>No tiers, no bracket.</div>'
+      + '</div>';
+    var _hs = document.getElementById('hdr-sub'); if(_hs) _hs.textContent = 'Season-long · no playoffs';
+    return;
+  }
+
   var weeks = Object.keys(seasonData).filter(function(k){ return seasonData[k] && seasonData[k].length; }).map(Number);
   var maxWeek = weeks.length ? Math.max.apply(null, weeks) : 0;
 

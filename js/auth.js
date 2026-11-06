@@ -380,6 +380,11 @@
         season:      settings.season     || 2026,
         format:      settings.format     || 'cumulative',
         guillotine:  settings.guillotine || false,
+        // Cumulative playoff config travels on the context so league.html and
+        // playoffs.html can set up tiers synchronously. Absent playoffFormat on
+        // a legacy cumulative league means tiers (its original behavior).
+        playoffFormat: settings.playoffFormat || (settings.format === 'cumulative' ? 'tiers' : 'none'),
+        tierLockWeek:  settings.tierLockWeek  || 14,
         cap:         settings.cap        || 60000,
         role:        'member',
         isPreseason: settings.isPreseason || settings.format === 'preseason' || settings.seasonType === 'Preseason',
