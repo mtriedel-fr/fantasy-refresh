@@ -88,6 +88,19 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
 .format-opt.selected{border-color:var(--or);background:rgba(0,229,212,.06);}
 .format-opt-title{font-family:var(--fd);font-size:13px;font-weight:800;color:var(--ink);text-transform:uppercase;margin-bottom:3px;}
 .format-opt-desc{font-size:11px;color:var(--ink3);line-height:1.4;}
+/* Template-first recipe cards (Points Race / Head to Head / Last One Standing) */
+.recipe-list{display:flex;flex-direction:column;gap:12px;}
+.recipe-card{display:flex;align-items:center;gap:14px;background:var(--bg3);border:2px solid var(--bdr);border-radius:12px;padding:18px;cursor:pointer;transition:all .15s;}
+.recipe-card:hover{border-color:var(--or);background:rgba(0,229,212,.06);}
+.recipe-card.selected{border-color:var(--or);background:rgba(0,229,212,.08);}
+.recipe-emoji{font-size:30px;line-height:1;flex-shrink:0;}
+.recipe-text{flex:1;min-width:0;}
+.recipe-name{font-family:var(--fd);font-size:18px;font-weight:900;color:var(--ink);text-transform:uppercase;letter-spacing:.3px;}
+.recipe-desc{font-size:12.5px;color:var(--ink3);line-height:1.5;margin-top:3px;}
+.recipe-arrow{font-size:20px;color:var(--or);flex-shrink:0;}
+.chosen-recipe{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:10px;padding:10px 14px;margin-bottom:16px;}
+.chosen-recipe-label{font-family:var(--fd);font-size:14px;font-weight:800;color:var(--or);text-transform:uppercase;letter-spacing:.3px;}
+.chosen-change{font-size:12px;color:var(--ink3);text-decoration:underline;cursor:pointer;flex-shrink:0;}
 
 /* ── TOGGLE ── */
 .toggle-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--bdr);}
@@ -198,14 +211,59 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
     </div>
   </div>
 
-  <!-- ── SCREEN 2A: Create League ── -->
+  <!-- ── SCREEN 2A-i: Pick a league type (template-first) ── -->
   <div class="screen" id="screen-create">
-    <div class="card">
+    <div class="card" id="create-pick">
       <div class="card-top">
-        <div class="card-title">Create League</div>
-        <div class="card-sub">Set it up how you want. You can adjust most of this later.</div>
+        <div class="card-title">Pick your league type</div>
+        <div class="card-sub">Choose how your league plays. You'll name it and add the details next.</div>
       </div>
       <div class="card-body">
+        <div class="recipe-list">
+          <div class="recipe-card" id="recipe-cumulative" onclick="pickRecipe('cumulative')">
+            <div class="recipe-emoji">📊</div>
+            <div class="recipe-text">
+              <div class="recipe-name">Points Race</div>
+              <div class="recipe-desc">Every week's points stack up. Highest season total wins — no bracket, just the long climb.</div>
+            </div>
+            <span class="recipe-arrow">→</span>
+          </div>
+          <div class="recipe-card" id="recipe-headtohead" onclick="pickRecipe('headtohead')">
+            <div class="recipe-emoji">⚔️</div>
+            <div class="recipe-text">
+              <div class="recipe-name">Head to Head</div>
+              <div class="recipe-desc">Face one opponent each week. Build a record, then win it in the playoff bracket.</div>
+            </div>
+            <span class="recipe-arrow">→</span>
+          </div>
+          <div class="recipe-card" id="recipe-guillotine" onclick="pickRecipe('guillotine')">
+            <div class="recipe-emoji">🪓</div>
+            <div class="recipe-text">
+              <div class="recipe-name">Last One Standing</div>
+              <div class="recipe-desc">Lowest score each week is eliminated. Outlast everyone — the final manager left wins.</div>
+            </div>
+            <span class="recipe-arrow">→</span>
+          </div>
+        </div>
+      </div>
+      <div class="card-footer">
+        <button class="btn btn-outline" onclick="goBack()">← Back</button>
+      </div>
+    </div>
+
+    <!-- ── SCREEN 2A-ii: Name it / confirm (branches by recipe) ── -->
+    <div class="card" id="create-confirm" style="display:none;">
+      <div class="card-top">
+        <div class="card-title" id="confirm-title">Name your league</div>
+        <div class="card-sub" id="confirm-sub">Add the finishing touches and you're set.</div>
+      </div>
+      <div class="card-body">
+        <!-- Chosen recipe, with a way back to the picker -->
+        <div class="chosen-recipe">
+          <span class="chosen-recipe-label" id="chosen-recipe-label">📊 Points Race</span>
+          <span class="chosen-change" onclick="backToRecipes()">Change</span>
+        </div>
+
         <!-- League Name -->
         <div class="form-group">
           <label class="form-label">League Name</label>
@@ -218,25 +276,6 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
           <input type="text" class="form-input upper" id="league-code" placeholder="BALLERS27" maxlength="12"
             oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')">
           <div class="form-hint">Letters and numbers only, no spaces. Share this with your players.</div>
-        </div>
-
-        <!-- Format -->
-        <div class="form-group">
-          <label class="form-label">League Format</label>
-          <div class="format-grid" style="grid-template-columns:1fr 1fr;">
-            <div class="format-opt selected" id="fmt-cumulative" onclick="selectFormat('cumulative')">
-              <div class="format-opt-title">📊 Cumulative</div>
-              <div class="format-opt-desc">Your scores stack up week over week. Highest total at season's end wins.</div>
-            </div>
-            <div class="format-opt" id="fmt-headtohead" onclick="selectFormat('headtohead')">
-              <div class="format-opt-title">⚔️ Head to Head</div>
-              <div class="format-opt-desc">You face a different opponent each week. Best record makes the playoffs.</div>
-            </div>
-            <div class="format-opt" id="fmt-guillotine" onclick="selectFormat('guillotine')">
-              <div class="format-opt-title">⚔️ Last One Standing</div>
-              <div class="format-opt-desc">Lowest scorer gets knocked out every week. Survive longer than everyone else to win.</div>
-            </div>
-          </div>
         </div>
 
         <!-- Optional toggles -->
@@ -256,7 +295,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
           </div>
           <div class="toggle-row" id="tog-guillotine-row">
             <div>
-              <div class="toggle-label">⚔️ Last One Standing</div>
+              <div class="toggle-label">🪓 Add a Last One Standing side-game</div>
               <div class="toggle-sub">Also run a survival side-game — lowest weekly scorer gets eliminated each week</div>
             </div>
             <label class="toggle"><input type="checkbox" id="tog-guillotine"><span class="toggle-slider"></span></label>
@@ -358,7 +397,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
       </div>
       <div class="card-footer">
         <div class="btn-row">
-          <button class="btn btn-outline" onclick="goBack()">← Back</button>
+          <button class="btn btn-outline" onclick="backToRecipes()">← Back</button>
           <button class="btn btn-primary" id="btn-create" onclick="createLeague()">Create League →</button>
         </div>
         <div class="status" id="status-create"></div>
@@ -513,10 +552,8 @@ window.addEventListener('DOMContentLoaded', function(){
   // Load existing leagues for this user
   loadUserLeagues();
 
-  // Establish the correct initial panel state — Cumulative shows as
-  // selected from the start, but its settings panel was never actually
-  // shown without this (pre-existing gap, not something new).
-  selectFormat('cumulative');
+  // No format is pre-selected now: the create flow opens on the recipe picker,
+  // and pickRecipe() sets up the confirm panels when a card is chosen.
 });
 
 // ── LOAD EXISTING LEAGUES ─────────────────────────────────────
@@ -591,9 +628,10 @@ function nextFromChoice(){
   document.getElementById('screen-1').classList.remove('active');
   if(selectedMode === 'create'){
     document.getElementById('screen-create').classList.add('active');
-    // Auto-generate a join code suggestion
-    var code = generateCode();
-    document.getElementById('league-code').placeholder = code;
+    // Always enter on the recipe picker; the confirm view opens after a pick
+    // (pickRecipe), which is also where the join-code suggestion is generated.
+    document.getElementById('create-pick').style.display = '';
+    document.getElementById('create-confirm').style.display = 'none';
   } else {
     document.getElementById('screen-join').classList.add('active');
     // Watch join code input for live lookup
@@ -611,34 +649,77 @@ function goBack(){
   document.getElementById('btn-next-1').disabled = true;
 }
 
+// ── RECIPE (TEMPLATE-FIRST) SELECTION ─────────────────────────
+// Each recipe is one of the three core formats with a friendly name and a
+// confirm step tuned to it: Points Race and Last One Standing are "just name
+// it"; Head to Head also asks for league size and playoff settings.
+var RECIPE_META = {
+  cumulative: { label:'📊 Points Race',        title:'Name your Points Race league',      sub:'Season-long points race — no bracket. Name it and invite your players.' },
+  headtohead: { label:'⚔️ Head to Head',       title:'Set up your Head to Head league',   sub:'Pick your league size and when the playoffs start.' },
+  guillotine: { label:'🪓 Last One Standing',  title:'Name your Last One Standing league', sub:'Survivor rules — lowest score each week is out. Just name it to finish.' }
+};
+function recipeLabel(fmt){
+  return (RECIPE_META[fmt] && RECIPE_META[fmt].label) || RECIPE_META.cumulative.label;
+}
+
+function pickRecipe(fmt){
+  selectFormat(fmt);                 // sets selectedFmt, panels, side-game row
+  var meta = RECIPE_META[fmt] || RECIPE_META.cumulative;
+  var lbl = document.getElementById('chosen-recipe-label'); if(lbl) lbl.textContent = meta.label;
+  var ttl = document.getElementById('confirm-title');       if(ttl) ttl.textContent = meta.title;
+  var sub = document.getElementById('confirm-sub');         if(sub) sub.textContent = meta.sub;
+
+  // Suggest a join code, but never clobber one the manager has already typed.
+  var codeEl = document.getElementById('league-code');
+  if(codeEl && !codeEl.value) codeEl.placeholder = generateCode();
+
+  // Swap the picker for the confirm view.
+  document.getElementById('create-pick').style.display = 'none';
+  document.getElementById('create-confirm').style.display = '';
+  var st = document.getElementById('status-create'); if(st){ st.textContent = ''; st.className = 'status'; }
+  window.scrollTo(0, 0);
+}
+
+function backToRecipes(){
+  document.getElementById('create-confirm').style.display = 'none';
+  document.getElementById('create-pick').style.display = '';
+  window.scrollTo(0, 0);
+}
+
 // ── FORMAT SELECTION ──────────────────────────────────────────
+// Drives the confirm-view panels and the side-game toggle for the picked
+// recipe. Null-safe: the old format grid (fmt-*) was replaced by recipe cards,
+// so every lookup is guarded.
 function selectFormat(fmt){
   selectedFmt = fmt;
-  document.getElementById('fmt-cumulative').classList.toggle('selected', fmt==='cumulative');
-  document.getElementById('fmt-headtohead').classList.toggle('selected', fmt==='headtohead');
-  document.getElementById('fmt-guillotine').classList.toggle('selected', fmt==='guillotine');
+  ['cumulative','headtohead','guillotine'].forEach(function(f){
+    var card = document.getElementById('recipe-'+f);
+    if(card) card.classList.toggle('selected', f===fmt);
+  });
 
   // Show/hide cumulative and H2H settings panels
   var cumSettings = document.getElementById('cum-settings');
   var h2hSettings = document.getElementById('h2h-settings');
-  cumSettings.style.display = fmt === 'cumulative' ? 'block' : 'none';
-  h2hSettings.style.display = fmt === 'headtohead' ? 'block' : 'none';
+  if(cumSettings) cumSettings.style.display = fmt === 'cumulative' ? 'block' : 'none';
+  if(h2hSettings) h2hSettings.style.display = fmt === 'headtohead' ? 'block' : 'none';
 
   if(fmt === 'headtohead') updateH2HCalc();
   onPreseasonToggleChange(); // keep H2H playoff visibility correct regardless of format switches
 
-  // Concurrent guillotine: disable for standalone guillotine
+  // A standalone Last One Standing league IS the survivor format, so the
+  // side-game add-on doesn't apply — hide its row and clear it. On Points Race
+  // and Head to Head the row is shown as an optional add-on.
   var togRow  = document.getElementById('tog-guillotine-row');
   var togInp  = document.getElementById('tog-guillotine');
-  if(fmt === 'guillotine'){
-    togRow.style.opacity = '.4';
-    togInp.checked  = false;
-    togInp.disabled = true;
-    togRow.querySelector('.toggle-sub').textContent = 'Not available — this league is already a survivor format';
-  } else {
-    togRow.style.opacity = '1';
-    togInp.disabled = false;
-    togRow.querySelector('.toggle-sub').textContent = 'Also run a survival side-game — lowest weekly scorer gets eliminated each week';
+  if(togRow && togInp){
+    if(fmt === 'guillotine'){
+      togInp.checked  = false;
+      togInp.disabled = true;
+      togRow.style.display = 'none';
+    } else {
+      togInp.disabled = false;
+      togRow.style.display = '';
+    }
   }
 }
 
@@ -877,8 +958,8 @@ function lookupLeague(){
       joinTargetLeagueId = settings.leagueId;
       document.getElementById('join-league-name').textContent = settings.name;
       document.getElementById('join-league-meta').textContent =
-        (settings.format==='headtohead'?'⚔️ Head to Head':settings.format==='guillotine'?'⚔️ Last One Standing':'📊 Cumulative')
-        + (settings.guillotine?' · ⚔️ Last One Standing':'')
+        recipeLabel(settings.format)
+        + (settings.guillotine?' · 🪓 Last One Standing':'')
         + ' · ' + (settings.members||0) + '/' + (settings.maxMembers||'—') + ' players';
       preview.style.display = 'block';
     })
@@ -958,8 +1039,8 @@ function showSuccess(mode, name, code, format, guillotine){
     document.getElementById('success-code-box').style.display = 'block';
     document.getElementById('success-details').innerHTML =
       '<strong style="color:var(--ink2);">'+name+'</strong> is ready.<br>'
-      + 'Format: '+(format==='headtohead'?'⚔️ Head to Head':'📊 Cumulative')
-      + (guillotine?' + ⚔️ Last One Standing':'')+'<br><br>'
+      + 'Format: '+recipeLabel(format)
+      + (guillotine?' + 🪓 Last One Standing':'')+'<br><br>'
       + 'Share the join code with your players. They\'ll enter it when they sign up.';
   } else {
     document.getElementById('success-title').textContent = 'Joined! 🎉';
