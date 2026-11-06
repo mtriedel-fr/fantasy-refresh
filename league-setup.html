@@ -241,12 +241,12 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
 
         <!-- Optional toggles -->
         <div style="background:var(--bg3);border-radius:10px;border:1px solid var(--bdr);padding:0 16px;">
-          <!-- Preseason toggle — only rendered at all while preseason games are
-               actually happening (see PRESEASON_TOGGLE_CUTOFF below). This
-               isn't just hidden by CSS; the row is removed from the DOM
-               entirely once the cutoff passes, so there's no way to click
-               it after preseason ends, and no confusing leftover control
-               sitting in the form during the real season. -->
+          <!-- Preseason toggle — ADMIN-ONLY (the yearly pre-season shakedown),
+               never shown to league managers, and even for an admin only while
+               preseason games are actually happening (see PRESEASON_TOGGLE_CUTOFF
+               and the boot gate below). Hidden by default here; boot either
+               reveals it (admin, in-window) or removes it from the DOM, so
+               there's no leftover control for anyone else. -->
           <div class="toggle-row" id="tog-preseason-row" style="display:none;">
             <div>
               <div class="toggle-label">🏈 Use Preseason Games</div>
@@ -440,11 +440,12 @@ var selectedBracketFormat = 'fixed';
 // not just hidden by CSS — no leftover control sitting in the form
 // during the real season, and nothing to accidentally click.
 var PRESEASON_TOGGLE_CUTOFF = new Date('2026-09-01T00:00:00');
-if (new Date() < PRESEASON_TOGGLE_CUTOFF) {
-  document.getElementById('tog-preseason-row').style.display = '';
-} else {
-  document.getElementById('tog-preseason-row').remove();
-}
+// Preseason test mode is an ADMIN-ONLY tool for shaking the site down before
+// each real season — it is NOT offered to league managers. The row stays
+// hidden by default (display:none in the markup); the reveal decision lives in
+// boot (below) because it needs the signed-in user, which isn't known at parse
+// time. There, an admin sees it only while preseason games are happening; for
+// everyone else the row is removed from the DOM entirely.
 
 // selectSeedMethod/selectBracketFormat removed — their UI (division
 // seeding, bracket reseeding choice) was removed while honing in on the
@@ -468,6 +469,21 @@ window.addEventListener('DOMContentLoaded', function(){
   // Get user from FRAuth
   currentUser = FRAuth.getUser();
   if(!currentUser) return;
+
+  // Preseason test mode is admin-only (see PRESEASON_TOGGLE_CUTOFF note above).
+  // Reveal the toggle only for an admin, and only during the preseason window;
+  // every other manager never sees it, so the row leaves the DOM for them.
+  (function(){
+    var row = document.getElementById('tog-preseason-row');
+    if(!row) return;
+    var email = (currentUser.email || '').toLowerCase();
+    var isAdmin = ADMIN_EMAILS.indexOf(email) > -1;
+    if(isAdmin && new Date() < PRESEASON_TOGGLE_CUTOFF){
+      row.style.display = '';
+    } else {
+      row.remove();
+    }
+  })();
 
   // Update nav
   var navUser = document.getElementById('nav-user');
@@ -629,9 +645,9 @@ function selectFormat(fmt){
 // A ~3-4 week preseason test doesn't have room for a playoff bracket —
 // hides the H2H playoff section entirely rather than just defaulting it,
 // so there's nothing confusing left half-visible. The preseason toggle
-// row itself only exists in the DOM before PRESEASON_TOGGLE_CUTOFF (see
-// top of script), so this function is a no-op harmlessly once that row
-// is gone — the element just won't be found.
+// row only exists in the DOM for an admin during the preseason window (see
+// the boot gate), so this function is a harmless no-op for everyone else —
+// the element just won't be found.
 function onPreseasonToggleChange(){
   var toggle = document.getElementById('tog-preseason');
   var isPreseason = !!(toggle && toggle.checked);
