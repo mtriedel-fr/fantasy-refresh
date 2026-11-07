@@ -4,11 +4,19 @@ const assert = require('node:assert');
 const vm = require('vm');
 const { read, fn, load } = require('./extract');
 
-test('playoffs: groups set after Week 14, playoffs Weeks 15–17 on both playoff screens', () => {
+test('tier playoff timing is per-league via the shared config, originals preserved', () => {
   const L = read('league.html'), P = read('playoffs.html');
-  assert.ok(L.includes('var TIER_LOCK_WEEK = 14;') && L.includes('var PLAYOFF_WEEKS = [15, 16, 17];'));
-  assert.ok(P.includes("var TIER_LOCK_WEEK = PO_SEASON === '2025' ? 15 : 14;"));
-  assert.ok(P.includes("var PLAYOFF_WEEKS = PO_SEASON === '2025' ? [16, 17, 18] : [15, 16, 17];"));
+  const { config } = require('../js/playoff-config.js');
+  // Both playoff screens now load the one shared config instead of each
+  // hard-coding its own copy of the tier constants.
+  assert.ok(L.includes('js/playoff-config.js') && P.includes('js/playoff-config.js'), 'both pages load playoff-config.js');
+  assert.ok(L.includes('applyPlayoffConfig'), 'league.html applies per-league config');
+  // The original league is unchanged: tiers, lock after Week 14, playoffs 15–17.
+  const base = config({ format: 'cumulative' }, '2026');
+  assert.deepStrictEqual([base.lockWeek, base.weeks], [14, [15, 16, 17]]);
+  // The 2025 archive keeps its 18-week schedule: lock after 15, playoffs 16–18.
+  const arch = config({ format: 'cumulative' }, '2025');
+  assert.deepStrictEqual([arch.lockWeek, arch.weeks], [15, [16, 17, 18]]);
   for (const [name, s] of [['league', L], ['playoffs', P]]) {
     assert.ok(!/getWeeklyScores\(1[5-8]\)/.test(s), `${name}: no hard-coded playoff week`);
     assert.ok(!/['"][^'"\n]*Weeks 16–18/.test(s), `${name}: no stale "Weeks 16–18" text on screen`);

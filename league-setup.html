@@ -310,15 +310,25 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
         </div>
 
 
-        <!-- CUMULATIVE SETTINGS PANEL — simplified to a single fixed
-             behavior (season total, no playoffs) while honing in on the
-             three core formats. Bracket/survivor-tier playoff options
-             removed from the UI rather than just defaulted, since they
-             weren't necessary yet and were adding real decision surface
-             without a corresponding need. -->
-        <div id="cum-settings" style="display:none;margin-top:12px;background:var(--bg3);border-radius:10px;border:1px solid var(--bdr);overflow:hidden;padding:14px 16px;">
-          <div style="font-family:var(--fd);font-size:13px;font-weight:800;color:var(--ink);">🏁 Season Total — No Playoffs</div>
-          <div style="font-size:12px;color:var(--ink3);margin-top:4px;">Highest total score after the season wins. Simple, no bracket, no drama at the end.</div>
+        <!-- CUMULATIVE (POINTS RACE) SETTINGS PANEL — a Points Race is a
+             season-long race by default (highest total wins, no bracket).
+             Optionally it can add tier playoffs: after the regular season,
+             teams split into 3 tiers by cumulative score and play a 3-week
+             bracket. Only the lock week is configurable — the playoff engine
+             is built around exactly 3 tiers and 3 rounds. -->
+        <div id="cum-settings" style="display:none;margin-top:12px;background:var(--bg3);border-radius:10px;border:1px solid var(--bdr);overflow:hidden;">
+          <div class="toggle-row" id="tog-cum-playoffs-row" style="padding:12px 16px;">
+            <div>
+              <div class="toggle-label">🏆 Add tier playoffs</div>
+              <div class="toggle-sub">After the regular season, teams split into 3 tiers by cumulative score and play a 3-week playoff. Off = season-long race, highest total wins.</div>
+            </div>
+            <label class="toggle"><input type="checkbox" id="tog-cum-playoffs" onchange="onCumPlayoffToggle()"><span class="toggle-slider"></span></label>
+          </div>
+          <div id="cum-playoff-fields" style="display:none;padding:0 16px 14px;">
+            <label class="form-label" style="margin-top:4px;">Regular season ends after week</label>
+            <input type="number" class="form-input" id="cum-tier-lock" value="14" min="1" max="20" style="max-width:120px;">
+            <div class="form-hint">Tiers lock after this week; the playoffs run the next 3 weeks. (14 → playoffs Weeks 15–17.)</div>
+          </div>
         </div>
 
         <!-- H2H SETTINGS PANEL — simplified to just Total Teams (the one
@@ -924,6 +934,8 @@ function createLeague(){
         season:     parseInt(FR_SEASON),
         format:     selectedFmt,
         guillotine,
+        playoffFormat: cumPlayoff.playoffFormat || (selectedFmt === 'cumulative' ? 'tiers' : 'none'),
+        tierLockWeek:  cumPlayoff.tierLockWeek || 14,
         cap,
         maxSalary:  maxSal,
         minSalary:  3700,
@@ -1064,33 +1076,28 @@ function goDirectToLeague(leagueId){
 
 // ── HELPERS ───────────────────────────────────────────────────
 
-// updateCap/selectCumPlayoff/updateCumCalc/buildTierSchedule removed —
-// roster slots are now fixed (see the locked roster/cap block above,
-// $60,000/9-player default) and cumulative playoff sub-options
-// (bracket/tiers) were removed from the UI while honing in on the three
-// core formats. cumPlayoffType stays 'none' for good below.
+// updateCap/updateCumCalc/buildTierSchedule removed — roster slots are fixed
+// (see the locked roster/cap block above, $60,000/9-player default). The
+// cumulative bracket sub-option stayed cut; the tier-playoff option is back as
+// a simple on/off + lock week (see below), since a Points Race league like the
+// original one does split into tiers after the regular season.
 
-// ── CUMULATIVE PLAYOFF SETTINGS ────────────────────────────────
-var cumPlayoffType = 'none';
+// ── CUMULATIVE (POINTS RACE) PLAYOFF SETTINGS ──────────────────
+// A Points Race is season-long by default; the commissioner can opt into tier
+// playoffs and set when the regular season ends (the lock week). The playoff
+// engine reads playoffFormat + tierLockWeek per league (js/playoff-config.js).
+function onCumPlayoffToggle(){
+  var on = document.getElementById('tog-cum-playoffs');
+  var fields = document.getElementById('cum-playoff-fields');
+  if(fields) fields.style.display = (on && on.checked) ? 'block' : 'none';
+}
 
 function getCumPlayoffSettings(){
-  if(cumPlayoffType === 'none') return { playoffFormat:'none' };
-  if(cumPlayoffType === 'bracket') return {
-    playoffFormat:   'bracket',
-    playoffTeams:    parseInt(document.getElementById('cum-bracket-teams').value)||4,
-    playoffStartWeek:parseInt(document.getElementById('cum-bracket-start').value)||15
-  };
-  if(cumPlayoffType === 'tiers'){
-    var endMode = document.querySelector('input[name="tier-end"]:checked').value;
-    return {
-      playoffFormat:    'tiers',
-      tierCount:        parseInt(document.getElementById('cum-tier-count').value)||3,
-      tierStartWeek:    parseInt(document.getElementById('cum-tier-start').value)||13,
-      tierEndMode:      endMode,
-      tierFinalWeek:    endMode === 'week' ? parseInt(document.getElementById('cum-tier-final-week').value)||17 : null
-    };
-  }
-  return { playoffFormat:'none' };
+  var on = document.getElementById('tog-cum-playoffs');
+  if(!on || !on.checked) return { playoffFormat:'none' };
+  var lock = parseInt(document.getElementById('cum-tier-lock').value, 10);
+  if(!lock || lock < 1 || lock > 20) lock = 14;
+  return { playoffFormat:'tiers', tierCount:3, tierLockWeek:lock };
 }
 
 function genLeagueId(){
