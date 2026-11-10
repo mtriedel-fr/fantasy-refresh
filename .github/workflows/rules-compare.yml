@@ -23,7 +23,7 @@ jobs:
             // Live rules may contain comments; strip them before parsing.
             const strip = s => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
             let live; try { live = JSON.parse(strip(d)); } catch (e) { return ann('warning', 'Live rules not plain JSON', e.message + ' — length ' + d.length); }
-            const file = JSON.parse(fs.readFileSync('.github/rules-before-19.json', 'utf8'));
+            const file = JSON.parse(fs.readFileSync('database.rules.json', 'utf8'));
             const diffs = [];
             (function walk(a, b, p) {
               const keys = new Set([...Object.keys(a || {}), ...Object.keys(b || {})]);

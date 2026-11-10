@@ -15,7 +15,19 @@
         "members": {
           ".read": true,
           "$uid": {
-            ".write": true
+            ".write": "auth != null && (auth.uid === $uid || root.child('leagues/' + $leagueId + '/settings/commissioners/' + auth.uid).val() === true || root.child('leagues/' + $leagueId + '/settings/createdBy').val() === auth.uid)",
+            "email": {
+              ".validate": "false"
+            },
+            "duesClaim": {
+              ".validate": "false"
+            },
+            "duesClaimedAt": {
+              ".validate": "false"
+            },
+            "duesPaid": {
+              ".validate": "newData.val() === data.val() || root.child('leagues/' + $leagueId + '/settings/commissioners/' + auth.uid).val() === true || root.child('leagues/' + $leagueId + '/settings/createdBy').val() === auth.uid"
+            }
           }
         },
         "season": {
@@ -35,7 +47,7 @@
           "$season": {
             "$week": {
               "$uid": {
-                ".write": "auth != null && auth.uid === $uid"
+                ".write": "auth != null && auth.uid === $uid && (!root.child('leagues/' + $leagueId + '/settings/draftLockedUntil').exists() || now > root.child('leagues/' + $leagueId + '/settings/draftLockedUntil').val())"
               }
             }
           }
@@ -44,9 +56,67 @@
           ".read": true,
           ".write": "auth != null"
         },
+        "chat": {
+          ".read": true,
+          "$msgId": {
+            ".write": "auth != null && ((!data.exists() && newData.child('uid').val() === auth.uid) || (data.exists() && !newData.exists() && (data.child('uid').val() === auth.uid || root.child('leagues/' + $leagueId + '/settings/commissioners/' + auth.uid).val() === true || root.child('leagues/' + $leagueId + '/settings/createdBy').val() === auth.uid)))",
+            ".validate": "newData.hasChildren(['uid','ts']) && newData.child('uid').val() === auth.uid && newData.child('ts').isNumber() && (newData.hasChild('text') || newData.hasChild('gifUrl')) && (!newData.hasChild('text') || (newData.child('text').isString() && newData.child('text').val().length <= 2000)) && (!newData.hasChild('gifUrl') || (newData.child('gifUrl').isString() && newData.child('gifUrl').val().length <= 1000)) && (!newData.hasChild('team') || (newData.child('team').isString() && newData.child('team').val().length <= 120))"
+          }
+        },
         "matchups": {
           ".read": true,
           ".write": "auth != null && root.child('leagues/' + $leagueId + '/settings/commissioners/' + auth.uid).val() === true"
+        }
+      }
+    },
+    "memberPrivate": {
+      "$leagueId": {
+        ".read": "auth != null && (root.child('leagues/' + $leagueId + '/settings/commissioners/' + auth.uid).val() === true || root.child('leagues/' + $leagueId + '/settings/createdBy').val() === auth.uid)",
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid",
+          ".write": "auth != null && (auth.uid === $uid || root.child('leagues/' + $leagueId + '/settings/commissioners/' + auth.uid).val() === true || root.child('leagues/' + $leagueId + '/settings/createdBy').val() === auth.uid)",
+          "email": {
+            ".validate": "newData.isString() && newData.val().length < 200"
+          },
+          "duesClaimedAt": {
+            ".validate": "newData.isNumber()"
+          },
+          "duesClaim": {
+            ".validate": "newData.hasChildren(['method', 'paidOn'])",
+            "method": {
+              ".validate": "newData.isString() && newData.val().length <= 20"
+            },
+            "paidOn": {
+              ".validate": "newData.isString() && newData.val().length === 10"
+            },
+            "from": {
+              ".validate": "newData.isString() && newData.val().length <= 80"
+            },
+            "$other": {
+              ".validate": "false"
+            }
+          },
+          "$other": {
+            ".validate": "false"
+          }
+        }
+      }
+    },
+    "saveLog": {
+      "$leagueId": {
+        ".read": "auth != null && (root.child('leagues/' + $leagueId + '/settings/commissioners/' + auth.uid).val() === true || root.child('leagues/' + $leagueId + '/settings/createdBy').val() === auth.uid)",
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid",
+          "$entry": {
+            ".write": "auth != null && auth.uid === $uid && !data.exists()",
+            ".validate": "newData.hasChildren(['ts','outcome'])",
+            "ts": { ".validate": "newData.isNumber()" },
+            "outcome": { ".validate": "newData.isString() && newData.val().length <= 20" },
+            "reason": { ".validate": "newData.isString() && newData.val().length <= 160" },
+            "week": { ".validate": "newData.isNumber()" },
+            "team": { ".validate": "newData.isString() && newData.val().length <= 120" },
+            "$other": { ".validate": "false" }
+          }
         }
       }
     },
@@ -66,9 +136,25 @@
       ".read": true,
       ".write": "auth != null && root.child('leagues/fr_refresh26/settings/commissioners/' + auth.uid).val() === true"
     },
+    "gameStats": {
+      ".read": true,
+      ".write": "auth != null && root.child('leagues/fr_refresh26/settings/commissioners/' + auth.uid).val() === true"
+    },
+    "liveGameStatus": {
+      ".read": true,
+      ".write": "auth != null && root.child('leagues/fr_refresh26/settings/commissioners/' + auth.uid).val() === true"
+    },
     "computedFantasyHistory": {
       ".read": true,
-      ".write": "auth != null"
+      ".write": "auth != null && root.child('leagues/fr_refresh26/settings/commissioners/' + auth.uid).val() === true",
+      "$profile": {
+        "$season": {
+          "$player": {
+            ".write": "auth != null && (!data.exists() || !data.child('schemaVersion').exists() || data.child('schemaVersion').val() < newData.child('schemaVersion').val())",
+            ".validate": "newData.hasChildren(['weeks', 'cachedAt', 'schemaVersion']) && newData.child('schemaVersion').isNumber() && newData.child('cachedAt').isNumber()"
+          }
+        }
+      }
     },
     "waitlist": {
       ".read": "auth != null && root.child('leagues/fr_refresh26/settings/commissioners/' + auth.uid).val() === true",
@@ -78,9 +164,13 @@
       }
     },
     "users": {
-      ".read": true,
+      ".read": false,
       "$uid": {
-        ".write": "auth != null && auth.uid === $uid"
+        ".read": true,
+        ".write": "auth != null && auth.uid === $uid",
+        "email": {
+          ".validate": "false"
+        }
       }
     },
     "teamNames2026": {
@@ -88,8 +178,12 @@
       ".write": "auth != null"
     },
     "joinCodes": {
-      ".read": true,
-      ".write": "auth != null"
+      ".read": false,
+      ".write": "auth != null && root.child('leagues/fr_refresh26/settings/commissioners/' + auth.uid).val() === true",
+      "$code": {
+        ".read": true,
+        ".write": "auth != null && root.child('leagues/fr_refresh26/settings/commissioners/' + auth.uid).val() === true"
+      }
     },
     "season2025": {
       ".read": true,
