@@ -1,0 +1,88 @@
+name: Week9 what-if (read-only)
+on:
+  push:
+    branches: [audit/draft-check]
+    paths: ['.github/workflows/whatif-check.yml']
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: What if yyyy had Collins instead of Evans in Week 9
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB = process.env.FIREBASE_DB_URL, T = process.env.FIREBASE_AUTH_TOKEN;
+          const get = p => new Promise((res,rej)=>https.get(`${FB}${p}${p.includes('?')?'&':'?'}auth=${T}`,r=>{let d='';r.on('data',c=>d+=c);r.on('end',()=>{try{res(JSON.parse(d));}catch(e){res(null);}});}).on('error',rej));
+          const esc = s => String(s).replace(/%/g,'%25').replace(/\r/g,'%0D').replace(/\n/g,'%0A');
+          const ann = (l,t,m)=>console.log(`::${l} title=${esc(t).replace(/:/g,'%3A').replace(/,/g,'%2C')}::${esc(m)}`);
+          const norm = s => String(s||'').toLowerCase().replace(/\b(jr|sr|ii|iii|iv|v)\b/g,'').replace(/[^a-z0-9 ]/g,'').replace(/\s+/g,' ').trim();
+          const r2 = n => Math.round(n*100)/100;
+          const TEAM='yyyy', W=9;
+
+          (async () => {
+            const O=[];
+            const lineups = await get(`/leagues/fr_refresh26/lineups/2026/week${W}.json`) || {};
+            const scores  = await get(`/leagues/fr_refresh26/season/2026/${W}.json`) || {};
+
+            // locate yyyy + the Evans slot, and any team holding Collins + that slot
+            let yUid=null,yEvansSlot=null,cUid=null,cSlot=null;
+            for (const u of Object.keys(lineups)) {
+              const lu=lineups[u]||{}, slots=lu.slots||{};
+              if (norm(lu.team)===norm(TEAM) || norm(lu.team).includes(norm(TEAM))) {
+                yUid=u; for (const s of Object.keys(slots)) if (norm((slots[s]||{}).name)==='mike evans') yEvansSlot=s;
+              }
+              if (!cUid) for (const s of Object.keys(slots)) if (norm((slots[s]||{}).name)==='nico collins'){ cUid=u; cSlot=s; }
+            }
+            if (!yUid){ ann('warning','not found',`no team matching "${TEAM}" in week ${W}`); return; }
+
+            const ySc = scores[yUid]||{};
+            const evansPts = (ySc.slotPts||{})[yEvansSlot];
+            const collinsPts = cUid ? (scores[cUid]||{}).slotPts?.[cSlot] : undefined;
+            O.push(`Week ${W} score status: ${ySc.status||'?'} · yyyy team: ${ySc.team}`);
+            O.push(`Mike Evans (slot ${yEvansSlot}) scored: ${evansPts}`);
+            O.push(cUid ? `Nico Collins (from "${(scores[cUid]||{}).team}", slot ${cSlot}) scored: ${collinsPts}` : 'Nico Collins: not rostered by any team in week 9 — cannot read his points');
+            if (evansPts==null || collinsPts==null){ ann('warning','missing points', O.join('\n')); return; }
+            const delta = r2(collinsPts - evansPts);
+            const yOld = ySc.score, yNew = r2(yOld - evansPts + collinsPts);
+            O.push(`Δ = ${delta>=0?'+':''}${delta}  →  yyyy week ${W}: ${yOld} → ${yNew}`);
+            O.push('');
+
+            // Week-9 ranking (now vs after)
+            const wkArr = Object.keys(scores).map(u=>({u,team:scores[u].team,score:scores[u].score})).filter(x=>typeof x.score==='number');
+            const rankOf = (arr,u)=>{const s=arr.slice().sort((a,b)=>b.score-a.score);return s.findIndex(x=>x.u===u)+1;};
+            const n = wkArr.length;
+            const wkNow = rankOf(wkArr,yUid);
+            const wkAfter = rankOf(wkArr.map(x=>x.u===yUid?{...x,score:yNew}:x),yUid);
+            O.push(`Week ${W} rank: ${wkNow}/${n} → ${wkAfter}/${n}`);
+            // lowest scorer (Last One Standing relevance)
+            const low = wkArr.slice().sort((a,b)=>a.score-b.score);
+            const lowAfter = wkArr.map(x=>x.u===yUid?{...x,score:yNew}:x).slice().sort((a,b)=>a.score-b.score);
+            O.push(`Week ${W} LOWEST now: ${low[0].team} (${low[0].score}); 2nd-lowest ${low[1].team} (${low[1].score})`);
+            O.push(`Week ${W} LOWEST if swapped: ${lowAfter[0].team} (${lowAfter[0].score})`);
+            O.push(`  → yyyy is ${low[0].u===yUid?'the LOWEST now':'not the lowest'}; after swap ${lowAfter[0].u===yUid?'STILL lowest':'not lowest'}`);
+            O.push('');
+
+            // Cumulative season totals (now vs after)
+            const season = await get(`/leagues/fr_refresh26/season/2026.json`) || {};
+            const totals={}, teamName={};
+            for (const wk of Object.keys(season)) {
+              const wo=season[wk]; if(!wo||typeof wo!=='object') continue;
+              for (const u of Object.keys(wo)){ const s=wo[u]; if(s&&typeof s.score==='number'){ totals[u]=(totals[u]||0)+s.score; if(s.team)teamName[u]=s.team; } }
+            }
+            const seasonArr=Object.keys(totals).map(u=>({u,team:teamName[u]||u,total:r2(totals[u])}));
+            const sRankNow = (()=>{const s=seasonArr.slice().sort((a,b)=>b.total-a.total);return s.findIndex(x=>x.u===yUid)+1;})();
+            const sRankAfter=(()=>{const s=seasonArr.map(x=>x.u===yUid?{...x,total:r2(x.total+delta)}:x).sort((a,b)=>b.total-a.total);return s.findIndex(x=>x.u===yUid)+1;})();
+            const yT = seasonArr.find(x=>x.u===yUid)||{total:0};
+            O.push(`Season total: ${yT.total} → ${r2(yT.total+delta)}  ·  overall rank ${sRankNow}/${seasonArr.length} → ${sRankAfter}/${seasonArr.length}`);
+
+            // Guillotine / Last One Standing status
+            const g = await get(`/leagues/fr_refresh26/guillotineStatus.json`);
+            if (g){ const s=JSON.stringify(g); O.push('', 'guillotineStatus: '+s.slice(0,600)); }
+            else O.push('', 'guillotineStatus: (none)');
+
+            ann('notice','Week 9 what-if: Collins for Evans', O.join('\n'));
+          })().catch(e=>{ann('error','check failed',e.message+'\n'+e.stack);process.exit(1);});
+          SCRIPT
