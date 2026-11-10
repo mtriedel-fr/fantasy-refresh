@@ -109,3 +109,28 @@ test('player-card cache: any member can fill a miss or upgrade an old entry, not
   await assertFails(set(ref(db('bob'), C + 'junk'), { hello: 'x' }));         // must look like a cache entry
   await assertSucceeds(set(ref(db('comm'), C + 'current player'), entry(7))); // commissioners can always fix
 });
+
+test('save-attempt log: members append their own entries; private to member + commissioners', async () => {
+  const S = uid => `saveLog/${L}/${uid}`;
+  const ok = { ts: 1, outcome: 'saved', week: 9, team: 'A' };
+  // a member can create entries under their own uid (append-only)
+  await assertSucceeds(set(ref(db('alice'), S('alice') + '/e1'), ok));
+  await assertSucceeds(set(ref(db('alice'), S('alice') + '/e2'), { ts: 2, outcome: 'blocked', reason: 'locked:Mike Evans', week: 9 }));
+  // minimal valid entry is fine (ts + outcome)
+  await assertSucceeds(set(ref(db('bob'), S('bob') + '/e1'), { ts: 3, outcome: 'cleared' }));
+  // cannot write someone else's log, overwrite an existing entry, or delete
+  await assertFails(set(ref(db('bob'), S('alice') + '/e3'), ok));
+  await assertFails(set(ref(db('alice'), S('alice') + '/e1'), { ts: 9, outcome: 'saved' })); // create-only
+  await assertFails(set(ref(db('alice'), S('alice') + '/e1'), null));                        // no delete
+  // shape is enforced: no stray fields (e.g. email), required fields present
+  await assertFails(set(ref(db('alice'), S('alice') + '/bad1'), { ts: 1, outcome: 'saved', email: 'a@x.com' }));
+  await assertFails(set(ref(db('alice'), S('alice') + '/bad2'), { ts: 1 }));                 // missing outcome
+  await assertFails(set(ref(db('alice'), S('alice') + '/bad3'), { ts: 'x', outcome: 'saved' })); // ts not a number
+  // reads: the member reads their own, commissioners read all, nobody else
+  await assertSucceeds(get(ref(db('alice'), S('alice'))));
+  await assertSucceeds(get(ref(db('comm'), `saveLog/${L}`)));
+  await assertSucceeds(get(ref(db('owner'), `saveLog/${L}`)));
+  await assertFails(get(ref(db('bob'), S('alice'))));
+  await assertFails(get(ref(db(null), S('alice'))));
+  await assertFails(get(ref(db('bob'), `saveLog/${L}`)));
+});

@@ -102,6 +102,24 @@
         }
       }
     },
+    "saveLog": {
+      "$leagueId": {
+        ".read": "auth != null && (root.child('leagues/' + $leagueId + '/settings/commissioners/' + auth.uid).val() === true || root.child('leagues/' + $leagueId + '/settings/createdBy').val() === auth.uid)",
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid",
+          "$entry": {
+            ".write": "auth != null && auth.uid === $uid && !data.exists()",
+            ".validate": "newData.hasChildren(['ts','outcome'])",
+            "ts": { ".validate": "newData.isNumber()" },
+            "outcome": { ".validate": "newData.isString() && newData.val().length <= 20" },
+            "reason": { ".validate": "newData.isString() && newData.val().length <= 160" },
+            "week": { ".validate": "newData.isNumber()" },
+            "team": { ".validate": "newData.isString() && newData.val().length <= 120" },
+            "$other": { ".validate": "false" }
+          }
+        }
+      }
+    },
     "playerPool": {
       ".read": true,
       ".write": "auth != null && root.child('leagues/fr_refresh26/settings/commissioners/' + auth.uid).val() === true"
