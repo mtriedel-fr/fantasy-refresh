@@ -1,0 +1,119 @@
+name: Fix yyyy Week9 lineup (ops)
+on:
+  push:
+    branches: [ops/fix-yyyy-week9]
+    paths: ['.github/workflows/fix-yyyy-week9.yml']
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Swap Evans -> Collins in yyyy Week 9 (guarded, backed up)
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB = process.env.FIREBASE_DB_URL, T = process.env.FIREBASE_AUTH_TOKEN;
+          const DRY_RUN = true;   // <<< first run prints the plan and writes NOTHING
+          const LEAGUE='fr_refresh26', W=9;
+
+          const esc = s => String(s).replace(/%/g,'%25').replace(/\r/g,'%0D').replace(/\n/g,'%0A');
+          const ann = (l,t,m)=>console.log(`::${l} title=${esc(t).replace(/:/g,'%3A').replace(/,/g,'%2C')}::${esc(m)}`);
+          const norm = s => String(s||'').toLowerCase().replace(/\b(jr|sr|ii|iii|iv|v)\b/g,'').replace(/[^a-z0-9 ]/g,'').replace(/\s+/g,' ').trim();
+          const r2 = n => Math.round(n*100)/100;
+          const req = (method, path, body) => new Promise((res, rej) => {
+            const u = new URL(`${FB}${path}.json?auth=${T}`);
+            const r = https.request(u, { method, headers:{'Content-Type':'application/json'} }, resp => {
+              let d=''; resp.on('data',c=>d+=c); resp.on('end',()=>{
+                if (resp.statusCode>=400) return rej(new Error(`${method} ${path} -> HTTP ${resp.statusCode}: ${d.slice(0,200)}`));
+                try{ res(d?JSON.parse(d):null); }catch(e){ res(d); }
+              });
+            });
+            r.on('error',rej); if(body!==undefined) r.write(JSON.stringify(body)); r.end();
+          });
+          const get = p => req('GET', p);
+          const abort = m => { ann('error','ABORTED — no changes made', m); process.exit(1); };
+
+          (async () => {
+            const lineups = await get(`/leagues/${LEAGUE}/lineups/2026/week${W}`);
+            const scores  = await get(`/leagues/${LEAGUE}/season/2026/${W}`);
+            const standings = await get(`/leagues/${LEAGUE}/standings/2026/week${W}`) || {};
+
+            // locate yyyy + Evans slot
+            let yUid=null, evansSlot=null;
+            for (const u of Object.keys(lineups||{})) {
+              const lu=lineups[u]||{}, slots=lu.slots||{};
+              if (norm(lu.team)===norm('yyyy')) { yUid=u; for (const s of Object.keys(slots)) if (norm((slots[s]||{}).name)==='mike evans') evansSlot=s; }
+            }
+            if (!yUid) abort('no single team named "yyyy" found');
+            if (!evansSlot) abort('Mike Evans is no longer in yyyy\'s week 9 lineup — state changed, not touching anything');
+            const yLineup = lineups[yUid], yScore = scores[yUid];
+            if (Object.values(yLineup.slots).some(p => norm((p||{}).name)==='nico collins')) abort('Nico Collins is already in the lineup — looks already fixed');
+
+            // canonical Collins object + his scored points/breakdown, copied from a team that rostered him
+            let cUid=null, cSlot=null;
+            for (const u of Object.keys(lineups)) { const slots=(lineups[u]||{}).slots||{}; for (const s of Object.keys(slots)) if (norm((slots[s]||{}).name)==='nico collins'){ cUid=u; cSlot=s; break; } if (cUid) break; }
+            if (!cUid) abort('no team rostered Nico Collins in week 9 — cannot source his record');
+            const collinsSlotObj = (lineups[cUid].slots)[cSlot];
+            const collinsPts = ((scores[cUid]||{}).slotPts||{})[cSlot];
+            const collinsBreakdown = ((scores[cUid]||{}).slotBreakdown||{})[cSlot] || [];
+            const evansPts = (yScore.slotPts||{})[evansSlot];
+            if (typeof collinsPts!=='number') abort('Collins has no scored points in week 9');
+
+            // salaries / cap
+            const evansSal = (yLineup.slots[evansSlot]||{}).sal || 0;
+            const collinsSal = collinsSlotObj.sal || 0;
+            const newTotalSal = (yLineup.totalSal||0) - evansSal + collinsSal;
+            const CAP = 60000;
+            if (newTotalSal > CAP) abort(`swap would be $${newTotalSal} — over the $${CAP} cap; it was NOT a cap-legal swap, stopping`);
+
+            const newScore = r2((yScore.score||0) - (evansPts||0) + collinsPts);
+
+            const plan = [
+              `Team: ${yLineup.team}  (week ${W}, status ${yScore.status})`,
+              `Slot ${evansSlot}: Mike Evans ($${evansSal}, ${evansPts} pts)  ->  Nico Collins ($${collinsSal}, ${collinsPts} pts)`,
+              `totalSal: $${yLineup.totalSal} -> $${newTotalSal}   (cap $${CAP})`,
+              `week ${W} score: ${yScore.score} -> ${newScore}`,
+              `Collins source: team "${(scores[cUid]||{}).team}" slot ${cSlot}`,
+              `standings/week${W} snapshot: will re-rank with the new score`,
+              '', DRY_RUN ? '*** DRY RUN — nothing was written ***' : '*** LIVE — applying changes ***'
+            ].join('\n');
+
+            if (DRY_RUN) { ann('notice','DRY RUN plan (no changes)', plan); process.exit(0); }
+
+            // ---- LIVE WRITES ----
+            const ts = Date.now();
+            // 1) backup (private /backups) BEFORE any change
+            await req('PUT', `/backups/fixLineup_yyyy_wk${W}_${ts}`, {
+              at: ts, reason: 'save-bug false-success: member swapped Collins for Evans (ruled Out, 0 pts) pre-kickoff; write was silently denied',
+              lineup: yLineup, score: yScore, standingsEntry: ((standings.entries||[]).find(e=>e.uid===yUid)||null)
+            });
+            // 2) lineup
+            await req('PATCH', `/leagues/${LEAGUE}/lineups/2026/week${W}/${yUid}`, { ['slots/'+evansSlot]: collinsSlotObj, totalSal: newTotalSal });
+            // 3) score
+            await req('PATCH', `/leagues/${LEAGUE}/season/2026/${W}/${yUid}`, {
+              ['slotPts/'+evansSlot]: collinsPts, ['slotBreakdown/'+evansSlot]: collinsBreakdown,
+              score: newScore, updatedAt: ts, commishEdit: { at: ts, from: 'Mike Evans', to: 'Nico Collins', reason: 'save-bug correction' }
+            });
+            // 4) per-week standings snapshot: re-rank with new score
+            if (Array.isArray(standings.entries)) {
+              const entries = standings.entries.map(e => e.uid===yUid ? {...e, score: newScore} : e);
+              entries.sort((a,b)=>{ if(a.notSubmitted&&!b.notSubmitted)return 1; if(!a.notSubmitted&&b.notSubmitted)return -1; return (b.score||0)-(a.score||0); });
+              entries.forEach((e,i)=>{ e.rank=i+1; });
+              await req('PUT', `/leagues/${LEAGUE}/standings/2026/week${W}`, { entries, updatedAt: ts });
+            }
+
+            // 5) verify
+            const vLineup = await get(`/leagues/${LEAGUE}/lineups/2026/week${W}/${yUid}`);
+            const vScore = await get(`/leagues/${LEAGUE}/season/2026/${W}/${yUid}`);
+            const after = [
+              plan, '',
+              `VERIFIED slot ${evansSlot}: ${(vLineup.slots[evansSlot]||{}).name}  ($${vLineup.totalSal})`,
+              `VERIFIED week ${W} score: ${vScore.score}  (slotPts ${evansSlot}=${(vScore.slotPts||{})[evansSlot]})`,
+              `backup: /backups/fixLineup_yyyy_wk${W}_${ts}`
+            ].join('\n');
+            ann('notice','DONE — Week 9 corrected', after);
+            process.exit(0);
+          })().catch(e => { ann('error','FAILED', e.message + '\n' + (e.stack||'')); process.exit(1); });
+          SCRIPT
