@@ -7,7 +7,7 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - name: Can a signed-out visitor read past lineups?
+      - name: Verify a team's saved roster (Evans/Collins swap)
         env:
           FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
           FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
@@ -15,27 +15,64 @@ jobs:
           node << 'SCRIPT'
           const https = require('https');
           const FB = process.env.FIREBASE_DB_URL, T = process.env.FIREBASE_AUTH_TOKEN;
-          const raw = u => new Promise((res, rej) => https.get(u, r => { let d = ''; r.on('data', c => d += c); r.on('end', () => res({ status: r.statusCode, body: d })); }).on('error', rej));
-          const esc = s => String(s).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
-          const ann = (l, t, m) => console.log(`::${l} title=${esc(t).replace(/:/g,'%3A').replace(/,/g,'%2C')}::${esc(m)}`);
+          const get = p => new Promise((res, rej) => https.get(`${FB}${p}${p.includes('?')?'&':'?'}auth=${T}`, r => { let d=''; r.on('data',c=>d+=c); r.on('end',()=>{ try{res(JSON.parse(d));}catch(e){res(null);} }); }).on('error', rej));
+          const esc = s => String(s).replace(/%/g,'%25').replace(/\r/g,'%0D').replace(/\n/g,'%0A');
+          const ann = (l,t,m) => console.log(`::${l} title=${esc(t).replace(/:/g,'%3A').replace(/,/g,'%2C')}::${esc(m)}`);
+          const ct = ms => (typeof ms==='number') ? new Date(ms).toLocaleString('en-US',{timeZone:'America/Chicago',weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})+' CT' : 'no timestamp';
+          const norm = s => String(s||'').toLowerCase().replace(/\b(jr|sr|ii|iii|iv|v)\b/g,'').replace(/[^a-z0-9 ]/g,'').replace(/\s+/g,' ').trim();
+
+          const TEAM_QUERY = 'yyyy';              // the team the commissioner asked about
+          const WANT = ['mike evans','nico collins'];
+
           (async () => {
-            const lines = [];
-            const meta = JSON.parse((await raw(`${FB}/leagues/fr_refresh26/season/2026/meta.json`)).body);
-            lines.push(`season meta: ${JSON.stringify(meta)}`);
-            for (let w = 1; w <= 8; w++) {
-              const pub = await raw(`${FB}/leagues/fr_refresh26/lineups/2026/week${w}.json?shallow=true`);
-              const adm = await raw(`${FB}/leagues/fr_refresh26/lineups/2026/week${w}.json?shallow=true&auth=${T}`);
-              const pc = pub.status === 200 ? Object.keys(JSON.parse(pub.body) || {}).length : '-';
-              const ac = adm.status === 200 ? Object.keys(JSON.parse(adm.body) || {}).length : '-';
-              const sc = await raw(`${FB}/leagues/fr_refresh26/season/2026/${w}.json?shallow=true`);
-              lines.push(`week ${w}: lineups public HTTP ${pub.status} (${pc} teams), admin ${ac} teams; scores HTTP ${sc.status} (${sc.status === 200 ? Object.keys(JSON.parse(sc.body) || {}).length : '-'})`);
+            const settings = await get('/leagues/fr_refresh26/settings.json') || {};
+            const season = settings.season || 2026;
+            const meta = await get(`/leagues/fr_refresh26/season/${season}/meta.json`) || {};
+            const cur = (typeof meta.week === 'number') ? meta.week : null;
+            const lock = settings.draftLockedUntil, now = Date.now();
+            const lockState = typeof lock!=='number' ? 'unknown' : (lock<=now ? `OPEN (since ${ct(lock)})` : `LOCKED until ${ct(lock)}`);
+
+            const head = [];
+            head.push(`Season ${season}, current week ${cur}. Draft: ${lockState}.`);
+
+            const weeks = [cur-1, cur, cur+1].filter(w => w>=1 && w<=18);
+            const allTeams = new Set();
+            const hits = [];   // team-name matches for TEAM_QUERY
+
+            for (const w of weeks) {
+              const wk = await get(`/leagues/fr_refresh26/lineups/${season}/week${w}.json`) || {};
+              for (const uid of Object.keys(wk)) {
+                const lu = wk[uid] || {};
+                const team = lu.team || '(no name)';
+                allTeams.add(team);
+                const nteam = norm(team), nq = norm(TEAM_QUERY);
+                if (nteam === nq || (nq && nteam.includes(nq))) {
+                  const slots = lu.slots || {};
+                  const roster = Object.keys(slots).map(s => {
+                    const p = slots[s] || {};
+                    const star = WANT.includes(norm(p.name)) ? ' <<' : '';
+                    return `  ${s}: ${p.name||'?'}${p.sal?` ($${p.sal})`:''}${star}`;
+                  });
+                  const present = WANT.filter(n => Object.values(slots).some(p => norm((p||{}).name)===n));
+                  hits.push([
+                    `— ${team} · week ${w} —`,
+                    `  saved: ${ct(lu.submitted)}  ·  totalSal: ${lu.totalSal!=null?('$'+lu.totalSal):'?'}`,
+                    `  Mike Evans present: ${present.includes('mike evans')?'YES':'no'}  ·  Nico Collins present: ${present.includes('nico collins')?'YES':'no'}`,
+                    ...roster
+                  ].join('\n'));
+                }
+              }
             }
-            // one lineup's shape (field names only)
-            const one = JSON.parse((await raw(`${FB}/leagues/fr_refresh26/lineups/2026/week6.json?auth=${T}`)).body) || {};
-            const first = Object.values(one)[0] || {};
-            lines.push(`week6 lineup fields: ${Object.keys(first).join(',')}; slot keys: ${Object.keys(first.slots || {}).join(',')}`);
-            const backups = JSON.parse((await raw(`${FB}/backups.json?shallow=true&auth=${T}`)).body) || {};
-            lines.push(`backups: ${Object.keys(backups).sort().slice(-6).join(', ')}`);
-            ann('notice', 'Lineup check', lines.join('\n'));
-          })().catch(e => { ann('error', 'check failed', e.message); process.exit(1); });
+
+            if (hits.length) {
+              ann('notice', `Roster check — "${TEAM_QUERY}"`, head.concat('', hits).join('\n'));
+            } else {
+              const names = [...allTeams].sort((a,b)=>a.localeCompare(b));
+              const chunk = [];
+              let cur2 = `No team matched "${TEAM_QUERY}". ${names.length} teams with lineups in weeks ${weeks.join('/')}:\n`;
+              names.forEach(n => { if ((cur2+n).length > 3500){ chunk.push(cur2); cur2=''; } cur2 += '• '+n+'\n'; });
+              chunk.push(cur2);
+              ann('warning', 'Team not found — pick from this list', head.concat('', chunk).join('\n'));
+            }
+          })().catch(e => { ann('error','check failed', e.message); process.exit(1); });
           SCRIPT
