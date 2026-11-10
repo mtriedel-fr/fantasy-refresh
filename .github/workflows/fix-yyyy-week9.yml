@@ -77,6 +77,8 @@ jobs:
               `week ${W} score: ${yScore.score} -> ${newScore}`,
               `Collins source: team "${(scores[cUid]||{}).team}" slot ${cSlot}`,
               `standings/week${W} snapshot: will re-rank with the new score`,
+              '', 'EVANS slot object: ' + JSON.stringify(yLineup.slots[evansSlot]),
+              'COLLINS slot object: ' + JSON.stringify(collinsSlotObj),
               '', DRY_RUN ? '*** DRY RUN — nothing was written ***' : '*** LIVE — applying changes ***'
             ].join('\n');
 
