@@ -1,0 +1,46 @@
+name: DB structure check (read-only)
+on:
+  push:
+    branches: [audit/draft-check]
+    paths: ['.github/workflows/structure-check.yml']
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Is there any activity/save log node in the database?
+        env:
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
+        run: |
+          node << 'SCRIPT'
+          const https = require('https');
+          const FB = process.env.FIREBASE_DB_URL, T = process.env.FIREBASE_AUTH_TOKEN;
+          const get = p => new Promise((res,rej)=>https.get(`${FB}${p}${p.includes('?')?'&':'?'}auth=${T}`,r=>{let d='';r.on('data',c=>d+=c);r.on('end',()=>{try{res(JSON.parse(d));}catch(e){res(null);}});}).on('error',rej));
+          const esc = s => String(s).replace(/%/g,'%25').replace(/\r/g,'%0D').replace(/\n/g,'%0A');
+          const ann = (l,t,m)=>console.log(`::${l} title=${esc(t).replace(/:/g,'%3A').replace(/,/g,'%2C')}::${esc(m)}`);
+          const RX = /log|audit|event|activity|history|track|attempt/i;
+          (async () => {
+            const L = [];
+            // shallow = keys only, no values (no PII)
+            const root = await get('/.json?shallow=true') || {};
+            const rootKeys = Object.keys(root).sort();
+            L.push(`Top-level DB nodes (${rootKeys.length}): ${rootKeys.join(', ')}`);
+            const rootHits = rootKeys.filter(k => RX.test(k));
+            L.push(`Top-level nodes matching log/audit/activity/history: ${rootHits.length ? rootHits.join(', ') : 'NONE'}`);
+
+            const lg = await get('/leagues/fr_refresh26.json?shallow=true') || {};
+            const lgKeys = Object.keys(lg).sort();
+            L.push(`Nodes under leagues/fr_refresh26 (${lgKeys.length}): ${lgKeys.join(', ')}`);
+            const lgHits = lgKeys.filter(k => RX.test(k));
+            L.push(`League nodes matching log/audit/activity/history: ${lgHits.length ? lgHits.join(', ') : 'NONE'}`);
+
+            // sanity: what one lineup record actually stores (field names only)
+            const meta = await get('/leagues/fr_refresh26/season/2026/meta.json') || {};
+            const cur = typeof meta.week==='number' ? meta.week : 9;
+            const wk = await get(`/leagues/fr_refresh26/lineups/2026/week${cur}.json`) || {};
+            const one = Object.values(wk)[0] || {};
+            L.push(`A week-${cur} lineup record's fields: ${Object.keys(one).join(', ') || '(none)'} — only 'submitted' is a timestamp, overwritten each successful save.`);
+
+            ann('notice', 'DB structure check', L.join('\n'));
+          })().catch(e => { ann('error','check failed', e.message); process.exit(1); });
+          SCRIPT
