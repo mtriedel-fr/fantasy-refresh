@@ -62,8 +62,8 @@ jobs:
             if (typeof collinsPts!=='number') abort('Collins has no scored points in week 9');
 
             // salaries / cap
-            const evansSal = (yLineup.slots[evansSlot]||{}).sal || 0;
-            const collinsSal = collinsSlotObj.sal || 0;
+            const evansSal = (yLineup.slots[evansSlot]||{}).salary || 0;
+            const collinsSal = collinsSlotObj.salary || 0;
             const newTotalSal = (yLineup.totalSal||0) - evansSal + collinsSal;
             const CAP = 60000;
             if (newTotalSal > CAP) abort(`swap would be $${newTotalSal} — over the $${CAP} cap; it was NOT a cap-legal swap, stopping`);
