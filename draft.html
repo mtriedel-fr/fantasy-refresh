@@ -2515,20 +2515,43 @@ function updateSubmitBtn(){
   }
 }
 
+// ── SAVE-ATTEMPT LOG ───────────────────────────────────────────
+// Appends one entry per save/submit attempt to /saveLog/{league}/{uid}/{key},
+// so a commissioner can later see exactly WHEN someone tried to save and
+// whether it went through — or why it was blocked ("I swapped my guy but it
+// didn't save" is otherwise impossible to verify, since a blocked save writes
+// nothing). Fire-and-forget and fully wrapped so it can NEVER interfere with
+// the real submit. Privacy-safe: uid is the key; the entry holds only a
+// timestamp, an outcome, a short reason, the week and the team name — no email.
+function logSaveAttempt(outcome, reason){
+  try {
+    if(!currentUser || !currentUser.uid || typeof FR === 'undefined' || !FR.fb) return;
+    var ctx = (typeof FRAuth !== 'undefined' && FRAuth.getLeagueCtx) ? FRAuth.getLeagueCtx() : null;
+    var leagueId = (ctx && ctx.leagueId) || 'fr_refresh26';
+    var entry = { ts: Date.now(), outcome: String(outcome || '').slice(0, 20), week: currentWeek };
+    if(reason) entry.reason = String(reason).slice(0, 160);
+    if(ctx && ctx.teamName) entry.team = String(ctx.teamName).slice(0, 120);
+    var key = entry.ts + '_' + Math.random().toString(36).slice(2, 8);
+    FR.fb.put('/saveLog/' + leagueId + '/' + currentUser.uid + '/' + key, entry).catch(function(){});
+  } catch(e){ /* logging must never break a submit */ }
+}
+
 // ── SUBMIT ─────────────────────────────────────────────────────
 function submitLineup(){
-  if(isDraftLocked()){ showToast('🔒 Drafting isn\'t open yet — check back closer to kickoff.', true); return; }
+  if(isDraftLocked()){ logSaveAttempt('blocked','draft-locked'); showToast('🔒 Drafting isn\'t open yet — check back closer to kickoff.', true); return; }
   if(!currentUser){ showToast('Sign in first',true); return; }
   var emptySlots = SLOT_DEFS.filter(function(s){ return !lineup[s.id]; });
   if(emptySlots.length){
     var names = emptySlots.map(function(s){ return s.label; }).join(', ');
+    logSaveAttempt('blocked','incomplete:'+emptySlots.length+'-open');
     showToast('Fill every roster spot before submitting — missing: ' + names, true);
     return;
   }
-  if(getSpent()>CAP){ showToast('Over cap',true); return; }
+  if(getSpent()>CAP){ logSaveAttempt('blocked','over-cap:'+getSpent()); showToast('Over cap',true); return; }
   var startedUnsubmitted = SLOT_DEFS.map(function(s){ return lineup[s.id]; }).filter(function(p){ return p && isStartedUnsubmitted(p); });
   if(startedUnsubmitted.length){
     var who = startedUnsubmitted.map(function(p){ return p.name; }).join(', ');
+    logSaveAttempt('blocked','started-unsubmitted:'+who);
     showToast('🔒 ' + who + (startedUnsubmitted.length === 1 ? '\'s game has' : '\'s games have') + ' started and ' + (startedUnsubmitted.length === 1 ? 'he wasn\'t' : 'they weren\'t') + ' in a submitted lineup — swap ' + (startedUnsubmitted.length === 1 ? 'him' : 'them') + ' out to submit.', true);
     return;
   }
@@ -2548,10 +2571,11 @@ function submitLineup(){
     : Promise.resolve(true);
 
   authCheck.then(function(valid){
-    if(!valid) return;
+    if(!valid){ logSaveAttempt('blocked','session-invalid'); return; }
 
     btn.textContent='Submitting…';
     saveLineupToFirebase().then(function(){
+      logSaveAttempt('saved','totalSal:'+getSpent());
       var msg=document.getElementById('submit-msg');
       msg.textContent='✓ Lineup submitted! Good luck.'; msg.className='submit-msg ok';
       btn.textContent='↑ Update Lineup'; btn.disabled=false;
@@ -2560,6 +2584,7 @@ function submitLineup(){
       clearDraftLocal(); // it's safely in the cloud now — drop the local draft
       setTimeout(function(){ window.location.href = '/league.html'; }, 1200);
     }).catch(function(err){
+      logSaveAttempt('error', err && err.message);
       console.error('Lineup submit failed:', err);
       document.getElementById('submit-msg').textContent='Submission failed — try again';
       document.getElementById('submit-msg').className='submit-msg err';
@@ -2635,6 +2660,7 @@ function clearRoster(){
   msg.className = 'submit-msg';
 
   saveLineupToFirebase().then(function(){
+    logSaveAttempt('cleared', lockedSlots.length ? ('kept:'+lockedSlots.length+'-locked') : null);
     var stillHasPlayers = Object.values(lineup).filter(Boolean).length > 0;
     msg.textContent = stillHasPlayers
       ? '✓ Cleared — ' + lockedSlots.length + ' locked player' + (lockedSlots.length===1?'':'s') + ' kept'
@@ -2646,6 +2672,7 @@ function clearRoster(){
     showToast('Roster cleared and saved');
     setSubmittedFrom(lineup);
   }).catch(function(err){
+    logSaveAttempt('error', 'clear:'+(err && err.message));
     console.error('Clear roster save failed:', err);
     msg.textContent = 'Cleared locally but failed to save — try again';
     msg.className = 'submit-msg err';
