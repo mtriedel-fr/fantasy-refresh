@@ -64,8 +64,26 @@ jobs:
               }
             }
 
+            // ── WHY: lock timing for Evans/Collins + is next week's draft available ──
+            const diag = [];
+            const sheetCur = await get(`/leagues/fr_refresh26/salaries/${season}/week${cur}.json`) || {};
+            const playersCur = Object.values(sheetCur.players || {});
+            const teamOf = nm => { const p = playersCur.find(p => norm(p.name)===norm(nm)); return p ? (p.team||p.tm||'?') : '?'; };
+            const sched = await get(`/nflSchedule/${season}/Regular.json`) || {};
+            const games = (sched.weeks && sched.weeks[`week${cur}`]) || [];
+            const ALIAS = { WSH:'WAS', JAC:'JAX', LA:'LAR' };
+            const nt = t => { const u=String(t||'').toUpperCase(); return ALIAS[u]||u; };
+            for (const nm of ['Mike Evans','Nico Collins']) {
+              const tm = nt(teamOf(nm));
+              const g = games.find(x => nt(x.home)===tm || nt(x.away)===tm);
+              const kt = g && g.time ? new Date(g.time).getTime() : null;
+              diag.push(`${nm} (${tm||'?'}): week ${cur} game ${kt?ct(kt):'unknown'} — ${kt?(kt<=now?'ALREADY STARTED (player locked if submitted)':'not yet started'):'?'}`);
+            }
+            const nextSheet = await get(`/leagues/fr_refresh26/salaries/${season}/week${cur+1}.json?shallow=true`);
+            diag.push(`Week ${cur+1} salary sheet exists: ${nextSheet ? 'YES (next draft buildable/open)' : 'no (next week not opened yet)'}`);
+
             if (hits.length) {
-              ann('notice', `Roster check — "${TEAM_QUERY}"`, head.concat('', hits).join('\n'));
+              ann('notice', `Roster check — "${TEAM_QUERY}"`, head.concat('', hits, '', '— why —', diag).join('\n'));
             } else {
               const names = [...allTeams].sort((a,b)=>a.localeCompare(b));
               const chunk = [];
