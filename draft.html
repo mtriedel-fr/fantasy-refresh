@@ -2586,7 +2586,13 @@ function submitLineup(){
     }).catch(function(err){
       logSaveAttempt('error', err && err.message);
       console.error('Lineup submit failed:', err);
-      document.getElementById('submit-msg').textContent='Submission failed — try again';
+      // A denied write (usually an expired session) now rejects here instead of
+      // looking like a success — tell the member clearly so they don't think it
+      // saved. They keep their picks (nothing was cleared) and can retry.
+      var authFail = err && (err.isAuthError || /permission|denied|auth|token/i.test(err.message || ''));
+      document.getElementById('submit-msg').textContent = authFail
+        ? '⚠️ Not saved — your session expired. Refresh the page, sign in again, then re-submit.'
+        : '⚠️ Not saved — submission failed. Please try again.';
       document.getElementById('submit-msg').className='submit-msg err';
       btn.disabled=false; btn.textContent='Submit Lineup →';
     });

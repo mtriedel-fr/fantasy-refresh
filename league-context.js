@@ -147,6 +147,28 @@
     return url;
   }
 
+  // Turn a write response into success/failure. The Firebase REST API does NOT
+  // use a network error for a rejected write — it returns an HTTP 401/403 (or
+  // other non-2xx) with a body like {"error":"Permission denied"} (e.g. when the
+  // auth token has expired by the time the write lands). fetch() treats that as
+  // a normal response, so without this check a denied write would resolve as if
+  // it succeeded — the UI shows "saved", but nothing was written and the change
+  // "reverts" on reload. This makes every write reject on failure so callers'
+  // .catch() runs. Successful writes are unaffected.
+  function writeResult(r) {
+    return r.text().then(function(txt) {
+      var body = null;
+      if (txt) { try { body = JSON.parse(txt); } catch (e) { body = null; } }
+      if (!r.ok || (body && body.error)) {
+        var err = new Error((body && body.error) || ('write failed (HTTP ' + r.status + ')'));
+        err.status = r.status;
+        err.isAuthError = (r.status === 401 || r.status === 403);
+        throw err;
+      }
+      return body;
+    });
+  }
+
   // ── FIREBASE HELPERS ────────────────────────────────────────
   var fb = {
     // GET — no auth needed (public rules)
@@ -166,34 +188,34 @@
       }).catch(function() { return null; });
     },
 
-    // PUT — authenticated write
+    // PUT — authenticated write (rejects on a denied/failed write)
     put: function(path, data) {
       return getToken().then(function(token) {
         return fetch(authUrl(path, token), {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(data)
-        }).then(function(r) { return r.json(); });
+        }).then(writeResult);
       });
     },
 
-    // PATCH — authenticated write
+    // PATCH — authenticated write (rejects on a denied/failed write)
     patch: function(path, data) {
       return getToken().then(function(token) {
         return fetch(authUrl(path, token), {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(data)
-        }).then(function(r) { return r.json(); });
+        }).then(writeResult);
       });
     },
 
-    // DELETE — authenticated write
+    // DELETE — authenticated write (rejects on a denied/failed write)
     delete: function(path) {
       return getToken().then(function(token) {
         return fetch(authUrl(path, token), {
           method: 'DELETE'
-        }).then(function(r) { return r.json(); });
+        }).then(writeResult);
       });
     },
 
