@@ -177,12 +177,18 @@
       ".read": true,
       ".write": "auth != null"
     },
+    "leagueIndex": {
+      ".read": true,
+      "$leagueId": {
+        ".write": "auth != null && (root.child('leagues/' + $leagueId + '/settings/commissioners/' + auth.uid).val() === true || root.child('leagues/' + $leagueId + '/settings/createdBy').val() === auth.uid)"
+      }
+    },
     "joinCodes": {
       ".read": false,
-      ".write": "auth != null && root.child('leagues/fr_refresh26/settings/commissioners/' + auth.uid).val() === true",
       "$code": {
         ".read": true,
-        ".write": "auth != null && root.child('leagues/fr_refresh26/settings/commissioners/' + auth.uid).val() === true"
+        ".write": "auth != null && ((!data.exists() && newData.isString() && root.child('leagues/' + newData.val() + '/settings/commissioners/' + auth.uid).val() === true) || (data.exists() && root.child('leagues/' + data.val() + '/settings/commissioners/' + auth.uid).val() === true))",
+        ".validate": "newData.isString() && newData.val().length <= 64"
       }
     },
     "season2025": {

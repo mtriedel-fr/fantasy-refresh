@@ -32,7 +32,11 @@ beforeEach(async () => {
           alice: { uid: 'alice', teamName: 'A', duesPaid: false, email: 'legacy@x.com' }, // legacy email still public until the move
           bob: { uid: 'bob', teamName: 'B' }
         }
-      } },
+      },
+      // A second, independent league run by a different commissioner — used to
+      // prove leagues stay isolated once creation is open to others (a commish
+      // of one league can't touch another's join codes or directory entry).
+      fr_other: { settings: { commissioners: { other: true }, createdBy: 'other', name: 'Other' } } },
       memberPrivate: { [L]: {
         alice: { email: 'alice@x.com', duesClaimedAt: 1, duesClaim: { method: 'Venmo', paidOn: '2026-10-20' } },
         bob: { email: 'bob@x.com' }
@@ -108,6 +112,35 @@ test('player-card cache: any member can fill a miss or upgrade an old entry, not
   await assertFails(set(ref(db(null), C + 'another'), entry(7)));             // must be signed in
   await assertFails(set(ref(db('bob'), C + 'junk'), { hello: 'x' }));         // must look like a cache entry
   await assertSucceeds(set(ref(db('comm'), C + 'current player'), entry(7))); // commissioners can always fix
+});
+
+test('join codes: a commissioner can create a code for their own league, not another\'s', async () => {
+  // comm runs L (fr_test); other runs fr_other.
+  await assertSucceeds(set(ref(db('comm'), 'joinCodes/AAAA'), L));           // own league → ok
+  await assertSucceeds(set(ref(db('other'), 'joinCodes/BBBB'), 'fr_other')); // other runs fr_other → ok
+  await assertFails(set(ref(db('other'), 'joinCodes/CCCC'), L));             // not a commissioner of L
+  await assertFails(set(ref(db('comm'), 'joinCodes/DDDD'), 'fr_other'));     // can't point a code at a league you don't run
+  await assertFails(set(ref(db('bob'), 'joinCodes/EEEE'), L));               // a member is not a commissioner
+  await assertFails(set(ref(db(null), 'joinCodes/FFFF'), L));                // must be signed in
+  await assertFails(set(ref(db('comm'), 'joinCodes/GGGG'), { not: 'a string' })); // value must be a leagueId string
+});
+
+test('join codes: readable for joining, but cannot be enumerated, hijacked, or repointed', async () => {
+  await env.withSecurityRulesDisabled(async ctx => { await set(ref(ctx.database(), 'joinCodes/TAKEN'), L); });
+  await assertSucceeds(get(ref(db(null), 'joinCodes/TAKEN')));   // a single code is a public lookup (joining)
+  await assertFails(get(ref(db('other'), 'joinCodes')));         // but the whole index is not enumerable
+  await assertFails(set(ref(db('other'), 'joinCodes/TAKEN'), 'fr_other')); // can't repoint another league's code
+  await assertFails(set(ref(db('bob'), 'joinCodes/TAKEN'), null));         // a non-commissioner can't delete it
+  await assertSucceeds(set(ref(db('comm'), 'joinCodes/TAKEN'), null));     // the owning commissioner can (rename flow)
+});
+
+test('league directory: anyone reads it; only a league\'s own commissioner writes its entry', async () => {
+  const entry = n => ({ name: n, season: 2026, format: 'playoff', members: 1, maxMembers: 20, visibility: 'public' });
+  await assertSucceeds(get(ref(db(null), 'leagueIndex')));                 // public directory
+  await assertSucceeds(set(ref(db('comm'), 'leagueIndex/' + L), entry('Test')));   // commissioner of L
+  await assertSucceeds(set(ref(db('owner'), 'leagueIndex/' + L), entry('Test')));  // createdBy of L
+  await assertFails(set(ref(db('other'), 'leagueIndex/' + L), entry('Hijack')));   // commissioner of a different league
+  await assertFails(set(ref(db(null), 'leagueIndex/' + L), entry('x')));           // signed out
 });
 
 test('save-attempt log: members append their own entries; private to member + commissioners', async () => {
