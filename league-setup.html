@@ -244,6 +244,14 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
             </div>
             <span class="recipe-arrow">→</span>
           </div>
+          <div class="recipe-card" id="recipe-playoff" onclick="pickRecipe('playoff')">
+            <div class="recipe-emoji">🏈</div>
+            <div class="recipe-text">
+              <div class="recipe-name">The Playoff Game</div>
+              <div class="recipe-desc">A standalone run through the NFL playoffs. One budget across all four rounds — most points through the Super Bowl wins.</div>
+            </div>
+            <span class="recipe-arrow">→</span>
+          </div>
         </div>
       </div>
       <div class="card-footer">
@@ -384,12 +392,44 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
           </div>
         </div>
 
+        <!-- PLAYOFF GAME SETTINGS PANEL — a standalone run through the NFL
+             playoffs. One budget covers all four rounds (Wild Card, Divisional,
+             Conference, Super Bowl): managers spend from a shared pool for the
+             first three rounds, and whatever's left carries into the Super Bowl,
+             which always has at least the floor to spend. Prices regenerate each
+             round; same 9-man roster every round. Scoring is DraftKings-style
+             with the yardage bonuses on. (The in-season draft/scoring engine for
+             this game is the next build — this panel sets it up in the wizard.) -->
+        <div id="playoff-settings" style="display:none;margin-top:12px;background:var(--bg3);border-radius:10px;border:1px solid var(--bdr);overflow:hidden;">
+          <div style="padding:10px 16px;background:var(--bg4);border-bottom:1px solid var(--bdr);">
+            <span style="font-family:var(--fd);font-size:11px;font-weight:800;color:var(--or);text-transform:uppercase;letter-spacing:.8px;">🏈 Playoff Game Budget</span>
+          </div>
+          <div style="padding:14px 16px;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+              <div class="form-group" style="margin:0;">
+                <label class="form-label">Total budget</label>
+                <input type="number" class="form-input" id="po-total" value="240000" min="40000" step="5000" oninput="updatePlayoffBudget()">
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label class="form-label">Super Bowl floor</label>
+                <input type="number" class="form-input" id="po-floor" value="40000" min="0" step="5000" oninput="updatePlayoffBudget()">
+              </div>
+            </div>
+            <div class="form-hint" id="po-budget-hint" style="margin-top:10px;">$200,000 to spend across the first three rounds; whatever's left rolls into the Super Bowl, which always has at least $40,000.</div>
+            <div class="form-group" style="margin:14px 0 0;">
+              <label class="form-label">Entry fee <span style="color:var(--ink3);font-weight:500;">— per manager, optional</span></label>
+              <input type="number" class="form-input" id="po-entry" value="0" min="0" step="5" style="max-width:140px;">
+            </div>
+            <div class="form-hint" style="margin-top:10px;">Standard roster every round (1 QB · 2 RB · 3 WR · 1 TE · 1 FLEX · 1 DEF). Prices regenerate each round and repeat picks are allowed.</div>
+          </div>
+        </div>
+
         <!-- ROSTER & CAP — locked to the standard configuration while
              honing in on the three core formats, rather than offered as
              something to customize per league. Hidden inputs carry the
              same fixed values under the same element IDs createLeague()
              already reads, so nothing downstream needed to change. -->
-        <div style="margin-top:12px;background:var(--bg2);border-radius:8px;border:1px solid var(--bdr);padding:12px 14px;font-size:12px;color:var(--ink3);">
+        <div id="roster-cap-summary" style="margin-top:12px;background:var(--bg2);border-radius:8px;border:1px solid var(--bdr);padding:12px 14px;font-size:12px;color:var(--ink3);">
           Standard roster — 1 QB, 2 RB, 3 WR, 1 TE, 1 FLEX, 1 DEF · $60,000 cap
         </div>
         <input type="hidden" id="adv-qb" value="1">
@@ -666,7 +706,8 @@ function goBack(){
 var RECIPE_META = {
   cumulative: { label:'📊 Points Race',        title:'Name your Points Race league',      sub:'Season-long points race — no bracket. Name it and invite your players.' },
   headtohead: { label:'⚔️ Head to Head',       title:'Set up your Head to Head league',   sub:'Pick your league size and when the playoffs start.' },
-  guillotine: { label:'🪓 Last One Standing',  title:'Name your Last One Standing league', sub:'Survivor rules — lowest score each week is out. Just name it to finish.' }
+  guillotine: { label:'🪓 Last One Standing',  title:'Name your Last One Standing league', sub:'Survivor rules — lowest score each week is out. Just name it to finish.' },
+  playoff:    { label:'🏈 The Playoff Game',   title:'Set up your Playoff Game',           sub:'One budget across all four NFL playoff rounds. Set the budget and invite your players.' }
 };
 function recipeLabel(fmt){
   return (RECIPE_META[fmt] && RECIPE_META[fmt].label) || RECIPE_META.cumulative.label;
@@ -702,27 +743,37 @@ function backToRecipes(){
 // so every lookup is guarded.
 function selectFormat(fmt){
   selectedFmt = fmt;
-  ['cumulative','headtohead','guillotine'].forEach(function(f){
+  ['cumulative','headtohead','guillotine','playoff'].forEach(function(f){
     var card = document.getElementById('recipe-'+f);
     if(card) card.classList.toggle('selected', f===fmt);
   });
 
-  // Show/hide cumulative and H2H settings panels
+  // Show/hide cumulative, H2H and Playoff Game settings panels (one at a time)
   var cumSettings = document.getElementById('cum-settings');
   var h2hSettings = document.getElementById('h2h-settings');
+  var poSettings  = document.getElementById('playoff-settings');
   if(cumSettings) cumSettings.style.display = fmt === 'cumulative' ? 'block' : 'none';
   if(h2hSettings) h2hSettings.style.display = fmt === 'headtohead' ? 'block' : 'none';
+  if(poSettings)  poSettings.style.display  = fmt === 'playoff'    ? 'block' : 'none';
+
+  // The Playoff Game panel states its own roster + run-wide budget, so the
+  // generic "standard roster · $60,000 cap" summary (a weekly-cap idea that
+  // doesn't apply to the four-round budget) is hidden for that recipe only.
+  var rosterSummary = document.getElementById('roster-cap-summary');
+  if(rosterSummary) rosterSummary.style.display = fmt === 'playoff' ? 'none' : '';
 
   if(fmt === 'headtohead') updateH2HCalc();
+  if(fmt === 'playoff')    updatePlayoffBudget();
   onPreseasonToggleChange(); // keep H2H playoff visibility correct regardless of format switches
 
-  // A standalone Last One Standing league IS the survivor format, so the
-  // side-game add-on doesn't apply — hide its row and clear it. On Points Race
-  // and Head to Head the row is shown as an optional add-on.
+  // A standalone Last One Standing league IS the survivor format, and the
+  // Playoff Game is its own self-contained game — so the side-game add-on
+  // doesn't apply to either; hide its row and clear it. On Points Race and
+  // Head to Head the row is shown as an optional add-on.
   var togRow  = document.getElementById('tog-guillotine-row');
   var togInp  = document.getElementById('tog-guillotine');
   if(togRow && togInp){
-    if(fmt === 'guillotine'){
+    if(fmt === 'guillotine' || fmt === 'playoff'){
       togInp.checked  = false;
       togInp.disabled = true;
       togRow.style.display = 'none';
@@ -744,6 +795,26 @@ function onPreseasonToggleChange(){
   var isPreseason = !!(toggle && toggle.checked);
   var playoffSection = document.getElementById('h2h-playoff-section');
   if(playoffSection) playoffSection.style.display = isPreseason ? 'none' : 'block';
+}
+
+// Keeps the Playoff Game budget hint in sync with the two inputs. The pool
+// for the first three rounds is total minus the Super Bowl floor; the floor
+// is the minimum that always carries into the Super Bowl (managers can also
+// roll unused pool money forward on top of it). Guards against a floor larger
+// than the total so the hint never shows a negative pool.
+function updatePlayoffBudget(){
+  var totalEl = document.getElementById('po-total');
+  var floorEl = document.getElementById('po-floor');
+  var hint    = document.getElementById('po-budget-hint');
+  if(!totalEl || !floorEl || !hint) return;
+  var total = parseInt(totalEl.value) || 0;
+  var floor = parseInt(floorEl.value) || 0;
+  if(floor > total) floor = total;
+  var pool = total - floor;
+  var fmt  = function(n){ return '$' + n.toLocaleString('en-US'); };
+  hint.textContent = fmt(pool) + ' to spend across the first three rounds; '
+    + "whatever's left rolls into the Super Bowl, which always has at least "
+    + fmt(floor) + '.';
 }
 
 function updateH2HCalc(){
@@ -790,6 +861,8 @@ function createLeague(){
   // H2H specific
   // Cumulative playoff config
   var cumPlayoff   = selectedFmt === 'cumulative' ? getCumPlayoffSettings() : {};
+  // Playoff Game config (standalone NFL-playoff game) — only read when picked.
+  var playoffGame  = selectedFmt === 'playoff' ? getPlayoffGameSettings() : null;
   var h2hTeams     = selectedFmt === 'headtohead' ? (parseInt(document.getElementById('h2h-teams').value)||12) : null;
   var h2hDivisions = 0;
   // Playoffs don't apply during a short preseason test — no bracket fits
@@ -866,17 +939,22 @@ function createLeague(){
     bracketFormat:       bracketFormat,    // 'fixed' | 'reseed'
     // Cumulative playoff
     ...cumPlayoff,
+    // Playoff Game — standalone four-round NFL-playoff game. gameType marks it
+    // for the (next-build) in-season engine; playoffGame carries the budget +
+    // scoring. 'season' for every other recipe so existing pages are unchanged.
+    gameType:            selectedFmt === 'playoff' ? 'playoff' : 'season',
+    playoffGame:         playoffGame,     // null unless the Playoff Game is picked
     visibility:          isPublic ? 'public' : 'private',
     commissioners:       {[currentUser.uid]: true},
     created:             Date.now(),
     createdBy:           currentUser.uid,
     maxMembers:          h2hTeams || maxMembers,
-    entryFee:            0,
+    entryFee:            playoffGame ? playoffGame.entryFee : 0,
     prizePool:           0,
     active:              true,
     // Preseason specific
-    seasonType:          isPreseason ? 'Preseason' : 'Regular',
-    weeks:               isPreseason ? 4 : 18,
+    seasonType:          playoffGame ? 'Playoff' : (isPreseason ? 'Preseason' : 'Regular'),
+    weeks:               playoffGame ? 4 : (isPreseason ? 4 : 18),
     isPreseason:         isPreseason
   };
 
@@ -933,6 +1011,7 @@ function createLeague(){
         leagueName: name,
         season:     parseInt(FR_SEASON),
         format:     selectedFmt,
+        gameType:   selectedFmt === 'playoff' ? 'playoff' : 'season',
         guillotine,
         playoffFormat: cumPlayoff.playoffFormat || (selectedFmt === 'cumulative' ? 'tiers' : 'none'),
         tierLockWeek:  cumPlayoff.tierLockWeek || 14,
@@ -1098,6 +1177,46 @@ function getCumPlayoffSettings(){
   var lock = parseInt(document.getElementById('cum-tier-lock').value, 10);
   if(!lock || lock < 1 || lock > 20) lock = 14;
   return { playoffFormat:'tiers', tierCount:3, tierLockWeek:lock };
+}
+
+// ── PLAYOFF GAME SETTINGS ──────────────────────────────────────
+// The standalone four-round NFL-playoff game. One budget (`total`) covers all
+// four rounds: `pool` (total − floor) is shared across the first three rounds,
+// and the Super Bowl always has at least `superBowlFloor` plus whatever pool is
+// left (carryover). Prices regenerate each round, repeat picks allowed, same
+// 9-man roster. Scoring is DK with the yardage bonuses on. Values are clamped
+// so the stored config is always coherent (never a negative pool).
+function getPlayoffGameSettings(){
+  var total = parseInt(document.getElementById('po-total').value, 10);
+  var floor = parseInt(document.getElementById('po-floor').value, 10);
+  var entry = parseInt(document.getElementById('po-entry').value, 10);
+  if(!total || total < 0) total = 240000;
+  if(isNaN(floor) || floor < 0) floor = 40000;
+  if(floor > total) floor = total;        // never a negative pool
+  if(isNaN(entry) || entry < 0) entry = 0;
+  return {
+    total:          total,
+    superBowlFloor: floor,
+    pool:           total - floor,         // shared across the first three rounds
+    entryFee:       entry,
+    rounds:         ['wildcard','divisional','conference','superbowl'],
+    carryover:      true,                  // unused pool rolls into the Super Bowl
+    repeatPicks:    true,                  // same player can be picked each round
+    regenPrices:    true,                  // prices rebuilt each round
+    // DK scoring (INT/fumble -2) plus the Playoff Game's yardage bonuses: +3
+    // at 350+ passing, 150+ rushing, 150+ receiving yards. Thresholds are
+    // stored explicitly (not encoded in a key name) since they differ from the
+    // regular-season 300/100/100 bonuses the rules page reads.
+    scoring: {
+      intThrown:  -2,
+      fumbleLost: -2,
+      bonuses: {
+        pass: { yards: 350, points: 3 },
+        rush: { yards: 150, points: 3 },
+        rec:  { yards: 150, points: 3 }
+      }
+    }
+  };
 }
 
 function genLeagueId(){
