@@ -46,7 +46,7 @@ test('Divisional round: bank, this-round, and the pool/floor split are right', (
   // $70k spent in Wild Card; $48,500 in progress this round.
   const html = renderHTML({ week: 2, prior: { 1: 70000 }, spentThis: 48500 });
   assert.match(html, /Playoff Bank/);
-  assert.match(html, /\$121,500 <small>of \$240,000<\/small>/); // bank left = 240 - 118.5
+  assert.match(html, /\$121,500<\/div><div class="pf-amount-sub">of \$240,000<\/div>/); // bank left = 240 - 118.5
   assert.match(html, /Spent \$118,500/);
   assert.match(html, /Left to spend \$81,500/);                 // pool 200 - 118.5
   assert.match(html, /First 3 rounds · \$200,000/);
@@ -68,7 +68,7 @@ test('over budget turns the bar pink and reports the overage', () => {
 test('Super Bowl shows the floor + carryover opened up', () => {
   // $185k spent across rounds 1-3 → bank left is $55k (the Super Bowl budget).
   const html = renderHTML({ week: 4, prior: { 1: 70000, 2: 60000, 3: 55000 }, spentThis: 0 });
-  assert.match(html, /\$55,000 <small>of \$240,000<\/small>/);
+  assert.match(html, /\$55,000<\/div><div class="pf-amount-sub">of \$240,000<\/div>/);
   // Super Bowl chip is the active one.
   assert.match(html, /Super Bowl<\/div><div class="pf-rt-v">\$0<\/div><div class="pf-rt-sub">drafting/);
 });
