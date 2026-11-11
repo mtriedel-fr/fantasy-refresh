@@ -1203,7 +1203,19 @@ function getPlayoffGameSettings(){
     carryover:      true,                  // unused pool rolls into the Super Bowl
     repeatPicks:    true,                  // same player can be picked each round
     regenPrices:    true,                  // prices rebuilt each round
-    scoring: { intThrown:-2, fumbleLost:-2, pass300Bonus:3, rush100Bonus:3, rec100Bonus:3 }
+    // DK scoring (INT/fumble -2) plus the Playoff Game's yardage bonuses: +3
+    // at 350+ passing, 150+ rushing, 150+ receiving yards. Thresholds are
+    // stored explicitly (not encoded in a key name) since they differ from the
+    // regular-season 300/100/100 bonuses the rules page reads.
+    scoring: {
+      intThrown:  -2,
+      fumbleLost: -2,
+      bonuses: {
+        pass: { yards: 350, points: 3 },
+        rush: { yards: 150, points: 3 },
+        rec:  { yards: 150, points: 3 }
+      }
+    }
   };
 }
 

@@ -52,12 +52,16 @@ test('getPlayoffGameSettings returns a coherent budget + DK scoring', () => {
   assert.strictEqual(g.entryFee, 25);
   assert.strictEqual(g.carryover, true);
   assert.strictEqual(g.rounds.join(','), 'wildcard,divisional,conference,superbowl');
-  // Scoring matches calcDKPoints (INT/fumble -2) with the yardage bonuses on.
+  // Scoring matches calcDKPoints (INT/fumble -2) with the Playoff Game's
+  // yardage bonuses: +3 at 350+ passing, 150+ rushing, 150+ receiving yards.
   assert.strictEqual(g.scoring.intThrown, -2);
   assert.strictEqual(g.scoring.fumbleLost, -2);
-  assert.strictEqual(g.scoring.pass300Bonus, 3);
-  assert.strictEqual(g.scoring.rush100Bonus, 3);
-  assert.strictEqual(g.scoring.rec100Bonus, 3);
+  assert.strictEqual(g.scoring.bonuses.pass.yards, 350);
+  assert.strictEqual(g.scoring.bonuses.pass.points, 3);
+  assert.strictEqual(g.scoring.bonuses.rush.yards, 150);
+  assert.strictEqual(g.scoring.bonuses.rush.points, 3);
+  assert.strictEqual(g.scoring.bonuses.rec.yards, 150);
+  assert.strictEqual(g.scoring.bonuses.rec.points, 3);
 });
 
 test('getPlayoffGameSettings never yields a negative pool or bad numbers', () => {
