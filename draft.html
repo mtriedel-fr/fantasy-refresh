@@ -17,6 +17,11 @@
   <link rel="apple-touch-icon" href="/icons/icon.svg">
 <script src="league-context.js"></script>
 <script src="/js/auth.js"></script>
+<!-- Playoff Game logic (budget engine + data model). Only used when the league
+     is a Playoff Game (gameType 'playoff'); harmless/no-op for every other
+     league. Loaded before boot so round labels + (next) the budget are ready. -->
+<script src="/js/playoff-budget.js"></script>
+<script src="/js/playoff-game.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/css/theme.css">
 <style>
@@ -424,6 +429,23 @@ var PS_MODE   = false;
 var PS_WEEK   = 1;
 var TEST_MODE = false; // ?testMode=hof swaps all data to mock endpoints
 var CAP = 60000;
+// The league's settings, stored once at boot so playoff-aware helpers can read
+// gameType. Null until loaded; every playoff check treats null as "not a
+// Playoff Game", so regular leagues behave exactly as before.
+var LEAGUE_SETTINGS = null;
+// Is this league the Playoff Game? (Rounds instead of weeks, one-bank budget.)
+function isPlayoffLeague(){
+  return (typeof FRPlayoffGame !== 'undefined') && FRPlayoffGame.isPlayoffGame(LEAGUE_SETTINGS);
+}
+// Header/roster label for the current week — a round name ("Wild Card") for the
+// Playoff Game, or "Week N" for every other league.
+function roundOrWeekLabel(){
+  if(isPlayoffLeague()){
+    var r = FRPlayoffGame.round(currentWeek);
+    return r ? r.label : ('Round ' + currentWeek);
+  }
+  return 'Week ' + currentWeek;
+}
 var SLOT_DEFS = [
   {id:'qb1', pos:'QB',   label:'QB',   eligible:['QB']},
   {id:'rb1', pos:'RB',   label:'RB',   eligible:['RB']},
@@ -768,6 +790,7 @@ document.addEventListener('DOMContentLoaded', function(){
     var ctx0 = FRAuth.getLeagueCtx();
     var leagueId0 = ctx0 ? ctx0.leagueId : 'fr_refresh26';
     FR.fb.get('/leagues/' + leagueId0 + '/settings').then(function(settings){
+      LEAGUE_SETTINGS = settings || {};
       if(settings && settings.rosterConfig){
         SLOT_DEFS = buildSlotDefsFromConfig(settings.rosterConfig);
       }
@@ -890,7 +913,8 @@ function loadWeekAndData(){
       FR.fb.get(FR.paths.season() + '/' + highestWeek + '/finalizedAt')
         .then(function(finalizedAt){
           if(typeof finalizedAt === 'number' && (Date.now() - finalizedAt) > 24 * 60 * 60 * 1000){
-            currentWeek = Math.min(highestWeek + 1, 18);
+            // The Playoff Game runs four rounds (weeks 1-4), not 18.
+            currentWeek = Math.min(highestWeek + 1, isPlayoffLeague() ? 4 : 18);
           } else {
             currentWeek = highestWeek;
           }
@@ -901,8 +925,8 @@ function loadWeekAndData(){
     .catch(function(){ currentWeek=1; loadSalaries(); loadSchedule(); });
 
   function finishRegularLoad(){
-    document.getElementById('hdr-week').textContent = 'Week '+currentWeek+' Draft';
-    document.getElementById('week-label').textContent = 'Week '+currentWeek;
+    document.getElementById('hdr-week').textContent = roundOrWeekLabel()+' Draft';
+    document.getElementById('week-label').textContent = roundOrWeekLabel();
     loadSalaries();
     loadSchedule();
     loadSubmitted();
