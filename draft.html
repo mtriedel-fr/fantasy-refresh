@@ -17,6 +17,11 @@
   <link rel="apple-touch-icon" href="/icons/icon.svg">
 <script src="league-context.js"></script>
 <script src="/js/auth.js"></script>
+<!-- Playoff Game logic (budget engine + data model). Only used when the league
+     is a Playoff Game (gameType 'playoff'); harmless/no-op for every other
+     league. Loaded before boot so round labels + (next) the budget are ready. -->
+<script src="/js/playoff-budget.js"></script>
+<script src="/js/playoff-game.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/css/theme.css">
 <style>
@@ -280,6 +285,50 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
 [data-theme="light"] .news-sheet{background:var(--bg2);}
 [data-theme="light"] .news-overlay{background:rgba(0,0,0,.4);}
 
+/* ── PLAYOFF GAME BUDGET BAR (playoff leagues only; replaces the cap row) ── */
+#playoff-cap .pf-label{font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;display:flex;justify-content:center;align-items:center;gap:6px;}
+#playoff-cap .pf-amount{font-family:var(--fd);font-size:24px;font-weight:900;color:var(--or);line-height:1;margin:4px 0 2px;text-align:center;}
+#playoff-cap .pf-amount.over{color:var(--pk);}
+#playoff-cap .pf-amount-sub{font-family:var(--fd);font-size:12px;font-weight:700;color:var(--ink3);text-align:center;margin:0 0 10px;}
+/* Invisible left spacer the width of the (?) so the centered label text isn't
+   pushed left by the icon sitting on its right. */
+.pf-info-spacer{width:15px;flex:0 0 auto;}
+#playoff-cap .pf-amount.over{color:var(--pk);}
+#playoff-cap .pf-amount small{font-size:12px;color:var(--ink3);font-weight:700;}
+.pf-info-wrap{position:relative;display:inline-block;}
+.pf-info-dot{width:15px;height:15px;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;background:var(--bg4);color:var(--ink3);font-size:10px;font-weight:800;cursor:pointer;border:none;padding:0;}
+.pf-info-pop{display:none;position:absolute;top:22px;left:50%;transform:translateX(-50%);width:270px;max-width:78vw;background:var(--bg4);border:1px solid var(--bdr2);border-radius:10px;padding:12px 14px;font-size:12px;line-height:1.55;color:var(--ink2);text-transform:none;letter-spacing:normal;font-family:var(--fb);z-index:20;box-shadow:0 8px 24px rgba(0,0,0,.45);font-weight:400;}
+.pf-info-pop.open{display:block;}
+.pf-info-pop h4{font-family:var(--fd);font-size:12.5px;font-weight:800;color:var(--ink);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px;}
+.pf-info-pop ul{margin:0;padding-left:16px;}
+.pf-info-pop li{margin-bottom:6px;}
+.pf-info-pop li:last-child{margin-bottom:0;}
+.pf-info-pop b{color:var(--gold);}
+.pf-info-close{position:absolute;top:7px;right:8px;width:18px;height:18px;border-radius:5px;background:none;border:none;color:var(--ink3);font-size:16px;line-height:1;cursor:pointer;}
+.pf-seg{display:flex;height:18px;border-radius:5px;overflow:hidden;border:1px solid var(--bdr);}
+.pf-seg-spent{background:var(--ink3);}
+.pf-seg-spent.over{background:var(--pk);}
+.pf-seg-avail{background:linear-gradient(90deg,var(--or),var(--pk));}
+.pf-seg-floor{background:repeating-linear-gradient(45deg,var(--bg4),var(--bg4) 5px,var(--bg3) 5px,var(--bg3) 10px);border-left:2px solid var(--gold);}
+.pf-zones{display:flex;margin-top:5px;}
+.pf-zone{position:relative;text-align:center;font-family:var(--fd);font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.3px;color:var(--ink3);padding-top:7px;}
+.pf-zone::before{content:'';position:absolute;top:0;height:5px;border:1px solid var(--bdr2);border-bottom:none;}
+.pf-zone.pool::before{left:3px;right:3px;border-right:none;}
+.pf-zone.floor::before{left:0;right:3px;border-left:2px solid var(--gold);}
+.pf-zone.floor{color:var(--gold);}
+.pf-key{display:flex;gap:14px;margin-top:10px;flex-wrap:wrap;}
+.pf-key span{font-family:var(--fd);font-size:10.5px;font-weight:700;color:var(--ink3);display:flex;align-items:center;gap:5px;}
+.pf-key i{width:9px;height:9px;border-radius:2px;display:inline-block;}
+.pf-rt{display:flex;gap:6px;margin-top:12px;}
+.pf-rt-chip{flex:1;border:1px solid var(--bdr);border-radius:9px;padding:7px 3px;text-align:center;background:var(--bg3);}
+.pf-rt-chip.on{border-color:var(--or);background:rgba(0,229,212,.08);box-shadow:0 0 0 1px var(--or);}
+.pf-rt-chip.done{opacity:.85;}
+.pf-rt-chip.future{opacity:.45;}
+.pf-rt-r{font-family:var(--fd);font-size:9px;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.3px;}
+.pf-rt-v{font-family:var(--fd);font-size:12.5px;font-weight:800;color:var(--ink);margin-top:3px;}
+.pf-rt-chip.on .pf-rt-v{color:var(--or);}
+.pf-rt-sub{font-family:var(--fd);font-size:8.5px;font-weight:700;color:var(--ink3);margin-top:2px;}
+
 </style>
 </head>
 <body>
@@ -318,6 +367,9 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
     <div style="text-align:right;"><div class="cap-label">Roster</div><div class="cap-slots-info"><span id="slots-n">0</span>/9 filled</div></div>
   </div>
   <div class="cap-track"><div class="cap-track-fill" id="cap-fill" style="width:0%"></div></div>
+  <!-- Playoff Game budget UI — replaces the cap row/track above for a Playoff
+       Game league (filled by renderPlayoffBudget()); hidden for every other. -->
+  <div id="playoff-cap" style="display:none;"></div>
 </div>
 
 <div class="main">
@@ -424,6 +476,23 @@ var PS_MODE   = false;
 var PS_WEEK   = 1;
 var TEST_MODE = false; // ?testMode=hof swaps all data to mock endpoints
 var CAP = 60000;
+// The league's settings, stored once at boot so playoff-aware helpers can read
+// gameType. Null until loaded; every playoff check treats null as "not a
+// Playoff Game", so regular leagues behave exactly as before.
+var LEAGUE_SETTINGS = null;
+// Is this league the Playoff Game? (Rounds instead of weeks, one-bank budget.)
+function isPlayoffLeague(){
+  return (typeof FRPlayoffGame !== 'undefined') && FRPlayoffGame.isPlayoffGame(LEAGUE_SETTINGS);
+}
+// Header/roster label for the current week — a round name ("Wild Card") for the
+// Playoff Game, or "Week N" for every other league.
+function roundOrWeekLabel(){
+  if(isPlayoffLeague()){
+    var r = FRPlayoffGame.round(currentWeek);
+    return r ? r.label : ('Round ' + currentWeek);
+  }
+  return 'Week ' + currentWeek;
+}
 var SLOT_DEFS = [
   {id:'qb1', pos:'QB',   label:'QB',   eligible:['QB']},
   {id:'rb1', pos:'RB',   label:'RB',   eligible:['RB']},
@@ -768,6 +837,7 @@ document.addEventListener('DOMContentLoaded', function(){
     var ctx0 = FRAuth.getLeagueCtx();
     var leagueId0 = ctx0 ? ctx0.leagueId : 'fr_refresh26';
     FR.fb.get('/leagues/' + leagueId0 + '/settings').then(function(settings){
+      LEAGUE_SETTINGS = settings || {};
       if(settings && settings.rosterConfig){
         SLOT_DEFS = buildSlotDefsFromConfig(settings.rosterConfig);
       }
@@ -890,7 +960,8 @@ function loadWeekAndData(){
       FR.fb.get(FR.paths.season() + '/' + highestWeek + '/finalizedAt')
         .then(function(finalizedAt){
           if(typeof finalizedAt === 'number' && (Date.now() - finalizedAt) > 24 * 60 * 60 * 1000){
-            currentWeek = Math.min(highestWeek + 1, 18);
+            // The Playoff Game runs four rounds (weeks 1-4), not 18.
+            currentWeek = Math.min(highestWeek + 1, isPlayoffLeague() ? 4 : 18);
           } else {
             currentWeek = highestWeek;
           }
@@ -901,8 +972,9 @@ function loadWeekAndData(){
     .catch(function(){ currentWeek=1; loadSalaries(); loadSchedule(); });
 
   function finishRegularLoad(){
-    document.getElementById('hdr-week').textContent = 'Week '+currentWeek+' Draft';
-    document.getElementById('week-label').textContent = 'Week '+currentWeek;
+    document.getElementById('hdr-week').textContent = roundOrWeekLabel()+' Draft';
+    document.getElementById('week-label').textContent = roundOrWeekLabel();
+    if(isPlayoffLeague()) loadPlayoffBudget();
     loadSalaries();
     loadSchedule();
     loadSubmitted();
@@ -2468,6 +2540,129 @@ function updateCap(){
   // Autosave the in-progress lineup on every change (updateCap runs after
   // every pick/swap/remove). No-op until the initial load+restore finishes.
   autosaveDraft();
+
+  // Playoff Game: redraw the budget bar (bank, pool/floor split, round chips).
+  // The flat CAP above is set to the round's available budget, so the over-cap
+  // and submit logic already works; this is the overall-budget visualization.
+  if(isPlayoffLeague()) renderPlayoffBudget();
+}
+
+// ── PLAYOFF GAME BUDGET BAR ───────────────────────────────────────────────
+// A standalone playoff league carries one budget across four rounds. The flat
+// CAP is the current round's spendable amount (so the existing cap/submit logic
+// is reused); this bar shows the WHOLE picture: the $240k bank, the split
+// between the first-three-rounds pool and the reserved Super Bowl floor, and a
+// chip per round. Every number is derived from the manager's saved earlier-round
+// rosters (PLAYOFF_PRIOR_COSTS) plus the in-progress roster (getSpent()).
+var PLAYOFF_PRIOR_COSTS = {};  // {roundIndex: totalSal} from saved earlier rounds
+var PLAYOFF_INFO_OPEN = false; // the "(?) how it works" popover
+
+function pfMoney(n){ n = Math.round(n || 0); return (n < 0 ? '-$' : '$') + Math.abs(n).toLocaleString(); }
+
+// Load the manager's earlier-round roster costs, set the round's CAP, and show
+// the budget bar in place of the flat cap row. Called once per draft load.
+function loadPlayoffBudget(){
+  if(typeof FRBudget === 'undefined' || typeof FRPlayoffGame === 'undefined' || !currentUser) return;
+  PLAYOFF_PRIOR_COSTS = {};
+  setupPlayoffCapBar();     // swap the UI immediately so the flat bar doesn't flash
+  renderPlayoffBudget();
+  var jobs = [];
+  for(var i = 1; i < currentWeek; i++){ (function(ri){
+    jobs.push(FR.fb.get(FR.paths.myLineup(ri, currentUser.uid))
+      .then(function(l){ PLAYOFF_PRIOR_COSTS[ri] = (l && l.totalSal) || 0; })
+      .catch(function(){ PLAYOFF_PRIOR_COSTS[ri] = 0; }));
+  })(i); }
+  Promise.all(jobs).then(function(){
+    var cfg = FRBudget.normalize((LEAGUE_SETTINGS && LEAGUE_SETTINGS.playoffGame) || {});
+    // This round's spendable amount becomes the cap the rest of the page uses.
+    CAP = FRBudget.availableForRound(cfg, currentWeek, FRPlayoffGame.spentBefore(PLAYOFF_PRIOR_COSTS, currentWeek));
+    updateCap();
+  });
+}
+
+function setupPlayoffCapBar(){
+  var capRow   = document.querySelector('.cap-bar .cap-row');
+  var capTrack = document.querySelector('.cap-bar .cap-track');
+  var pf       = document.getElementById('playoff-cap');
+  if(capRow)   capRow.style.display = 'none';
+  if(capTrack) capTrack.style.display = 'none';
+  if(pf)       pf.style.display = 'block';
+}
+
+function togglePlayoffInfo(){
+  PLAYOFF_INFO_OPEN = !PLAYOFF_INFO_OPEN;
+  var pop = document.getElementById('pf-info-pop');
+  if(pop) pop.classList.toggle('open', PLAYOFF_INFO_OPEN);
+}
+// Tap outside the popover closes it (matches the Def-Rank info popover).
+document.addEventListener('click', function(e){
+  if(!PLAYOFF_INFO_OPEN) return;
+  var wrap = document.getElementById('pf-info-wrap');
+  if(wrap && !wrap.contains(e.target)){
+    PLAYOFF_INFO_OPEN = false;
+    var pop = document.getElementById('pf-info-pop');
+    if(pop) pop.classList.remove('open');
+  }
+});
+
+function renderPlayoffBudget(){
+  var host = document.getElementById('playoff-cap');
+  if(!host || typeof FRBudget === 'undefined') return;
+  var cfg = FRBudget.normalize((LEAGUE_SETTINGS && LEAGUE_SETTINGS.playoffGame) || {});
+  var round      = currentWeek;
+  var spentPrior = FRPlayoffGame.spentBefore(PLAYOFF_PRIOR_COSTS, round);
+  var spentThis  = getSpent();
+  var totalSpent = spentPrior + spentThis;
+  var bankLeft   = cfg.total - totalSpent;
+  var availThis  = FRBudget.availableForRound(cfg, round, spentPrior);
+  var leftThis   = availThis - spentThis;
+  var over       = leftThis < 0;
+  var t = cfg.total || 1;
+  var spentFrac      = Math.max(0, Math.min(100, totalSpent / t * 100));
+  var poolRemainFrac = Math.max(0, cfg.pool - totalSpent) / t * 100;
+  var floorFrac      = cfg.superBowlFloor / t * 100;
+  var poolFrac       = cfg.pool / t * 100;
+
+  var chipLabels = ['Wild Card', 'Divisional', 'Conf', '🔒 Super Bowl'];
+  var chips = '';
+  for(var i = 1; i <= 4; i++){
+    var cls = 'pf-rt-chip', val = '—', sub = 'ahead';
+    if(i < round){ cls += ' done'; val = pfMoney(PLAYOFF_PRIOR_COSTS[i] || 0); sub = 'spent'; }
+    else if(i === round){ cls += ' on'; val = pfMoney(spentThis); sub = 'drafting'; }
+    else { cls += ' future'; if(i === 4){ val = '$40k+'; sub = 'floor'; } }
+    chips += '<div class="' + cls + '"><div class="pf-rt-r">' + chipLabels[i-1] + '</div>'
+          +  '<div class="pf-rt-v">' + val + '</div><div class="pf-rt-sub">' + sub + '</div></div>';
+  }
+
+  host.innerHTML =
+      '<span class="pf-label"><span class="pf-info-spacer"></span>Playoff Bank'
+    +   '<span class="pf-info-wrap" id="pf-info-wrap">'
+    +     '<button type="button" class="pf-info-dot" onclick="event.stopPropagation();togglePlayoffInfo();">?</button>'
+    +     '<div class="pf-info-pop' + (PLAYOFF_INFO_OPEN ? ' open' : '') + '" id="pf-info-pop">'
+    +       '<button type="button" class="pf-info-close" onclick="event.stopPropagation();togglePlayoffInfo();">×</button>'
+    +       '<h4>How the Playoff Bank works</h4><ul>'
+    +         '<li>One budget of <b>$' + cfg.total.toLocaleString() + '</b> for the whole playoffs.</li>'
+    +         '<li>Draft a fresh 9 every round — prices reset and you can re-pick players.</li>'
+    +         '<li>Spend up to <b>$' + cfg.pool.toLocaleString() + '</b> across the first three rounds.</li>'
+    +         '<li>The last <b>$' + cfg.superBowlFloor.toLocaleString() + '</b> is held back for the <b>Super Bowl</b>.</li>'
+    +         '<li>Any money you don’t spend in the <b>Wild Card, Divisional and Conference Championship</b> carries over to the <b>Super Bowl</b>.</li>'
+    +       '</ul></div></span></span>'
+    + '<div class="pf-amount' + (over ? ' over' : '') + '">' + pfMoney(bankLeft) + '</div>'
+    + '<div class="pf-amount-sub">of $' + cfg.total.toLocaleString() + '</div>'
+    + '<div class="pf-seg">'
+    +   '<div class="pf-seg-spent' + (over ? ' over' : '') + '" style="width:' + spentFrac.toFixed(2) + '%"></div>'
+    +   '<div class="pf-seg-avail" style="width:' + poolRemainFrac.toFixed(2) + '%"></div>'
+    +   '<div class="pf-seg-floor" style="width:' + floorFrac.toFixed(2) + '%"></div>'
+    + '</div>'
+    + '<div class="pf-zones">'
+    +   '<div class="pf-zone pool" style="flex:0 0 ' + poolFrac.toFixed(2) + '%">First 3 rounds · $' + cfg.pool.toLocaleString() + '</div>'
+    +   '<div class="pf-zone floor" style="flex:0 0 ' + floorFrac.toFixed(2) + '%">🔒 Super Bowl · $' + cfg.superBowlFloor.toLocaleString() + '</div>'
+    + '</div>'
+    + '<div class="pf-key">'
+    +   '<span><i style="background:var(--ink3);"></i>Spent ' + pfMoney(totalSpent) + '</span>'
+    +   '<span><i style="background:var(--or);"></i>' + (over ? 'Over by ' + pfMoney(-leftThis) : 'Left to spend ' + pfMoney(leftThis)) + '</span>'
+    + '</div>'
+    + '<div class="pf-rt">' + chips + '</div>';
 }
 
 function updateSubmitBtn(){
