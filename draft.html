@@ -286,13 +286,13 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);display:flex;fl
 [data-theme="light"] .news-overlay{background:rgba(0,0,0,.4);}
 
 /* ── PLAYOFF GAME BUDGET BAR (playoff leagues only; replaces the cap row) ── */
-#playoff-cap .pf-label{font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;display:inline-flex;align-items:center;gap:6px;}
-#playoff-cap .pf-amount{font-family:var(--fd);font-size:24px;font-weight:900;color:var(--or);line-height:1;margin:4px 0 10px;}
+#playoff-cap .pf-label{font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;display:flex;justify-content:center;align-items:center;gap:6px;}
+#playoff-cap .pf-amount{font-family:var(--fd);font-size:24px;font-weight:900;color:var(--or);line-height:1;margin:4px 0 10px;text-align:center;}
 #playoff-cap .pf-amount.over{color:var(--pk);}
 #playoff-cap .pf-amount small{font-size:12px;color:var(--ink3);font-weight:700;}
 .pf-info-wrap{position:relative;display:inline-block;}
 .pf-info-dot{width:15px;height:15px;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;background:var(--bg4);color:var(--ink3);font-size:10px;font-weight:800;cursor:pointer;border:none;padding:0;}
-.pf-info-pop{display:none;position:absolute;top:22px;left:-4px;width:270px;max-width:78vw;background:var(--bg4);border:1px solid var(--bdr2);border-radius:10px;padding:12px 14px;font-size:12px;line-height:1.55;color:var(--ink2);text-transform:none;letter-spacing:normal;font-family:var(--fb);z-index:20;box-shadow:0 8px 24px rgba(0,0,0,.45);font-weight:400;}
+.pf-info-pop{display:none;position:absolute;top:22px;left:50%;transform:translateX(-50%);width:270px;max-width:78vw;background:var(--bg4);border:1px solid var(--bdr2);border-radius:10px;padding:12px 14px;font-size:12px;line-height:1.55;color:var(--ink2);text-transform:none;letter-spacing:normal;font-family:var(--fb);z-index:20;box-shadow:0 8px 24px rgba(0,0,0,.45);font-weight:400;}
 .pf-info-pop.open{display:block;}
 .pf-info-pop h4{font-family:var(--fd);font-size:12.5px;font-weight:800;color:var(--ink);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px;}
 .pf-info-pop ul{margin:0;padding-left:16px;}
