@@ -30,6 +30,13 @@
   --logo-ink:#E8F8F8;   /* "FANTASY" in the logo */
 }
 
+/* Stop iOS Safari from auto-inflating text on orientation change ("font
+   boosting"): rotating the phone blew up the fonts (most visibly in the draft
+   room) and they stayed big until the next tap forced a reflow. Pinning the
+   adjust to 100% keeps text at its designed size through a rotate. Applies to
+   every page since this file is linked everywhere. */
+html{ -webkit-text-size-adjust:100%; text-size-adjust:100%; }
+
 /* LIGHT MODE — one set for every page (Oct 27, 2026). Pages used to carry
    their own light colors, which drifted: the league page had a dark top bar,
    lighter teal and brighter pink than My Leagues and the draft page. These
