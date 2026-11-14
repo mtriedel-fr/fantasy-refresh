@@ -421,6 +421,40 @@ body{background:var(--bg);color:var(--ink);font-family:var(--fb);min-height:100v
               <input type="number" class="form-input" id="po-entry" value="0" min="0" step="5" style="max-width:140px;">
             </div>
             <div class="form-hint" style="margin-top:10px;">Standard roster every round (1 QB · 2 RB · 3 WR · 1 TE · 1 FLEX · 1 DEF). Prices regenerate each round and repeat picks are allowed.</div>
+
+            <!-- Yardage bonuses — commissioner on/off with editable thresholds.
+                 When on, a player who clears the yard line earns the points on
+                 top of DK scoring (applied by js/playoff-scoring.js). When off,
+                 no bonus config is written and the scorer awards none. -->
+            <div style="margin-top:16px;border-top:1px solid var(--bdr);padding-top:14px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+                <div>
+                  <div class="form-label" style="margin:0;">Yardage bonuses</div>
+                  <div style="font-size:11px;color:var(--ink3);">Extra points for big-yardage games</div>
+                </div>
+                <label class="toggle"><input type="checkbox" id="po-bonus-on" checked onchange="updatePlayoffBonuses()"><span class="toggle-slider"></span></label>
+              </div>
+              <div id="po-bonus-fields" style="margin-top:12px;">
+                <div style="display:grid;grid-template-columns:1fr auto auto;gap:8px 10px;align-items:center;">
+                  <div></div>
+                  <div style="font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;text-align:center;">Yards</div>
+                  <div style="font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;text-align:center;">Points</div>
+
+                  <div class="form-label" style="margin:0;align-self:center;">Passing</div>
+                  <input type="number" class="form-input" id="po-bpass-y" value="350" min="1" step="25" style="width:84px;text-align:center;">
+                  <input type="number" class="form-input" id="po-bpass-p" value="3" min="0" step="1" style="width:66px;text-align:center;">
+
+                  <div class="form-label" style="margin:0;align-self:center;">Rushing</div>
+                  <input type="number" class="form-input" id="po-brush-y" value="150" min="1" step="25" style="width:84px;text-align:center;">
+                  <input type="number" class="form-input" id="po-brush-p" value="3" min="0" step="1" style="width:66px;text-align:center;">
+
+                  <div class="form-label" style="margin:0;align-self:center;">Receiving</div>
+                  <input type="number" class="form-input" id="po-brec-y" value="150" min="1" step="25" style="width:84px;text-align:center;">
+                  <input type="number" class="form-input" id="po-brec-p" value="3" min="0" step="1" style="width:66px;text-align:center;">
+                </div>
+                <div class="form-hint" style="margin-top:8px;">A 350+ yard passing game earns +3, etc. Set a category's points to 0 to drop just that one.</div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -763,7 +797,7 @@ function selectFormat(fmt){
   if(rosterSummary) rosterSummary.style.display = fmt === 'playoff' ? 'none' : '';
 
   if(fmt === 'headtohead') updateH2HCalc();
-  if(fmt === 'playoff')    updatePlayoffBudget();
+  if(fmt === 'playoff')  { updatePlayoffBudget(); updatePlayoffBonuses(); }
   onPreseasonToggleChange(); // keep H2H playoff visibility correct regardless of format switches
 
   // A standalone Last One Standing league IS the survivor format, and the
@@ -802,6 +836,13 @@ function onPreseasonToggleChange(){
 // is the minimum that always carries into the Super Bowl (managers can also
 // roll unused pool money forward on top of it). Guards against a floor larger
 // than the total so the hint never shows a negative pool.
+// Show/hide the editable yardage-bonus thresholds based on the on/off toggle.
+function updatePlayoffBonuses(){
+  var on = document.getElementById('po-bonus-on');
+  var fields = document.getElementById('po-bonus-fields');
+  if(fields) fields.style.display = (on && on.checked) ? 'block' : 'none';
+}
+
 function updatePlayoffBudget(){
   var totalEl = document.getElementById('po-total');
   var floorEl = document.getElementById('po-floor');
@@ -1194,6 +1235,24 @@ function getPlayoffGameSettings(){
   if(isNaN(floor) || floor < 0) floor = 40000;
   if(floor > total) floor = total;        // never a negative pool
   if(isNaN(entry) || entry < 0) entry = 0;
+
+  // DK scoring (INT/fumble -2), plus the commissioner's optional yardage
+  // bonuses. The scoring engine (js/playoff-scoring.js) treats absent/empty
+  // bonuses as off, so turning the toggle off simply omits the block. A single
+  // category whose points are 0 is dropped (that category off). Thresholds are
+  // stored explicitly since they differ from the regular-season 300/100/100.
+  var scoring = { intThrown: -2, fumbleLost: -2 };
+  var bonusOn = document.getElementById('po-bonus-on');
+  if(bonusOn && bonusOn.checked){
+    var bonuses = {
+      pass: getPlayoffBonusCat('po-bpass-y', 'po-bpass-p', 350),
+      rush: getPlayoffBonusCat('po-brush-y', 'po-brush-p', 150),
+      rec:  getPlayoffBonusCat('po-brec-y',  'po-brec-p',  150)
+    };
+    ['pass','rush','rec'].forEach(function(k){ if(bonuses[k].points <= 0) delete bonuses[k]; });
+    if(Object.keys(bonuses).length) scoring.bonuses = bonuses;
+  }
+
   return {
     total:          total,
     superBowlFloor: floor,
@@ -1203,20 +1262,18 @@ function getPlayoffGameSettings(){
     carryover:      true,                  // unused pool rolls into the Super Bowl
     repeatPicks:    true,                  // same player can be picked each round
     regenPrices:    true,                  // prices rebuilt each round
-    // DK scoring (INT/fumble -2) plus the Playoff Game's yardage bonuses: +3
-    // at 350+ passing, 150+ rushing, 150+ receiving yards. Thresholds are
-    // stored explicitly (not encoded in a key name) since they differ from the
-    // regular-season 300/100/100 bonuses the rules page reads.
-    scoring: {
-      intThrown:  -2,
-      fumbleLost: -2,
-      bonuses: {
-        pass: { yards: 350, points: 3 },
-        rush: { yards: 150, points: 3 },
-        rec:  { yards: 150, points: 3 }
-      }
-    }
+    scoring:        scoring
   };
+}
+
+// Read one yardage-bonus category (yards threshold + points) from the wizard,
+// clamping to sane values. defY is the fallback yard line.
+function getPlayoffBonusCat(yId, pId, defY){
+  var y = parseInt(document.getElementById(yId).value, 10);
+  var p = parseInt(document.getElementById(pId).value, 10);
+  if(!y || y < 1) y = defY;
+  if(isNaN(p) || p < 0) p = 0;
+  return { yards: y, points: p };
 }
 
 function genLeagueId(){

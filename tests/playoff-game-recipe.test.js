@@ -10,11 +10,32 @@ const { read, fn, load } = require('./extract');
 const SETUP = read('league-setup.html');
 
 // Tiny DOM stub: getElementById returns a node whose .value we seed per field.
+// A value of `true` also marks the node `.checked` (for the bonus toggle).
 function mockDoc(values) {
   const nodes = {};
-  const get = id => (nodes[id] || (nodes[id] = { value: values[id] !== undefined ? values[id] : '', textContent: '', style: {} }));
+  const get = id => (nodes[id] || (nodes[id] = {
+    value: values[id] !== undefined ? values[id] : '',
+    checked: values[id] === true,
+    textContent: '', style: {}
+  }));
   return { getElementById: get, _nodes: nodes };
 }
+
+// getPlayoffGameSettings now calls getPlayoffBonusCat, so load both.
+function poSettings(values) {
+  return load(
+    [fn(SETUP, 'getPlayoffGameSettings'), fn(SETUP, 'getPlayoffBonusCat')],
+    ['getPlayoffGameSettings'],
+    { document: mockDoc(values) }
+  ).getPlayoffGameSettings();
+}
+// Default field values with the bonus toggle ON at the 350/150/150 defaults.
+const BONUS_ON = {
+  'po-bonus-on': true,
+  'po-bpass-y': '350', 'po-bpass-p': '3',
+  'po-brush-y': '150', 'po-brush-p': '3',
+  'po-brec-y': '150', 'po-brec-p': '3'
+};
 
 test('a Playoff Game recipe card exists and is wired to pickRecipe', () => {
   assert.ok(
@@ -43,9 +64,7 @@ test('selectFormat shows the playoff panel and hides the side-game add-on', () =
 });
 
 test('getPlayoffGameSettings returns a coherent budget + DK scoring', () => {
-  const S = load([fn(SETUP, 'getPlayoffGameSettings')], ['getPlayoffGameSettings'],
-    { document: mockDoc({ 'po-total': '240000', 'po-floor': '40000', 'po-entry': '25' }) });
-  const g = S.getPlayoffGameSettings();
+  const g = poSettings(Object.assign({ 'po-total': '240000', 'po-floor': '40000', 'po-entry': '25' }, BONUS_ON));
   assert.strictEqual(g.total, 240000);
   assert.strictEqual(g.superBowlFloor, 40000);
   assert.strictEqual(g.pool, 200000);          // total - floor, the first-three-rounds pool
@@ -65,19 +84,51 @@ test('getPlayoffGameSettings returns a coherent budget + DK scoring', () => {
 });
 
 test('getPlayoffGameSettings never yields a negative pool or bad numbers', () => {
-  const S = load([fn(SETUP, 'getPlayoffGameSettings')], ['getPlayoffGameSettings'],
-    { document: mockDoc({ 'po-total': '50000', 'po-floor': '80000', 'po-entry': '-5' }) });
-  const g = S.getPlayoffGameSettings();
+  const g = poSettings({ 'po-total': '50000', 'po-floor': '80000', 'po-entry': '-5' });
   assert.strictEqual(g.superBowlFloor, 50000); // clamped down to total
   assert.strictEqual(g.pool, 0);               // never negative
   assert.strictEqual(g.entryFee, 0);           // negative entry clamped to 0
   // Blank/zero total falls back to the default rather than producing $0.
-  const S2 = load([fn(SETUP, 'getPlayoffGameSettings')], ['getPlayoffGameSettings'],
-    { document: mockDoc({ 'po-total': '', 'po-floor': '', 'po-entry': '' }) });
-  const g2 = S2.getPlayoffGameSettings();
+  const g2 = poSettings({ 'po-total': '', 'po-floor': '', 'po-entry': '' });
   assert.strictEqual(g2.total, 240000);
   assert.strictEqual(g2.superBowlFloor, 40000);
   assert.strictEqual(g2.pool, 200000);
+});
+
+test('yardage bonuses are a commissioner on/off toggle with editable thresholds', () => {
+  // ON at defaults → the 350/150/150 +3 block.
+  const on = poSettings(Object.assign({ 'po-total': '240000', 'po-floor': '40000' }, BONUS_ON));
+  assert.strictEqual(on.scoring.bonuses.pass.yards, 350);
+  assert.strictEqual(on.scoring.bonuses.rush.points, 3);
+
+  // ON with EDITED thresholds → the commissioner's numbers are honored.
+  const custom = poSettings(Object.assign({ 'po-total': '240000', 'po-floor': '40000' }, BONUS_ON, {
+    'po-bpass-y': '300', 'po-bpass-p': '5', 'po-brush-y': '125', 'po-brec-y': '175'
+  }));
+  assert.strictEqual(custom.scoring.bonuses.pass.yards, 300);
+  assert.strictEqual(custom.scoring.bonuses.pass.points, 5);
+  assert.strictEqual(custom.scoring.bonuses.rush.yards, 125);
+  assert.strictEqual(custom.scoring.bonuses.rec.yards, 175);
+
+  // OFF → no bonuses block at all (the scorer awards none), DK base intact.
+  const off = poSettings({ 'po-total': '240000', 'po-floor': '40000' /* po-bonus-on unchecked */ });
+  assert.strictEqual(off.scoring.intThrown, -2);
+  assert.strictEqual(off.scoring.bonuses, undefined);
+
+  // A single category set to 0 points is dropped, the others stay.
+  const partial = poSettings(Object.assign({ 'po-total': '240000', 'po-floor': '40000' }, BONUS_ON, { 'po-brush-p': '0' }));
+  assert.strictEqual(partial.scoring.bonuses.rush, undefined); // rushing off
+  assert.strictEqual(partial.scoring.bonuses.pass.points, 3);  // passing still on
+  assert.strictEqual(partial.scoring.bonuses.rec.points, 3);
+});
+
+test('selectFormat initializes the bonus fields for the playoff recipe', () => {
+  const sel = fn(SETUP, 'selectFormat');
+  assert.match(sel, /updatePlayoffBonuses\(\)/);
+  // The toggle + editable fields exist in the panel.
+  assert.match(SETUP, /id="po-bonus-on"[^>]*checked/);
+  assert.match(SETUP, /id="po-bpass-y"/);
+  assert.match(SETUP, /id="po-brush-p"/);
 });
 
 test('updatePlayoffBudget writes a sensible hint and survives a huge floor', () => {
