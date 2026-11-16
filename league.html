@@ -9886,7 +9886,7 @@ function renderChatFeed(data){
     var when = m.ts ? new Date(m.ts).toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'}) : '';
     var body = m.gifUrl
       ? '<img src="' + escapeHtmlFR(m.gifUrl) + '" loading="lazy" style="max-width:180px;max-height:180px;border-radius:8px;margin-top:4px;display:block;" />'
-      : '<div style="font-size:14px;color:var(--ink);margin-top:2px;word-break:break-word;">' + escapeHtmlFR(m.text) + '</div>';
+      : '<div style="font-size:14px;color:var(--ink);margin-top:2px;word-break:break-word;">' + highlightMentions(m.text, chatMembers) + '</div>';
     return '<div style="padding:7px 0;border-bottom:1px solid var(--bdr);">'
       + '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;">'
       + '<span style="font-family:var(--fd);font-weight:800;font-size:12.5px;color:var(--or);">' + escapeHtmlFR(m.team || 'Someone') + '</span>'
@@ -10011,6 +10011,74 @@ function sendGifMessage(gifId){
     });
 }
 
+// League members available for @mentions in Trash Talk ([{uid, team}]), loaded
+// by initChat. Used by the @ picker, mention parsing, and highlighting.
+var chatMembers = [];
+
+function escapeRegExpFR(s){ return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
+// Pure: the uids @mentioned in a message, by matching "@<team name>" against the
+// league's member team names (case-insensitive). Multi-word team names work
+// because we match the full name after the @. Exported-shape for tests.
+function parseMentions(text, members){
+  var out = {};
+  if(!text) return out;
+  var low = String(text).toLowerCase();
+  (members || []).forEach(function(m){
+    if(!m || !m.uid || !m.team) return;
+    if(low.indexOf('@' + String(m.team).toLowerCase()) !== -1) out[m.uid] = true;
+  });
+  return out;
+}
+
+// Pure: escape a message and wrap any "@<team name>" in a highlight span.
+function highlightMentions(text, members){
+  var html = escapeHtmlFR(text || '');
+  (members || []).forEach(function(m){
+    if(!m || !m.team) return;
+    var escTok = escapeHtmlFR('@' + m.team);
+    html = html.replace(new RegExp(escapeRegExpFR(escTok), 'gi'),
+      '<span style="color:var(--or);font-weight:700;">' + escTok + '</span>');
+  });
+  return html;
+}
+
+// @ autocomplete: as the member types "@partial", show matching teammates.
+function onChatInput(){
+  var input = document.getElementById('chat-input');
+  var pop = document.getElementById('chat-mention-pop');
+  if(!input || !pop) return;
+  var val = input.value || '';
+  var caret = (input.selectionStart == null) ? val.length : input.selectionStart;
+  var before = val.slice(0, caret);
+  var at = before.lastIndexOf('@');
+  if(at === -1){ pop.style.display = 'none'; return; }
+  var partial = before.slice(at + 1).toLowerCase();
+  var matches = partial.length
+    ? chatMembers.filter(function(m){ return m.team && m.team.toLowerCase().indexOf(partial) === 0; })
+    : chatMembers.slice();
+  matches = matches.slice(0, 6);
+  if(!matches.length){ pop.style.display = 'none'; return; }
+  pop.innerHTML = matches.map(function(m){
+    return '<div data-at="' + at + '" data-team="' + encodeURIComponent(m.team) + '" onclick="pickMention(this)"'
+      + ' style="padding:9px 12px;font-size:13.5px;color:var(--ink);cursor:pointer;border-bottom:1px solid var(--bdr);">'
+      + '<span style="color:var(--or);font-weight:700;">@</span>' + escapeHtmlFR(m.team) + '</div>';
+  }).join('');
+  pop.style.display = 'block';
+}
+function pickMention(el){
+  var input = document.getElementById('chat-input');
+  var pop = document.getElementById('chat-mention-pop');
+  if(!input) return;
+  var at = parseInt(el.getAttribute('data-at'), 10);
+  var team = decodeURIComponent(el.getAttribute('data-team'));
+  var val = input.value || '';
+  var caret = (input.selectionStart == null) ? val.length : input.selectionStart;
+  input.value = val.slice(0, at) + '@' + team + ' ' + val.slice(caret);
+  if(pop) pop.style.display = 'none';
+  input.focus();
+}
+
 function sendChatMessage(){
   var input = document.getElementById('chat-input');
   var text = (input.value || '').trim();
@@ -10031,9 +10099,14 @@ function sendChatMessage(){
   // no need for a server-side push ID for a single-league chat feed.
   var key = now + '_' + Math.random().toString(36).slice(2, 8);
 
-  FR.fb.put(chatBasePath() + '/' + key, { uid: user.uid, team: teamName, text: text, ts: now })
+  var msg = { uid: user.uid, team: teamName, text: text, ts: now };
+  var mentions = parseMentions(text, chatMembers);
+  if(Object.keys(mentions).length) msg.mentions = mentions;  // tags for the login pop-up
+
+  FR.fb.put(chatBasePath() + '/' + key, msg)
     .then(function(){
       input.value = '';
+      var pop = document.getElementById('chat-mention-pop'); if(pop) pop.style.display = 'none';
       loadChatMessages();
     })
     .catch(function(err){
@@ -10059,6 +10132,17 @@ function deleteChatMessage(key){
 
 function initChat(){
   loadChatMessages();
+  // Load league members for the @mention picker (team names → uids).
+  try {
+    var ctx0 = FRAuth.getLeagueCtx && FRAuth.getLeagueCtx();
+    var lid = (ctx0 && ctx0.leagueId) || 'fr_refresh26';
+    FR.fb.get('/leagues/' + lid + '/members').then(function(mem){
+      chatMembers = Object.keys(mem || {}).map(function(uid){
+        var m = mem[uid] || {};
+        return { uid: uid, team: m.teamName || m.displayName || '' };
+      }).filter(function(x){ return x.team; });
+    }).catch(function(){});
+  } catch(e){}
   var user = (typeof FRAuth !== 'undefined' && FRAuth.getUser) ? FRAuth.getUser() : null;
   if(user){
     FR.isCommissioner(user.uid).then(function(isComm){
@@ -12751,11 +12835,14 @@ document.addEventListener('DOMContentLoaded', function(){
     <div id="chat-gif-results" style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;max-height:180px;overflow-y:auto;padding:0 10px 6px;"></div>
     <div style="text-align:right;padding:0 10px 6px;font-size:9px;color:var(--ink3);">Powered by GIPHY</div>
   </div>
+  <!-- @mention autocomplete: floats above the input when typing "@" -->
+  <div id="chat-mention-pop" style="display:none;position:absolute;left:12px;right:12px;bottom:58px;max-height:168px;overflow-y:auto;background:var(--pop,#091414);border:1px solid var(--bdr2);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.5);z-index:600;"></div>
   <div class="chat-panel-input-row">
     <button onclick="openGifSearch()" title="Add a GIF"
       style="padding:9px 11px;background:var(--bg);border:1px solid var(--bdr2);border-radius:9px;color:var(--ink2);font-family:var(--fd);font-weight:800;font-size:11px;cursor:pointer;white-space:nowrap;">GIF</button>
-    <input type="text" id="chat-input" placeholder="Say something..." maxlength="280"
+    <input type="text" id="chat-input" placeholder="Say something… @ to tag" maxlength="280"
       style="flex:1;padding:9px 12px;background:var(--bg);border:1px solid var(--bdr2);border-radius:9px;color:var(--ink);font-family:var(--fb);font-size:13.5px;outline:none;"
+      oninput="onChatInput()"
       onkeydown="if(event.key==='Enter') sendChatMessage()">
     <button onclick="sendChatMessage()" id="chat-send-btn"
       style="padding:9px 14px;background:linear-gradient(135deg,var(--or),var(--pk));border:none;border-radius:9px;color:var(--on-accent);font-family:var(--fd);font-weight:800;font-size:12px;text-transform:uppercase;letter-spacing:.5px;cursor:pointer;white-space:nowrap;">Send</button>
@@ -12804,8 +12891,8 @@ if('serviceWorker' in navigator){
   function shown(el){ return !!el && getComputedStyle(el).display !== 'none' && getComputedStyle(el).visibility !== 'hidden'; }
   function hasOpen(id){ var e = byId(id); return !!e && e.classList.contains('open'); }
   FRBackCloses.watch([
-    { isOpen: function(){ return !!byId('fr-dues-alert') || !!byId('fr-injury-alert'); },
-      close: function(){ ['fr-dues-alert','fr-injury-alert'].forEach(function(id){ var e = byId(id); if(!e) return; var b = e.querySelector('[data-act="later"],[data-act="ok"],[data-act="done"]'); if(b) b.click(); else e.remove(); }); } },
+    { isOpen: function(){ return !!byId('fr-dues-alert') || !!byId('fr-injury-alert') || !!byId('fr-mention-alert'); },
+      close: function(){ ['fr-dues-alert','fr-injury-alert','fr-mention-alert'].forEach(function(id){ var e = byId(id); if(!e) return; var b = e.querySelector('[data-act="later"],[data-act="ok"],[data-act="done"]'); if(b) b.click(); else e.remove(); }); } },
     { isOpen: function(){ return shown(byId('team-name-modal')); }, close: function(){ byId('team-name-modal').style.display = 'none'; } },
     { isOpen: function(){ return shown(byId('share-overlay')); },    close: function(){ closeShare(); } },
     { isOpen: function(){ return hasOpen('fbs-overlay'); },          close: function(){ closeFullBoardStats(); } },
@@ -12828,5 +12915,8 @@ if('serviceWorker' in navigator){
 <!-- Injury check pop-up: lists lineup players tagged Out/IR/Doubtful/Questionable (js/injury-alert.js) -->
 <script src="/js/injury-alert.js"></script>
 <script>window.addEventListener('load', function(){ setTimeout(function(){ if (window.FRInjuryAlert) FRInjuryAlert.check({ onDraftPage: false }); }, 1500); });</script>
+<!-- Trash Talk @mention pop-up: shows unseen call-outs on login (js/mention-alert.js) -->
+<script src="/js/mention-alert.js"></script>
+<script>window.addEventListener('load', function(){ setTimeout(function(){ if (window.FRMentionAlert) FRMentionAlert.check({ openChat: function(){ try{ if(typeof chatPanelOpen!=='undefined' && !chatPanelOpen && typeof toggleChatPanel==='function') toggleChatPanel(); }catch(e){} } }); }, 1800); });</script>
 </body>
 </html>
