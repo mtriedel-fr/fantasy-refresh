@@ -979,8 +979,8 @@ if ('serviceWorker' in navigator) {
 <script src="/js/back-closes.js"></script>
 <script>
 if (window.FRBackCloses) FRBackCloses.watch([
-    { isOpen: function(){ return !!document.getElementById('fr-dues-alert') || !!document.getElementById('fr-injury-alert'); },
-      close: function(){ ['fr-dues-alert','fr-injury-alert'].forEach(function(id){ var e = document.getElementById(id); if(!e) return; var b = e.querySelector('[data-act="later"],[data-act="ok"],[data-act="done"]'); if(b) b.click(); else e.remove(); }); } },
+    { isOpen: function(){ return !!document.getElementById('fr-dues-alert') || !!document.getElementById('fr-injury-alert') || !!document.getElementById('fr-mention-alert'); },
+      close: function(){ ['fr-dues-alert','fr-injury-alert','fr-mention-alert'].forEach(function(id){ var e = document.getElementById(id); if(!e) return; var b = e.querySelector('[data-act="later"],[data-act="ok"],[data-act="done"]'); if(b) b.click(); else e.remove(); }); } },
     { isOpen: function(){ var d = document.getElementById('profile-drawer'); return !!d && d.style.display !== 'none'; }, close: function(){ closeProfileDrawer(); } }
 ]);
 </script>
@@ -993,5 +993,8 @@ if (window.FRBackCloses) FRBackCloses.watch([
 <!-- Injury check pop-up: lists lineup players tagged Out/IR/Doubtful/Questionable (js/injury-alert.js) -->
 <script src="/js/injury-alert.js"></script>
 <script>window.addEventListener('load', function(){ setTimeout(function(){ if (window.FRInjuryAlert) FRInjuryAlert.check({ onDraftPage: false }); }, 1500); });</script>
+<!-- Trash Talk @mention pop-up: shows unseen call-outs on login (js/mention-alert.js) -->
+<script src="/js/mention-alert.js"></script>
+<script>window.addEventListener('load', function(){ setTimeout(function(){ if (window.FRMentionAlert) FRMentionAlert.check(); }, 1800); });</script>
 </body>
 </html>
