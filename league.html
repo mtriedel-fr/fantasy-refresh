@@ -23,6 +23,9 @@
 <script src="/js/stadiums.js"></script>
 <script src="/js/weather.js"></script>
 <script src="/js/playoff-config.js"></script>
+<script src="/js/playoff-game.js"></script>
+<script src="/js/playoff-scoring.js"></script>
+<script src="/js/playoff-standings.js"></script>
 <script src="/league-context.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/css/theme.css">
@@ -1448,6 +1451,20 @@ setTimeout(function(){
     </div>
   </div>
   <div id="wweather"></div>
+</div>
+
+<div id="tab-postandings" class="content hidden">
+  <div class="tab-overlay-close-bar hidden">
+    <div class="tab-overlay-close-bar-row">
+      <span class="tab-overlay-close-bar-title">🏈 Standings</span>
+      <button class="tab-overlay-close-btn" onclick="closeH2HTabOverlay()">✕ Close</button>
+    </div>
+  </div>
+  <div style="padding:16px 16px 0;">
+    <div style="font-family:var(--fd);font-weight:900;font-size:19px;color:var(--ink);letter-spacing:-.3px;">Playoff Standings</div>
+    <div id="postandings-sub" style="font-family:var(--fd);font-size:12px;color:var(--ink3);margin-top:2px;">Cumulative points across the playoff rounds.</div>
+  </div>
+  <div id="postandings-board" style="padding:12px 16px 24px;"></div>
 </div>
 
 <div id="tab-dues" class="content hidden">
@@ -9085,6 +9102,7 @@ function handleNav(val){
   if(val === 'playoffs'){ document.body.style.overflow = 'hidden'; document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); }); document.getElementById('tab-playoffs').classList.remove('hidden'); document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); }); document.getElementById('navtab-playoffs').classList.add('active'); setStatBoxes('hidden'); renderPlayoffs(); return; }
   if(val === 'dues'){ document.body.style.overflow = 'hidden'; document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); }); document.getElementById('tab-dues').classList.remove('hidden'); document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); }); setStatBoxes('hidden'); var cumHomeEl = document.getElementById('cum-home'); if(cumHomeEl) cumHomeEl.classList.add('hidden'); renderPayouts(); renderDues(); return; }
   if(val === 'weather'){ document.body.style.overflow = 'hidden'; document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); }); document.getElementById('tab-weather').classList.remove('hidden'); document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); }); setStatBoxes('hidden'); renderWeather(); return; }
+  if(val === 'postandings'){ document.body.style.overflow = 'hidden'; document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); }); document.getElementById('tab-postandings').classList.remove('hidden'); document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); }); setStatBoxes('hidden'); renderPlayoffStandings(); return; }
   if(val === 'yourteam'){ document.body.style.overflow = 'hidden'; document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); }); var ytEl = document.getElementById('tab-yourteam'); if(ytEl) ytEl.classList.remove('hidden'); document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); }); setStatBoxes('hidden'); renderMyTeamTab(); return; }
   if(val === 'guillotine'){ document.body.style.overflow = 'hidden'; document.querySelectorAll('.content').forEach(function(c){ c.classList.add('hidden'); }); document.getElementById('tab-guillotine').classList.remove('hidden'); document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); }); document.getElementById('navtab-guillotine').classList.add('active'); setStatBoxes('guillotine'); renderGuillotine(); return; }
   if(val === 'yourseason'){
@@ -12458,6 +12476,43 @@ function renderWeather(){
   });
 }
 
+// ── PLAYOFF GAME: cumulative standings view ───────────────────────────
+// Only meaningful for a Playoff Game league (settings.gameType === 'playoff').
+// Reads the raw uid-keyed per-round score store (/season/{season}) and hands it
+// straight to the render module — the shape the auto-scorer writes is exactly
+// what cumulativeStandings consumes, so this is a passthrough. PLAYOFF_GAME is
+// set by initPlayoffGame() during boot (guards the More-menu button + this view).
+var PLAYOFF_GAME = false;
+function renderPlayoffStandings(){
+  var el = document.getElementById('postandings-board');
+  if(!el) return;
+  if(typeof FRPlayoffStandings === 'undefined'){
+    el.innerHTML = '<div style="padding:20px;color:var(--ink3);font-family:var(--fd);">Standings unavailable right now.</div>';
+    return;
+  }
+  var season = FR.seasonKey ? FR.seasonKey() : ((FRAuth.getLeagueCtx && FRAuth.getLeagueCtx().season) || 2026);
+  var myUid = (typeof user !== 'undefined' && user && user.uid) ? user.uid : null;
+  el.innerHTML = '<div style="padding:20px;color:var(--ink3);font-family:var(--fd);font-size:13px;">Loading the leaderboard…</div>';
+  FR.fb.get('/leagues/' + leagueId + '/season/' + season).then(function(raw){
+    el.innerHTML = FRPlayoffStandings.renderBoard(raw || {}, { myUid: myUid, rounds: 4 });
+  }).catch(function(){
+    el.innerHTML = '<div style="padding:20px;color:var(--ink3);font-family:var(--fd);">Couldn’t load the standings. <a href="#" onclick="renderPlayoffStandings();return false;" style="color:var(--or);">Try again</a></div>';
+  });
+}
+
+// Reveal the Playoff Game surfaces only for a Playoff Game league. Non-playoff
+// leagues (every live league today) never see the button or the view, so this
+// is inert for them.
+function initPlayoffGame(){
+  if(typeof FRPlayoffGame === 'undefined') return;
+  FR.fb.get('/leagues/' + leagueId + '/settings').then(function(settings){
+    PLAYOFF_GAME = FRPlayoffGame.isPlayoffGame(settings);
+    var btn = document.getElementById('more-postandings-btn');
+    if(btn) btn.style.display = PLAYOFF_GAME ? '' : 'none';
+    if(PLAYOFF_GAME && typeof applyMainNav === 'function') applyMainNav();
+  }).catch(function(){ /* leave hidden on error */ });
+}
+
 function paintWeather(el, week, games, wx){
   var ROOF = { dome: 'Indoor · dome', retractable: 'Roofed · retractable', fixed: 'Roofed' };
   var dayFmt = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
@@ -12776,6 +12831,7 @@ function applyMainNav(){
 applyMainNav();
 document.addEventListener('DOMContentLoaded', applyMainNav);
 if(IS_H2H_LEAGUE) initH2HVisibility();
+initPlayoffGame();
 
 // Run commissioner check after a short delay to ensure Firebase is ready
 setTimeout(function(){ initCommissionerAccess(); }, 800);
@@ -12870,6 +12926,10 @@ document.addEventListener('DOMContentLoaded', function(){
     <button id="more-weather-btn" onclick="closeMoreMenu();switchBottomNav('weather','bn-more')" style="background:var(--bg3);border:1px solid var(--bdr2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;">
       <div style="font-size:20px;margin-bottom:4px;">🌦️</div>
       <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink2);text-transform:uppercase;">Weather</div>
+    </button>
+    <button id="more-postandings-btn" onclick="closeMoreMenu();switchBottomNav('postandings','bn-more')" style="display:none;background:var(--bg3);border:1px solid var(--bdr2);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;">
+      <div style="font-size:20px;margin-bottom:4px;">🏈</div>
+      <div style="font-family:var(--fd);font-size:10px;font-weight:700;color:var(--ink2);text-transform:uppercase;">Standings</div>
     </button>
   </div>
 </div>
