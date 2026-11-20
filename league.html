@@ -10042,9 +10042,11 @@ function parseMentions(text, members){
   var out = {};
   if(!text) return out;
   var low = String(text).toLowerCase();
+  // "@all" (a standalone token — not part of an email or a longer word) tags everyone.
+  var all = /(^|[^\w])@all(?![\w])/i.test(text);
   (members || []).forEach(function(m){
     if(!m || !m.uid || !m.team) return;
-    if(low.indexOf('@' + String(m.team).toLowerCase()) !== -1) out[m.uid] = true;
+    if(all || low.indexOf('@' + String(m.team).toLowerCase()) !== -1) out[m.uid] = true;
   });
   return out;
 }
@@ -10057,6 +10059,10 @@ function highlightMentions(text, members){
     var escTok = escapeHtmlFR('@' + m.team);
     html = html.replace(new RegExp(escapeRegExpFR(escTok), 'gi'),
       '<span style="color:var(--or);font-weight:700;">' + escTok + '</span>');
+  });
+  // Highlight a standalone "@all" (not part of an email or longer word).
+  html = html.replace(/(^|[^\w])(@all)(?![\w])/gi, function(m, pre, tok){
+    return pre + '<span style="color:var(--or);font-weight:700;">' + tok + '</span>';
   });
   return html;
 }
@@ -10076,12 +10082,22 @@ function onChatInput(){
     ? chatMembers.filter(function(m){ return m.team && m.team.toLowerCase().indexOf(partial) === 0; })
     : chatMembers.slice();
   matches = matches.slice(0, 6);
-  if(!matches.length){ pop.style.display = 'none'; return; }
-  pop.innerHTML = matches.map(function(m){
+  // "@all" option (tags everyone) — shown when "@" is empty or the start of "all".
+  var showAll = chatMembers.length > 1 && (partial.length === 0 || 'all'.indexOf(partial) === 0);
+  var items = [];
+  if(showAll){
+    items.push('<div data-at="' + at + '" data-team="all" onclick="pickMention(this)"'
+      + ' style="padding:9px 12px;font-size:13.5px;color:var(--ink);cursor:pointer;border-bottom:1px solid var(--bdr);">'
+      + '<span style="color:var(--or);font-weight:700;">@all</span>'
+      + '<span style="color:var(--ink3);"> — everyone</span></div>');
+  }
+  items = items.concat(matches.map(function(m){
     return '<div data-at="' + at + '" data-team="' + encodeURIComponent(m.team) + '" onclick="pickMention(this)"'
       + ' style="padding:9px 12px;font-size:13.5px;color:var(--ink);cursor:pointer;border-bottom:1px solid var(--bdr);">'
       + '<span style="color:var(--or);font-weight:700;">@</span>' + escapeHtmlFR(m.team) + '</div>';
-  }).join('');
+  }));
+  if(!items.length){ pop.style.display = 'none'; return; }
+  pop.innerHTML = items.join('');
   pop.style.display = 'block';
 }
 function pickMention(el){
@@ -10119,6 +10135,7 @@ function sendChatMessage(){
 
   var msg = { uid: user.uid, team: teamName, text: text, ts: now };
   var mentions = parseMentions(text, chatMembers);
+  if(user && user.uid) delete mentions[user.uid];            // don't notify yourself (e.g. your own @all)
   if(Object.keys(mentions).length) msg.mentions = mentions;  // tags for the login pop-up
 
   FR.fb.put(chatBasePath() + '/' + key, msg)
