@@ -40,3 +40,18 @@ test('highlightMentions wraps @mentions and escapes HTML', () => {
   assert.match(safe, /&lt;script&gt;/);
   assert.match(safe, /<span[^>]*>@Charlie<\/span>/);
 });
+
+test('parseMentions: @all tags every member (case-insensitive)', () => {
+  assert.deepStrictEqual(plain(P.parseMentions('lets go @all', MEMBERS)), { u1: true, u2: true, u3: true });
+  assert.deepStrictEqual(plain(P.parseMentions('@ALL meeting now', MEMBERS)), { u1: true, u2: true, u3: true });
+});
+
+test('parseMentions: @all only as a standalone token (not emails/longer words)', () => {
+  assert.deepStrictEqual(plain(P.parseMentions('email me@all.com', MEMBERS)), {}); // not a blanket tag
+  assert.deepStrictEqual(plain(P.parseMentions('go @allstars', MEMBERS)), {});     // no such member
+});
+
+test('highlightMentions wraps a standalone @all but not inside an email', () => {
+  assert.match(H.highlightMentions('heads up @all', MEMBERS), /<span[^>]*>@all<\/span>/i);
+  assert.doesNotMatch(H.highlightMentions('reach me@all.com', MEMBERS), /<span[^>]*>@all<\/span>/i);
+});
